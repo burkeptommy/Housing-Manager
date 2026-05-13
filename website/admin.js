@@ -6273,6 +6273,300 @@ function renderConciergeVendorSheetHtml(req) {
   `;
 }
 
+// ============================================================================
+// Phase 86C — Vendor outbound email + counter-offer composers
+// ============================================================================
+// Two slide-over modals reachable from any vendor card on the cockpit's
+// vendor sheet. Both compose-and-send through the new edge surfaces:
+//   • openVendorEmailComposer → POST send-chez-vendor-email
+//   • openVendorCounterComposer → POST chez-concierge action=draft_negotiation
+//     (preview), then send-chez-vendor-email when the operator hits Send
+//
+// The composer is always "review before send" — Claude drafts, operator
+// edits, operator approves the final wording. The vendor email goes out
+// AS Chez with reply-to set to vendor+<token>@alfred.getchez.com so the
+// reply lands back in the case thread automatically via receive-email.
+// ============================================================================
+
+function openVendorEmailComposer(activeReq, vendor) {
+  if (!activeReq) return;
+  const overlay = document.createElement("div");
+  overlay.className = "admin-modal-overlay";
+  overlay.innerHTML = `
+    <div class="admin-modal admin-modal--wide">
+      <header class="admin-modal__head">
+        <div>
+          <span class="cockpit-eyebrow">Email vendor as Chez</span>
+          <h2>${escapeHtml(vendor.name || "Vendor")}</h2>
+          <p class="admin-muted">To: ${escapeHtml(vendor.email)} · Reply routes back into this case thread.</p>
+        </div>
+        <button type="button" class="admin-modal__close" aria-label="Close">&times;</button>
+      </header>
+      <div class="admin-modal__body">
+        <form data-vendor-email-form>
+          <label class="cockpit-vendor__rationale">
+            <span>Subject</span>
+            <input type="text" name="subject" required placeholder="Quick question about availability for the Burke household" />
+          </label>
+          <label class="cockpit-vendor__rationale">
+            <span>Message</span>
+            <textarea name="body" rows="10" required placeholder="Hi [vendor first name],&#10;&#10;Chez is reaching out on behalf of the Burke family about… Could you let us know your availability and a rough estimate for…&#10;&#10;Thanks for the help."></textarea>
+          </label>
+          <div class="cockpit-vendor__form-actions" style="margin-top: 16px;">
+            <span class="admin-muted">From: Chez Concierge &lt;hello@getchez.com&gt;</span>
+            <div>
+              <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cancel>Cancel</button>
+              <button type="submit" class="cockpit-btn cockpit-btn--primary cockpit-btn--sm">Send email</button>
+            </div>
+          </div>
+          <p class="admin-muted cockpit-vendor__form-feedback" data-vendor-email-feedback></p>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".admin-modal__close").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("[data-cancel]").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const form = overlay.querySelector("[data-vendor-email-form]");
+  const feedback = overlay.querySelector("[data-vendor-email-feedback]");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const subject = (fd.get("subject") || "").toString().trim();
+    const body = (fd.get("body") || "").toString().trim();
+    if (!subject || !body) {
+      feedback.textContent = "Subject and message are both required.";
+      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      return;
+    }
+    feedback.textContent = "Sending…";
+    feedback.style.color = "var(--text-muted, #6F6A88)";
+    try {
+      // Call the new send-chez-vendor-email function. It records the
+      // outreach + posts a system message + returns the reply_token.
+      const session = state.session;
+      const baseUrl = SUPABASE_URL;
+      const resp = await fetch(`${baseUrl}/functions/v1/send-chez-vendor-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          request_id: activeReq.id,
+          vendor_name: vendor.name,
+          vendor_email: vendor.email,
+          subject,
+          body,
+        }),
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error) {
+        throw new Error(result.error || `HTTP ${resp.status}`);
+      }
+      feedback.textContent = "Sent. The vendor's reply will appear in this thread automatically.";
+      feedback.style.color = "var(--success, #4A7C59)";
+      // Refresh the case thread so the new system message appears.
+      try {
+        await loadChezMessages(activeReq.id);
+        renderConciergeCockpit();
+      } catch (_e) { /* non-fatal */ }
+      setTimeout(() => overlay.remove(), 1500);
+    } catch (err) {
+      console.error("[vendor-email-composer]", err);
+      feedback.textContent = `Failed to send: ${err.message || err}`;
+      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+    }
+  });
+}
+
+function openVendorCounterComposer(activeReq, vendor) {
+  if (!activeReq) return;
+  const overlay = document.createElement("div");
+  overlay.className = "admin-modal-overlay";
+  overlay.innerHTML = `
+    <div class="admin-modal admin-modal--wide">
+      <header class="admin-modal__head">
+        <div>
+          <span class="cockpit-eyebrow">Draft counter-offer to ${escapeHtml(vendor.name || "vendor")}</span>
+          <h2>Negotiate ${escapeHtml(vendor.currentCostLabel || "the quote")}</h2>
+          <p class="admin-muted">AI drafts the email; you review and send. The vendor's reply lands in this case thread.</p>
+        </div>
+        <button type="button" class="admin-modal__close" aria-label="Close">&times;</button>
+      </header>
+      <div class="admin-modal__body">
+        <form data-vendor-counter-form>
+          <div class="cockpit-vendor__grid-3">
+            <label>Current quote (cents)
+              <input type="number" name="current_amount_cents" placeholder="e.g. 245000 for $2,450" />
+            </label>
+            <label>Target amount (cents)
+              <input type="number" name="target_amount_cents" placeholder="e.g. 220000 for $2,200" />
+            </label>
+            <label>Reduction %
+              <input type="number" name="target_reduction_pct" min="0" max="50" placeholder="e.g. 10" />
+            </label>
+          </div>
+          <label class="cockpit-vendor__rationale" style="margin-top: 12px;">
+            <span>Scope being negotiated</span>
+            <input type="text" name="scope" value="${escapeHtml(vendor.currentCostLabel || "")}" />
+          </label>
+          <label class="cockpit-vendor__rationale">
+            <span>Operator notes — what's the negotiation angle?</span>
+            <textarea name="operator_notes" rows="3" placeholder="e.g. comp quote from competing vendor is $X; ask for a 10% match. Or: long-term-relationship discount."></textarea>
+          </label>
+
+          <div class="cockpit-vendor__form-actions" style="margin-top: 16px;">
+            <button type="button" class="cockpit-btn cockpit-btn--ai cockpit-btn--sm" data-counter-draft>
+              <span class="cockpit-spark cockpit-spark--sm">✦</span>Draft counter
+            </button>
+            <span class="admin-muted">Claude sonnet-4-6 · always-review</span>
+          </div>
+
+          <div data-counter-draft-output class="is-hidden" style="margin-top: 20px;">
+            <label class="cockpit-vendor__rationale">
+              <span>Subject (edit before sending)</span>
+              <input type="text" name="subject" />
+            </label>
+            <label class="cockpit-vendor__rationale">
+              <span>Email body (edit before sending)</span>
+              <textarea name="body" rows="10"></textarea>
+            </label>
+            <p class="admin-muted" data-counter-rationale></p>
+            <label>Vendor email
+              <input type="email" name="vendor_email" value="${escapeHtml(vendor.email || "")}" placeholder="vendor@example.com" required />
+            </label>
+
+            <div class="cockpit-vendor__form-actions" style="margin-top: 16px;">
+              <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cancel>Cancel</button>
+              <button type="submit" class="cockpit-btn cockpit-btn--primary cockpit-btn--sm">Send counter-offer</button>
+            </div>
+          </div>
+
+          <p class="admin-muted cockpit-vendor__form-feedback" data-counter-feedback></p>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector(".admin-modal__close").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("[data-cancel]")?.addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const form = overlay.querySelector("[data-vendor-counter-form]");
+  const draftOutput = overlay.querySelector("[data-counter-draft-output]");
+  const feedback = overlay.querySelector("[data-counter-feedback]");
+  const draftBtn = overlay.querySelector("[data-counter-draft]");
+  const rationaleEl = overlay.querySelector("[data-counter-rationale]");
+
+  draftBtn.addEventListener("click", async () => {
+    const fd = new FormData(form);
+    const currentCents = Number(fd.get("current_amount_cents")) || null;
+    const targetCents = Number(fd.get("target_amount_cents")) || null;
+    const targetPct = Number(fd.get("target_reduction_pct")) || null;
+    const scope = (fd.get("scope") || "").toString().trim();
+    const operatorNotes = (fd.get("operator_notes") || "").toString().trim();
+    feedback.textContent = "Drafting counter-offer…";
+    feedback.style.color = "var(--text-muted, #6F6A88)";
+    draftBtn.disabled = true;
+    try {
+      const result = await callChezConcierge({
+        action: "workbench_action",
+        household_id: activeReq.household_id,
+        entity_type: "utility",
+        entity_id: activeReq.id, // proxy — draft_negotiation doesn't require a real utility row when invoked here
+        action_type: "draft_negotiation",
+        request_id: activeReq.id,
+        payload: {
+          vendor_name: vendor.name,
+          vendor_email: vendor.email,
+          current_amount_cents: currentCents,
+          target_amount_cents: targetCents,
+          target_reduction_pct: targetPct,
+          scope,
+          operator_notes: operatorNotes,
+        },
+      });
+      const side = result?.side_effect ?? {};
+      if (!side.drafted || !side.draft) {
+        feedback.textContent = `Could not draft: ${side.reason || side.error || "unknown"}`;
+        feedback.style.color = "var(--salmon-dark, #D14E3E)";
+        draftBtn.disabled = false;
+        return;
+      }
+      // Populate the editable output area.
+      const draft = side.draft;
+      form.querySelector('input[name="subject"]').value = draft.subject || "";
+      form.querySelector('textarea[name="body"]').value = draft.body || "";
+      if (rationaleEl) rationaleEl.textContent = draft.rationale ? `Why this works: ${draft.rationale}` : "";
+      draftOutput.classList.remove("is-hidden");
+      feedback.textContent = "Draft ready — edit before sending if needed.";
+      feedback.style.color = "var(--success, #4A7C59)";
+      draftBtn.disabled = false;
+    } catch (err) {
+      console.error("[counter-draft]", err);
+      feedback.textContent = `Failed to draft: ${err.message || err}`;
+      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      draftBtn.disabled = false;
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const subject = (fd.get("subject") || "").toString().trim();
+    const body = (fd.get("body") || "").toString().trim();
+    const vendorEmail = (fd.get("vendor_email") || "").toString().trim();
+    const targetCents = Number(fd.get("target_amount_cents")) || null;
+    if (!subject || !body || !vendorEmail) {
+      feedback.textContent = "Subject, body, and vendor email are all required.";
+      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      return;
+    }
+    feedback.textContent = "Sending counter-offer…";
+    feedback.style.color = "var(--text-muted, #6F6A88)";
+    try {
+      const session = state.session;
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/send-chez-vendor-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          request_id: activeReq.id,
+          vendor_name: vendor.name,
+          vendor_email: vendorEmail,
+          subject,
+          body,
+          negotiation_payload: {
+            scope: vendor.currentCostLabel || "",
+            target_amount_cents: targetCents,
+            sent_by: "chez_counter_offer",
+          },
+        }),
+      });
+      const result = await resp.json();
+      if (!resp.ok || result.error) throw new Error(result.error || `HTTP ${resp.status}`);
+      feedback.textContent = "Counter-offer sent. The vendor's reply will appear in this thread.";
+      feedback.style.color = "var(--success, #4A7C59)";
+      try {
+        await loadChezMessages(activeReq.id);
+        renderConciergeCockpit();
+      } catch (_e) {}
+      setTimeout(() => overlay.remove(), 1800);
+    } catch (err) {
+      console.error("[counter-send]", err);
+      feedback.textContent = `Failed to send: ${err.message || err}`;
+      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+    }
+  });
+}
+
 function renderConciergeVendorRowHtml(req, v, idx, callData) {
   const key = vendorCandidateKey(v);
   const isExpanded = state.chezExpandedVendorKeys?.[req.id]?.[key];
@@ -6394,6 +6688,16 @@ function renderConciergeVendorRowHtml(req, v, idx, callData) {
     </div>
   ` : "";
 
+  // Phase 86C — outbound vendor email + counter-offer buttons. Only
+  // show "Email" when we have an email address to send to; "Counter"
+  // when there's a quoted cost we can negotiate against.
+  const vendorEmail = v.email || v.contact_email || "";
+  const hasQuotedCost = !!(costRange && costRange !== "" && costRange !== "Will quote on site visit");
+  const phase86cActions = `
+    ${vendorEmail ? `<button type="button" class="cockpit-vendor__act" data-vendor-email="${escapeHtml(vendorEmail)}" data-vendor-name-attr="${escapeHtml(name)}" title="Email this vendor as Chez — reply routes back into this case">📧 Email</button>` : ""}
+    ${hasQuotedCost ? `<button type="button" class="cockpit-vendor__act cockpit-vendor__act--counter" data-vendor-counter data-vendor-name-attr="${escapeHtml(name)}" data-vendor-email="${escapeHtml(vendorEmail)}" data-vendor-cost="${escapeHtml(costRange)}" title="AI-draft a counter-offer">🤝 Counter</button>` : ""}
+  `;
+
   return `
     <article class="cockpit-vendor ${recommended ? "is-recommended" : ""} ${noAnswer ? "is-noanswer" : ""}" data-vendor-key="${escapeHtml(key)}">
       <div class="cockpit-vendor__head" data-action="${isExpanded ? "collapse-vendor" : "expand-vendor"}">
@@ -6404,6 +6708,7 @@ function renderConciergeVendorRowHtml(req, v, idx, callData) {
             ${v.rating ? `<span class="cockpit-stars">★ ${Number(v.rating).toFixed(1)}</span>` : ""}
             ${v.user_ratings_total || v.review_count ? `<span class="cockpit-muted cockpit-vendor__reviews">(${escapeHtml(String(v.user_ratings_total || v.review_count))})</span>` : ""}
             ${networkPill} ${answeredPill} ${recommendedPill} ${noAnswerPill}
+            ${phase86cActions}
           </div>
           <div class="cockpit-vendor__meta">
             ${v.address || v.formatted_address || v.city ? `<span>📍 ${escapeHtml(v.address || v.formatted_address || v.city)}</span>` : ""}
@@ -7983,6 +8288,26 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
       if (!action) return;
       e.stopPropagation();
       await handleConciergeAction(action, activeReq, btn);
+    });
+  });
+
+  // Phase 86C — vendor card outbound buttons (Email + Counter).
+  host.querySelectorAll("[data-vendor-email]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const email = btn.dataset.vendorEmail;
+      const name = btn.dataset.vendorNameAttr || "";
+      if (!email) return;
+      openVendorEmailComposer(activeReq, { name, email });
+    });
+  });
+  host.querySelectorAll("[data-vendor-counter]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.vendorNameAttr || "";
+      const email = btn.dataset.vendorEmail || "";
+      const cost = btn.dataset.vendorCost || "";
+      openVendorCounterComposer(activeReq, { name, email, currentCostLabel: cost });
     });
   });
 

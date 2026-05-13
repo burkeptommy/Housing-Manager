@@ -360,6 +360,96 @@ serve(async (req: Request) => {
 
     console.log(`[receive-email] From: ${fromAddress}, To: ${toAddress}, Subject: ${subject}, Has attachment: ${!!attachmentBase64}`);
 
+    // --- Phase 86C: VENDOR REPLY BRANCH ---------------------------------
+    // Emails to `vendor+<token>@alfred.getchez.com` are vendor responses
+    // to Chez-initiated outreach (`send-chez-vendor-email`). Route them
+    // straight into the chez_vendor_outreach table + drop a system
+    // message on the linked case thread. We extract the vendor's real
+    // email from the From header so future outreach can target them
+    // directly.
+    const vendorReplyMatch = toAddress.match(/vendor\+([a-f0-9]{8,64})@(?:alfred\.getchez\.com|(?:alfred|projects)\.havenhome\.dev)/i);
+    if (vendorReplyMatch) {
+      const replyToken = vendorReplyMatch[1].toLowerCase();
+      console.log(`[receive-email] Vendor reply token: ${replyToken}`);
+
+      const { data: outboundRow, error: lookupErr } = await supabase
+        .from("chez_vendor_outreach")
+        .select("id, request_id, household_id, contractor_id, vendor_name, vendor_email")
+        .eq("reply_token", replyToken)
+        .eq("direction", "outbound")
+        .maybeSingle();
+
+      if (lookupErr || !outboundRow) {
+        console.warn(`[receive-email] Unknown vendor reply_token: ${replyToken}`);
+        return new Response(
+          JSON.stringify({ error: "Unknown vendor reply token" }),
+          { status: 404, headers }
+        );
+      }
+
+      const senderEmailRaw = (() => {
+        const m = fromAddress.match(/<([^>]+)>/);
+        return (m ? m[1] : fromAddress).trim().toLowerCase();
+      })();
+
+      // Record the inbound message.
+      const { data: inboundRow, error: inboundErr } = await supabase
+        .from("chez_vendor_outreach")
+        .insert({
+          request_id: outboundRow.request_id,
+          household_id: outboundRow.household_id,
+          contractor_id: outboundRow.contractor_id,
+          direction: "inbound",
+          channel: "email",
+          vendor_name: outboundRow.vendor_name,
+          vendor_email: senderEmailRaw,
+          subject: subject || null,
+          body: emailBody || "(no body)",
+          status: "received",
+          received_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (inboundErr) {
+        console.error("[receive-email] vendor inbound insert failed:", inboundErr);
+        return new Response(JSON.stringify({ error: "Could not record vendor reply" }), { status: 500, headers });
+      }
+
+      // Post a system message on the case thread. Truncate the body so
+      // the homeowner-facing thread doesn't show 800 chars of vendor
+      // signature blocks.
+      const excerpt = (emailBody || "")
+        .replace(/^\s*>.*$/gm, "") // strip quoted prior-message lines
+        .trim()
+        .slice(0, 280);
+      const vendorLabel = outboundRow.vendor_name || senderEmailRaw;
+      const sysContent = `${vendorLabel} replied: "${excerpt}${(emailBody || "").length > 280 ? "…" : ""}"`;
+      await supabase.from("concierge_messages").insert({
+        request_id: outboundRow.request_id,
+        role: "system",
+        content: sysContent,
+      });
+
+      // Mark the case unread for admin (Tom needs to read + act on the
+      // vendor reply). Last-message timestamp also bumps so the case
+      // floats to the top of the operator queue.
+      await supabase
+        .from("chez_requests")
+        .update({
+          unread_for_admin: true,
+          last_message_at: new Date().toISOString(),
+        })
+        .eq("id", outboundRow.request_id);
+
+      console.log(`[receive-email] Vendor reply routed to case ${outboundRow.request_id} (inbound row ${inboundRow?.id})`);
+      return new Response(JSON.stringify({
+        ok: true,
+        kind: "vendor_reply",
+        inbound_id: inboundRow?.id,
+        request_id: outboundRow.request_id,
+      }), { headers });
+    }
+
     // --- LOOK UP HOUSEHOLD ---
     // Match alfred.getchez.com (canonical) plus legacy alfred.havenhome.dev /
     // projects.havenhome.dev so old forwards keep working post-cutover.

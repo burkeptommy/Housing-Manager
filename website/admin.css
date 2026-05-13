@@ -11867,3 +11867,36 @@ details.admin-chez__analysis-section pre {
 .cockpit-tag-picker__row:hover {
   background: var(--indigo-50, #F2EFF8);
 }
+
+/* ============================================================================
+ * Phase 86C — Vendor card action buttons (Email / Counter)
+ * ============================================================================ */
+.cockpit-vendor__act {
+  background: var(--indigo-50, #F2EFF8);
+  border: 1px solid var(--indigo-100, #E8E4F2);
+  border-radius: 6px;
+  color: var(--indigo, #453A70);
+  cursor: pointer;
+  font: 600 11px var(--sans);
+  margin-left: 6px;
+  padding: 4px 10px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.cockpit-vendor__act:hover {
+  background: var(--indigo-100, #E8E4F2);
+  border-color: var(--indigo, #453A70);
+}
+.cockpit-vendor__act--counter {
+  background: var(--salmon-50, #FFF5F2);
+  border-color: var(--salmon-pale, #FFE8E2);
+  color: #B23E2C;
+}
+.cockpit-vendor__act--counter:hover {
+  background: var(--salmon-pale, #FFE8E2);
+  border-color: var(--salmon, #ED6955);
+}
+
+.cockpit-vendor__form-feedback {
+  font-size: 12px;
+  margin-top: 8px;
+}

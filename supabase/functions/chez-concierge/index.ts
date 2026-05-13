@@ -3752,9 +3752,130 @@ async function runWorkbenchSideEffect(args: {
       return { audit_id: data.id, variance_cents: variance };
     }
     case "draft_negotiation": {
-      // No DB write today — Claude draft will be wired in PR 7. For
-      // now we just record the intent in the audit trail.
-      return { drafted: false, reason: "claude_draft_not_yet_wired" };
+      // Phase 86C — wired. Generates a counter-offer email body via
+      // Claude sonnet-4-6 using the homeowner's standing instructions +
+      // the utility bill context. Always-review for v1 per Tom's
+      // approval: returns the draft, doesn't auto-send.
+      //
+      // Input payload shape (admin-supplied from the cockpit):
+      //   {
+      //     vendor_name?, vendor_email?, current_amount_cents,
+      //     target_amount_cents?, target_reduction_pct?,
+      //     scope?, operator_notes?
+      //   }
+      //
+      // Returns { draft: { subject, body, suggested_target_cents, rationale } }.
+      const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!apiKey) {
+        return { drafted: false, reason: "anthropic_key_missing" };
+      }
+      // Pull the homeowner's chez_profile for standing instructions
+      // (budget orientation, vendor prefs, communication tone). This is
+      // the linchpin: the same Claude prompt produces different output
+      // for a "premium prefers local" homeowner vs. a "budget avoid
+      // chains" one.
+      const { data: hh } = await service
+        .from("households")
+        .select("chez_profile, name")
+        .eq("id", householdId)
+        .maybeSingle();
+      const profile = (hh?.chez_profile as Record<string, unknown> | null) ?? {};
+      // Vendor + bill context.
+      const utility: Record<string, unknown> = (payload.utility ?? {}) as Record<string, unknown>;
+      const vendorName = asString(payload.vendor_name) ?? asString(utility.provider_name) ?? "the vendor";
+      const currentCents = asNumber(payload.current_amount_cents) ?? asNumber(payload.current_cents) ?? null;
+      const targetCents = asNumber(payload.target_amount_cents) ?? null;
+      const targetPct = asNumber(payload.target_reduction_pct) ?? null;
+      const scope = asString(payload.scope) ?? asString(utility.service_type) ?? "the service";
+      const operatorNotes = asString(payload.operator_notes) ?? "";
+
+      const moneyStr = (cents: number | null) =>
+        cents == null ? "(unspecified)" : `$${(cents / 100).toFixed(2)}`;
+
+      const systemPrompt = `You are Chez, a concierge service negotiating service-vendor pricing on behalf of a HNW homeowner. Write a counter-offer email body (no subject, no signature — those go elsewhere).
+
+The email goes from Chez to the vendor. Brand voice: professional, warm but firm, direct about the ask, no em dashes, no overstated apologies. Two to four short paragraphs.
+
+Goals:
+1. Acknowledge the relationship + quoted price specifically
+2. State the target price or target reduction clearly
+3. Give a real-feeling reason for the counter (market comp, longer-term relationship, scope tradeoff)
+4. Leave the door open with a soft close
+
+DO NOT:
+- Include "Dear" / "Sincerely" / closing signature lines (those are appended outside)
+- Use em dashes (—) at all
+- Invent specifics about the home or homeowner not provided
+- Threaten to walk away
+
+Output JSON only with this exact shape:
+{
+  "subject": "<email subject — short, no Re:>",
+  "body": "<the email body, plain text with \\n line breaks>",
+  "suggested_target_cents": <integer cents or null>,
+  "rationale": "<1-sentence internal note explaining why this counter-offer is reasonable>"
+}`;
+
+      const userPrompt = `Vendor: ${vendorName}
+Service / scope: ${scope}
+Current quoted amount: ${moneyStr(currentCents)}
+Target amount (if operator-specified): ${moneyStr(targetCents)}
+Target reduction percent (if operator-specified): ${targetPct == null ? "(unspecified)" : `${targetPct}%`}
+
+Homeowner standing instructions:
+- About: ${JSON.stringify(profile.about_us || "(none)")}
+- Vendor preferences: ${JSON.stringify(profile.vendor_preferences || {})}
+- Spending tiers: ${JSON.stringify(profile.spending_tiers || {})}
+- Communication tone: ${JSON.stringify(profile.communication || {})}
+
+Operator notes on the negotiation strategy:
+${operatorNotes || "(none — pick a reasonable counter based on market comp and the homeowner's budget orientation)"}
+
+Generate the counter-offer JSON now.`;
+
+      try {
+        const result = await callClaudeWithDiscipline({
+          supabase: service,
+          apiKey,
+          tag: "draft_negotiation",
+          model: "claude-sonnet-4-6",
+          max_tokens: 900,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+          user_id: user.id,
+        });
+        const text = result?.text ?? "";
+        // Robust JSON parse — Claude usually returns clean JSON but
+        // occasionally wraps it in ```json fences.
+        const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(cleaned);
+        } catch (_e) {
+          // Fallback: return the raw text as body, no subject parse.
+          return {
+            drafted: true,
+            draft: {
+              subject: `Following up on the quote for ${scope}`,
+              body: cleaned,
+              suggested_target_cents: targetCents,
+              rationale: "(model returned non-JSON; using as plaintext body)",
+            },
+          };
+        }
+        return {
+          drafted: true,
+          draft: {
+            subject: typeof parsed.subject === "string" ? parsed.subject : `Following up on the quote for ${scope}`,
+            body: typeof parsed.body === "string" ? parsed.body : "",
+            suggested_target_cents: typeof parsed.suggested_target_cents === "number" ? parsed.suggested_target_cents : targetCents,
+            rationale: typeof parsed.rationale === "string" ? parsed.rationale : "",
+          },
+        };
+      } catch (e) {
+        console.error("[draft_negotiation] Claude call failed:", e);
+        return { drafted: false, reason: "claude_call_failed", error: String(e) };
+      }
     }
 
     // ----- Vehicles -----
