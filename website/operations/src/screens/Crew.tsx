@@ -190,6 +190,42 @@ export default function CrewScreen() {
               </div>
             </Card>
 
+            {/* T5.8 (post-overnight) — per-tech revenue + utilization
+                metrics. Server-side surfaces lifetimeRevenueCents,
+                thisMonthRevenueCents, and utilizationRate on every
+                team member row. HomeDetail.tsx already surfaced
+                home-level lifetime spend; this is the per-tech mirror
+                so Tom can see who's most productive at a glance. */}
+            <Card padding="default">
+              <div className="ops-section-label" style={{ marginBottom: 8 }}>Performance</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+                <Detail
+                  icon="dollar-sign"
+                  label="Lifetime"
+                  value={formatCents(selected.lifetimeRevenueCents ?? 0)}
+                />
+                <Detail
+                  icon="trending-up"
+                  label="Last 30 days"
+                  value={formatCents(selected.thisMonthRevenueCents ?? 0)}
+                />
+                <Detail
+                  icon="check-circle"
+                  label="Completed"
+                  value={String(selected.completedCount ?? 0)}
+                />
+                <Detail
+                  icon="activity"
+                  label="On-time rate"
+                  value={
+                    selected.utilizationRate != null
+                      ? `${Math.round((selected.utilizationRate ?? 0) * 100)}%`
+                      : "—"
+                  }
+                />
+              </div>
+            </Card>
+
             <Card padding="default">
               <div className="ops-section-label" style={{ marginBottom: 8 }}>Dispatch</div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

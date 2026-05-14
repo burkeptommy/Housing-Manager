@@ -2848,12 +2848,39 @@ async function loadDashboard(
     .slice(0, 8);
 
   const activeMembers = teamMembers.filter((row) => compactString(row.status) === "active");
+  // T5.8 (post-overnight) — per-tech revenue + utilization metrics
+  // for the Operations Desk Crew screen. HomeDetail.tsx already
+  // computes lifetime spend client-side from visit.quote.total; we
+  // surface the same shape here aggregated per workspace member.
+  // Plus a 30-day count for "this month" utilization context.
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10);
   const teamMemberRows = teamMembers.map((member) => {
     const memberId = compactString(member.id);
     const memberVisits = visitRows.filter((row) => row.assignment?.memberId === memberId);
     const todayStops = memberVisits.filter((row) => row.routeDate === today).length;
     const openVisits = memberVisits.filter((row) => !["completed", "cancelled", "declined"].includes(row.status)).length;
     const completedCount = memberVisits.filter((row) => row.status === "completed").length;
+    // Lifetime $ — sum of quote.total for every visit assigned to this
+    // member where a quote exists and the visit ended in 'completed'.
+    // Cents-precision Number to avoid floating drift.
+    const lifetimeRevenueCents = memberVisits
+      .filter((row) => row.status === "completed" && row.quote?.total != null)
+      .reduce((sum, row) => sum + Math.round(Number(row.quote?.total ?? 0) * 100), 0);
+    // This-month $ — same aggregation, scoped to last 30 days by
+    // routeDate. Visits without a routeDate are treated as 'today'
+    // (recent activity) so they don't accidentally drop off.
+    const thisMonthRevenueCents = memberVisits
+      .filter((row) => row.status === "completed" && row.quote?.total != null)
+      .filter((row) => {
+        const date = row.routeDate ?? today;
+        return date >= thirtyDaysAgo;
+      })
+      .reduce((sum, row) => sum + Math.round(Number(row.quote?.total ?? 0) * 100), 0);
+    // Utilization rate — completed / (completed + open). 0-1.0.
+    // Surfaces as a percentage on the Crew screen.
+    const totalAssigned = completedCount + openVisits;
+    const utilizationRate = totalAssigned > 0 ? completedCount / totalAssigned : 0;
     return {
       id: memberId,
       userId: compactString(member.user_id),
@@ -2869,6 +2896,10 @@ async function loadDashboard(
       todayStops,
       openVisits,
       completedCount,
+      // T5.8 — analytics fields
+      lifetimeRevenueCents,
+      thisMonthRevenueCents,
+      utilizationRate,
       mobileFocus: compactString(member.role) === "technician",
       isDefaultAssignee: member.is_default_assignee === true,
     };

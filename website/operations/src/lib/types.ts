@@ -425,6 +425,15 @@ export interface TeamMember {
   todayStops: number;
   openVisits: number;
   completedCount: number;
+  /// T5.8 (post-overnight) — per-tech revenue + utilization metrics.
+  /// Server-side aggregated from visit.quote.total over completed
+  /// visits assigned to this member. Defaults to 0 / null when the
+  /// member has no completed work yet.
+  lifetimeRevenueCents?: number;
+  thisMonthRevenueCents?: number;
+  /// 0.0-1.0 ratio of completed / (completed + open) visits assigned
+  /// to this member. Renders as percentage on the Crew screen.
+  utilizationRate?: number;
   mobileFocus: boolean;
   isDefaultAssignee: boolean;
 }
