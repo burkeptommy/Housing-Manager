@@ -9469,6 +9469,17 @@ private struct HavenFieldVisitWorkspaceView: View {
     @State private var showCamera = false
     @State private var showAddSystemCamera = false
     @State private var selectedSystem: HavenFieldSystemSnapshot?
+    /// T2.3 (post-overnight) — manual entry + library fallback state
+    /// for the Add system flow. The capture Menu now offers three
+    /// options instead of just camera; these flags drive the
+    /// corresponding sheet presentations.
+    @State private var showAddSystemPhotoLibrary = false
+    @State private var showAddSystemManual = false
+    /// T2.11 — camera permission denied sheet trigger.
+    @State private var showCameraPermissionSheet = false
+    /// T2.3 staging for the picked-from-library image so the existing
+    /// addSystemFromPhoto pipeline can consume it without code change.
+    @State private var pickedLibraryItem: PhotosPickerItem?
     /// Phase 78: items currently mid-flight on the toggle-done network
     /// call. Lets the row show a spinner / dimmed state without an
     /// optimistic mutation that would race with the server response.
@@ -9870,6 +9881,61 @@ private struct HavenFieldVisitWorkspaceView: View {
             HavenFieldCameraPicker { image in
                 guard let data = image.jpegData(compressionQuality: 0.82) else { return }
                 Task { await viewModel.addSystemFromPhoto(imageData: data) }
+            }
+        }
+        // T2.11 — camera permission denied sheet. Caller (the Add
+        // System menu) flips showCameraPermissionSheet when
+        // havenFieldCheckCameraPermission returned false. The
+        // sheet exposes Open Settings + Choose from library +
+        // Skip the photo.
+        .sheet(isPresented: $showCameraPermissionSheet) {
+            HavenFieldCameraPermissionSheet(
+                onChooseFromLibrary: { showAddSystemPhotoLibrary = true },
+                onSkip: { showAddSystemManual = true }
+            )
+        }
+        // T2.3 — manual entry sheet. Same fields as
+        // HavenFieldHomeSystemEditSheet but creates a NEW snapshot in
+        // the visit's draft instead of editing an existing
+        // home_systems row. Skips the AI extraction round-trip
+        // entirely.
+        .sheet(isPresented: $showAddSystemManual) {
+            HavenFieldManualSystemEntrySheet { snapshot in
+                Task {
+                    await MainActor.run {
+                        // Append directly to the draft so the user
+                        // sees the row immediately. The sync path
+                        // will push the new snapshot up alongside
+                        // the next portal sync.
+                        if var draft = viewModel.draft {
+                            draft.systemsSnapshot.append(snapshot)
+                            viewModel.draft = draft
+                            viewModel.syncMessage = "System added"
+                            HavenFieldCache.saveDraft(draft, token: viewModel.portalToken ?? "")
+                        }
+                    }
+                }
+            }
+        }
+        // T2.3 — library picker fallback. Uses the existing
+        // PhotosUI.PhotosPicker presented via the same boolean
+        // pattern as the camera. On selection, materializes the
+        // image data and routes through the existing
+        // addSystemFromPhoto pipeline — no new server endpoint
+        // needed since identify-equipment already accepts arbitrary
+        // base64 jpeg.
+        .photosPicker(
+            isPresented: $showAddSystemPhotoLibrary,
+            selection: $pickedLibraryItem,
+            matching: .images
+        )
+        .onChange(of: pickedLibraryItem) { _, newValue in
+            guard let newValue else { return }
+            Task {
+                if let data = try? await newValue.loadTransferable(type: Data.self) {
+                    await viewModel.addSystemFromPhoto(imageData: data)
+                }
+                pickedLibraryItem = nil
             }
         }
         .sheet(isPresented: $showRescheduleSheet) {
@@ -11808,8 +11874,38 @@ private struct HavenFieldVisitWorkspaceView: View {
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
 
-                    Button("Add system from label photo") {
-                        showAddSystemCamera = true
+                    // T2.3 (post-overnight) — capture options Menu instead
+                    // of bare Button. Adds 'Choose from library' fallback
+                    // and 'Enter manually' path so handymen don't dead-end
+                    // when the camera fails / the label is unreadable /
+                    // they're already past the unit. T2.11 camera permission
+                    // gate also runs from the take-photo branch.
+                    Menu {
+                        Button {
+                            Task {
+                                let granted = await havenFieldCheckCameraPermission()
+                                if granted {
+                                    showAddSystemCamera = true
+                                } else {
+                                    showCameraPermissionSheet = true
+                                }
+                            }
+                        } label: {
+                            Label("Take photo", systemImage: "camera.fill")
+                        }
+                        Button {
+                            showAddSystemPhotoLibrary = true
+                        } label: {
+                            Label("Choose from library", systemImage: "photo.on.rectangle")
+                        }
+                        Button {
+                            showAddSystemManual = true
+                        } label: {
+                            Label("Enter manually", systemImage: "square.and.pencil")
+                        }
+                    } label: {
+                        Text("Add system")
+                            .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(FieldPrimaryButtonStyle())
 
@@ -19477,6 +19573,92 @@ private struct HavenFieldHomeSystemDetailSheet: View {
             }
             .sheet(isPresented: $isLookingUpManual) {
                 HavenFieldManualLookupSheet(systemId: system.id, systemName: system.name)
+            }
+        }
+    }
+}
+
+/// T2.3 (post-overnight) — manual system entry sheet. Lets the
+/// handyman type system details when the camera flow isn't viable
+/// (label unreadable, mechanical room too dark, customer not
+/// home, etc.). Skips the identify-equipment round-trip entirely
+/// and emits a HavenFieldSystemSnapshot the caller appends to the
+/// visit draft.
+private struct HavenFieldManualSystemEntrySheet: View {
+    let onSubmit: (HavenFieldSystemSnapshot) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String = ""
+    @State private var category: String = "HVAC"
+    @State private var manufacturer: String = ""
+    @State private var modelNumber: String = ""
+    @State private var serialNumber: String = ""
+    @State private var installDate: String = ""
+    @State private var notes: String = ""
+
+    /// Same canonical category list as HavenFieldAddVendorSheet so
+    /// downstream coverage matchers see identical strings.
+    private let categoryOptions: [String] = [
+        "HVAC", "Plumbing", "Electrical", "Water Heater", "Roofing",
+        "Generator", "Pool/Spa", "Septic", "Well", "Solar",
+        "Irrigation", "Garage Door", "Security", "Appliance", "Other"
+    ]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("System") {
+                    TextField("Name (e.g. Main HVAC, Boiler, Pool pump)", text: $name)
+                        .textInputAutocapitalization(.words)
+                    Picker("Category", selection: $category) {
+                        ForEach(categoryOptions, id: \.self) { c in
+                            Text(c).tag(c)
+                        }
+                    }
+                }
+                Section("Identity (optional)") {
+                    TextField("Manufacturer", text: $manufacturer)
+                        .textInputAutocapitalization(.words)
+                    TextField("Model number", text: $modelNumber)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                    TextField("Serial number", text: $serialNumber)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                    TextField("Install date (YYYY-MM-DD)", text: $installDate)
+                        .keyboardType(.numbersAndPunctuation)
+                        .autocorrectionDisabled()
+                }
+                Section("Notes (optional)") {
+                    TextField("Anything worth remembering for this system", text: $notes, axis: .vertical)
+                        .lineLimit(3...8)
+                }
+            }
+            .navigationTitle("Add system")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add") {
+                        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmedName.isEmpty else { return }
+                        let snap = HavenFieldSystemSnapshot(
+                            id: "local-\(UUID().uuidString)",
+                            name: trimmedName,
+                            category: category,
+                            manufacturer: manufacturer.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                            modelNumber: modelNumber.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                            serialNumber: serialNumber.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                            installDate: installDate.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                            needsSetup: false
+                        )
+                        onSubmit(snap)
+                        dismiss()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
             }
         }
     }
