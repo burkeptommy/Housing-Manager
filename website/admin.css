@@ -10947,3 +10947,19 @@ details.admin-chez__analysis-section pre {
   background: #1F7A4A;
   color: #FFF;
 }
+
+/* Phase 85.5 fix — older `.admin-modal` definition has `position: fixed`
+   for its single-element pattern. New modals nest `admin-modal-overlay >
+   admin-modal`; reset position on inner panels so flex centering works. */
+.admin-modal-overlay > .admin-modal {
+  position: relative;
+  inset: auto;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+}
+.admin-modal-overlay > .admin-modal.admin-modal--sm {
+  width: min(540px, 92vw);
+  max-height: 80vh;
+}
