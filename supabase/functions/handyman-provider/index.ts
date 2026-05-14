@@ -12254,6 +12254,57 @@ async function addRecommendedTask(
   return { ok: true, recommended_task: created };
 }
 
+/** T3.16 (post-overnight) — handyman unlinks a homeowner from their
+ * workspace. Removes the provider_contractor_links row(s) tying the
+ * workspace to every contractor in the target household. Past
+ * handyman_requests + visit reports stay (history is preserved); only
+ * the active linkage drops so the home falls off the workspace's
+ * homes list on next dashboard refresh.
+ *
+ * Auth: caller must be a workspace member (any role; permission-gating
+ * to owner-only is up to client UI).
+ *
+ * Closes Wave 1b finding 2.10.
+ */
+async function unlinkHomeFromWorkspace(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>,
+) {
+  const workspaceId = compactString(body.workspaceId);
+  const householdId = compactString(body.householdId);
+  if (!workspaceId) throw new Error("workspaceId required");
+  if (!householdId) throw new Error("householdId required");
+
+  // Workspace auth — caller must belong to the workspace.
+  await assertWorkspaceAccess(service, user.id, workspaceId);
+
+  // Find every contractor row for this household that's linked to
+  // this workspace, then drop the link rows. The contractors stay
+  // (they're owned by the household) — only the workspace<->contractor
+  // edge gets cut. Safe + reversible (a future relink action can
+  // re-insert the row).
+  const { data: contractorRows } = await service
+    .from("contractors")
+    .select("id")
+    .eq("household_id", householdId);
+  const contractorIds = ((contractorRows as Array<{ id: string }> | null) ?? [])
+    .map((r) => compactString(r.id))
+    .filter(Boolean);
+  if (contractorIds.length === 0) {
+    return { ok: true, removed: 0, note: "no linked contractors found" };
+  }
+
+  const { error: deleteError, count } = await service
+    .from("provider_contractor_links")
+    .delete({ count: "exact" })
+    .eq("workspace_id", workspaceId)
+    .in("contractor_id", contractorIds);
+  if (deleteError) throw deleteError;
+
+  return { ok: true, removed: count ?? 0 };
+}
+
 /** T5.6 (post-overnight) — admin gate action. Tom flags a submitted
  * assessment as needing revision before it ships verbatim to the
  * homeowner. Sets home_assessments.status='needs_revision' + stamps
@@ -15152,6 +15203,14 @@ serve(async (req) => {
 
       if (action === "decide_handyman_recommendation") {
         const result = await decideHandymanRecommendation(service, user, body);
+        return json(result);
+      }
+
+      // T3.16 (post-overnight) — handyman unlinks a homeowner from
+      // their workspace. Removes provider_contractor_links rows;
+      // history is preserved.
+      if (action === "unlink_home_from_workspace") {
+        const result = await unlinkHomeFromWorkspace(service, user, body);
         return json(result);
       }
 

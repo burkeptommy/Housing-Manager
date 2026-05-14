@@ -4640,6 +4640,21 @@ actor HavenFieldService {
         )
     }
 
+    /// T3.16 (post-overnight) — handyman unlinks a homeowner from
+    /// the workspace. Removes provider_contractor_links rows so the
+    /// home falls off the workspace's homes list on next dashboard
+    /// refresh. Past handyman_requests + visit reports stay.
+    /// Wraps unlink_home_from_workspace.
+    func unlinkHomeFromWorkspace(workspaceId: String, householdId: String) async throws {
+        struct Request: Encodable {
+            let action = "unlink_home_from_workspace"
+            let workspaceId: String
+            let householdId: String
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, householdId: householdId))
+        try await perform(function: "handyman-provider", method: "POST", body: data)
+    }
+
     /// T2.10 (post-overnight) — flip the homeowner_present flag on
     /// the active assessment. Called from the visit detail when the
     /// handyman arrives + the homeowner isn't there. Server defaults
@@ -12036,6 +12051,12 @@ private struct HavenFieldHomeProfileView: View {
     /// T2.5 (post-overnight) — Add vendor flow state.
     @State private var showAddVendor = false
     @State private var capturedVendors: [HavenFieldHomeVendor] = []
+    /// T3.16 (post-overnight) — End-relationship confirmation +
+    /// in-flight + error state.
+    @State private var showEndRelationshipConfirm = false
+    @State private var isEndingRelationship = false
+    @State private var endRelationshipError: String?
+    @State private var endRelationshipDone = false
 
     enum HomeProfileTab: String, CaseIterable {
         case home = "Home"
@@ -12238,6 +12259,43 @@ private struct HavenFieldHomeProfileView: View {
                     FieldKeyValueRow(label: "Outstanding work", value: "\(home.openTasks.count)")
                     if let lastCompletedVisit = home.lastCompletedVisit?.fieldDateTime {
                         FieldKeyValueRow(label: "Last completed visit", value: lastCompletedVisit)
+                    }
+                    // T3.16 (post-overnight) — manage-relationship row
+                    // at the bottom of the Home card. Tapping opens a
+                    // confirmation alert; on confirm the workspace's
+                    // provider_contractor_links rows for this household
+                    // are deleted (reversible — re-link via the existing
+                    // pair flow). Past visits + invoices stay.
+                    if let workspaceId, let householdId = home.householdId {
+                        Divider()
+                        if endRelationshipDone {
+                            Label("Relationship ended", systemImage: "checkmark.circle.fill")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.success)
+                        } else {
+                            Button {
+                                showEndRelationshipConfirm = true
+                            } label: {
+                                HStack {
+                                    Label("End relationship with this homeowner", systemImage: "person.crop.circle.badge.minus")
+                                        .font(HavenTypography.bodySmall)
+                                        .foregroundStyle(HavenColors.critical)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(HavenColors.beige400)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isEndingRelationship)
+                        }
+                        if let endRelationshipError, !endRelationshipError.isEmpty {
+                            Text(endRelationshipError)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.critical)
+                        }
+                        let _ = workspaceId  // silence unused
+                        let _ = householdId
                     }
                 }
             }
@@ -12574,6 +12632,41 @@ private struct HavenFieldHomeProfileView: View {
                     }
                 )
             }
+        }
+        // T3.16 (post-overnight) — End-relationship confirmation alert.
+        // Destructive action so we name the consequence clearly + give
+        // the homeowner data preservation reassurance.
+        .alert("End relationship?", isPresented: $showEndRelationshipConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("End relationship", role: .destructive) {
+                Task { await performEndRelationship() }
+            }
+        } message: {
+            Text("This home will fall off your homes list. Past visits and invoices stay on file. You can re-pair anytime from Visits → New visit.")
+        }
+    }
+
+    /// T3.16 (post-overnight) — call unlink_home_from_workspace + flip
+    /// local state so the homeTab shows the success label.
+    private func performEndRelationship() async {
+        guard let workspaceId, let householdId = home.householdId else { return }
+        isEndingRelationship = true
+        endRelationshipError = nil
+        defer { isEndingRelationship = false }
+        do {
+            try await HavenFieldService.shared.unlinkHomeFromWorkspace(
+                workspaceId: workspaceId,
+                householdId: householdId
+            )
+            endRelationshipDone = true
+            // Post the dashboard-refresh notification so the Homes
+            // tab drops this row on the next render.
+            NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
+        } catch {
+            endRelationshipError = friendlyServerError(
+                from: error,
+                fallback: "Couldn’t end the relationship. Please try again."
+            )
         }
     }
 
