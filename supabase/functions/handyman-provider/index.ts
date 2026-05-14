@@ -12241,6 +12241,155 @@ async function addRecommendedTask(
   return { ok: true, recommended_task: created };
 }
 
+/** T5.6 (post-overnight) — admin gate action. Tom flags a submitted
+ * assessment as needing revision before it ships verbatim to the
+ * homeowner. Sets home_assessments.status='needs_revision' + stamps
+ * admin_notes (the reason). Fires push to the original handyman
+ * member so they see the flag in the field app.
+ *
+ * Auth: caller must be in CHEZ_ADMIN_EMAILS. We DON'T do
+ * assertWorkspaceAccess here since admins reach across workspaces.
+ *
+ * Closes Wave 6 finding 16.5.
+ */
+async function flagAssessmentForRevision(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>,
+) {
+  const assessmentId = compactString(body.assessment_id);
+  const reason = compactString(body.reason);
+  if (!assessmentId) throw new Error("assessment_id required");
+  if (!reason) throw new Error("reason required (what does the handyman need to fix?)");
+
+  // Admin auth — caller's email must be on the allowlist.
+  const adminEmails = (Deno.env.get("CHEZ_ADMIN_EMAILS") ?? "").split(",").filter(Boolean);
+  if (adminEmails.length === 0) {
+    throw new Error("CHEZ_ADMIN_EMAILS not configured");
+  }
+  const { data: callerRow } = await service
+    .from("users").select("email").eq("id", user.id).maybeSingle();
+  const callerEmail = (compactString(callerRow?.email) || "").toLowerCase();
+  if (!adminEmails.map((e) => e.toLowerCase()).includes(callerEmail)) {
+    throw new Error("Admin only");
+  }
+
+  const assessment = await loadAssessment(service, assessmentId);
+  if (!assessment) throw new Error("assessment not found");
+
+  // Walk the row to needs_revision status with the reason in admin_notes.
+  // Existing admin_notes are appended-to so multiple revision rounds
+  // build a clean audit trail.
+  const existingNotes = compactString((assessment as Record<string, unknown>).admin_notes) || "";
+  const stamped = `[${isoNow()}] Revision requested: ${reason}`;
+  const combinedNotes = existingNotes
+    ? `${existingNotes}\n\n${stamped}`
+    : stamped;
+
+  const { data: updated, error: updateError } = await service
+    .from("home_assessments")
+    .update({
+      status: "needs_revision",
+      admin_notes: combinedNotes,
+      updated_at: isoNow(),
+    })
+    .eq("id", assessmentId)
+    .select("*")
+    .single();
+  if (updateError) throw updateError;
+
+  // Fire push to the original handyman member so they see the flag
+  // in the field app.
+  const handymanMemberId = compactString((assessment as Record<string, unknown>).handyman_member_id);
+  if (handymanMemberId) {
+    const { data: memberRow } = await service
+      .from("provider_workspace_members")
+      .select("user_id")
+      .eq("id", handymanMemberId)
+      .maybeSingle();
+    const handymanUserId = compactString(memberRow?.user_id);
+    if (handymanUserId) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      await sendAssessmentPush(
+        supabaseUrl, serviceRoleKey, [handymanUserId],
+        "Assessment flagged for revision",
+        reason,
+        {
+          type: "chez_assessment_corrections_received",
+          assessment_id: assessmentId,
+        },
+      );
+    }
+  }
+
+  return { ok: true, assessment: updated };
+}
+
+/** T5.6 (post-overnight) — admin gate action. Tom approves or
+ * rejects a handyman's vendor recommendation BEFORE it reaches the
+ * homeowner. Updates assessment_recommended_tasks.recommended_owner
+ * (admin_approved → routed; admin_rejected → not routed) plus
+ * stamps approval_decided_at + approval_decided_by.
+ *
+ * Auth: caller must be in CHEZ_ADMIN_EMAILS.
+ *
+ * Closes Wave 6 finding 16.6.
+ */
+async function decideHandymanRecommendation(
+  service: ServiceClient,
+  user: { id: string },
+  body: Record<string, unknown>,
+) {
+  const taskId = compactString(body.task_id);
+  const decision = compactString(body.decision); // 'approve' | 'reject'
+  const reason = compactString(body.reason);
+  if (!taskId) throw new Error("task_id required");
+  if (!["approve", "reject"].includes(decision)) {
+    throw new Error("decision must be approve or reject");
+  }
+
+  // Admin auth (same pattern as flagAssessmentForRevision).
+  const adminEmails = (Deno.env.get("CHEZ_ADMIN_EMAILS") ?? "").split(",").filter(Boolean);
+  if (adminEmails.length === 0) {
+    throw new Error("CHEZ_ADMIN_EMAILS not configured");
+  }
+  const { data: callerRow } = await service
+    .from("users").select("email").eq("id", user.id).maybeSingle();
+  const callerEmail = (compactString(callerRow?.email) || "").toLowerCase();
+  if (!adminEmails.map((e) => e.toLowerCase()).includes(callerEmail)) {
+    throw new Error("Admin only");
+  }
+
+  // Build update — append the decision to handyman_notes audit trail.
+  const { data: existing } = await service
+    .from("assessment_recommended_tasks")
+    .select("handyman_notes, recommended_owner")
+    .eq("id", taskId)
+    .maybeSingle();
+  const existingNotes = compactString(existing?.handyman_notes) || "";
+  const stamped = `[${isoNow()}] Admin ${decision}: ${reason || "no reason given"}`;
+  const combinedNotes = existingNotes
+    ? `${existingNotes}\n${stamped}`
+    : stamped;
+
+  const newOwner = decision === "approve"
+    ? "chez_vendor"  // routed normally
+    : "rejected_by_admin";
+
+  const { data: updated, error: updateError } = await service
+    .from("assessment_recommended_tasks")
+    .update({
+      recommended_owner: newOwner,
+      handyman_notes: combinedNotes,
+    })
+    .eq("id", taskId)
+    .select("*")
+    .single();
+  if (updateError) throw updateError;
+  return { ok: true, recommended_task: updated };
+}
+
 /** Wrap-up: homeowner_response / disputed / homeowner_handled. (G46, G48) */
 async function updateRecommendedTask(
   service: ServiceClient,
@@ -14977,6 +15126,19 @@ serve(async (req) => {
       // Wrap-up: homeowner_response / homeowner_handled / disputed.
       if (action === "update_recommended_task") {
         const result = await updateRecommendedTask(service, user, body);
+        return json(result);
+      }
+
+      // T5.6 (post-overnight) — admin gate actions. Tom-only via the
+      // Operations Desk Concierge cockpit. Both checks the
+      // CHEZ_ADMIN_EMAILS allowlist before allowing the write.
+      if (action === "flag_assessment_for_revision") {
+        const result = await flagAssessmentForRevision(service, user, body);
+        return json(result);
+      }
+
+      if (action === "decide_handyman_recommendation") {
+        const result = await decideHandymanRecommendation(service, user, body);
         return json(result);
       }
 
