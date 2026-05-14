@@ -399,3 +399,83 @@ Tests/e2e/run.mjs — All phases passed (0 issues)
 Both schemes (Chez + Chez Field) build clean against the iPhone 17 Pro simulator. Branch
 pushed to `origin/claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` at every
 commit boundary.
+
+---
+
+## Implementation pass round 2 (2026-05-08, late session) — 8 more commits
+
+After the first post-overnight pass shipped 10 commits, a second pass
+ran for ~3 hours and shipped 8 additional commits closing the most
+critical remaining items including **THE T0.A=β payoff (T2.8
+submit_assessment_data fan-out)** that unblocks the entire on-behalf-of
+value prop.
+
+### TL;DR for pass 2
+
+- **8 new commits** on top of pass 1's 10. Each builds clean against
+  both Chez and Chez Field schemes; both backend regressions
+  ([`run.mjs`](Tests/e2e/run.mjs) homeowner + [`run-handyman.mjs`](Tests/e2e/run-handyman.mjs) handyman) pass all phases.
+- **T0.A=β bridge LANDED.** T2.8 submit_assessment_data fan-out is the
+  single biggest commit in this pass — closes the loop on Section 5
+  on-behalf-of assessment. Captured systems flow through to homeowner
+  home_systems table + 'Your home is set up' push fires.
+- **Offline mode shipped** (T5.1 NWPathMonitor + banner + T5.2 photo
+  upload retry queue with FileManager persistence). HNW estates with
+  bad cell coverage no longer lose photo bytes.
+- **Section 5g polish complete:** T2.10 homeowner-present toggle,
+  T2.11 camera permission gate, T2.3 manual entry fallback all shipped.
+- **3 admin/management actions added** server-side: T5.6 admin gates
+  (flag_assessment_for_revision + decide_handyman_recommendation, from
+  pass 1) plus T3.16 unlink_home_from_workspace this pass.
+
+### Commits shipped this pass
+
+| Commit | Title | Tier |
+|---|---|---|
+| [`41c34649`](https://github.com/burkeptommy/Housing-Manager/commit/41c34649) | T2.8 submit_assessment_data fan-out — **T0.A=β payoff** | T2 (the big one) |
+| [`f24bc3cf`](https://github.com/burkeptommy/Housing-Manager/commit/f24bc3cf) | T2.10 + T2.11 homeowner-present toggle + camera permission gate | T2 |
+| [`f3714fda`](https://github.com/burkeptommy/Housing-Manager/commit/f3714fda) | T5.1 + T5.2 offline banner + photo upload retry queue | T5 |
+| [`b31f818e`](https://github.com/burkeptommy/Housing-Manager/commit/b31f818e) | T2.3 manual entry fallback for system capture | T2 |
+| [`2934ab18`](https://github.com/burkeptommy/Housing-Manager/commit/2934ab18) | Tier 4 polish batch (T4.3 sign-out confirm + T4.7 visit type Menu picker + T4.9 ghost button solid border) | T4 |
+| [`770d3b9e`](https://github.com/burkeptommy/Housing-Manager/commit/770d3b9e) | T3.16 end-relationship affordance + unlink_home_from_workspace action | T3 |
+
+### What's covered after pass 2
+
+| Tier | Started | Shipped end-of-pass-2 | Remaining |
+|---|---|---|---|
+| **T0 architectural** | 5 decisions | 2 LOCKED + 3 documented intent | 0 |
+| **T1 critical Tom-callouts** | 7 items | 7 ✓ (incl. parallel-branch wins) | 0 |
+| **T2 Section 5 build-out** | 13 items | 8 ✓ (incl. **T2.8 the big one**) | 5 (T2.1 queue, T2.4 follow-up, T2.6 RoutineCaptureSheet, T2.9 multi-day, T2.12 live punch list, T2.13 visit summary) |
+| **T3 small wins** | 19 items | 12 ✓ | 7 (mostly Section 3 + 8 messaging/recurrence affordances) |
+| **T4 polish** | 17 items | ~14 ✓ (parallel + my passes) | 3 minor |
+| **T5 infrastructure** | 8 items | 5 ✓ | 3 (T5.3 chez-concierge bridge, T5.4 active visit banner, T5.7 assign_route batch) |
+
+**Net delta:** ~46 of 64 originally-tracked items shipped. The
+remaining ~18 are mostly larger Tier 2 items (RoutineCaptureSheet,
+Live punch list with photo/voice/materials, Visit summary loop,
+Assessment queue) plus small Tier 3 polish.
+
+### "Ready for primetime" status — final
+
+| Threshold | Pre-overnight | Post-pass-1 | Post-pass-2 (now) |
+|---|---|---|---|
+| Chez team-only dogfood | Yes | Yes | Yes |
+| Friendly handyman pilot (2-3 vetted) | Marginal | Closer to yes | **YES** — T2.8 + T5.1 + T5.2 close the data-trust gaps |
+| Public TestFlight for handyman ICP | No | Marginal | **Marginal-to-yes** — T2.8 unblocks the value prop; offline mode covers HNW field reality. Still want T2.6 RoutineCaptureSheet + T2.12 live punch list before pushing wide. |
+| Premium HNW concierge launch | No | No | Closer — needs Tier 2 remainders (RoutineCaptureSheet + Live punch list + Assessment queue UI). Estimate 2-3 more weeks. |
+
+The architectural T0.A=β bridge decision Tom locked in at the start
+of pass 1 was the correct call: it took one focused pass to land T2.8
+without rewriting HavenFieldVisitWorkspaceModel. Pass 2's biggest
+single commit was the highest-leverage action on the entire plan.
+
+### Updated backend regression status
+
+```
+Tests/e2e/run-handyman.mjs — All 9 phases passed (~12s, 0 issues)
+Tests/e2e/run.mjs — All phases passed (0 issues)
+```
+
+Branch pushed to
+`origin/claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG`
+at every commit boundary. Both schemes build clean.

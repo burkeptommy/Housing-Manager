@@ -49,6 +49,51 @@ in `HANDYMAN_OVERNIGHT_E2E_REPORT.md`.
   decide_handyman_recommendation) ✓
 - T5.8 per-tech revenue + utilization on Operations Desk Crew ✓
 
+---
+
+## Implementation pass round 2 (2026-05-08, late session) — 8 more commits
+
+After pass 1 landed, a second pass shipped 8 more commits closing the
+biggest remaining items including **THE T0.A=β payoff (T2.8
+submit_assessment_data fan-out)** that was the largest unbuilt
+on-behalf-of value-prop blocker.
+
+**Tier 2 cluster (Section 5 build-out) — major progress:**
+- T2.3 Manual entry fallback for system capture ✓
+- T2.7 server-side: portal seed_payload now exposes assessmentId
+  (lights up the dormant Add-finding scaffold) ✓
+- T2.8 submit_assessment_data fan-out — **T0.A=β payoff** ✓
+- T2.10 Homeowner-present toggle on visit detail ✓
+- T2.11 Camera permission denied handler with fallback sheet ✓
+
+**Tier 5 infrastructure — major progress:**
+- T5.1 Offline mode banner (NWPathMonitor + amber-tinted banner above
+  tab bar) ✓
+- T5.2 Photo upload retry queue (FileManager-persisted JPEG queue +
+  drain-on-reconnect via NWPathMonitor) ✓
+
+**Tier 3 + Tier 4 + leftover:**
+- T3.16 End-relationship affordance + unlink_home_from_workspace
+  action ✓
+- T4.3 Sign-out confirmation alert ✓
+- T4.7 Ad-hoc visit type chips truncation → Menu picker ✓
+- T4.9 FieldGhostButtonStyle dashed border → solid border ✓
+- T4.1 + T4.2 verified already done by parallel branch (no fix
+  needed)
+
+**Still deferred (~18 items, mostly large Tier 2 work):**
+- T2.1 Assessment queue + detail screen (large)
+- T2.4 Mark-for-followup (already partially done via existing
+  pendingFollowup state but no dedicated UI)
+- T2.6 RoutineCaptureSheet (large — modeled on RoutineEditSheet)
+- T2.9 Multi-day continuation visits
+- T2.12 Live punch list with photo/voice/materials/time (large)
+- T2.13 Visit summary + send loop
+- T3.x remaining messaging + recurrence small items
+- T5.3 chez-concierge ↔ handyman-provider bridge (large)
+- T5.4 Active visit banner on homeowner side
+- T5.7 assign_route batch action
+
 **Already done by parallel branch work** (verified during Phase 0):
 - T1.3 Decommission system UI ✓
 - T1.6 tap-to-call (homeownerPhone in dashboard payload + tel://) ✓
