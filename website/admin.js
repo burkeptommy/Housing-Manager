@@ -17703,6 +17703,10 @@ async function renderHouseholdsView() {
       const result = await callChezConcierge({ action: "fetch_households_list" });
       state.households.list = (result.households ?? []);
       state.households.listLoadedAt = Date.now();
+      // Phase 85.5: sidebar Households badge reads state.households.list.length
+      // — re-render the sidebar after the list lands so the badge picks up
+      // the count instead of remaining at 0.
+      renderNav();
     } catch (e) {
       el.list.innerHTML = `<p class="admin-muted">Couldn't load households: ${escapeHtml(String(e.message || e))}</p>`;
       return;
@@ -19698,6 +19702,8 @@ async function renderUpcomingView() {
       });
       state.upcoming.items = (result.items ?? []);
       state.upcoming.fetchedAt = Date.now();
+      // Phase 85.5: refresh the sidebar Upcoming badge after items load.
+      renderNav();
     } catch (e) {
       el.list.innerHTML = `<p class="admin-muted">Couldn't load upcoming: ${escapeHtml(String(e.message || e))}</p>`;
       return;
