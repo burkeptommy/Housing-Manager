@@ -4146,6 +4146,46 @@ actor HavenFieldService {
         let mimeType: String?
     }
 
+    /// T3.7 (post-overnight) — lookup-manual response shape. Matches
+    /// the catalog edge function at supabase/functions/lookup-manual/
+    /// index.ts. `manualUrl` is a signed URL to a cached PDF when we
+    /// have one; otherwise `supportUrl` is the manufacturer's portal
+    /// deep-link the user can open in Safari to find the manual on
+    /// the mfr's site.
+    struct HavenFieldManualLookupResponse: Decodable {
+        let found: Bool?
+        let manualUrl: String?
+        let supportUrl: String?
+        let supportPhone: String?
+        let manufacturer: String?
+        let modelName: String?
+        let modelNumber: String?
+        let suggestion: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case found
+            case manualUrl = "manual_url"
+            case supportUrl = "support_url"
+            case supportPhone = "support_phone"
+            case manufacturer
+            case modelName = "model_name"
+            case modelNumber = "model_number"
+            case suggestion
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            found = (try? c.decodeIfPresent(Bool.self, forKey: .found)) ?? nil
+            manualUrl = (try? c.decodeIfPresent(String.self, forKey: .manualUrl)) ?? nil
+            supportUrl = (try? c.decodeIfPresent(String.self, forKey: .supportUrl)) ?? nil
+            supportPhone = (try? c.decodeIfPresent(String.self, forKey: .supportPhone)) ?? nil
+            manufacturer = (try? c.decodeIfPresent(String.self, forKey: .manufacturer)) ?? nil
+            modelName = (try? c.decodeIfPresent(String.self, forKey: .modelName)) ?? nil
+            modelNumber = (try? c.decodeIfPresent(String.self, forKey: .modelNumber)) ?? nil
+            suggestion = (try? c.decodeIfPresent(String.self, forKey: .suggestion)) ?? nil
+        }
+    }
+
     /// Wave M3 — response shape extract_system_from_photo returns.
     /// Mirrors the identify-equipment edge function's structured Claude
     /// Vision JSON. Fields are nullable because the AI returns null when
@@ -4241,6 +4281,33 @@ actor HavenFieldService {
             expecting: HavenFieldSystemUpdateResponse.self
         )
         return response.system
+    }
+
+    /// T3.7 (post-overnight) — look up a system's manual / spec sheet
+    /// on demand. The `lookup-manual` Edge Function takes a
+    /// home_system_id and returns the cached PDF (signed URL) when
+    /// available, or the manufacturer's support portal URL as a
+    /// fallback. Pre-T3.7 the iOS field app surfaced ONLY the
+    /// pre-cached links on the system row — no on-demand lookup
+    /// affordance for systems without a cached link yet. Now the
+    /// system detail sheet exposes a "Pull up manual" button when the
+    /// system has a modelNumber.
+    ///
+    /// Note: lookup-manual is a generic catalog endpoint and doesn't
+    /// require workspace auth. Routes through the standard
+    /// callEdgeFunction layer (anon JWT is fine since the data is
+    /// public catalog content).
+    func lookupManual(homeSystemId: String) async throws -> HavenFieldManualLookupResponse {
+        struct Request: Encodable {
+            let home_system_id: String
+        }
+        let data = try JSONEncoder().encode(Request(home_system_id: homeSystemId))
+        return try await perform(
+            function: "lookup-manual",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldManualLookupResponse.self
+        )
     }
 
     /// T1.2 (post-overnight) — fill in missing brand / model / serial /
@@ -18568,6 +18635,9 @@ private struct HavenFieldHomeSystemDetailSheet: View {
     /// T1.2 (post-overnight) — Edit button reveals the inline edit form.
     /// Sheet stays in place; on save the form closes back to the detail.
     @State private var isEditing = false
+    /// T3.7 (post-overnight) — Manual lookup sheet. Calls lookup-manual
+    /// on present, renders the result.
+    @State private var isLookingUpManual = false
 
     var body: some View {
         NavigationStack {
@@ -18697,6 +18767,20 @@ private struct HavenFieldHomeSystemDetailSheet: View {
                             Label("Edit details", systemImage: "pencil")
                                 .foregroundStyle(HavenColors.action)
                         }
+                        // T3.7 (post-overnight) — Pull up manual /
+                        // spec sheet. Calls lookup-manual edge function
+                        // with the home_system_id; renders results in
+                        // a sheet (cached PDF link if available, else
+                        // mfr support portal). Gated on having a
+                        // modelNumber so we don't open an empty search.
+                        if system.modelNumber?.nonEmpty != nil {
+                            Button {
+                                isLookingUpManual = true
+                            } label: {
+                                Label("Pull up manual", systemImage: "doc.text.magnifyingglass")
+                                    .foregroundStyle(HavenColors.navy700)
+                            }
+                        }
                         Button {
                             dismiss()
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -18736,6 +18820,125 @@ private struct HavenFieldHomeSystemDetailSheet: View {
                     )
                 }
             }
+            .sheet(isPresented: $isLookingUpManual) {
+                HavenFieldManualLookupSheet(systemId: system.id, systemName: system.name)
+            }
+        }
+    }
+}
+
+/// T3.7 (post-overnight) — manual lookup result viewer. Calls
+/// lookup-manual on appear, surfaces the result with tappable links.
+/// When a cached PDF exists, the primary CTA opens it in Safari /
+/// system PDF reader. Otherwise the manufacturer's support portal is
+/// the fallback. Loading + error + not-found states all render with
+/// helpful copy.
+private struct HavenFieldManualLookupSheet: View {
+    let systemId: String
+    let systemName: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var isLoading = true
+    @State private var response: HavenFieldService.HavenFieldManualLookupResponse?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if isLoading {
+                        VStack(spacing: 14) {
+                            ProgressView()
+                                .controlSize(.large)
+                            Text("Looking up the manual…")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
+                    } else if let errorMessage {
+                        FieldEmptyState(
+                            title: "Couldn’t find a manual",
+                            subtitle: errorMessage
+                        )
+                    } else if let response, response.found == true {
+                        FieldSectionCard(
+                            kicker: "Found",
+                            title: response.modelName?.nonEmpty ?? response.modelNumber?.nonEmpty ?? systemName
+                        ) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                if let manufacturer = response.manufacturer?.nonEmpty {
+                                    FieldKeyValueRow(label: "Manufacturer", value: manufacturer)
+                                }
+                                if let model = response.modelNumber?.nonEmpty {
+                                    FieldKeyValueRow(label: "Model", value: model)
+                                }
+                                if let manualUrl = response.manualUrl?.nonEmpty,
+                                   let url = URL(string: manualUrl) {
+                                    Link(destination: url) {
+                                        Label("Open manual (PDF)", systemImage: "doc.text.fill")
+                                            .font(HavenTypography.uiButton)
+                                            .foregroundStyle(HavenColors.textOnAction)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 14)
+                                            .background(HavenColors.action)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    }
+                                }
+                                if let supportUrl = response.supportUrl?.nonEmpty,
+                                   let url = URL(string: supportUrl) {
+                                    Link(destination: url) {
+                                        Label("Manufacturer support page", systemImage: "safari.fill")
+                                            .font(HavenTypography.uiButton)
+                                            .foregroundStyle(HavenColors.navy700)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 14)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .stroke(HavenColors.navy700.opacity(0.4), lineWidth: 1)
+                                            )
+                                    }
+                                }
+                                if let phone = response.supportPhone?.nonEmpty,
+                                   let url = URL(string: "tel://\(phone.filter { $0.isNumber || $0 == "+" })") {
+                                    Link(destination: url) {
+                                        Label("Support: \(phone)", systemImage: "phone.fill")
+                                            .font(HavenTypography.bodySmall)
+                                            .foregroundStyle(HavenColors.navy700)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        FieldEmptyState(
+                            title: "No manual on file",
+                            subtitle: response?.suggestion?.nonEmpty
+                                ?? "Try editing the system and adding a more specific model number to widen the search."
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+            }
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Manual lookup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .task { await runLookup() }
+    }
+
+    private func runLookup() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            response = try await HavenFieldService.shared.lookupManual(homeSystemId: systemId)
+        } catch {
+            errorMessage = friendlyServerError(from: error, fallback: "We couldn’t reach the manual catalog right now.")
         }
     }
 }
