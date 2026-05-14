@@ -1804,6 +1804,11 @@ struct HavenFieldHome: Codable, Identifiable {
     let openTasks: [HavenFieldOpenTask]
     let recentVisits: [HavenFieldHomeVisit]
     let files: [HavenFieldHomeFile]
+    /// T3.5 (post-overnight) — homeowner standing instructions surface.
+    /// Sourced from `households.chez_profile` JSONB; server passes only
+    /// the contractor-relevant subset (spending tiers + vendor prefs +
+    /// logistics). Communication prefs are intentionally not surfaced.
+    let chezProfile: HavenFieldChezProfile?
 
     private enum CodingKeys: String, CodingKey {
         case propertyId
@@ -1818,6 +1823,7 @@ struct HavenFieldHome: Codable, Identifiable {
         case openTasks
         case recentVisits
         case files
+        case chezProfile
     }
 
     init(from decoder: Decoder) throws {
@@ -1838,6 +1844,111 @@ struct HavenFieldHome: Codable, Identifiable {
         openTasks = (try? container.decodeIfPresent([HavenFieldOpenTask].self, forKey: .openTasks)) ?? []
         recentVisits = (try? container.decodeIfPresent([HavenFieldHomeVisit].self, forKey: .recentVisits)) ?? []
         files = (try? container.decodeIfPresent([HavenFieldHomeFile].self, forKey: .files)) ?? []
+        chezProfile = (try? container.decodeIfPresent(HavenFieldChezProfile.self, forKey: .chezProfile)) ?? nil
+    }
+}
+
+/// T3.5 (post-overnight) — read-only standing-instructions struct
+/// derived from `households.chez_profile`. The server hands us the
+/// contractor-relevant subset (spending tiers + vendor preferences +
+/// logistics). Communication preferences are intentionally not
+/// surfaced — those are between the homeowner and Chez (operator
+/// channel choice). Fully resilient decoder so a partial / mis-shaped
+/// JSON blob doesn't take the home payload down.
+struct HavenFieldChezProfile: Codable, Hashable {
+    let spendingTiers: SpendingTiers?
+    let vendorPreferences: VendorPreferences?
+    let logistics: Logistics?
+
+    struct SpendingTiers: Codable, Hashable {
+        /// Auto-approve under this dollar amount (default $200).
+        let autoApproveUnder: Double?
+        /// Ping homeowner under this dollar amount (default $500).
+        let pingUnder: Double?
+        /// Explicit homeowner approval required above this amount
+        /// (default $500). Per CLAUDE.md, also gates the home_manager
+        /// approval guardrail.
+        let explicitAbove: Double?
+
+        private enum CodingKeys: String, CodingKey {
+            case autoApproveUnder = "auto_approve_under"
+            case pingUnder = "ping_under"
+            case explicitAbove = "explicit_above"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            autoApproveUnder = (try? c.decodeIfPresent(Double.self, forKey: .autoApproveUnder)) ?? nil
+            pingUnder = (try? c.decodeIfPresent(Double.self, forKey: .pingUnder)) ?? nil
+            explicitAbove = (try? c.decodeIfPresent(Double.self, forKey: .explicitAbove)) ?? nil
+        }
+    }
+
+    struct VendorPreferences: Codable, Hashable {
+        /// E.g. "value", "balanced", "premium" — homeowner's posture.
+        let budgetOrientation: String?
+        let preferLocalOwned: Bool?
+        let notes: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case budgetOrientation = "budget_orientation"
+            case preferLocalOwned = "prefer_local_owned"
+            case notes
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            budgetOrientation = (try? c.decodeIfPresent(String.self, forKey: .budgetOrientation)) ?? nil
+            preferLocalOwned = (try? c.decodeIfPresent(Bool.self, forKey: .preferLocalOwned)) ?? nil
+            notes = (try? c.decodeIfPresent(String.self, forKey: .notes)) ?? nil
+        }
+    }
+
+    struct Logistics: Codable, Hashable {
+        /// Free-text pet warnings. Critical for handyman safety.
+        let pets: String?
+        /// Free-text entry instructions ("Side gate code 1234. Lockbox
+        /// on the back porch."). Most important field for HNW estates.
+        let entryInstructions: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case pets
+            case entryInstructions = "entry_instructions"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            pets = (try? c.decodeIfPresent(String.self, forKey: .pets)) ?? nil
+            entryInstructions = (try? c.decodeIfPresent(String.self, forKey: .entryInstructions)) ?? nil
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case spendingTiers, vendorPreferences, logistics
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        spendingTiers = (try? c.decodeIfPresent(SpendingTiers.self, forKey: .spendingTiers)) ?? nil
+        vendorPreferences = (try? c.decodeIfPresent(VendorPreferences.self, forKey: .vendorPreferences)) ?? nil
+        logistics = (try? c.decodeIfPresent(Logistics.self, forKey: .logistics)) ?? nil
+    }
+
+    /// Returns true when there's nothing meaningful to render (avoids
+    /// showing an empty "Standing instructions" card).
+    var isEmpty: Bool {
+        let st = spendingTiers
+        let vp = vendorPreferences
+        let lg = logistics
+        let hasSpend = (st?.autoApproveUnder ?? nil) != nil ||
+                       (st?.pingUnder ?? nil) != nil ||
+                       (st?.explicitAbove ?? nil) != nil
+        let hasVendor = (vp?.budgetOrientation?.nonEmpty != nil) ||
+                        (vp?.preferLocalOwned ?? nil) != nil ||
+                        (vp?.notes?.nonEmpty != nil)
+        let hasLogistics = (lg?.pets?.nonEmpty != nil) ||
+                           (lg?.entryInstructions?.nonEmpty != nil)
+        return !(hasSpend || hasVendor || hasLogistics)
     }
 }
 
@@ -11237,6 +11348,19 @@ private struct HavenFieldHomeProfileView: View {
                 }
             }
 
+            // T3.5 (post-overnight) — homeowner standing instructions.
+            // Sourced from `households.chez_profile` JSONB. Renders only
+            // when the homeowner has actually configured something —
+            // empty profiles don't surface a useless "no instructions
+            // yet" card. Saves the handyman from re-asking 'do you
+            // prefer email or text?', 'is there anything I should know
+            // about pets?'. Critical for HNW estates where the
+            // entry_instructions field carries gate codes and dog
+            // warnings the handyman MUST see before knocking.
+            if let chezProfile = home.chezProfile, !chezProfile.isEmpty {
+                chezProfileCard(profile: chezProfile)
+            }
+
             FieldSectionCard(kicker: "Recent", title: "Visits at this home") {
                 if home.recentVisits.isEmpty {
                     FieldEmptyState(title: "No visit history yet", subtitle: "Completed and upcoming visits will show up here as the relationship builds.")
@@ -11423,6 +11547,113 @@ private struct HavenFieldHomeProfileView: View {
                 }
             }
         }
+    }
+
+    /// T3.5 (post-overnight) — homeowner standing instructions read-only
+    /// card. Surfaces the contractor-relevant subset of `chez_profile`
+    /// JSONB sent by the server. Most important field is the entry-
+    /// instructions string (gate codes, lockbox codes, dog warnings) —
+    /// HNW handymen need to see this BEFORE they knock.
+    @ViewBuilder
+    private func chezProfileCard(profile: HavenFieldChezProfile) -> some View {
+        FieldSectionCard(kicker: "Standing instructions", title: "What the homeowner wants you to know") {
+            VStack(alignment: .leading, spacing: 14) {
+                if let logistics = profile.logistics {
+                    if let entry = logistics.entryInstructions?.nonEmpty {
+                        chezProfileBlock(
+                            icon: "key.fill",
+                            label: "Entry",
+                            body: entry,
+                            tint: HavenColors.action
+                        )
+                    }
+                    if let pets = logistics.pets?.nonEmpty {
+                        chezProfileBlock(
+                            icon: "pawprint.fill",
+                            label: "Pets",
+                            body: pets,
+                            tint: HavenColors.warning
+                        )
+                    }
+                }
+                if let vp = profile.vendorPreferences {
+                    if let bo = vp.budgetOrientation?.nonEmpty {
+                        chezProfileBlock(
+                            icon: "dollarsign.circle",
+                            label: "Budget posture",
+                            body: bo.capitalized,
+                            tint: HavenColors.navy700
+                        )
+                    }
+                    if let local = vp.preferLocalOwned, local {
+                        chezProfileBlock(
+                            icon: "mappin.and.ellipse",
+                            label: "Vendor preference",
+                            body: "Prefers local-owned vendors when possible.",
+                            tint: HavenColors.navy700
+                        )
+                    }
+                    if let notes = vp.notes?.nonEmpty {
+                        chezProfileBlock(
+                            icon: "note.text",
+                            label: "Vendor notes",
+                            body: notes,
+                            tint: HavenColors.navy700
+                        )
+                    }
+                }
+                if let st = profile.spendingTiers {
+                    let summary = chezProfileSpendingSummary(st)
+                    if !summary.isEmpty {
+                        chezProfileBlock(
+                            icon: "checkmark.shield.fill",
+                            label: "Spending authority",
+                            body: summary,
+                            tint: HavenColors.success
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func chezProfileBlock(
+        icon: String,
+        label: String,
+        body: String,
+        tint: Color
+    ) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 22, alignment: .leading)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label.uppercased())
+                    .font(HavenTypography.uiLabelSmall)
+                    .kerning(0.6)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text(body)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func chezProfileSpendingSummary(_ st: HavenFieldChezProfile.SpendingTiers) -> String {
+        var parts: [String] = []
+        if let auto = st.autoApproveUnder {
+            parts.append("Auto-approve under $\(Int(auto))")
+        }
+        if let ping = st.pingUnder {
+            parts.append("Ping for approval under $\(Int(ping))")
+        }
+        if let explicit = st.explicitAbove {
+            parts.append("Explicit approval above $\(Int(explicit))")
+        }
+        return parts.joined(separator: ". ")
     }
 }
 
