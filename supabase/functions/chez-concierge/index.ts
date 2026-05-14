@@ -134,6 +134,25 @@ async function householdIdForUser(
   return (data as { household_id: string | null }).household_id ?? null;
 }
 
+// Phase 85.5: admin operators don't have a household_id on their user row
+// — they delegate / update entities on behalf of a homeowner via the admin
+// workbench. This helper returns the explicit `household_id` from the
+// payload when the caller is an admin, otherwise falls back to the user's
+// own household_id. Homeowners cannot override via payload (so they can't
+// touch a household that isn't theirs).
+async function resolveHouseholdId(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payloadHouseholdId: unknown
+): Promise<string | null> {
+  if (!user) return null;
+  if (isAdminUser(user)) {
+    const explicit = compactString((payloadHouseholdId as string | undefined) || "");
+    if (explicit) return explicit;
+  }
+  return householdIdForUser(service, user.id);
+}
+
 // ============================================================================
 // Push + email helpers
 // ============================================================================
@@ -808,7 +827,9 @@ async function handleDelegateRoutine(
   if (!user) return json({ error: "auth required" }, 401);
   const routineId = compactString(payload.routine_id);
   if (!routineId) return json({ error: "routine_id required" }, 400);
-  const householdId = await householdIdForUser(service, user.id);
+  // Phase 85.5: admin operators pass household_id explicitly via the
+  // workbench; homeowners resolve from their own user row.
+  const householdId = await resolveHouseholdId(service, user, (payload as { household_id?: string }).household_id);
   if (!householdId) return json({ error: "no household" }, 404);
 
   const { data: routine, error: lookupErr } = await service
@@ -904,7 +925,8 @@ async function handleDelegateContractor(
   if (!user) return json({ error: "auth required" }, 401);
   const contractorId = compactString(payload.contractor_id);
   if (!contractorId) return json({ error: "contractor_id required" }, 400);
-  const householdId = await householdIdForUser(service, user.id);
+  // Phase 85.5: admin household pass-through.
+  const householdId = await resolveHouseholdId(service, user, (payload as { household_id?: string }).household_id);
   if (!householdId) return json({ error: "no household" }, 404);
 
   const { data: contractor, error: lookupErr } = await service
@@ -1008,7 +1030,8 @@ async function handleDelegateTask(
   if (!user) return json({ error: "auth required" }, 401);
   const taskId = compactString(payload.task_id);
   if (!taskId) return json({ error: "task_id required" }, 400);
-  const householdId = await householdIdForUser(service, user.id);
+  // Phase 85.5: admin household pass-through.
+  const householdId = await resolveHouseholdId(service, user, (payload as { household_id?: string }).household_id);
   if (!householdId) return json({ error: "no household" }, 404);
 
   // Pull the task + the linked contractor (if any) so we can route the
@@ -1124,7 +1147,7 @@ async function handleDelegateTask(
   let systemBody: string;
   if (hasVendor) {
     const vendorName = vendorRow?.company_name ?? "their vendor";
-    systemBody = `Customer delegated this task to Chez. Coordinate with ${vendorName} to schedule and follow up — they don't want to chase the appointment themselves.\n\nTask: ${task.title}`;
+    systemBody = `Customer delegated this task to Chez. Coordinate with ${vendorName} to schedule and follow up so they don't have to chase the appointment themselves.\n\nTask: ${task.title}`;
   } else {
     systemBody = `Customer asked Chez to source a vendor for this task and own coordination end-to-end. Find a vetted local pro, propose them, and handle scheduling once approved.\n\nTask: ${task.title}`;
   }
@@ -1233,7 +1256,7 @@ async function handlePropose(
       user_id: request.user_id,
       request_id: request.id,
       role: "concierge",
-      content: content || `Chez sent you a proposal — tap to review.`,
+      content: content || `Chez sent you a proposal. Tap to review.`,
       attachments: [],
       proposal: proposalWithStatus,
       proposal_kind: proposal.kind,
@@ -2424,6 +2447,7 @@ interface DelegateEntityPayload {
   delegated: boolean;
   notes?: string;
   property_id?: string;                       // required for "insurance" since insurance lives on properties
+  household_id?: string;                      // admin-only — workbench operators pass this explicitly since they aren't tied to any household. task / routine / contractor have their own delegate_* actions.
 }
 
 const ENTITY_TABLES: Record<string, { table: string; idCol: string; labelCol?: string; categoryCol?: string }> = {
@@ -2463,7 +2487,11 @@ async function handleDelegateEntity(
   const entityType = payload.entity_type;
   const entityId = compactString(payload.entity_id);
   if (!entityType || !entityId) return json({ error: "entity_type + entity_id required" }, 400);
-  const householdId = await householdIdForUser(service, user.id);
+  // Phase 85.5: admin operators delegate on behalf of a homeowner via the
+  // workbench. resolveHouseholdId accepts an explicit `household_id`
+  // payload field for admin callers only — homeowners resolve from their
+  // own user row.
+  const householdId = await resolveHouseholdId(service, user, payload.household_id);
   if (!householdId) return json({ error: "no household" }, 404);
 
   const now = new Date().toISOString();
@@ -2630,7 +2658,8 @@ async function handleSetOwnershipGroup(
   if (!user) return json({ error: "auth required" }, 401);
   const group = compactString(payload.group);
   if (!group) return json({ error: "group required" }, 400);
-  const householdId = await householdIdForUser(service, user.id);
+  // Phase 85.5: admin household pass-through.
+  const householdId = await resolveHouseholdId(service, user, (payload as { household_id?: string }).household_id);
   if (!householdId) return json({ error: "no household" }, 404);
 
   const now = new Date().toISOString();
@@ -3835,7 +3864,7 @@ async function handleFetchHouseholdWorkbench(
     householdRes, propertiesRes, usersRes, familyRes,
     routinesRes, systemsRes, contractorsRes, tasksRes, projectsRes,
     documentsRes, utilitiesRes, vehiclesRes,
-    casesRes, workbenchActionsRes, remindersRes,
+    casesRes, workbenchActionsRes, remindersRes, punchItemsRes,
   ] = await Promise.all([
     safe(service.from("households").select("*").eq("id", householdId).maybeSingle(), "household"),
     safe(service.from("properties").select("*").eq("household_id", householdId), "properties"),
@@ -3852,6 +3881,10 @@ async function handleFetchHouseholdWorkbench(
     safe(service.from("chez_requests").select("*").eq("household_id", householdId).neq("status", "resolved").order("last_message_at", { ascending: false }), "open_cases"),
     safe(service.from("chez_workbench_actions").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(20), "workbench_actions"),
     safe(service.from("chez_reminders").select("*").eq("household_id", householdId).is("completed_at", null).order("due_at", { ascending: true }).limit(20), "reminders"),
+    // Phase 85.5: include the household's pending handyman punch list so
+    // the admin workbench can render the Handyman tab + the Upcoming
+    // "Handyman punch list" row click has somewhere to drill into.
+    safe(service.from("handyman_punch_items").select("id, household_id, title, notes, created_at, source").is("archived_at", null).is("completed_at", null).order("created_at", { ascending: true }), "punch_items"),
   ]);
 
   return json({
@@ -3870,6 +3903,7 @@ async function handleFetchHouseholdWorkbench(
     open_cases: ((casesRes as { data?: unknown[] })?.data) ?? [],
     workbench_actions: ((workbenchActionsRes as { data?: unknown[] })?.data) ?? [],
     reminders: ((remindersRes as { data?: unknown[] })?.data) ?? [],
+    handyman_punch_items: ((punchItemsRes as { data?: unknown[] })?.data) ?? [],
   });
 }
 
@@ -4669,7 +4703,7 @@ async function handleAssignHandymanToAssessment(
     await sendAdminEmail(
       [memberEmail],
       "New Chez home assessment assigned to you",
-      `You've been assigned a Chez free home assessment visit.\n\nOpen the Chez Operations Desk: https://www.getchez.com/operations/\n\n— Chez`,
+      `You've been assigned a Chez free home assessment visit.\n\nOpen the Chez Operations Desk: https://www.getchez.com/operations/\n\nChez`,
       emailBody({
         preview: "You've been assigned a new Chez home assessment visit.",
         heading: "New home assessment assigned",

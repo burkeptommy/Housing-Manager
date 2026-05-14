@@ -10783,3 +10783,167 @@ details.admin-chez__analysis-section pre {
   color: var(--text-muted, #6F6A88);
   line-height: 1.45;
 }
+
+/* ========================================================================
+   Phase 85.5 — confirm modals, toasts, USD inputs, danger pills, radio modals
+   ======================================================================== */
+
+/* Danger-styled confirm button used by destructive case actions (Revoke
+   Chez ownership). Pairs with admin-pill base styles. */
+.admin-pill--danger {
+  background: #B83C2E;
+  border-color: #B83C2E;
+  color: #FFF;
+  font: 500 11px var(--sans);
+  padding: 5px 12px;
+}
+.admin-pill--danger:hover {
+  background: #9B3225;
+}
+.admin-pill[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Required-field asterisk in modal labels. */
+.admin-required {
+  color: #B83C2E;
+  font-weight: 600;
+}
+
+/* USD input — $ prefix glued to the left of the number input. */
+.admin-input-prefix {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border, #D8DADF);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #FFF;
+}
+.admin-input-prefix__token {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: rgba(67, 75, 145, 0.05);
+  color: var(--text-muted, #6F6A88);
+  font: 500 13px var(--sans);
+  border-right: 1px solid var(--border, #EDEEF0);
+}
+.admin-input-prefix > .admin-input {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.admin-input-prefix > .admin-input:focus {
+  outline: 2px solid var(--brand-strong, #ED6955);
+  outline-offset: -2px;
+}
+
+/* Reclassify modal radio rows — replaces the native window.prompt(1-6). */
+.admin-modal__radios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.admin-modal__radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #EDEEF0);
+  border-radius: 10px;
+  cursor: pointer;
+  background: #FFF;
+  transition: border-color 0.15s, background 0.15s;
+}
+.admin-modal__radio:hover {
+  border-color: var(--brand-strong, #ED6955);
+  background: rgba(237, 105, 85, 0.03);
+}
+.admin-modal__radio input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--brand-strong, #ED6955);
+}
+.admin-modal__radio strong {
+  display: block;
+  font: 600 13px var(--sans);
+  color: var(--text, #2A2252);
+  margin-bottom: 2px;
+}
+.admin-modal__radio .admin-muted {
+  font: 400 12px var(--sans);
+  color: var(--text-muted, #6F6A88);
+  line-height: 1.4;
+}
+
+/* Quick-pill row used by Snooze + Date pickers. */
+.admin-modal__quickpills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.admin-quickpill {
+  font: 500 11px var(--sans);
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--border, #D8DADF);
+  background: #FFF;
+  color: var(--text, #2A2252);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.admin-quickpill:hover {
+  background: rgba(67, 75, 145, 0.05);
+  border-color: var(--text, #2A2252);
+}
+.admin-quickpill.is-active {
+  background: var(--text, #2A2252);
+  color: #FFF;
+  border-color: var(--text, #2A2252);
+}
+
+/* Toast host + toasts. Fixed bottom-right of the viewport so they don't
+   block the operator's hands. Click-to-dismiss; auto-dismiss after ~3.5s. */
+.admin-toast-host {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  z-index: 9999;
+  pointer-events: none;
+}
+.admin-toast {
+  pointer-events: auto;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font: 500 12px var(--sans);
+  line-height: 1.4;
+  max-width: 360px;
+  box-shadow: 0 8px 24px rgba(42, 34, 82, 0.16);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  cursor: pointer;
+}
+.admin-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.admin-toast--info {
+  background: #2A2252;
+  color: #FFF;
+}
+.admin-toast--error {
+  background: #B83C2E;
+  color: #FFF;
+}
+.admin-toast--success {
+  background: #1F7A4A;
+  color: #FFF;
+}
