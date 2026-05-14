@@ -1809,6 +1809,14 @@ struct HavenFieldHome: Codable, Identifiable {
     /// the contractor-relevant subset (spending tiers + vendor prefs +
     /// logistics). Communication prefs are intentionally not surfaced.
     let chezProfile: HavenFieldChezProfile?
+    /// T3.1 (post-overnight) — recurring services on this home, sourced
+    /// from the `routines` table. Defaults empty so pre-payload-extension
+    /// rows decode fine.
+    let routines: [HavenFieldHomeRoutine]
+    /// T3.2 (post-overnight) — vendors the homeowner uses, sourced from
+    /// the `contractors` table. Mirror of homeowner-side contractors
+    /// list. Defaults empty.
+    let vendors: [HavenFieldHomeVendor]
 
     private enum CodingKeys: String, CodingKey {
         case propertyId
@@ -1824,6 +1832,8 @@ struct HavenFieldHome: Codable, Identifiable {
         case recentVisits
         case files
         case chezProfile
+        case routines
+        case vendors
     }
 
     init(from decoder: Decoder) throws {
@@ -1845,6 +1855,115 @@ struct HavenFieldHome: Codable, Identifiable {
         recentVisits = (try? container.decodeIfPresent([HavenFieldHomeVisit].self, forKey: .recentVisits)) ?? []
         files = (try? container.decodeIfPresent([HavenFieldHomeFile].self, forKey: .files)) ?? []
         chezProfile = (try? container.decodeIfPresent(HavenFieldChezProfile.self, forKey: .chezProfile)) ?? nil
+        routines = (try? container.decodeIfPresent([HavenFieldHomeRoutine].self, forKey: .routines)) ?? []
+        vendors = (try? container.decodeIfPresent([HavenFieldHomeVendor].self, forKey: .vendors)) ?? []
+    }
+}
+
+/// T3.1 (post-overnight) — per-home recurring service sourced from
+/// the `routines` table. Read-only on the field side for now (write
+/// surface lands when T2.6 RoutineCaptureSheet ships).
+struct HavenFieldHomeRoutine: Codable, Identifiable, Hashable {
+    let id: String
+    let label: String
+    let kind: String?
+    let cadence: String?
+    let daysOfWeek: [Int]
+    let timeOfDay: String?
+    let activeMonths: [Int]
+    let vendorId: String?
+    let costCents: Double?
+    let setupState: String
+    let chezOwned: Bool
+    let paused: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case id, label, kind, cadence, daysOfWeek, timeOfDay
+        case activeMonths, vendorId, costCents, setupState, chezOwned, paused
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? "Routine"
+        kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? nil
+        cadence = (try? c.decodeIfPresent(String.self, forKey: .cadence)) ?? nil
+        daysOfWeek = (try? c.decodeIfPresent([Int].self, forKey: .daysOfWeek)) ?? []
+        timeOfDay = (try? c.decodeIfPresent(String.self, forKey: .timeOfDay)) ?? nil
+        activeMonths = (try? c.decodeIfPresent([Int].self, forKey: .activeMonths)) ?? []
+        vendorId = (try? c.decodeIfPresent(String.self, forKey: .vendorId)) ?? nil
+        costCents = (try? c.decodeIfPresent(Double.self, forKey: .costCents)) ?? nil
+        setupState = (try? c.decodeIfPresent(String.self, forKey: .setupState)) ?? "active"
+        chezOwned = (try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)) ?? false
+        paused = (try? c.decodeIfPresent(Bool.self, forKey: .paused)) ?? false
+    }
+
+    /// "Tuesdays · Apr-Nov · $200" or similar one-liner for row display.
+    var summary: String {
+        var parts: [String] = []
+        if !daysOfWeek.isEmpty {
+            let formatter = DateFormatter()
+            let names = formatter.shortStandaloneWeekdaySymbols ?? []
+            // ISO 8601 1=Sunday..7=Saturday per CLAUDE.md routines schema.
+            let dayLabels = daysOfWeek.compactMap { day -> String? in
+                guard day >= 1, day <= 7, names.count >= 7 else { return nil }
+                return names[day - 1]
+            }
+            if !dayLabels.isEmpty {
+                parts.append(dayLabels.joined(separator: ", "))
+            }
+        } else if let cadence = cadence?.nonEmpty {
+            parts.append(cadence.replacingOccurrences(of: "_", with: " ").capitalized)
+        }
+        if !activeMonths.isEmpty, activeMonths.count < 12 {
+            let monthNames = DateFormatter().shortStandaloneMonthSymbols ?? []
+            if monthNames.count == 12, let first = activeMonths.first, let last = activeMonths.last,
+               first >= 1, first <= 12, last >= 1, last <= 12 {
+                parts.append("\(monthNames[first - 1])-\(monthNames[last - 1])")
+            }
+        }
+        if let cents = costCents, cents > 0 {
+            parts.append("$\(Int(cents / 100))")
+        }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// T3.2 (post-overnight) — per-home vendor sourced from the
+/// `contractors` table. Read-only on the field side for now (write
+/// surface lands when T2.5 Add vendor sheet ships). Carries everything
+/// needed for the row + tap-to-call / tap-to-email affordances.
+struct HavenFieldHomeVendor: Codable, Identifiable, Hashable {
+    let id: String
+    let companyName: String
+    let contactName: String?
+    let phone: String?
+    let email: String?
+    let website: String?
+    let category: String?
+    let source: String
+    let logoUrl: String?
+    let brandColor: String?
+    let chezOwned: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case id, companyName, contactName, phone, email, website
+        case category, source, logoUrl, brandColor, chezOwned
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        companyName = (try? c.decodeIfPresent(String.self, forKey: .companyName)) ?? "Vendor"
+        contactName = (try? c.decodeIfPresent(String.self, forKey: .contactName)) ?? nil
+        phone = (try? c.decodeIfPresent(String.self, forKey: .phone)) ?? nil
+        email = (try? c.decodeIfPresent(String.self, forKey: .email)) ?? nil
+        website = (try? c.decodeIfPresent(String.self, forKey: .website)) ?? nil
+        category = (try? c.decodeIfPresent(String.self, forKey: .category)) ?? nil
+        source = (try? c.decodeIfPresent(String.self, forKey: .source)) ?? "manual"
+        logoUrl = (try? c.decodeIfPresent(String.self, forKey: .logoUrl)) ?? nil
+        brandColor = (try? c.decodeIfPresent(String.self, forKey: .brandColor)) ?? nil
+        chezOwned = (try? c.decodeIfPresent(Bool.self, forKey: .chezOwned)) ?? false
     }
 }
 
@@ -11155,6 +11274,11 @@ private struct HavenFieldHomeProfileView: View {
     enum HomeProfileTab: String, CaseIterable {
         case home = "Home"
         case systems = "Systems"
+        // T3.1 + T3.2 (post-overnight) — recurring services + vendors
+        // surfaces. Read-only for now; write affordances land with T2.5
+        // (Add vendor sheet) and T2.6 (RoutineCaptureSheet).
+        case routines = "Routines"
+        case vendors = "Vendors"
         case files = "Files"
     }
 
@@ -11179,6 +11303,10 @@ private struct HavenFieldHomeProfileView: View {
                     homeTab
                 case .systems:
                     systemsTab
+                case .routines:
+                    routinesTab
+                case .vendors:
+                    vendorsTab
                 case .files:
                     filesTab
                 }
@@ -11546,6 +11674,179 @@ private struct HavenFieldHomeProfileView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// T3.1 (post-overnight) — read-only Routines surface. Sourced
+    /// from the homeowner's `routines` table via the dashboard payload.
+    /// Write affordances (create / edit) land with T2.6
+    /// RoutineCaptureSheet in Phase C.
+    private var routinesTab: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            FieldSectionCard(kicker: "Routines", title: "Recurring services on file") {
+                if home.routines.isEmpty {
+                    FieldEmptyState(
+                        title: "No routines yet",
+                        subtitle: "Recurring services like lawn care, cleaning, pest control, or pool service will show up here once captured."
+                    )
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(home.routines) { routine in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: routineIcon(for: routine.kind))
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(HavenColors.navy700)
+                                    .frame(width: 22, alignment: .leading)
+                                    .padding(.top, 2)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 8) {
+                                        Text(routine.label)
+                                            .font(HavenTypography.headline)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                        if routine.chezOwned {
+                                            Text("CHEZ")
+                                                .font(.system(size: 9, weight: .heavy))
+                                                .tracking(0.6)
+                                                .foregroundStyle(HavenColors.action)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(HavenColors.action.opacity(0.12))
+                                                .clipShape(Capsule())
+                                        }
+                                        if routine.paused {
+                                            Text("PAUSED")
+                                                .font(.system(size: 9, weight: .heavy))
+                                                .tracking(0.6)
+                                                .foregroundStyle(HavenColors.warning)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(HavenColors.warning.opacity(0.12))
+                                                .clipShape(Capsule())
+                                        }
+                                        Spacer()
+                                    }
+                                    if !routine.summary.isEmpty {
+                                        Text(routine.summary)
+                                            .font(HavenTypography.bodySmall)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                            .background(HavenColors.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// T3.2 (post-overnight) — read-only Vendors surface. Sourced from
+    /// the homeowner's `contractors` table. Mirror of the homeowner-side
+    /// contractors list. Each row exposes tap-to-call / tap-to-email.
+    /// Write affordance lands with T2.5 in Phase C.
+    private var vendorsTab: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            FieldSectionCard(kicker: "Vendors", title: "Who the homeowner uses") {
+                if home.vendors.isEmpty {
+                    FieldEmptyState(
+                        title: "No vendors on file",
+                        subtitle: "Plumbers, electricians, landscapers — the homeowner's roster will show up here once captured during an assessment."
+                    )
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(home.vendors) { vendor in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) {
+                                    Text(vendor.companyName)
+                                        .font(HavenTypography.headline)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    if vendor.chezOwned {
+                                        Text("CHEZ")
+                                            .font(.system(size: 9, weight: .heavy))
+                                            .tracking(0.6)
+                                            .foregroundStyle(HavenColors.action)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(HavenColors.action.opacity(0.12))
+                                            .clipShape(Capsule())
+                                    }
+                                    Spacer()
+                                }
+                                if let category = vendor.category?.nonEmpty {
+                                    Text(category.capitalized)
+                                        .font(HavenTypography.uiLabelSmall)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
+                                if let contact = vendor.contactName?.nonEmpty {
+                                    Text("Contact: \(contact)")
+                                        .font(HavenTypography.bodySmall)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
+                                HStack(spacing: 14) {
+                                    if let phone = vendor.phone?.nonEmpty,
+                                       let url = URL(string: "tel://\(phone.filter { $0.isNumber || $0 == "+" })") {
+                                        Link(destination: url) {
+                                            Label(phone, systemImage: "phone.fill")
+                                                .font(HavenTypography.bodySmall)
+                                                .foregroundStyle(HavenColors.navy700)
+                                        }
+                                    }
+                                    if let email = vendor.email?.nonEmpty,
+                                       let url = URL(string: "mailto:\(email)") {
+                                        Link(destination: url) {
+                                            Label(email, systemImage: "envelope.fill")
+                                                .font(HavenTypography.bodySmall)
+                                                .foregroundStyle(HavenColors.navy700)
+                                        }
+                                    }
+                                }
+                                if let website = vendor.website?.nonEmpty,
+                                   let url = URL(string: website.hasPrefix("http") ? website : "https://\(website)") {
+                                    Link(destination: url) {
+                                        Label(website, systemImage: "safari.fill")
+                                            .font(HavenTypography.bodySmall)
+                                            .foregroundStyle(HavenColors.navy700)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                            .background(HavenColors.surface)
+                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func routineIcon(for kind: String?) -> String {
+        switch (kind ?? "").lowercased() {
+        case let k where k.contains("lawn") || k.contains("landscap"):
+            return "leaf.fill"
+        case let k where k.contains("clean"):
+            return "sparkles"
+        case let k where k.contains("pool") || k.contains("spa"):
+            return "drop.fill"
+        case let k where k.contains("snow"):
+            return "snowflake"
+        case let k where k.contains("pest") || k.contains("mosquito") || k.contains("tick"):
+            return "ladybug.fill"
+        case let k where k.contains("trash") || k.contains("recycl") || k.contains("waste"):
+            return "trash.fill"
+        case let k where k.contains("pet"):
+            return "pawprint.fill"
+        case let k where k.contains("hvac"):
+            return "fan.fill"
+        case let k where k.contains("handyman"):
+            return "hammer.fill"
+        default:
+            return "calendar.circle.fill"
         }
     }
 

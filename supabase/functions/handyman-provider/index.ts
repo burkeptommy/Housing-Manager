@@ -2105,6 +2105,44 @@ async function loadDashboard(
     chezProfileByHouseholdId.set(compactString(row.id), (row.chez_profile as Record<string, unknown>) ?? null);
   }
 
+  // T3.1 + T3.2 (post-overnight) — per-home routines + vendors so the
+  // home detail surface can render Routines + Vendors sub-tabs. Pull
+  // ALL routines and contractors for the in-scope households in one
+  // batch each, then index by household_id for the per-home loop below.
+  // Soft-deleted rows excluded. Limit: 50 routines + 50 contractors per
+  // home is plenty (HNW estates that exceed this can scroll).
+  const { data: routinesForHomes } = householdIds.length
+    ? await service
+        .from("routines")
+        .select("id, household_id, label, routine_kind, cadence_type, days_of_week, time_of_day, active_months, vendor_id, cost_cents, setup_state, paused_at, archived_at, chez_owned")
+        .in("household_id", householdIds)
+        .is("archived_at", null)
+        .order("created_at", { ascending: false })
+    : { data: [] as Record<string, unknown>[] };
+  const routinesByHouseholdId = new Map<string, Record<string, unknown>[]>();
+  for (const row of routinesForHomes ?? []) {
+    const householdId = compactString(row.household_id);
+    if (!householdId) continue;
+    const list = routinesByHouseholdId.get(householdId) ?? [];
+    list.push(row);
+    routinesByHouseholdId.set(householdId, list);
+  }
+  const { data: contractorsForHomes } = householdIds.length
+    ? await service
+        .from("contractors")
+        .select("id, household_id, company_name, contact_name, phone, email, website, category, source, logo_url, brand_color, chez_owned")
+        .in("household_id", householdIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as Record<string, unknown>[] };
+  const contractorsByHouseholdId = new Map<string, Record<string, unknown>[]>();
+  for (const row of contractorsForHomes ?? []) {
+    const householdId = compactString(row.household_id);
+    if (!householdId) continue;
+    const list = contractorsByHouseholdId.get(householdId) ?? [];
+    list.push(row);
+    contractorsByHouseholdId.set(householdId, list);
+  }
+
   // N-customer-phone fix: pull the primary family_member phone per
   // household so the visit detail header can render a tap-to-call
   // FieldTappablePhoneRow. We prefer the row whose relationship is
@@ -2635,6 +2673,52 @@ async function loadDashboard(
             logistics: (chezProfile as Record<string, unknown>)?.logistics ?? null,
           }
         : null,
+      // T3.1 + T3.2 (post-overnight) — per-home routines + vendors so
+      // the field app's home detail can render Routines + Vendors sub-
+      // tabs (Wave 3a Section 6.13/6.14 gap). Both are camelCase-mapped
+      // for iOS Codable parity. Cap at 50 each — HNW estates that
+      // exceed this are exotic; UI scrolls.
+      routines: (homeHouseholdId ? routinesByHouseholdId.get(homeHouseholdId) ?? [] : [])
+        .slice(0, 50)
+        .map((r) => {
+          const rec = r as Record<string, unknown>;
+          return {
+            id: compactString(rec.id),
+            label: compactString(rec.label),
+            kind: compactString(rec.routine_kind),
+            cadence: compactString(rec.cadence_type),
+            daysOfWeek: Array.isArray(rec.days_of_week)
+              ? (rec.days_of_week as number[]).map((n) => Number(n)).filter((n) => Number.isFinite(n))
+              : [],
+            timeOfDay: compactString(rec.time_of_day) || null,
+            activeMonths: Array.isArray(rec.active_months)
+              ? (rec.active_months as number[]).map((n) => Number(n)).filter((n) => Number.isFinite(n))
+              : [],
+            vendorId: compactString(rec.vendor_id) || null,
+            costCents: numberValue(rec.cost_cents) || null,
+            setupState: compactString(rec.setup_state) || "active",
+            chezOwned: Boolean(rec.chez_owned),
+            paused: rec.paused_at != null,
+          };
+        }),
+      vendors: (homeHouseholdId ? contractorsByHouseholdId.get(homeHouseholdId) ?? [] : [])
+        .slice(0, 50)
+        .map((v) => {
+          const rec = v as Record<string, unknown>;
+          return {
+            id: compactString(rec.id),
+            companyName: compactString(rec.company_name),
+            contactName: compactString(rec.contact_name) || null,
+            phone: compactString(rec.phone) || null,
+            email: compactString(rec.email) || null,
+            website: compactString(rec.website) || null,
+            category: compactString(rec.category) || null,
+            source: compactString(rec.source) || "manual",
+            logoUrl: compactString(rec.logo_url) || null,
+            brandColor: compactString(rec.brand_color) || null,
+            chezOwned: Boolean(rec.chez_owned),
+          };
+        }),
       // Sign photos in parallel — bucket is private so the React side
       // needs short-lived signed URLs to display thumbnails.
       systems: await Promise.all(homeSystems.map(async (system) => ({
