@@ -13409,12 +13409,35 @@ private struct HavenFieldAdHocVisitComposer: View {
                                     Text("Visit type")
                                         .font(HavenTypography.uiLabel)
                                         .foregroundStyle(HavenColors.textSecondary)
-                                    Picker("Visit type", selection: $visitKind) {
-                                        ForEach(VisitKind.allCases) { kind in
-                                            Text(kind.title).tag(kind)
+                                    // T4.7 (post-overnight) — was a
+                                    // .segmented Picker that truncated 3 of 4
+                                    // labels to ellipsis ('Standard...',
+                                    // 'Install / up...', 'Quote wal...').
+                                    // Menu picker shows the full selected
+                                    // label + opens to the full list — no
+                                    // truncation, full label always readable.
+                                    Menu {
+                                        Picker("Visit type", selection: $visitKind) {
+                                            ForEach(VisitKind.allCases) { kind in
+                                                Text(kind.title).tag(kind)
+                                            }
                                         }
+                                    } label: {
+                                        HStack {
+                                            Text(visitKind.title)
+                                                .font(HavenTypography.body)
+                                                .foregroundStyle(HavenColors.textPrimary)
+                                            Spacer()
+                                            Image(systemName: "chevron.up.chevron.down")
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundStyle(HavenColors.navy700)
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 12)
+                                        .background(HavenColors.surface)
+                                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(HavenColors.border, lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 16))
                                     }
-                                    .pickerStyle(.segmented)
                                 }
 
                                 VStack(alignment: .leading, spacing: 8) {
@@ -14759,6 +14782,9 @@ private struct FieldWorkspaceSettingsSheet: View {
     let onSignOut: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    /// T4.3 (post-overnight) — sign-out confirmation gate per the
+    /// Wave 1a A7 finding (destructive actions need confirmation).
+    @State private var showSignOutConfirm = false
 
     private var isOwner: Bool {
         (role ?? "").lowercased() == "owner"
@@ -14811,9 +14837,11 @@ private struct FieldWorkspaceSettingsSheet: View {
                             // not the recommended next step. Now renders as a
                             // critical-red outlined button that signals 'danger
                             // zone' without burning the brand-action salmon.
+                            // T4.3 (post-overnight) — also gated behind a
+                            // confirmation alert per Wave 1a A7 finding
+                            // (destructive actions need confirmation OR undo).
                             Button("Sign out") {
-                                dismiss()
-                                onSignOut()
+                                showSignOutConfirm = true
                             }
                             .font(HavenTypography.uiButton)
                             .foregroundStyle(HavenColors.critical)
@@ -14838,6 +14866,15 @@ private struct FieldWorkspaceSettingsSheet: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
                 }
+            }
+            .alert("Sign out?", isPresented: $showSignOutConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Sign out", role: .destructive) {
+                    dismiss()
+                    onSignOut()
+                }
+            } message: {
+                Text("You'll need your password to sign in again. Your workspace data stays safe.")
             }
         }
     }
@@ -21745,14 +21782,19 @@ private struct FieldGhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(HavenTypography.uiButton)
-            .foregroundStyle(HavenColors.textSecondary)
+            // T4.9 (post-overnight) — was textSecondary + dashed border
+            // which read as DISABLED even though the button was tappable.
+            // Multiple wave reports flagged the Decline button (used as
+            // FieldGhostButtonStyle) as inert-looking. Now solid border
+            // + textPrimary so it's clearly an active secondary affordance.
+            .foregroundStyle(HavenColors.textPrimary)
             .padding(.vertical, 12)
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity)
+            .background(HavenColors.surface)
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [5]))
-                    .foregroundStyle(HavenColors.border)
+                    .stroke(HavenColors.navy600.opacity(configuration.isPressed ? 0.45 : 0.25), lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 18))
     }
