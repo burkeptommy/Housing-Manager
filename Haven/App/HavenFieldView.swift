@@ -4283,6 +4283,92 @@ actor HavenFieldService {
         return response.system
     }
 
+    /// T2.5 (post-overnight) — capture a homeowner's existing vendor
+    /// on the home detail Vendors sub-tab. Wraps the existing
+    /// `create_contractor_from_card` action which inserts a contractor
+    /// row scoped to the customer's household_id with source='chez_field'.
+    ///
+    /// Phone is required server-side. Caller passes the canonical
+    /// SystemCategoryRegistry category string for the trade so the
+    /// homeowner-side vendor coverage matcher picks it up cleanly.
+    /// (See CLAUDE.md "Vendor coverage matches on canonical categories,
+    /// never exact strings" hard rule.)
+    func createVendorForHome(
+        workspaceId: String,
+        householdId: String,
+        companyName: String,
+        phone: String,
+        contactName: String?,
+        email: String?,
+        website: String?,
+        tradeCategory: String?,
+        notes: String?
+    ) async throws -> HavenFieldHomeVendor? {
+        struct Request: Encodable {
+            let action = "create_contractor_from_card"
+            let workspaceId: String
+            let householdId: String
+            let companyName: String
+            let phone: String
+            let contactName: String?
+            let email: String?
+            let website: String?
+            let tradeCategory: String?
+            let notes: String?
+        }
+        struct Response: Decodable {
+            let ok: Bool?
+            let contractor: HavenFieldRawContractor?
+        }
+        struct HavenFieldRawContractor: Decodable {
+            let id: String?
+            let household_id: String?
+            let company_name: String?
+            let contact_name: String?
+            let phone: String?
+            let email: String?
+            let website: String?
+            let specialties: [String]?
+            let source: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            householdId: householdId,
+            companyName: companyName,
+            phone: phone,
+            contactName: contactName,
+            email: email,
+            website: website,
+            tradeCategory: tradeCategory,
+            notes: notes
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        guard let raw = response.contractor, let id = raw.id else { return nil }
+        // Synthesize a HavenFieldHomeVendor from the raw row so the
+        // calling sheet can prepend it to the home's vendor list
+        // without waiting for a dashboard refresh round-trip.
+        let json: [String: Any] = [
+            "id": id,
+            "companyName": raw.company_name ?? companyName,
+            "contactName": raw.contact_name ?? (contactName ?? ""),
+            "phone": raw.phone ?? phone,
+            "email": raw.email ?? (email ?? ""),
+            "website": raw.website ?? (website ?? ""),
+            "category": (raw.specialties?.first ?? tradeCategory) ?? "",
+            "source": raw.source ?? "chez_field",
+            "logoUrl": "",
+            "brandColor": "",
+            "chezOwned": false,
+        ]
+        let bytes = (try? JSONSerialization.data(withJSONObject: json)) ?? Data()
+        return try? JSONDecoder().decode(HavenFieldHomeVendor.self, from: bytes)
+    }
+
     /// T3.7 (post-overnight) — look up a system's manual / spec sheet
     /// on demand. The `lookup-manual` Edge Function takes a
     /// home_system_id and returns the cached PDF (signed URL) when
@@ -11337,6 +11423,9 @@ private struct HavenFieldHomeProfileView: View {
     @State private var systemBanner: String?
     @State private var systemBannerKind: SystemBannerKind = .info
     @State private var bulkAddedThisVisit: Int = 0
+    /// T2.5 (post-overnight) — Add vendor flow state.
+    @State private var showAddVendor = false
+    @State private var capturedVendors: [HavenFieldHomeVendor] = []
 
     enum HomeProfileTab: String, CaseIterable {
         case home = "Home"
@@ -11811,85 +11900,137 @@ private struct HavenFieldHomeProfileView: View {
         }
     }
 
-    /// T3.2 (post-overnight) — read-only Vendors surface. Sourced from
-    /// the homeowner's `contractors` table. Mirror of the homeowner-side
+    /// T3.2 (post-overnight) — Vendors surface. Sourced from the
+    /// homeowner's `contractors` table. Mirror of the homeowner-side
     /// contractors list. Each row exposes tap-to-call / tap-to-email.
-    /// Write affordance lands with T2.5 in Phase C.
+    /// T2.5 (post-overnight) — write affordance: "+ Add vendor" CTA
+    /// at the top of the section opens HavenFieldAddVendorSheet.
     private var vendorsTab: some View {
         VStack(alignment: .leading, spacing: 18) {
+            // T2.5 — capture button. Only visible when we know the
+            // workspace + household, since the server enforces both
+            // for create_contractor_from_card.
+            if let workspaceId, let householdId = home.householdId, !householdId.isEmpty {
+                Button {
+                    showAddVendor = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text("Add a vendor")
+                            .font(HavenTypography.uiButton)
+                        Spacer()
+                    }
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
             FieldSectionCard(kicker: "Vendors", title: "Who the homeowner uses") {
-                if home.vendors.isEmpty {
+                if home.vendors.isEmpty && capturedVendors.isEmpty {
                     FieldEmptyState(
                         title: "No vendors on file",
                         subtitle: "Plumbers, electricians, landscapers — the homeowner's roster will show up here once captured during an assessment."
                     )
                 } else {
                     VStack(spacing: 10) {
+                        // T2.5 — show just-added vendors at top so the
+                        // user gets immediate confirmation without
+                        // waiting for a dashboard refresh round-trip.
+                        ForEach(capturedVendors) { vendor in
+                            vendorRow(vendor)
+                        }
                         ForEach(home.vendors) { vendor in
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(spacing: 8) {
-                                    Text(vendor.companyName)
-                                        .font(HavenTypography.headline)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                    if vendor.chezOwned {
-                                        Text("CHEZ")
-                                            .font(.system(size: 9, weight: .heavy))
-                                            .tracking(0.6)
-                                            .foregroundStyle(HavenColors.action)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(HavenColors.action.opacity(0.12))
-                                            .clipShape(Capsule())
-                                    }
-                                    Spacer()
-                                }
-                                if let category = vendor.category?.nonEmpty {
-                                    Text(category.capitalized)
-                                        .font(HavenTypography.uiLabelSmall)
-                                        .foregroundStyle(HavenColors.textSecondary)
-                                }
-                                if let contact = vendor.contactName?.nonEmpty {
-                                    Text("Contact: \(contact)")
-                                        .font(HavenTypography.bodySmall)
-                                        .foregroundStyle(HavenColors.textSecondary)
-                                }
-                                HStack(spacing: 14) {
-                                    if let phone = vendor.phone?.nonEmpty,
-                                       let url = URL(string: "tel://\(phone.filter { $0.isNumber || $0 == "+" })") {
-                                        Link(destination: url) {
-                                            Label(phone, systemImage: "phone.fill")
-                                                .font(HavenTypography.bodySmall)
-                                                .foregroundStyle(HavenColors.navy700)
-                                        }
-                                    }
-                                    if let email = vendor.email?.nonEmpty,
-                                       let url = URL(string: "mailto:\(email)") {
-                                        Link(destination: url) {
-                                            Label(email, systemImage: "envelope.fill")
-                                                .font(HavenTypography.bodySmall)
-                                                .foregroundStyle(HavenColors.navy700)
-                                        }
-                                    }
-                                }
-                                if let website = vendor.website?.nonEmpty,
-                                   let url = URL(string: website.hasPrefix("http") ? website : "https://\(website)") {
-                                    Link(destination: url) {
-                                        Label(website, systemImage: "safari.fill")
-                                            .font(HavenTypography.bodySmall)
-                                            .foregroundStyle(HavenColors.navy700)
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(14)
-                            .background(HavenColors.surface)
-                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            vendorRow(vendor)
                         }
                     }
                 }
             }
         }
+        .sheet(isPresented: $showAddVendor) {
+            if let workspaceId, let householdId = home.householdId {
+                HavenFieldAddVendorSheet(
+                    workspaceId: workspaceId,
+                    householdId: householdId,
+                    onCreated: { newVendor in
+                        // Optimistic local add — survives until next
+                        // dashboard refresh, then the server-sourced
+                        // entry takes over.
+                        capturedVendors.insert(newVendor, at: 0)
+                        showAddVendor = false
+                    }
+                )
+            }
+        }
+    }
+
+    /// T2.5 (post-overnight) — extracted vendor row body so both the
+    /// just-added (`capturedVendors`) array and the server-sourced
+    /// (`home.vendors`) array can use the same renderer.
+    @ViewBuilder
+    private func vendorRow(_ vendor: HavenFieldHomeVendor) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(vendor.companyName)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                if vendor.chezOwned {
+                    Text("CHEZ")
+                        .font(.system(size: 9, weight: .heavy))
+                        .tracking(0.6)
+                        .foregroundStyle(HavenColors.action)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(HavenColors.action.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+                Spacer()
+            }
+            if let category = vendor.category?.nonEmpty {
+                Text(category.capitalized)
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            if let contact = vendor.contactName?.nonEmpty {
+                Text("Contact: \(contact)")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            HStack(spacing: 14) {
+                if let phone = vendor.phone?.nonEmpty,
+                   let url = URL(string: "tel://\(phone.filter { $0.isNumber || $0 == "+" })") {
+                    Link(destination: url) {
+                        Label(phone, systemImage: "phone.fill")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                }
+                if let email = vendor.email?.nonEmpty,
+                   let url = URL(string: "mailto:\(email)") {
+                    Link(destination: url) {
+                        Label(email, systemImage: "envelope.fill")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                }
+            }
+            if let website = vendor.website?.nonEmpty,
+               let url = URL(string: website.hasPrefix("http") ? website : "https://\(website)") {
+                Link(destination: url) {
+                    Label(website, systemImage: "safari.fill")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.navy700)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
     private func routineIcon(for kind: String?) -> String {
@@ -18952,6 +19093,139 @@ private struct HavenFieldManualLookupSheet: View {
 /// system-detail edit pattern but scoped to the field-app workspace
 /// auth (workspace member must serve the household via at least one
 /// linked contractor).
+
+/// T2.5 (post-overnight) — capture an existing vendor the homeowner
+/// uses, on the home detail Vendors sub-tab. Wires to the existing
+/// create_contractor_from_card edge function action which inserts a
+/// contractor row scoped to the household with source='chez_field'.
+///
+/// Phone is required server-side (the create_contractor_from_card
+/// handler at handyman-provider:13000 throws "Phone is required" if
+/// missing). Trade category goes through SystemCategoryRegistry-style
+/// canonical strings to match the homeowner-side vendor coverage rule
+/// (CLAUDE.md hard rule: 'Vendor coverage matches on canonical
+/// categories, never exact strings.').
+private struct HavenFieldAddVendorSheet: View {
+    let workspaceId: String
+    let householdId: String
+    let onCreated: (HavenFieldHomeVendor) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var companyName: String = ""
+    @State private var contactName: String = ""
+    @State private var phone: String = ""
+    @State private var email: String = ""
+    @State private var website: String = ""
+    @State private var category: String = ""
+    @State private var notes: String = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    /// Common trade categories the field handyman is most likely to
+    /// capture during an on-behalf-of assessment. Picker uses these
+    /// canonical strings so the homeowner-side coverage matcher
+    /// recognizes them. Free-text custom entry stays available via
+    /// "Other…" → typed string saved to `category` directly.
+    private let tradeOptions: [String] = [
+        "HVAC", "Plumbing", "Electrical", "Landscaping", "Pest Control",
+        "Pool/Spa", "Roofing", "Cleaning", "Snow Removal", "Tree Service",
+        "Septic", "Well", "Chimney", "Handyman", "Other"
+    ]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Vendor") {
+                    TextField("Company name", text: $companyName)
+                        .textInputAutocapitalization(.words)
+                    TextField("Contact name (optional)", text: $contactName)
+                        .textInputAutocapitalization(.words)
+                }
+
+                Section("Trade") {
+                    Picker("Category", selection: $category) {
+                        Text("Pick a trade").tag("")
+                        ForEach(tradeOptions, id: \.self) { trade in
+                            Text(trade).tag(trade)
+                        }
+                    }
+                }
+
+                Section("Contact") {
+                    TextField("Phone (required)", text: $phone)
+                        .keyboardType(.phonePad)
+                    TextField("Email (optional)", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    TextField("Website (optional)", text: $website)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+
+                Section("Notes (optional)") {
+                    TextField("e.g. emergency-only / weekly mow / installed water heater 2023", text: $notes, axis: .vertical)
+                        .lineLimit(3...8)
+                }
+
+                if let errorMessage, !errorMessage.isEmpty {
+                    Section {
+                        Text(errorMessage)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.critical)
+                    }
+                }
+            }
+            .navigationTitle("Add a vendor")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isSaving ? "Saving…" : "Save") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving || !canSave)
+                }
+            }
+        }
+    }
+
+    private var canSave: Bool {
+        !companyName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func save() async {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
+            let resolvedCategory = trimmedCategory == "Other" ? "" : trimmedCategory
+            let vendor = try await HavenFieldService.shared.createVendorForHome(
+                workspaceId: workspaceId,
+                householdId: householdId,
+                companyName: companyName.trimmingCharacters(in: .whitespacesAndNewlines),
+                phone: phone.trimmingCharacters(in: .whitespacesAndNewlines),
+                contactName: contactName.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                website: website.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
+                tradeCategory: resolvedCategory.nonEmpty,
+                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            )
+            if let vendor {
+                onCreated(vendor)
+            }
+            dismiss()
+        } catch {
+            errorMessage = friendlyServerError(from: error, fallback: "Couldn’t add the vendor. Please try again.")
+        }
+    }
+}
+
 private struct HavenFieldHomeSystemEditSheet: View {
     let system: HavenFieldHomeSystem
     let workspaceId: String
