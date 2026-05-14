@@ -11010,8 +11010,7 @@ details.admin-chez__analysis-section pre {
    action row to proper button styling so Schedule / Mark complete /
    Propose ownership / etc. look like the action buttons elsewhere in
    the portal. */
-.admin-focused__action-row .admin-pill,
-.admin-focused__entity .admin-focused__action-row button.admin-pill {
+.admin-focused__action-row .admin-pill {
   background: #FFF;
   border: 1px solid var(--neutral-300, #D8DADF);
   border-radius: 12px;
