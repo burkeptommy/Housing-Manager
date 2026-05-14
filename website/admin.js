@@ -18197,6 +18197,14 @@ function renderFocusedEntityDetail() {
     renderHouseholdWorkbenchDetail();
     return;
   }
+  // Phase 85.5: when the focused panel is opened from Upcoming, the
+  // `admin-detail` parent + sibling `admin-empty-detail` were hidden by
+  // renderUpcomingView() so they have to be flipped back on here. Same
+  // for the Households view's empty-state pane.
+  el.detail?.classList.remove("is-hidden");
+  el.emptyDetail?.classList.add("is-hidden");
+  el.noteFocused?.classList.add("is-hidden");
+  el.decisionFocused?.classList.add("is-hidden");
   const entity = state.households.focusedEntityData;
   if (!entity) {
     // Phase 85.5: Improved error copy — the audit found that when an
