@@ -2332,6 +2332,107 @@ struct HavenFieldThreadMessage: Codable, Identifiable, Hashable {
     let body: String?
     let senderRole: String?
     let createdAt: String?
+    /// T3.13 (post-overnight) — metadata blob the server attaches to
+    /// every audit message. `kind` discriminates `status_change` /
+    /// `co_tech_added` / `visit_cancelled` / `quote_*` etc.; `status`
+    /// (when present) is the new request status. Drives the quick-
+    /// reply pre-fill suggestions on the field-side composer so the
+    /// tech doesn't have to type "Thanks for confirming!" by hand.
+    /// Defaults to empty so older payloads decode cleanly.
+    let metadataKind: String?
+    let metadataStatus: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, body, senderRole, createdAt, metadata
+    }
+
+    init(id: String, body: String?, senderRole: String?, createdAt: String?, metadataKind: String? = nil, metadataStatus: String? = nil) {
+        self.id = id
+        self.body = body
+        self.senderRole = senderRole
+        self.createdAt = createdAt
+        self.metadataKind = metadataKind
+        self.metadataStatus = metadataStatus
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        body = try? c.decodeIfPresent(String.self, forKey: .body)
+        senderRole = try? c.decodeIfPresent(String.self, forKey: .senderRole)
+        createdAt = try? c.decodeIfPresent(String.self, forKey: .createdAt)
+        // metadata is a free-form JSONB blob; pull just the two
+        // keys we use today via a generic decode against [String:
+        // FlexibleJSONValue]. Anything we don't recognize gets ignored
+        // gracefully so the struct doesn't take itself down.
+        if let raw = try? c.decodeIfPresent([String: FlexibleJSONValue].self, forKey: .metadata) {
+            metadataKind = raw["kind"]?.stringValue
+            metadataStatus = raw["status"]?.stringValue
+        } else {
+            metadataKind = nil
+            metadataStatus = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(body, forKey: .body)
+        try c.encodeIfPresent(senderRole, forKey: .senderRole)
+        try c.encodeIfPresent(createdAt, forKey: .createdAt)
+        if metadataKind != nil || metadataStatus != nil {
+            var meta: [String: String] = [:]
+            if let metadataKind { meta["kind"] = metadataKind }
+            if let metadataStatus { meta["status"] = metadataStatus }
+            try c.encode(meta, forKey: .metadata)
+        }
+    }
+}
+
+/// Tolerant decoder for arbitrary JSON values nested inside an externally-
+/// fed JSONB blob (handyman_request_messages.metadata, etc.). Mirrors the
+/// `FlexibleValue` pattern used elsewhere in the codebase. Stores the raw
+/// scalar (string / number / bool / null) and exposes a `.stringValue` so
+/// callers don't have to switch on the underlying case for the common
+/// "I just want a string" path.
+private enum FlexibleJSONValue: Codable, Hashable {
+    case string(String)
+    case int(Int)
+    case double(Double)
+    case bool(Bool)
+    case null
+    case unknown
+
+    var stringValue: String? {
+        switch self {
+        case .string(let s): return s.isEmpty ? nil : s
+        case .int(let i): return String(i)
+        case .double(let d): return String(d)
+        case .bool(let b): return b ? "true" : "false"
+        case .null, .unknown: return nil
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { self = .null; return }
+        if let s = try? c.decode(String.self) { self = .string(s); return }
+        if let i = try? c.decode(Int.self) { self = .int(i); return }
+        if let d = try? c.decode(Double.self) { self = .double(d); return }
+        if let b = try? c.decode(Bool.self) { self = .bool(b); return }
+        self = .unknown
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .string(let s): try c.encode(s)
+        case .int(let i): try c.encode(i)
+        case .double(let d): try c.encode(d)
+        case .bool(let b): try c.encode(b)
+        case .null, .unknown: try c.encodeNil()
+        }
+    }
 }
 
 struct HavenFieldTeamMember: Codable, Identifiable, Hashable {
@@ -12951,6 +13052,71 @@ private struct HavenFieldHomeProfileView: View {
     }
 }
 
+/// T3.13 (post-overnight) — small enum that maps a status-change
+/// audit message into a context-aware suggested reply. The detector
+/// reads `metadataKind == "status_change"` + `metadataStatus` first
+/// (since the server already attaches both), and falls back to body
+/// keyword matching for older audit messages or homeowner-side text
+/// chat that contains a recognizable phrase. Matches are intentionally
+/// narrow — the field tech can always type a custom reply, the
+/// suggestion is a "tap to start" affordance.
+private struct QuickReplySuggestion {
+    let label: String
+    let body: String
+
+    static func from(message: HavenFieldThreadMessage) -> QuickReplySuggestion? {
+        // Prefer the structured metadata.status pivot since it's a
+        // server-controlled enum; falls back to body sniff for legacy
+        // messages or homeowner text replies.
+        if let status = message.metadataStatus?.lowercased() {
+            switch status {
+            case "confirmed":
+                return .init(label: "Acknowledge confirmation", body: "Thanks for confirming! See you then.")
+            case "completed":
+                return .init(label: "Send completion thank-you", body: "All wrapped up. Thanks for having us out today.")
+            case "cancelled":
+                return .init(label: "Acknowledge cancellation", body: "Got it — sorry we couldn't make it work today. Let us know when you'd like to reschedule.")
+            case "alternate_dates_proposed":
+                return .init(label: "Acknowledge new times", body: "Thanks for the new options. We'll lock one in shortly.")
+            case "awaiting_homeowner":
+                return .init(label: "Nudge for response", body: "Just checking in on the time we proposed. Let us know what works.")
+            case "follow_up_recommended":
+                return .init(label: "Confirm follow-up next steps", body: "We'll get the follow-up visit on the books and reach out to confirm.")
+            case "on_my_way":
+                return .init(label: "Send ETA", body: "On the way now — should be there shortly.")
+            case "in_progress":
+                return .init(label: "Send work-started note", body: "Just getting started on the work. I'll send an update when we wrap.")
+            case "quoted":
+                return .init(label: "Nudge to review quote", body: "Quote is ready whenever you have a moment to take a look.")
+            default: break
+            }
+        }
+        // Body keyword fallback. Lowercased substring match so legacy
+        // copy variants ("Visit confirmed." vs "Homeowner confirmed
+        // the visit time.") all land on the same suggestion.
+        let body = message.body?.lowercased() ?? ""
+        if body.contains("accepted the quote") || body.contains("approved the quote") {
+            return .init(label: "Send acceptance thank-you", body: "Thanks for approving the quote — we'll get this scheduled.")
+        }
+        if body.contains("countered") || body.contains("counter offer") {
+            return .init(label: "Acknowledge counter", body: "Got your counter — we'll review and get back to you shortly.")
+        }
+        if body.contains("declined the quote") {
+            return .init(label: "Respond to decline", body: "Understood. Let us know if anything changes or if you'd like a revised estimate.")
+        }
+        if body.contains("confirmed the visit") || body.contains("visit confirmed") {
+            return .init(label: "Acknowledge confirmation", body: "Thanks for confirming! See you then.")
+        }
+        if body.contains("declined the visit") || body.contains("visit declined") {
+            return .init(label: "Respond to decline", body: "No problem — let us know when you'd like to reschedule.")
+        }
+        if body.contains("paid") && body.contains("invoice") {
+            return .init(label: "Send payment thank-you", body: "Payment received — thanks!")
+        }
+        return nil
+    }
+}
+
 private struct HavenFieldMessageThreadView: View {
     let thread: HavenFieldMessageThread
     let workspaceId: String?
@@ -12970,6 +13136,17 @@ private struct HavenFieldMessageThreadView: View {
     @State private var isSending = false
     @State private var feedback: String?
     @State private var selectedStatus: String = ""
+    /// T3.13 (post-overnight) — last seen status-change message id, so
+    /// the suggestion pill can re-arm on a new event without nagging
+    /// after the tech has tapped (or explicitly dismissed) the
+    /// previous suggestion.
+    @State private var dismissedSuggestionMessageId: String?
+    /// T3.14 (post-overnight) — message search affordance. Header
+    /// magnifier toggles the search bar; while non-empty, the thread
+    /// renders only matching bubbles (case-insensitive substring on
+    /// body OR senderRole).
+    @State private var isSearchActive: Bool = false
+    @State private var searchQuery: String = ""
 
     private var orderedMessages: [HavenFieldThreadMessage] {
         thread.recentMessages.sorted { lhs, rhs in
@@ -12977,6 +13154,42 @@ private struct HavenFieldMessageThreadView: View {
             let r = rhs.createdAt.flatMap(HavenFieldDateParser.parse) ?? .distantPast
             return l < r
         }
+    }
+
+    /// T3.14 — filtered messages used by the rendered list. Empty
+    /// query passes everything through; otherwise narrow by case-
+    /// insensitive substring match on body + senderRole. Same shape
+    /// as orderedMessages so the LazyVStack ForEach doesn't change.
+    private var visibleMessages: [HavenFieldThreadMessage] {
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return orderedMessages }
+        return orderedMessages.filter { msg in
+            let bodyHit = msg.body?.lowercased().contains(q) ?? false
+            let roleHit = msg.senderRole?.lowercased().contains(q) ?? false
+            return bodyHit || roleHit
+        }
+    }
+
+    /// T3.13 — the most recent qualifying status-change message that
+    /// the tech hasn't already dismissed or replied to. Drives the
+    /// suggestion pill above the composer.
+    private var pendingSuggestion: QuickReplySuggestion? {
+        guard let last = orderedMessages.reversed().first(where: { msg in
+            QuickReplySuggestion.from(message: msg) != nil
+        }) else { return nil }
+        guard last.id != dismissedSuggestionMessageId else { return nil }
+        // Don't suggest a reply to our own audit messages — tech
+        // sending vendor-side status flips doesn't need to type back
+        // to themselves.
+        if let role = last.senderRole?.lowercased(),
+           !role.contains("home") && !role.contains("client") && !role.contains("customer") && !role.contains("system") && !role.contains("haven") {
+            // Vendor / admin authored — only suggest if the metadata
+            // marks it as a homeowner-driven event (status_change
+            // metadata is the homeowner's action mirrored on the
+            // thread).
+            if last.metadataKind != "status_change" { return nil }
+        }
+        return QuickReplySuggestion.from(message: last)
     }
 
     var body: some View {
@@ -13002,8 +13215,20 @@ private struct HavenFieldMessageThreadView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 60)
+                        } else if visibleMessages.isEmpty {
+                            // T3.14 — search returned no matches.
+                            VStack(spacing: 10) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 28, weight: .light))
+                                    .foregroundStyle(HavenColors.textSecondary.opacity(0.6))
+                                Text("No matches in this thread")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
                         } else {
-                            ForEach(orderedMessages) { message in
+                            ForEach(visibleMessages) { message in
                                 FieldChatBubble(message: message)
                                     .id(message.id)
                             }
@@ -13103,6 +13328,59 @@ private struct HavenFieldMessageThreadView: View {
                     }
                 }
                 Spacer()
+                // T3.14 (post-overnight) — message search affordance.
+                // Tap-to-toggle the inline search bar; while active
+                // the bar replaces the suggestion pill row visually
+                // and `visibleMessages` filters by case-insensitive
+                // substring on body + senderRole.
+                Button {
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        isSearchActive.toggle()
+                        if !isSearchActive { searchQuery = "" }
+                    }
+                } label: {
+                    Image(systemName: isSearchActive ? "xmark.circle.fill" : "magnifyingglass")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isSearchActive ? HavenColors.textSecondary : HavenColors.action)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isSearchActive ? "Close search" : "Search this conversation")
+            }
+
+            if isSearchActive {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textSecondary)
+                    TextField("Search messages", text: $searchQuery)
+                        .textFieldStyle(.plain)
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .submitLabel(.search)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    if !searchQuery.isEmpty {
+                        Button {
+                            searchQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(HavenColors.textSecondary.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(HavenColors.creamLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(HavenColors.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .transition(.opacity)
             }
         }
         .padding(.horizontal, 16)
@@ -13121,6 +13399,56 @@ private struct HavenFieldMessageThreadView: View {
 
     private var composer: some View {
         VStack(spacing: 8) {
+            // T3.13 (post-overnight) — quick-reply pill renders above
+            // the composer when the most recent status-change /
+            // homeowner-event message has a suggested reply. Tap to
+            // pre-fill the composer; tap the X to dismiss without
+            // sending. Resets when a newer event arrives.
+            if let suggestion = pendingSuggestion {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(suggestion.label)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Button {
+                            messageBody = suggestion.body
+                            dismissedSuggestionMessageId = orderedMessages.reversed().first(where: { QuickReplySuggestion.from(message: $0) != nil })?.id
+                        } label: {
+                            Text(suggestion.body)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Button {
+                        dismissedSuggestionMessageId = orderedMessages.reversed().first(where: { QuickReplySuggestion.from(message: $0) != nil })?.id
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .padding(6)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss suggestion")
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(HavenColors.action.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(HavenColors.action.opacity(0.20), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .transition(.opacity)
+            }
+
             if let feedback {
                 Text(feedback)
                     .font(HavenTypography.caption)
