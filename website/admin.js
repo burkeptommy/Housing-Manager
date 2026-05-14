@@ -18411,16 +18411,38 @@ function attachFocusedEntityHandlers() {
   // `household_id` explicitly so admin operators (who don't have a
   // household_id on their user row) don't trip the server's "no household"
   // 404 — root cause of the toggle failure observed in the audit.
+  // Phase 85.6: state-aware ownership button. Dispatches on the
+  // data-ownership-state attribute set by renderOwnershipPill. Three
+  // paths:
+  //   owned   → confirm modal → existing delegate_* with delegated:false
+  //   pending → jump to the open proposal thread in the cockpit
+  //   propose → open the propose-ownership modal → server inserts a
+  //             chez_request with category=ownership_request + proposal
   el.auditFocused.querySelector("[data-focused-toggle-owned]")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
+    const ownershipState = btn.dataset.ownershipState;
     const entity = state.households.focusedEntityData;
-    const isCurrentlyOwned = !!entity?.chez_owned;
-    const nextValue = !isCurrentlyOwned;
     const entityLabel = focusedEntityLabel(focused.type, entity) || focused.type;
-    // Revoking is customer-visible (the homeowner sees the badge disappear
-    // from their delegated list in iOS) — always confirm. Delegating ON is
-    // beneficial and reversible, so it fires directly.
-    if (isCurrentlyOwned) {
+
+    if (ownershipState === "pending") {
+      // Jump the operator into the cockpit at the pending proposal thread.
+      const reqId = entity?.pending_ownership_request_id;
+      if (!reqId) {
+        showAdminToast("Pending proposal request not found. Refresh the workbench.", { kind: "error" });
+        return;
+      }
+      const req = (state.chezRequests || []).find((r) => r.id === reqId);
+      state.view = "chez";
+      if (req) {
+        state.selectedChezRequest = req;
+        state.concierge.queueMode = "case";
+        try { await loadChezMessages(reqId); } catch { /* noop */ }
+      }
+      render();
+      return;
+    }
+
+    if (ownershipState === "owned") {
       const ok = await openConfirmModal({
         title: `Revoke Chez ownership?`,
         body: `${entityLabel} will drop off the homeowner's delegated list. The Standing-engagement thread stays but no new system messages will fire.`,
@@ -18428,33 +18450,138 @@ function attachFocusedEntityHandlers() {
         danger: true,
       });
       if (!ok) return;
+      btn.disabled = true;
+      btn.textContent = "…";
+      try {
+        const t = focused.type;
+        const body = (t === "task")
+          ? { action: "delegate_task",       household_id: householdId, task_id: focused.id,       delegated: false }
+          : (t === "routine")
+          ? { action: "delegate_routine",    household_id: householdId, routine_id: focused.id,    delegated: false }
+          : (t === "contractor" || t === "vendor")
+          ? { action: "delegate_contractor", household_id: householdId, contractor_id: focused.id, delegated: false }
+          : { action: "delegate_entity",     household_id: householdId, entity_type: t,            entity_id: focused.id, delegated: false };
+        await callChezConcierge(body);
+        await loadHouseholdWorkbench(householdId);
+        state.households.focusedEntityData = lookupFocusedEntity(state.households.workbench, focused.type, focused.id);
+        renderFocusedEntityDetail();
+        showAdminToast(`Chez no longer owns ${entityLabel}.`, { kind: "info" });
+      } catch (err) {
+        console.error("[focused] revoke failed", err);
+        btn.disabled = false;
+        btn.textContent = "Revoke Chez ownership";
+        showAdminToast(`Couldn't revoke: ${err.message || err}`, { kind: "error" });
+      }
+      return;
     }
+
+    // Default path: propose ownership. Opens a modal that captures an
+    // optional preface message + sends the proposal to the homeowner.
+    const preface = await openProposeOwnershipModal({ entityLabel, entityType: focused.type });
+    if (preface === null) return;     // operator cancelled
     btn.disabled = true;
-    btn.textContent = "…";
+    btn.textContent = "Sending…";
     try {
-      // Phase 85.5: route to the right delegation action per entity type.
-      // task / routine / contractor have dedicated handlers; everything
-      // else routes through the generic `delegate_entity`.
-      const t = focused.type;
-      const body = (t === "task")
-        ? { action: "delegate_task",       household_id: householdId, task_id: focused.id,       delegated: nextValue }
-        : (t === "routine")
-        ? { action: "delegate_routine",    household_id: householdId, routine_id: focused.id,    delegated: nextValue }
-        : (t === "contractor" || t === "vendor")
-        ? { action: "delegate_contractor", household_id: householdId, contractor_id: focused.id, delegated: nextValue }
-        : { action: "delegate_entity",     household_id: householdId, entity_type: t,            entity_id: focused.id, delegated: nextValue };
-      await callChezConcierge(body);
+      const result = await callChezConcierge({
+        action: "propose_ownership",
+        household_id: householdId,
+        entities: [{
+          entity_type: focused.type,
+          entity_id: focused.id,
+          label: entityLabel,
+        }],
+        preface: preface || undefined,
+      });
       await loadHouseholdWorkbench(householdId);
+      await loadAdminData();
       state.households.focusedEntityData = lookupFocusedEntity(state.households.workbench, focused.type, focused.id);
       renderFocusedEntityDetail();
-      showAdminToast(nextValue ? `Chez now owns ${entityLabel}.` : `Chez no longer owns ${entityLabel}.`, { kind: "info" });
+      const reqId = result?.request_id;
+      showAdminToast(
+        `Proposal sent. Homeowner will see it in their iOS inbox.` + (reqId ? ` (Case ${String(reqId).slice(0, 8)})` : ""),
+        { kind: "info" }
+      );
     } catch (err) {
-      console.error("[focused] toggle owned failed", err);
+      console.error("[focused] propose ownership failed", err);
       btn.disabled = false;
-      btn.textContent = isCurrentlyOwned ? "Revoke Chez ownership" : "Have Chez own this";
-      showAdminToast(`Couldn't update ownership: ${err.message || err}`, { kind: "error" });
+      btn.textContent = "Propose Chez ownership";
+      // Surface cooldown rejections specifically so the operator
+      // understands why the proposal didn't go through.
+      const msg = err?.message || err;
+      if (typeof msg === "string" && msg.includes("cooldown")) {
+        showAdminToast("This entity is on a 60-day cooldown from a prior decline. Try again after the cooldown expires.", { kind: "error", ms: 6000 });
+      } else {
+        showAdminToast(`Couldn't send proposal: ${msg}`, { kind: "error" });
+      }
     }
   });
+}
+
+// Phase 85.6: small modal asking the operator for an optional preface
+// message before sending an ownership proposal. Returns the typed
+// preface (possibly empty string for "use the default") or null on cancel.
+function openProposeOwnershipModal({ entityLabel, entityType }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "admin-modal-overlay";
+    overlay.innerHTML = `
+      <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true">
+        <header class="admin-modal__head">
+          <h2>Propose ownership: ${escapeHtml(entityLabel)}</h2>
+          <button type="button" class="admin-modal__close" aria-label="Close" data-propose-cancel>&times;</button>
+        </header>
+        <div class="admin-modal__body">
+          <p class="admin-modal__intro">The homeowner will see an Approve / Decline card in their iOS inbox. On approve, Chez takes over scheduling + follow-up. On decline, the request goes on a 60-day cooldown.</p>
+          <label class="admin-modal__field">
+            <span>Optional message (otherwise we send a default)</span>
+            <textarea data-propose-preface rows="3" class="admin-input" placeholder="Hey Margaret — I noticed you've been asking about boiler care. Can Chez take this over so you don't have to think about it?"></textarea>
+          </label>
+        </div>
+        <div class="admin-modal__buttons" style="padding: 0 16px 16px;">
+          <button type="button" class="admin-pill" data-propose-cancel>Cancel</button>
+          <button type="button" class="admin-pill admin-pill--action" data-propose-ok>Send proposal</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const textarea = overlay.querySelector("[data-propose-preface]");
+    const cleanup = (result) => {
+      document.removeEventListener("keydown", onKey);
+      overlay.remove();
+      resolve(result);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); cleanup(null); }
+    };
+    document.addEventListener("keydown", onKey);
+    overlay.querySelectorAll("[data-propose-cancel]").forEach((b) => b.addEventListener("click", () => cleanup(null)));
+    overlay.querySelector("[data-propose-ok]").addEventListener("click", () => cleanup(textarea.value.trim()));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(null); });
+    requestAnimationFrame(() => textarea.focus());
+  });
+}
+
+// Phase 85.6: state-aware ownership pill. The same affordance renders in
+// four different states depending on the entity's current ownership +
+// any pending proposal:
+//
+//   1. NOT OWNED, no pending proposal     → "Propose Chez ownership"
+//   2. PENDING proposal (homeowner hasn't decided yet) → "Awaiting approval"
+//   3. OWNED                                → "Revoke Chez ownership" (confirm)
+//   4. On cooldown (declined within 60d)    → server rejects propose; no
+//      special UI here, the propose click lands an explanatory toast.
+//
+// The button is wired by a single shared handler below that dispatches
+// on the current state.
+function renderOwnershipPill(entity) {
+  if (!entity) return "";
+  if (entity.chez_owned) {
+    return `<button type="button" class="admin-pill" data-focused-toggle-owned data-ownership-state="owned">Revoke Chez ownership</button>`;
+  }
+  if (entity.pending_ownership_request_id) {
+    return `<button type="button" class="admin-pill admin-pill--ghost" data-focused-toggle-owned data-ownership-state="pending" title="Tap to open the open proposal thread.">Awaiting homeowner approval</button>`;
+  }
+  return `<button type="button" class="admin-pill admin-pill--action" data-focused-toggle-owned data-ownership-state="propose">Propose Chez ownership</button>`;
 }
 
 // Tiny helper to label a focused entity for confirm-modal copy.
@@ -18511,7 +18638,7 @@ function renderFocusedTaskHtml(t, wb) {
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Schedule</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="complete_on_behalf" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Mark complete</button>
           <button type="button" class="admin-pill" data-cockpit-action="workbench-action" data-action-id="snooze" data-entity-type="task" data-entity-id="${escapeHtml(t.id)}">Snooze 7d</button>
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${t.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(t)}
         </div>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action admin-pill--secondary" data-focused-message-homeowner data-request-id="${escapeHtml(t.chez_request_id || "")}">✉ Message homeowner</button>
@@ -18558,7 +18685,7 @@ function renderFocusedSystemHtml(s, wb, rel) {
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_service" data-entity-type="system" data-entity-id="${escapeHtml(s.id)}">Log service</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_maintenance" data-entity-type="system" data-entity-id="${escapeHtml(s.id)}">Schedule maintenance</button>
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${s.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(s)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
@@ -18652,7 +18779,7 @@ function renderFocusedRoutineHtml(r, wb, rel) {
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_visit" data-entity-type="routine" data-entity-id="${escapeHtml(r.id)}">Schedule next visit</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_visit" data-entity-type="routine" data-entity-id="${escapeHtml(r.id)}">Log a visit</button>
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${r.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(r)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
@@ -18701,7 +18828,7 @@ function renderFocusedContractorHtml(c, wb, rel) {
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_call" data-entity-type="contractor" data-entity-id="${escapeHtml(c.id)}">Log a call</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="send_message" data-entity-type="contractor" data-entity-id="${escapeHtml(c.id)}">Record message</button>
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${c.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(c)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
@@ -18752,7 +18879,7 @@ function renderFocusedProjectHtml(p, wb) {
         <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="open_project_workbench" data-entity-type="project" data-entity-id="${escapeHtml(p.id)}">Open negotiation pane</button>
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${p.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(p)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
@@ -18782,7 +18909,7 @@ function renderFocusedDocumentHtml(d, wb) {
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="mark_filed" data-entity-type="document" data-entity-id="${escapeHtml(d.id)}">Mark filed</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="share_with_vendor" data-entity-type="document" data-entity-id="${escapeHtml(d.id)}">Share with vendor</button>
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${d.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(d)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
         </div>
       </section>
@@ -18813,7 +18940,7 @@ function renderFocusedUtilityHtml(u, wb) {
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="audit_bill" data-entity-type="utility" data-entity-id="${escapeHtml(u.id)}">Audit bill</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="draft_negotiation" data-entity-type="utility" data-entity-id="${escapeHtml(u.id)}">Draft negotiation</button>
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${u.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(u)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
@@ -18850,7 +18977,7 @@ function renderFocusedVehicleHtml(v, wb, rel) {
           ${openRecalls.length > 0
             ? `<button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="handle_recall" data-entity-type="vehicle" data-entity-id="${escapeHtml(v.id)}">Handle ${openRecalls.length} recall${openRecalls.length === 1 ? "" : "s"}</button>`
             : `<button type="button" class="admin-pill" disabled title="No open recalls on this vehicle.">Handle recall</button>`}
-          <button type="button" class="admin-pill" data-focused-toggle-owned>${v.chez_owned ? "Revoke Chez ownership" : "Have Chez own this"}</button>
+          ${renderOwnershipPill(v)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>

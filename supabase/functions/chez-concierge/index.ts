@@ -1374,6 +1374,95 @@ async function handleDecideProposal(
   // This is the "memory" layer Tom asked for: once a homeowner picks one
   // of our recommendations, that vendor lives in their household forever
   // (iOS Contacts directory, Vendor Coverage, future-case matching).
+  // Phase 85.6 — ownership_request decision branch. Walk every entity
+  // in the proposal and either flip chez_owned=true (approve) or write
+  // a cooldown row + clear pending pointer (decline). This is the path
+  // that actually grants Chez the right to manage these entities — no
+  // other server code can flip chez_owned now without going through
+  // here OR through a homeowner-initiated delegate_* call.
+  {
+    const propBlob = (message.proposal as Record<string, unknown>) ?? {};
+    const kind = String(propBlob.kind ?? "");
+    if (kind === "ownership_request") {
+      const entities = Array.isArray((propBlob as { entities?: unknown }).entities)
+        ? ((propBlob as { entities: Array<Record<string, unknown>> }).entities)
+        : [];
+      const nowIso = new Date().toISOString();
+      const tablesPerType: Record<string, string> = {
+        task: "maintenance_tasks",
+        routine: "routines",
+        contractor: "contractors",
+        system: "home_systems",
+        project: "property_projects",
+        document: "documents",
+        utility: "utility_accounts",
+        vehicle: "vehicles",
+      };
+      for (const eRaw of entities) {
+        const eType = String(eRaw.entity_type ?? "");
+        const eId = String(eRaw.entity_id ?? "");
+        if (!eType || !eId) continue;
+        const tbl = tablesPerType[eType];
+        if (decision === "approved") {
+          if (eType === "insurance") {
+            // Insurance lives as a JSONB key on properties; we replay
+            // the same delegation pattern handleDelegateEntity uses.
+            const propertyId = String(eRaw.property_id ?? "");
+            if (!propertyId) continue;
+            const { data: prop } = await service
+              .from("properties")
+              .select("chez_owned_insurance, household_id")
+              .eq("id", propertyId)
+              .maybeSingle();
+            if (!prop || (prop as { household_id: string }).household_id !== request.household_id) continue;
+            const existing = ((prop as { chez_owned_insurance: Record<string, unknown> }).chez_owned_insurance) ?? {};
+            existing[eId] = { owned: true, owned_at: nowIso };
+            await service
+              .from("properties")
+              .update({ chez_owned_insurance: existing })
+              .eq("id", propertyId);
+          } else if (tbl) {
+            await service
+              .from(tbl)
+              .update({
+                chez_owned: true,
+                chez_owned_at: nowIso,
+                pending_ownership_request_id: null,   // clear pointer
+              })
+              .eq("id", eId);
+          }
+        } else if (decision === "declined") {
+          // Insert a cooldown row so the admin can't re-pitch within 60d.
+          await service
+            .from("chez_dismissed_ownership_proposals")
+            .insert({
+              household_id: request.household_id,
+              entity_type: eType,
+              entity_id: eId,
+              proposal_request_id: request.id,
+              note: payload.note || null,
+              // expires_at defaults to now() + 60 days via the schema.
+            });
+          if (tbl) {
+            await service
+              .from(tbl)
+              .update({ pending_ownership_request_id: null })
+              .eq("id", eId);
+          }
+        } else if (decision === "countered") {
+          // Counter just clears the pending pointer — the admin needs to
+          // re-pitch with the homeowner's adjusted scope. No cooldown.
+          if (tbl) {
+            await service
+              .from(tbl)
+              .update({ pending_ownership_request_id: null })
+              .eq("id", eId);
+          }
+        }
+      }
+    }
+  }
+
   if (decision === "approved") {
     const propBlob = (message.proposal as Record<string, unknown>) ?? {};
     const kind = String(propBlob.kind ?? "");
@@ -2625,6 +2714,254 @@ async function handleDelegateEntity(
   }
 
   return json({ ok: true });
+}
+
+// ============================================================================
+// Phase 85.6 — Ownership consent flow (propose / approve / decline)
+// ============================================================================
+//
+// Replaces the direct `delegate_entity` admin path with a consent loop:
+//   1. Admin clicks "Propose Chez ownership" → server creates a chez_request
+//      with category=ownership_request + a structured proposal message
+//      listing the entities the operator wants to take over.
+//   2. Homeowner sees an Approve/Decline card in iOS inbox.
+//   3. On approve, decide_proposal handler walks the listed entities and
+//      runs the existing delegate_* flow on each.
+//   4. On decline, the 60-day cooldown table (chez_dismissed_ownership_proposals)
+//      gets a row per entity so the admin can't re-pitch the same week.
+//
+// The proposal is single OR batched. Batched is critical for group toggles
+// ("Chez handles all my systems") — without batching, a homeowner with 18
+// systems would get 18 separate Approve/Decline cards.
+
+interface ProposeOwnershipEntity {
+  entity_type: "task" | "routine" | "contractor" | "system" | "project" | "document" | "utility" | "vehicle" | "insurance";
+  entity_id: string;
+  label?: string;          // Optional pre-resolved human label. If absent, server resolves from the entity table.
+  property_id?: string;    // Required for insurance (which lives as a JSONB key on properties).
+}
+
+interface ProposeOwnershipPayload {
+  household_id?: string;   // Admin-only override; homeowner callers resolve from their user row.
+  entities: ProposeOwnershipEntity[];
+  // Optional message preface ("Margaret, I noticed you've been asking
+  // about boiler care — can Chez take this over?")
+  preface?: string;
+  // Optional "Standing engagement" parent request to append to. If not
+  // provided, a new ownership_request thread is created.
+  request_id?: string;
+}
+
+async function handleProposeOwnership(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: ProposeOwnershipPayload,
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const householdId = await resolveHouseholdId(service, user, payload.household_id);
+  if (!householdId) return json({ error: "no household" }, 404);
+  const entities = Array.isArray(payload.entities) ? payload.entities : [];
+  if (entities.length === 0) return json({ error: "entities required" }, 400);
+  if (entities.length > 50) return json({ error: "too many entities in one proposal (max 50)" }, 400);
+
+  // Resolve the homeowner user_id for the household (proposals are routed
+  // to the primary user; future: route to whichever user delegated last).
+  const { data: userRows } = await service
+    .from("users")
+    .select("id, full_name, role")
+    .eq("household_id", householdId)
+    .limit(1);
+  const homeownerUserId = (userRows && userRows[0]?.id) || null;
+  if (!homeownerUserId) return json({ error: "no user on household" }, 404);
+
+  // Resolve labels for any entity that didn't ship one. We look up the
+  // table per entity_type from ENTITY_TABLES; for task/routine/contractor
+  // (which have their own delegate handlers and aren't in ENTITY_TABLES)
+  // we have to hardcode the table + label column.
+  const labelTable: Record<string, { table: string; col: string }> = {
+    task:       { table: "maintenance_tasks", col: "title" },
+    routine:    { table: "routines",          col: "label" },
+    contractor: { table: "contractors",       col: "company_name" },
+    system:     { table: "home_systems",      col: "name" },
+    project:    { table: "property_projects", col: "name" },
+    document:   { table: "documents",         col: "filename" },
+    utility:    { table: "utility_accounts",  col: "provider_name" },
+    vehicle:    { table: "vehicles",          col: "make" },     // synthesized below
+  };
+
+  const resolved: Array<ProposeOwnershipEntity & { label: string }> = [];
+  for (const e of entities) {
+    const t = e.entity_type;
+    if (!t) continue;
+    let label = compactString(e.label || "");
+    if (!label && labelTable[t]) {
+      const cfg = labelTable[t];
+      const cols = t === "vehicle" ? "year, make, model" : cfg.col;
+      const { data: row } = await service
+        .from(cfg.table)
+        .select(cols)
+        .eq("id", e.entity_id)
+        .eq("household_id", householdId)
+        .maybeSingle();
+      if (row) {
+        if (t === "vehicle") {
+          const v = row as { year: number | null; make: string | null; model: string | null };
+          label = [v.year, v.make, v.model].filter(Boolean).join(" ").trim();
+        } else {
+          label = String((row as Record<string, unknown>)[cfg.col] || "");
+        }
+      }
+    }
+    if (!label) label = `${t} ${e.entity_id.slice(0, 8)}`;
+    resolved.push({ ...e, label });
+  }
+
+  // Filter out entities that are still on cooldown from a prior decline.
+  // The cooldown query is one round-trip; we drop any entity that matches
+  // a still-active row and report it in the response so the admin sees
+  // "these 3 were excluded — homeowner declined within the last 60 days."
+  const nowIso = new Date().toISOString();
+  const { data: cooldownRows } = await service
+    .from("chez_dismissed_ownership_proposals")
+    .select("entity_type, entity_id, expires_at, note")
+    .eq("household_id", householdId)
+    .gt("expires_at", nowIso);
+  const cooldownSet = new Set(
+    ((cooldownRows ?? []) as Array<{ entity_type: string; entity_id: string }>)
+      .map((r) => `${r.entity_type}:${r.entity_id}`)
+  );
+  const proposable = resolved.filter((e) => !cooldownSet.has(`${e.entity_type}:${e.entity_id}`));
+  const skipped = resolved.filter((e) => cooldownSet.has(`${e.entity_type}:${e.entity_id}`));
+  if (proposable.length === 0) {
+    return json({
+      error: "all entities are on cooldown from prior declines",
+      skipped,
+    }, 409);
+  }
+
+  // Find or create the parent chez_request.
+  const now = new Date().toISOString();
+  let requestId = compactString(payload.request_id || "");
+  if (!requestId) {
+    const summary = proposable.length === 1
+      ? `Chez wants to handle: ${proposable[0].label}`
+      : `Chez wants to handle ${proposable.length} ${proposable[0].entity_type}s`;
+    const slaDueAt = await businessHoursDue(service);
+    const { data: req, error: createErr } = await service
+      .from("chez_requests")
+      .insert({
+        household_id: householdId,
+        user_id: homeownerUserId,
+        category: "ownership_request",
+        summary,
+        context: {
+          entity_types: Array.from(new Set(proposable.map((e) => e.entity_type))),
+          entity_count: proposable.length,
+        },
+        status: "open",
+        sla_due_at: slaDueAt,
+        last_message_at: now,
+        unread_for_user: true,
+        unread_for_admin: false,
+        pending_proposal_count: 1,
+      })
+      .select("id")
+      .single();
+    if (createErr || !req) return json({ error: createErr?.message || "failed to create request" }, 500);
+    requestId = (req as { id: string }).id;
+  }
+
+  // Insert the proposal message. The `kind: ownership_request` variant
+  // carries the full entity list so the iOS card can render one row per
+  // entity with Approve-all / Decline-all (and eventually a custom split).
+  const prefaceText = compactString(payload.preface || "");
+  const preview = proposable.slice(0, 3).map((e) => e.label).join(", ");
+  const extras = proposable.length > 3 ? ` and ${proposable.length - 3} more` : "";
+  const proposalContent = prefaceText
+    || (proposable.length === 1
+        ? `Hey — can Chez take over ${proposable[0].label}? We'll handle scheduling and follow-up so you don't have to think about it.`
+        : `Hey — can Chez take over ${proposable.length} items for you? (${preview}${extras}). We'll handle scheduling and follow-up so you don't have to think about it.`);
+
+  const { data: message, error: msgErr } = await service
+    .from("concierge_messages")
+    .insert({
+      household_id: householdId,
+      user_id: homeownerUserId,
+      request_id: requestId,
+      role: "concierge",
+      content: proposalContent,
+      attachments: [],
+      proposal: {
+        kind: "ownership_request",
+        status: "pending",
+        entities: proposable.map((e) => ({
+          entity_type: e.entity_type,
+          entity_id: e.entity_id,
+          label: e.label,
+          property_id: e.property_id,
+        })),
+      },
+      proposal_kind: "ownership_request",
+    })
+    .select("*")
+    .single();
+  if (msgErr || !message) {
+    return json({ error: msgErr?.message || "failed to insert proposal" }, 500);
+  }
+
+  // Stamp pending_ownership_request_id on each entity so the admin
+  // portal can resolve "is this entity already proposed?" without
+  // scanning concierge_messages. We do per-type updates because each
+  // entity table has its own column.
+  const tablesPerType: Record<string, string> = {
+    task: "maintenance_tasks",
+    routine: "routines",
+    contractor: "contractors",
+    system: "home_systems",
+    project: "property_projects",
+    document: "documents",
+    utility: "utility_accounts",
+    vehicle: "vehicles",
+  };
+  for (const e of proposable) {
+    const table = tablesPerType[e.entity_type];
+    if (!table) continue;        // insurance has no per-row pointer
+    await service
+      .from(table)
+      .update({ pending_ownership_request_id: requestId })
+      .eq("id", e.entity_id);
+  }
+
+  // Bump last_message_at + unread_for_user on the parent request.
+  await service
+    .from("chez_requests")
+    .update({
+      last_message_at: now,
+      unread_for_user: true,
+    })
+    .eq("id", requestId);
+
+  // Push to the homeowner.
+  await sendPush(
+    serviceUrl,
+    serviceRoleKey,
+    [homeownerUserId],
+    "Chez wants to help",
+    proposable.length === 1
+      ? `Approve Chez to take over ${proposable[0].label}?`
+      : `Approve Chez to take over ${proposable.length} items?`,
+    { type: "chez_request_reply", request_id: requestId }
+  );
+
+  return json({
+    ok: true,
+    request_id: requestId,
+    message_id: (message as { id: string }).id,
+    proposed: proposable.length,
+    skipped_for_cooldown: skipped,
+  });
 }
 
 // ============================================================================
@@ -4893,6 +5230,18 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as DelegateEntityPayload,
+          supabaseUrl,
+          serviceRoleKey
+        );
+
+      // Phase 85.6 — Ownership consent flow. Admin proposes; homeowner
+      // approves via the existing decide_proposal action, which now
+      // dispatches on `ownership_request` to flip chez_owned.
+      case "propose_ownership":
+        return handleProposeOwnership(
+          service,
+          user,
+          body as unknown as ProposeOwnershipPayload,
           supabaseUrl,
           serviceRoleKey
         );
