@@ -14,6 +14,70 @@ This file is the sink for **gaps** (features absent and should exist),
 
 ---
 
+## Post-overnight implementation pass (2026-05-08) — 10 commits shipped
+
+After the overnight pass landed, an architectural-decision-driven
+implementation pass executed the post-overnight plan at
+`/Users/tomburke/.claude/plans/now-go-through-everything-crystalline-bird.md`.
+Status updates marked **FIXED** below per ticket. Full commit table
+in `HANDYMAN_OVERNIGHT_E2E_REPORT.md`.
+
+**Architectural decisions locked:**
+- T0.A = β bridge (keep portal sessions for live execution; fan out to
+  home_assessments at submit time via T2.8 in a future commit)
+- T0.B = delete GuidedAssessmentView (740 LOC dead code) ✓ SHIPPED
+- T0.C/D/E = stay desktop-only (Settings/quote-builder), document
+  dark-mode opt-out as design choice
+
+**Tier 1 critical Tom-callouts shipped:**
+- T0.B delete GuidedAssessmentView ✓
+- T1.2 system Edit affordance (A4 fix) ✓
+- T1.5 push deep-link handler (typed routing) ✓
+
+**Tier 3 small wins shipped:**
+- T3.5 chez_profile read-only display on home detail ✓
+- T3.1 + T3.2 Routines + Vendors sub-tabs on home detail ✓
+- T3.7 Pull up manual link on system detail ✓
+
+**Tier 2 cluster started:**
+- T2.5 Add vendor sheet on home detail ✓
+- T2.7 Recommendation composer scaffold (gated dormant pending
+  portal seed_payload extension) ✓ partial
+
+**Tier 5 infrastructure shipped:**
+- T5.6 admin gate actions (flag_assessment_for_revision +
+  decide_handyman_recommendation) ✓
+- T5.8 per-tech revenue + utilization on Operations Desk Crew ✓
+
+**Already done by parallel branch work** (verified during Phase 0):
+- T1.3 Decommission system UI ✓
+- T1.6 tap-to-call (homeownerPhone in dashboard payload + tel://) ✓
+- T1.6 tap-to-navigate (Maps URL on visit detail) ✓
+- T1.7 Start visit / Check-in CTA ✓
+- T1.4 Quote → homeowner inbox surface (handyman_quote_received in
+  send_quote action) ✓
+- T1.1 CaptureCard equivalent ("Capture a system" section card) on
+  Customer Home Systems sub-tab ✓
+
+**Still deferred** (not in this pass):
+- T2.1 Assessment queue + detail screen (large)
+- T2.3 Manual entry fallback for system capture
+- T2.4 Mark for follow-up
+- T2.6 RoutineCaptureSheet (large)
+- T2.8 submit_assessment_data fan-out (T0.A=β payoff — large)
+- T2.9 Multi-day continuation visits
+- T2.10/T2.11 Homeowner-present toggle / camera permission handler
+- T2.12 Live punch list with photo/voice/materials/time (large)
+- T2.13 Visit summary
+- T3.16 Revoke / End-relationship affordance (defer — needs schema decision)
+- T5.1 Offline mode banner
+- T5.2 Photo upload retry queue
+- T5.3 chez-concierge ↔ handyman-provider bridge (large)
+- T5.4 Active visit banner on homeowner side
+- T5.7 assign_route batch action
+
+---
+
 ## Gaps (features absent, deferred to product)
 
 ### Section 1 — Account creation + workspace setup

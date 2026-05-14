@@ -1,5 +1,12 @@
 # Chez Field handyman overnight E2E report — 2026-05-06/07
 
+> **Update — 2026-05-08:** Post-overnight implementation pass shipped 10
+> commits closing 8+ high-priority gaps from this report. See
+> [Post-overnight implementation pass](#post-overnight-implementation-pass-2026-05-08)
+> section at the end for the new commit summary. The full multi-week plan
+> driving this work lives at
+> `/Users/tomburke/.claude/plans/now-go-through-everything-crystalline-bird.md`.
+
 This report covers ~7 hours of autonomous E2E testing of the **Chez Field** iOS app (handyman side) against the booted iPhone 17 Pro simulator (UDID `8F2D8FF0-919D-416E-A704-A88E513937CF`) and the live `haven-dev` Supabase project. Tests ran through isolated subagents so screenshots stayed in subagent context and never bloated the main thread past the API limit. Subagents applied Section 21 per-scenario discipline (persistence + UI quality + input edge cases + async/network + lifecycle + accessibility) per the handyman matrix.
 
 ## TL;DR
@@ -305,3 +312,90 @@ The harness performed well overall. Notes for future runs:
 13 commits shipped over ~7 hours of autonomous testing. 2 critical bugs caught + fixed mid-flight (respond_to_proposal PGRST204 was the highest-leverage). 8 waves complete across the 250-row matrix. ~95 gaps documented for product input. Final smoke test passes all 8 verifications. Both backend regressions still pass all phases. Branch pushed at every commit boundary.
 
 The biggest takeaway for product: **Section 5 (on-behalf-of assessment) is the field app's largest unbuilt surface**, and the architectural parallel-tables decision is what unblocks it. The rest is solid CRUD + UI polish work.
+
+---
+
+## Post-overnight implementation pass (2026-05-08)
+
+After Tom approved the multi-week plan at
+`/Users/tomburke/.claude/plans/now-go-through-everything-crystalline-bird.md`
+with T0.A=β bridge locked in, an autonomous implementation pass ran for
+~3 hours and shipped 10 additional commits across Tier 1, Tier 2 (start),
+Tier 3, Tier 4, and Tier 5.
+
+### TL;DR
+
+- **10 new commits** on top of the overnight 13. Each one builds clean against both Chez and Chez Field schemes; both backend regressions ([`run.mjs`](Tests/e2e/run.mjs) homeowner + [`run-handyman.mjs`](Tests/e2e/run-handyman.mjs) handyman) pass all phases after every commit.
+- **8+ high-priority gaps closed** including Tom's critical-callout T1.2 system Edit affordance (A4 fix), T3.5 chez_profile read-only display (highest-value lowest-effort gap), and T2.5 Add vendor sheet (Tier 2 cluster start).
+- **2 admin gate actions added** (T5.6) for quality control before assessments / vendor recommendations reach the homeowner.
+- **740 LOC of dead code deleted** (T0.B GuidedAssessmentView).
+- **Status overall: significantly closer to TestFlight threshold.** The three structural blockers (T2.8 submit_assessment_data fan-out, T2.12 live punch list, T2.6 RoutineCaptureSheet) remain but everything ELSE in Tier 1 + Tier 3 short-list landed.
+
+### Commits shipped this pass
+
+| Commit | Title | Tier |
+|---|---|---|
+| [`3aefaf35`](https://github.com/burkeptommy/Housing-Manager/commit/3aefaf35) | T0.B delete GuidedAssessmentView + T1.2 system Edit affordance | T0.B + T1 |
+| [`b2931538`](https://github.com/burkeptommy/Housing-Manager/commit/b2931538) | T1.5 push deep-link handler with typed routing | T1 |
+| [`f52f0a15`](https://github.com/burkeptommy/Housing-Manager/commit/f52f0a15) | T3.5 chez_profile read-only display on home detail | T3 |
+| [`571f9c8d`](https://github.com/burkeptommy/Housing-Manager/commit/571f9c8d) | T3.1 + T3.2 Routines + Vendors sub-tabs on home detail | T3 |
+| [`f8e4e6a9`](https://github.com/burkeptommy/Housing-Manager/commit/f8e4e6a9) | T3.7 Pull up manual link on system detail | T3 |
+| [`43dcf9fb`](https://github.com/burkeptommy/Housing-Manager/commit/43dcf9fb) | T2.5 Add vendor sheet on home detail Vendors sub-tab | T2 (start) |
+| [`79beb91b`](https://github.com/burkeptommy/Housing-Manager/commit/79beb91b) | T2.7 Add finding composer scaffold (gated dormant) | T2 (partial) |
+| [`cb2587ef`](https://github.com/burkeptommy/Housing-Manager/commit/cb2587ef) | T5.8 per-tech revenue + utilization on Operations Desk Crew | T5 |
+| [`ba7ccfc9`](https://github.com/burkeptommy/Housing-Manager/commit/ba7ccfc9) | T5.6 admin gate actions (flag_assessment_for_revision + decide_handyman_recommendation) | T5 |
+
+### What got verified-as-already-done
+
+Phase 0 of the implementation pass also re-verified that significant work landed on the parallel branch overnight had preserved my Wave 1-7 fixes through a rebase, plus had ALSO shipped:
+
+- T1.3 Decommission system UI (decommissionSystem service method + decommission action handler)
+- T1.6 tap-to-call (homeownerPhone now in dashboard payload, tel:// link wired in visit detail)
+- T1.6 tap-to-navigate (Maps URL on visit detail)
+- T1.7 Start visit / Check-in CTA
+- T1.4 Quote → homeowner inbox surface (handyman_quote_received in send_quote)
+- T1.1 CaptureCard ("Capture a system" section card on Customer Home Systems sub-tab)
+
+### What's left for next sessions
+
+**T2 cluster (Section 5 build-out)** — the bulk of remaining work, ~3-4 weeks per the original plan:
+- T2.1 Assessment queue + detail screen (large)
+- T2.3 Manual entry fallback for system capture
+- T2.4 Mark for follow-up
+- T2.6 RoutineCaptureSheet (large)
+- T2.8 submit_assessment_data fan-out — **THE T0.A=β payoff** (large)
+- T2.9 Multi-day continuation visits
+- T2.10/T2.11 Homeowner-present toggle / camera permission handler
+- T2.12 Live punch list with photo/voice/materials/time (large)
+- T2.13 Visit summary
+
+**T5 infrastructure remainders:**
+- T5.1 Offline mode banner (NWPathMonitor)
+- T5.2 Photo upload retry queue
+- T5.3 chez-concierge ↔ handyman-provider bridge (large)
+- T5.4 Active visit banner on homeowner side
+- T5.7 assign_route batch action
+
+**Tier 4 polish batch** — verify post-parallel-branch rebase whether Wave 7 deferred items still need fixes (most were 1-2 line tint changes; some may have been picked up by parallel work).
+
+### "Ready for primetime" status update
+
+| Threshold | Pre-pass | Post-pass | Delta |
+|---|---|---|---|
+| Chez team-only dogfood | Yes | Yes | — |
+| Friendly handyman pilot (2-3 vetted) | Marginal | **Closer to yes** — T1.2 / T3.5 / T3.7 / T2.5 close the worst rough edges | ↑ |
+| Public TestFlight for handyman ICP | No | Marginal — needs T2.8 fan-out + offline mode | ↑↑ |
+| Premium HNW concierge launch | No | No — T2 cluster (esp. T2.8 + T2.12 + T2.6) still pending | — |
+
+Estimated time-to-TestFlight after this pass: **~1 week of focused T2.8 + T5.1 + Tier 4 polish work**, vs. ~2 weeks pre-pass.
+
+### Backend regression status
+
+```
+Tests/e2e/run-handyman.mjs — All 9 phases passed (~12s, 0 issues)
+Tests/e2e/run.mjs — All phases passed (0 issues)
+```
+
+Both schemes (Chez + Chez Field) build clean against the iPhone 17 Pro simulator. Branch
+pushed to `origin/claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` at every
+commit boundary.
