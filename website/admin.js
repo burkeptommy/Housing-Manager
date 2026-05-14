@@ -18314,6 +18314,15 @@ function attachFocusedEntityHandlers() {
     });
   });
 
+  // Phase 85.6 Phase C: inline cross-entity links (e.g., the "System"
+  // value on a Task panel is a button that drills to that System).
+  el.auditFocused.querySelectorAll("[data-drill-link-id]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openFocusedEntityDetail(btn.dataset.drillLinkType, btn.dataset.drillLinkId);
+    });
+  });
+
   // Phase 85.5: handyman punch list actions. Schedule visit → opens the
   // workbench schedule_service modal targeting the household's standing
   // handyman contractor. Mark filed → archives the punch item via direct
@@ -18607,31 +18616,123 @@ function activeMonthsLabel(months) {
 
 // ----- Per-type focused detail renderers -----------------------------------
 
+// Phase 85.6 Phase C: Task parity rebuild. Mirrors iOS
+// MaintenanceTaskDetailSheet section-by-section:
+//   1. Header (title + frequency pill + priority pill)
+//   2. Status line (Next visit / Last completed / Scheduled / Unscheduled)
+//   3. Field grid (system, vendor, estimated cost, assignee)
+//   4. Description (cleaned — bundle checklist block stripped)
+//   5. WHAT'S INCLUDED — bundle checklist parsed from notes/description
+//   6. CUSTOM ADDITIONS — bundle_custom_subitems rows for this bundle_id
+//   7. Notes (cleaned — bundle block stripped)
+//   8. Actions row (Schedule / Mark complete / Snooze + ownership + msg)
+//   9. Linked case (if chez_request_id)
+
+// Helper: extract the "What's included:" checklist block from a notes
+// or description string. Mirrors the iOS extractBundledChecklist + filter:
+//   - Find "What's included:" marker
+//   - Take first paragraph (up to blank line)
+//   - Return lines starting with "- "
+function extractBundleChecklistLines(text) {
+  if (!text) return [];
+  const marker = text.indexOf("What's included:");
+  if (marker < 0) return [];
+  const trailing = text.substring(marker);
+  const firstParagraph = trailing.split(/\n\n/)[0] || "";
+  const lines = firstParagraph
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("- "))
+    .map((l) => l.substring(2).trim())
+    .filter((l) => l.length > 0);
+  return lines;
+}
+
+// Strip the bundle-checklist block from cleaned description/notes so
+// the operator doesn't see the same items twice.
+function stripBundleChecklistBlock(text) {
+  if (!text) return text;
+  const marker = text.indexOf("What's included:");
+  if (marker < 0) return text;
+  const trailing = text.substring(marker);
+  const firstParagraph = trailing.split(/\n\n/)[0] || "";
+  return text.replace(firstParagraph, "").trim();
+}
+
 function renderFocusedTaskHtml(t, wb) {
   const system = (wb.home_systems || []).find((s) => s.id === t.system_id);
   const vendor = (wb.contractors || []).find((c) => c.id === t.assigned_contractor_id);
+  const assignee = (wb.users || []).find((u) => u.id === t.assigned_to_user_id);
   const ownedBadge = t.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
-  const status = t.last_completed_date ? `Completed ${formatDateOnly(t.last_completed_date)}` : t.scheduled_date ? `Scheduled ${formatDateOnly(t.scheduled_date)}` : t.next_due_date ? `Due ${formatDateOnly(t.next_due_date)}` : "Unscheduled";
+  const status = t.last_completed_date
+    ? `Completed ${formatDateOnly(t.last_completed_date)}`
+    : t.scheduled_date
+    ? `Scheduled ${formatDateOnly(t.scheduled_date)}`
+    : t.next_due_date
+    ? `Due ${formatDateOnly(t.next_due_date)}`
+    : "Unscheduled";
+
+  // Phase 85.6 Phase C: bundle checklist parity. iOS pulls from notes
+  // first then description; admin does the same.
+  const bundleLines = extractBundleChecklistLines(t.notes) .length > 0
+    ? extractBundleChecklistLines(t.notes)
+    : extractBundleChecklistLines(t.description);
+  const isBundleParent = bundleLines.length > 0 && !!t.template_id;
+  const cleanDesc = stripBundleChecklistBlock(t.description);
+  const cleanNotes = stripBundleChecklistBlock(t.notes);
+  const customSubitems = isBundleParent
+    ? (wb.bundle_custom_subitems || []).filter((s) => s.bundle_id === t.template_id)
+    : [];
+
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
         <h2>${escapeHtml(t.title || "(untitled task)")}</h2>
         <div class="admin-focused__entity-meta">
           ${ownedBadge}
-          <span class="admin-pill admin-pill--note">${escapeHtml(t.assignment_type || "task")}</span>
-          ${t.priority ? `<span class="admin-pill">${escapeHtml(t.priority)}</span>` : ""}
+          ${t.frequency ? `<span class="admin-pill admin-pill--note">${escapeHtml(prettifyEnum(t.frequency))}</span>` : ""}
+          ${t.priority && t.priority !== "high" ? `<span class="admin-pill">${escapeHtml(prettifyEnum(t.priority))}</span>` : ""}
+          ${isBundleParent ? `<span class="admin-pill admin-pill--note">Bundle · ${bundleLines.length} items</span>` : ""}
         </div>
       </header>
+
       <section class="admin-focused__field-grid">
         <div><label>Status</label><strong>${escapeHtml(status)}</strong></div>
-        <div><label>Frequency</label><strong>${escapeHtml(t.frequency || "—")}</strong></div>
-        <div><label>System</label><strong>${escapeHtml(system?.name || system?.category || "—")}</strong></div>
-        <div><label>Vendor</label><strong>${escapeHtml(vendor?.company_name || (t.needs_vendor ? "Needs vendor" : "—"))}</strong></div>
+        <div><label>Assignment</label><strong>${escapeHtml(prettifyEnum(t.assignment_type) || "Task")}</strong></div>
+        <div><label>System</label><strong>${system ? `<button type="button" class="admin-link-inline" data-drill-link-type="system" data-drill-link-id="${escapeHtml(system.id)}">${escapeHtml(system.name || system.category)}</button>` : "—"}</strong></div>
+        <div><label>Vendor</label><strong>${vendor ? `<button type="button" class="admin-link-inline" data-drill-link-type="contractor" data-drill-link-id="${escapeHtml(vendor.id)}">${escapeHtml(vendor.company_name)}</button>` : (t.needs_vendor ? "Needs vendor" : "—")}</strong></div>
+        ${assignee ? `<div><label>Assigned to</label><strong>${escapeHtml(assignee.full_name || assignee.email || "")}</strong></div>` : ""}
         <div><label>Estimated cost</label><strong>${t.estimated_cost ? "$" + formatCompact(t.estimated_cost) : "—"}</strong></div>
         <div><label>Last completed</label><strong>${t.last_completed_date ? formatDateOnly(t.last_completed_date) : "Never"}</strong></div>
+        ${t.diy_effort_minutes ? `<div><label>DIY effort</label><strong>${t.diy_effort_minutes < 60 ? t.diy_effort_minutes + " min" : Math.round(t.diy_effort_minutes / 60 * 10) / 10 + " hr"}</strong></div>` : ""}
       </section>
-      ${t.description ? `<section class="admin-focused__notes-block"><h3>Description</h3><p>${escapeHtml(t.description)}</p></section>` : ""}
-      ${t.notes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(t.notes)}</p></section>` : ""}
+
+      ${cleanDesc ? `<section class="admin-focused__notes-block"><h3>Description</h3><p>${escapeHtml(cleanDesc)}</p></section>` : ""}
+
+      ${bundleLines.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>What's included · ${bundleLines.length}</h3>
+          <ul class="admin-focused__checklist">
+            ${bundleLines.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}
+          </ul>
+        </section>` : ""}
+
+      ${isBundleParent ? `
+        <section class="admin-focused__list-block">
+          <h3>Custom additions${customSubitems.length > 0 ? " · " + customSubitems.length : ""}</h3>
+          ${customSubitems.length === 0
+            ? `<p class="admin-muted">No homeowner-added items for this visit yet.</p>`
+            : customSubitems.map((s) => `
+              <div class="admin-households__entity-row">
+                <div class="admin-households__entity-main">
+                  <strong>${escapeHtml(s.title)}</strong>
+                  <span class="admin-muted">${s.recurrence === "always" ? "Every visit" : "Just this visit"}${s.added_at ? " · Added " + formatDateOnly(s.added_at) : ""}</span>
+                </div>
+              </div>`).join("")}
+        </section>` : ""}
+
+      ${cleanNotes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(cleanNotes)}</p></section>` : ""}
+
       <section class="admin-focused__actions">
         <h3>Actions</h3>
         <div class="admin-focused__action-row">
@@ -18645,6 +18746,7 @@ function renderFocusedTaskHtml(t, wb) {
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
       </section>
+
       ${t.chez_request_id ? `
         <section class="admin-focused__notes-block">
           <h3>Linked case</h3>
@@ -18888,29 +18990,91 @@ function renderFocusedProjectHtml(p, wb) {
   `;
 }
 
+// Phase 85.6 Phase C: Document parity rebuild. Mirrors iOS
+// DocumentDetailView section-by-section:
+//   1. Header (filename + category pill + filing status)
+//   2. Metadata grid (type, uploaded, expiration, file linked entities)
+//   3. Notes (homeowner notes)
+//   4. Linked-entity rows (system / project / vehicle this doc belongs to)
+//   5. Actions row (Mark filed / Share / Ownership / Message)
+//
+// We don't render the actual PDF preview (security + load weight); the
+// admin gets a "View original" button that hits the existing
+// view-document Edge Function which streams the decrypted file.
 function renderFocusedDocumentHtml(d, wb) {
   const ownedBadge = d.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
-  const filed = d.chez_filed_at ? `<span class="admin-pill">Filed ${relativeTimeString(d.chez_filed_at)}</span>` : "";
+  const filedPill = d.chez_filed_at
+    ? `<span class="admin-pill">Filed ${relativeTimeString(d.chez_filed_at)}</span>`
+    : `<span class="admin-pill admin-pill--warning">Needs filing</span>`;
+  const linkedSystem = d.system_id ? (wb.home_systems || []).find((s) => s.id === d.system_id) : null;
+  const linkedProject = d.project_id ? (wb.projects || []).find((p) => p.id === d.project_id) : null;
+  const linkedVehicle = d.vehicle_id ? (wb.vehicles || []).find((v) => v.id === d.vehicle_id) : null;
+  const expiringSoon = (() => {
+    if (!d.expiration_date) return false;
+    const diff = (new Date(d.expiration_date).getTime() - Date.now()) / 86400000;
+    return diff >= 0 && diff <= 30;
+  })();
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
         <h2>${escapeHtml(d.filename || "(no filename)")}</h2>
         <div class="admin-focused__entity-meta">
-          ${ownedBadge}${filed}
+          ${ownedBadge}${filedPill}
           <span class="admin-pill admin-pill--note">${escapeHtml(d.category || "Document")}</span>
+          ${expiringSoon ? `<span class="admin-pill admin-pill--warning">Expires soon</span>` : ""}
         </div>
       </header>
+
       <section class="admin-focused__field-grid">
-        <div><label>Type</label><strong>${escapeHtml(d.mime_type || "—")}</strong></div>
+        <div><label>Type</label><strong>${escapeHtml(d.mime_type || "Unknown")}</strong></div>
+        <div><label>Uploaded</label><strong>${d.created_at ? formatDateOnly(d.created_at) : "Unknown"}</strong></div>
         <div><label>Expiration</label><strong>${d.expiration_date ? formatDateOnly(d.expiration_date) : "—"}</strong></div>
+        <div><label>Filed</label><strong>${d.chez_filed_at ? formatDateOnly(d.chez_filed_at) : "Not yet"}</strong></div>
       </section>
+
+      ${d.notes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(d.notes)}</p></section>` : ""}
+
+      ${(linkedSystem || linkedProject || linkedVehicle) ? `
+        <section class="admin-focused__list-block">
+          <h3>Linked to</h3>
+          ${linkedSystem ? `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="system" data-drill-entity-id="${escapeHtml(linkedSystem.id)}">
+              <div class="admin-households__entity-main">
+                <strong>System: ${escapeHtml(linkedSystem.name || linkedSystem.category)}</strong>
+                <span class="admin-muted">${escapeHtml(linkedSystem.category)}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>` : ""}
+          ${linkedProject ? `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="project" data-drill-entity-id="${escapeHtml(linkedProject.id)}">
+              <div class="admin-households__entity-main">
+                <strong>Project: ${escapeHtml(linkedProject.name)}</strong>
+                <span class="admin-muted">${escapeHtml(prettifyEnum(linkedProject.status) || "")}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>` : ""}
+          ${linkedVehicle ? `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="vehicle" data-drill-entity-id="${escapeHtml(linkedVehicle.id)}">
+              <div class="admin-households__entity-main">
+                <strong>Vehicle: ${escapeHtml([linkedVehicle.year, linkedVehicle.make, linkedVehicle.model].filter(Boolean).join(" "))}</strong>
+                <span class="admin-muted">${escapeHtml(linkedVehicle.license_plate || "")}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>` : ""}
+        </section>` : `
+        <section class="admin-focused__list-block">
+          <h3>Linked to</h3>
+          <p class="admin-muted">This document isn't linked to a system, project, or vehicle yet.</p>
+        </section>`}
+
       <section class="admin-focused__actions">
         <h3>Actions</h3>
         <div class="admin-focused__action-row">
-          <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="mark_filed" data-entity-type="document" data-entity-id="${escapeHtml(d.id)}">Mark filed</button>
+          ${!d.chez_filed_at ? `<button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="mark_filed" data-entity-type="document" data-entity-id="${escapeHtml(d.id)}">Mark filed</button>` : ""}
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="share_with_vendor" data-entity-type="document" data-entity-id="${escapeHtml(d.id)}">Share with vendor</button>
           ${renderOwnershipPill(d)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
+          <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
       </section>
     </article>
@@ -18949,48 +19113,198 @@ function renderFocusedUtilityHtml(u, wb) {
   `;
 }
 
+// Phase 85.6 Phase C: full parity rebuild for Vehicle.
+// Mirrors iOS VehicleDetailView.swift section-by-section:
+//   1. Brand hero (year/make/model + plate + mileage pill)
+//   2. Mechanic card (linked contractor — drill to vendor panel)
+//   3. Cost summary row (total spent / service count / last service)
+//   4. Needs Attention (recalls + expiring docs)
+//   5. Registration / Insurance / Ownership cards
+//   6. Maintenance tasks (vehicle-linked, drill to task panel)
+//   7. Service history (date + type + cost + mileage + contractor)
+//   8. Documents (vehicle-linked, drill to doc panel)
+//   9. Open + Resolved recalls
 function renderFocusedVehicleHtml(v, wb, rel) {
-  const ownedBadge = v.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
-  const recalls = rel.recalls || [];
-  const openRecalls = recalls.filter((r) => !r.is_resolved);
+  // Data sourcing — workbench fetch now ships every supporting list so
+  // the panel doesn't have to chain DB calls.
+  const allServices = (wb.vehicle_service_records || []).filter((s) => s.vehicle_id === v.id);
+  const allRecalls = (wb.vehicle_recalls || []).filter((r) => r.vehicle_id === v.id);
+  const openRecalls = allRecalls.filter((r) => !r.is_resolved);
+  const resolvedRecalls = allRecalls.filter((r) => !!r.is_resolved);
+  // Fall back to `rel.recalls` (loaded by hydrateFocusedEntityRelations) if
+  // the workbench query is older than the relation fetch.
+  const recallsFromRel = rel.recalls || [];
+  const recallsAll = allRecalls.length > 0 ? allRecalls : recallsFromRel;
+  const openRecallsFinal = recallsAll.filter((r) => !r.is_resolved);
+  const resolvedRecallsFinal = recallsAll.filter((r) => !!r.is_resolved);
   const linkedTasks = (wb.tasks || []).filter((t) => t.vehicle_id === v.id && !t.is_archived);
+  const linkedDocs = (wb.documents || []).filter((d) => d.vehicle_id === v.id);
+  const mechanic = (wb.contractors || []).find((c) => c.id === v.preferred_mechanic_id);
+  const ownedBadge = v.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  // Cost summary calculations
+  const totalSpent = allServices.reduce((s, r) => s + (Number(r.cost) || 0), 0);
+  const lastService = allServices[0];   // already ordered desc
+  // Needs-attention badges (parity with iOS needsAttentionSection)
+  const today = new Date();
+  const within30Days = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const diff = (d.getTime() - today.getTime()) / 86400000;
+    return diff >= 0 && diff <= 30;
+  };
+  const regExpiringSoon = within30Days(v.registration_expiry);
+  const insExpiringSoon = within30Days(v.insurance_expiry);
+  const overdueTasks = linkedTasks.filter((t) => {
+    const due = t.scheduled_date || t.next_due_date;
+    if (!due) return false;
+    return new Date(due) < today;
+  });
+  const needsAttentionCount = openRecallsFinal.length
+    + (regExpiringSoon ? 1 : 0)
+    + (insExpiringSoon ? 1 : 0)
+    + overdueTasks.length;
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
-        <h2>${escapeHtml([v.year, v.make, v.model].filter(Boolean).join(" "))}</h2>
+        <h2>${escapeHtml([v.year, v.make, v.model].filter(Boolean).join(" ") || "Vehicle")}</h2>
         <div class="admin-focused__entity-meta">
           ${ownedBadge}
           ${v.license_plate ? `<span class="admin-pill admin-pill--note">${escapeHtml(v.license_plate)}</span>` : ""}
-          ${openRecalls.length > 0 ? `<span class="admin-pill admin-pill--warning">${openRecalls.length} open recall${openRecalls.length === 1 ? "" : "s"}</span>` : ""}
+          ${v.color ? `<span class="admin-pill">${escapeHtml(v.color)}</span>` : ""}
+          ${v.current_mileage ? `<span class="admin-pill">${formatCompact(v.current_mileage)} mi</span>` : ""}
+          ${openRecallsFinal.length > 0 ? `<span class="admin-pill admin-pill--warning">${openRecallsFinal.length} open recall${openRecallsFinal.length === 1 ? "" : "s"}</span>` : ""}
         </div>
       </header>
+
       <section class="admin-focused__field-grid">
         <div><label>VIN</label><strong>${escapeHtml(v.vin || "Not on file")}</strong></div>
         <div><label>Mileage</label><strong>${v.current_mileage ? formatCompact(v.current_mileage) + " mi" : "Not on file"}</strong></div>
-        <div><label>Reg expires</label><strong>${v.registration_expiry ? formatDateOnly(v.registration_expiry) : "Not on file"}</strong></div>
-        <div><label>Insurance expires</label><strong>${v.insurance_expiry ? formatDateOnly(v.insurance_expiry) : "Not on file"}</strong></div>
+        <div><label>Ownership</label><strong>${escapeHtml(prettifyEnum(v.ownership_type) || "Not on file")}</strong></div>
+        <div><label>Purchased</label><strong>${v.purchase_date ? formatDateOnly(v.purchase_date) : "Not on file"}</strong></div>
+        <div><label>Reg expires</label><strong>${v.registration_expiry ? formatDateOnly(v.registration_expiry) + (regExpiringSoon ? " ⚠️" : "") : "Not on file"}</strong></div>
+        <div><label>Insurance expires</label><strong>${v.insurance_expiry ? formatDateOnly(v.insurance_expiry) + (insExpiringSoon ? " ⚠️" : "") : "Not on file"}</strong></div>
+        ${v.insurance_carrier ? `<div><label>Insurance carrier</label><strong>${escapeHtml(v.insurance_carrier)}</strong></div>` : ""}
+        ${v.insurance_policy_num ? `<div><label>Policy #</label><strong>${escapeHtml(v.insurance_policy_num)}</strong></div>` : ""}
       </section>
+
       <section class="admin-focused__actions">
         <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_service" data-entity-type="vehicle" data-entity-id="${escapeHtml(v.id)}">Schedule service</button>
-          ${openRecalls.length > 0
-            ? `<button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="handle_recall" data-entity-type="vehicle" data-entity-id="${escapeHtml(v.id)}">Handle ${openRecalls.length} recall${openRecalls.length === 1 ? "" : "s"}</button>`
+          ${openRecallsFinal.length > 0
+            ? `<button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="handle_recall" data-entity-type="vehicle" data-entity-id="${escapeHtml(v.id)}">Handle ${openRecallsFinal.length} recall${openRecallsFinal.length === 1 ? "" : "s"}</button>`
             : `<button type="button" class="admin-pill" disabled title="No open recalls on this vehicle.">Handle recall</button>`}
           ${renderOwnershipPill(v)}
           <button type="button" class="admin-pill admin-pill--secondary" data-focused-message-homeowner>✉ Message homeowner</button>
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
       </section>
-      ${openRecalls.length > 0 ? `
+
+      ${mechanic ? `
         <section class="admin-focused__list-block">
-          <h3>Open recalls · ${openRecalls.length}</h3>
-          ${openRecalls.map((r) => `<div class="admin-households__entity-row"><div class="admin-households__entity-main"><strong>${escapeHtml(r.component || r.summary || "Recall")}</strong><span class="admin-muted">${escapeHtml(r.campaign_number || "")}</span></div></div>`).join("")}
+          <h3>Mechanic on file</h3>
+          <div class="admin-households__entity-row is-clickable" data-drill-entity-type="contractor" data-drill-entity-id="${escapeHtml(mechanic.id)}">
+            <div class="admin-households__entity-main">
+              <strong>${escapeHtml(mechanic.company_name || "Linked mechanic")}</strong>
+              <span class="admin-muted">${escapeHtml(mechanic.category || "Auto service")}${mechanic.phone ? " · " + formatPhoneNumber(mechanic.phone) : ""}</span>
+            </div>
+            <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+          </div>
+        </section>` : `
+        <section class="admin-focused__list-block">
+          <h3>Mechanic on file</h3>
+          <p class="admin-muted">No mechanic linked. Homeowner can pick one in the iOS app, or Chez can propose one.</p>
+        </section>`}
+
+      ${allServices.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Cost summary</h3>
+          <div class="admin-focused__field-grid">
+            <div><label>Total spent</label><strong>$${formatCompact(totalSpent)}</strong></div>
+            <div><label>Services logged</label><strong>${allServices.length}</strong></div>
+            <div><label>Last service</label><strong>${lastService?.service_date ? formatDateOnly(lastService.service_date) : "—"}</strong></div>
+          </div>
         </section>` : ""}
+
+      ${needsAttentionCount > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Needs attention · ${needsAttentionCount}</h3>
+          ${openRecallsFinal.map((r) => `
+            <div class="admin-households__entity-row">
+              <div class="admin-households__entity-main">
+                <strong>⚠️ Recall: ${escapeHtml(r.component || r.summary || "Open recall")}</strong>
+                <span class="admin-muted">${escapeHtml(r.campaign_number || "")}${r.consequence_summary ? " · " + escapeHtml(String(r.consequence_summary).slice(0, 100)) : ""}</span>
+              </div>
+            </div>`).join("")}
+          ${regExpiringSoon ? `<div class="admin-households__entity-row"><div class="admin-households__entity-main"><strong>📋 Registration expiring</strong><span class="admin-muted">${formatDateOnly(v.registration_expiry)}</span></div></div>` : ""}
+          ${insExpiringSoon ? `<div class="admin-households__entity-row"><div class="admin-households__entity-main"><strong>📋 Insurance expiring</strong><span class="admin-muted">${formatDateOnly(v.insurance_expiry)}</span></div></div>` : ""}
+          ${overdueTasks.map((t) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}">
+              <div class="admin-households__entity-main">
+                <strong>🔧 Overdue: ${escapeHtml(t.title)}</strong>
+                <span class="admin-muted">Was due ${formatDateOnly(t.scheduled_date || t.next_due_date)}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
+
       ${linkedTasks.length > 0 ? `
         <section class="admin-focused__list-block">
           <h3>Vehicle tasks · ${linkedTasks.length}</h3>
-          ${linkedTasks.slice(0, 8).map((t) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(t.title)}</strong><span class="admin-muted">${t.next_due_date ? "due " + formatDateOnly(t.next_due_date) : ""}</span></div></div>`).join("")}
+          ${linkedTasks.slice(0, 8).map((t) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(t.title)}</strong>
+                <span class="admin-muted">${t.next_due_date ? "Next due " + formatDateOnly(t.next_due_date) : t.scheduled_date ? "Scheduled " + formatDateOnly(t.scheduled_date) : "Unscheduled"}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
+
+      ${allServices.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Service history · ${allServices.length}</h3>
+          ${allServices.slice(0, 12).map((s) => {
+            const vendor = (wb.contractors || []).find((c) => c.id === s.contractor_id);
+            const vendorName = vendor?.company_name || s.shop_name || "";
+            return `
+              <div class="admin-households__entity-row">
+                <div class="admin-households__entity-main">
+                  <strong>${escapeHtml(s.service_type || s.description || "Service")}</strong>
+                  <span class="admin-muted">${s.service_date ? formatDateOnly(s.service_date) : ""}${s.mileage_at_service ? " · " + formatCompact(s.mileage_at_service) + " mi" : ""}${vendorName ? " · " + escapeHtml(vendorName) : ""}</span>
+                </div>
+                ${s.cost ? `<span class="admin-households__entity-meta">$${formatCompact(Number(s.cost))}</span>` : ""}
+              </div>`;
+          }).join("")}
+        </section>` : `
+        <section class="admin-focused__list-block">
+          <h3>Service history</h3>
+          <p class="admin-muted">No service records logged yet. The "Schedule service" action above creates the next entry; "Log service" on the system pulls from a workbench task.</p>
+        </section>`}
+
+      ${linkedDocs.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Vehicle documents · ${linkedDocs.length}</h3>
+          ${linkedDocs.slice(0, 10).map((d) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="document" data-drill-entity-id="${escapeHtml(d.id)}">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(d.filename || "Document")}</strong>
+                <span class="admin-muted">${escapeHtml(d.category || "Unfiled")}${d.expiration_date ? " · Expires " + formatDateOnly(d.expiration_date) : ""}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
+
+      ${resolvedRecallsFinal.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Resolved recalls · ${resolvedRecallsFinal.length}</h3>
+          ${resolvedRecallsFinal.slice(0, 6).map((r) => `
+            <div class="admin-households__entity-row">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(r.component || r.summary || "Recall")}</strong>
+                <span class="admin-muted">${escapeHtml(r.campaign_number || "")}${r.resolved_date ? " · Resolved " + formatDateOnly(r.resolved_date) : ""}</span>
+              </div>
+            </div>`).join("")}
         </section>` : ""}
     </article>
   `;

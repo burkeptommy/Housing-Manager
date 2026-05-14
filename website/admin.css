@@ -10963,3 +10963,40 @@ details.admin-chez__analysis-section pre {
   width: min(540px, 92vw);
   max-height: 80vh;
 }
+
+/* Phase 85.6 Phase C — inline cross-entity link button used on focused
+   panels to jump to a linked System / Vendor / etc. Looks like text,
+   acts like a button. */
+.admin-link-inline {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--brand-strong, #ED6955);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.admin-link-inline:hover {
+  color: var(--text, #2A2252);
+}
+
+/* Bundle checklist — bulleted list on Task focused panel. */
+.admin-focused__checklist {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+}
+.admin-focused__checklist li {
+  position: relative;
+  padding: 4px 0 4px 16px;
+  font: 400 13px var(--sans);
+  color: var(--text, #2A2252);
+  line-height: 1.4;
+}
+.admin-focused__checklist li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--text-muted, #6F6A88);
+}

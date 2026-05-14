@@ -4202,6 +4202,7 @@ async function handleFetchHouseholdWorkbench(
     routinesRes, systemsRes, contractorsRes, tasksRes, projectsRes,
     documentsRes, utilitiesRes, vehiclesRes,
     casesRes, workbenchActionsRes, remindersRes, punchItemsRes,
+    vehicleServiceRes, vehicleRecallsRes, bundleCustomSubitemsRes,
   ] = await Promise.all([
     safe(service.from("households").select("*").eq("id", householdId).maybeSingle(), "household"),
     safe(service.from("properties").select("*").eq("household_id", householdId), "properties"),
@@ -4212,7 +4213,7 @@ async function handleFetchHouseholdWorkbench(
     safe(service.from("contractors").select("*").eq("household_id", householdId), "contractors"),
     safe(service.from("maintenance_tasks").select("*").eq("household_id", householdId).eq("is_archived", false), "tasks"),
     safe(service.from("property_projects").select("*").eq("household_id", householdId), "projects"),
-    safe(service.from("documents").select("id, household_id, filename, category, mime_type, expiration_date, chez_owned, chez_owned_at").eq("household_id", householdId).limit(200), "documents"),
+    safe(service.from("documents").select("id, household_id, filename, category, mime_type, expiration_date, chez_owned, chez_owned_at, vehicle_id, project_id, chez_filed_at, created_at, notes, pending_ownership_request_id").eq("household_id", householdId).limit(200), "documents"),
     safe(service.from("utility_accounts").select("*").eq("household_id", householdId), "utilities"),
     safe(service.from("vehicles").select("*").eq("household_id", householdId), "vehicles"),
     safe(service.from("chez_requests").select("*").eq("household_id", householdId).neq("status", "resolved").order("last_message_at", { ascending: false }), "open_cases"),
@@ -4222,6 +4223,19 @@ async function handleFetchHouseholdWorkbench(
     // the admin workbench can render the Handyman tab + the Upcoming
     // "Handyman punch list" row click has somewhere to drill into.
     safe(service.from("handyman_punch_items").select("id, household_id, title, notes, created_at, source").is("archived_at", null).is("completed_at", null).order("created_at", { ascending: true }), "punch_items"),
+    // Phase 85.6 Phase C: vehicle service history. Needed by the rebuilt
+    // Vehicle focused panel which mirrors the iOS VehicleDetailView's
+    // service-history section. Loaded once per workbench fetch; the
+    // panel filters to the focused vehicle client-side.
+    safe(service.from("vehicle_service_records").select("*").eq("household_id", householdId).order("service_date", { ascending: false }).limit(100), "vehicle_service"),
+    // Phase 85.6 Phase C: vehicle recalls (open + resolved) so the
+    // panel can show the full recall history, not just the open ones
+    // already loaded into focused-entity relations.
+    safe(service.from("vehicle_recalls").select("*").eq("household_id", householdId), "vehicle_recalls"),
+    // Phase 85.6 Phase C: bundle custom subitems. iOS Task detail
+    // renders these as "Custom additions" under a bundle parent task.
+    // Filtered to active rows (archived_at NULL, used_at NULL).
+    safe(service.from("bundle_custom_subitems").select("*").eq("household_id", householdId).is("archived_at", null).is("used_at", null), "bundle_custom_subitems"),
   ]);
 
   return json({
@@ -4241,6 +4255,9 @@ async function handleFetchHouseholdWorkbench(
     workbench_actions: ((workbenchActionsRes as { data?: unknown[] })?.data) ?? [],
     reminders: ((remindersRes as { data?: unknown[] })?.data) ?? [],
     handyman_punch_items: ((punchItemsRes as { data?: unknown[] })?.data) ?? [],
+    vehicle_service_records: ((vehicleServiceRes as { data?: unknown[] })?.data) ?? [],
+    vehicle_recalls: ((vehicleRecallsRes as { data?: unknown[] })?.data) ?? [],
+    bundle_custom_subitems: ((bundleCustomSubitemsRes as { data?: unknown[] })?.data) ?? [],
   });
 }
 
