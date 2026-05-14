@@ -2345,6 +2345,30 @@ struct HavenFieldPortalPayload: Codable {
     let report: HavenFieldVisitDraft?
     let request: HavenFieldPortalRequest?
     let messages: [HavenFieldPortalMessage]
+    /// T2.7 + T2.8 (post-overnight) — active home_assessments row id
+    /// for this visit's household + property when one exists. Server
+    /// looks up the most recent non-terminal assessment and surfaces
+    /// it here so the field app can:
+    ///   (a) gate the Add-recommendation composer (T2.7)
+    ///   (b) call submit_assessment_data on Complete-visit (T2.8 fan-out
+    ///       — captured systems / contractors / routines flow through to
+    ///       the homeowner-side home_systems / contractors / routines
+    ///       tables, plus a "Your home is set up" push fires)
+    /// Defaults to nil so older payloads without this field decode fine.
+    let assessmentId: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case session, report, request, messages, assessmentId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        session = try c.decode(HavenFieldPortalSession.self, forKey: .session)
+        report = (try? c.decodeIfPresent(HavenFieldVisitDraft.self, forKey: .report)) ?? nil
+        request = (try? c.decodeIfPresent(HavenFieldPortalRequest.self, forKey: .request)) ?? nil
+        messages = (try? c.decodeIfPresent([HavenFieldPortalMessage].self, forKey: .messages)) ?? []
+        assessmentId = (try? c.decodeIfPresent(String.self, forKey: .assessmentId)) ?? nil
+    }
 }
 
 struct HavenFieldPortalSession: Codable {
@@ -4283,6 +4307,75 @@ actor HavenFieldService {
         return response.system
     }
 
+    /// T2.8 (post-overnight) — THE T0.A=β bridge payoff. Closes the
+    /// loop on Section 5: when the field handyman taps Complete visit,
+    /// the captured systems / contractors / routines should fan out to
+    /// the homeowner's home_systems / contractors / routines tables
+    /// (via server-side ingestAssessment), AND the "Your home is set up"
+    /// push should fire on the homeowner's device.
+    ///
+    /// Pre-T2.8 the iOS field app's completeVisit() only synced the
+    /// portal report (handyman_visit_reports row) — it never invoked
+    /// submit_assessment_data, so captured data died in a JSONB blob
+    /// nobody else read. The whole on-behalf-of value prop was silent.
+    ///
+    /// Server-side action at handyman-provider/index.ts:11288 already
+    /// does the heavy lifting — sets status='submitted', runs ingest,
+    /// fires homeowner push. iOS just needs to call it with the
+    /// assessment_id + the captured arrays. The visit's portal
+    /// systemsSnapshot maps to captured_systems; field/homeowner
+    /// notes map to handyman_notes. Vendors + routines come through
+    /// separate write paths (T2.5 Add-vendor / T2.6 RoutineCaptureSheet)
+    /// so we don't double-write them here.
+    func submitAssessmentData(
+        assessmentId: String,
+        capturedSystems: [HavenFieldSystemSnapshot],
+        handymanNotes: String?
+    ) async throws {
+        struct SystemPayload: Encodable {
+            let name: String
+            let category: String?
+            let manufacturer: String?
+            let model_number: String?
+            let serial_number: String?
+            let install_date: String?
+            let notes: String?
+            let subtype: String?
+            let label_photo_name: String?
+            let photo_captured_at: String?
+        }
+        struct Request: Encodable {
+            let action = "submit_assessment_data"
+            let assessment_id: String
+            let captured_systems: [SystemPayload]
+            let handyman_notes: String?
+        }
+        let payload = Request(
+            assessment_id: assessmentId,
+            captured_systems: capturedSystems.map { snap in
+                SystemPayload(
+                    name: snap.name,
+                    category: snap.category.nonEmpty,
+                    manufacturer: snap.manufacturer?.nonEmpty,
+                    model_number: snap.modelNumber?.nonEmpty,
+                    serial_number: snap.serialNumber?.nonEmpty,
+                    install_date: snap.installDate?.nonEmpty,
+                    notes: snap.notes?.nonEmpty,
+                    subtype: snap.subtype?.nonEmpty,
+                    label_photo_name: snap.labelPhotoName?.nonEmpty,
+                    photo_captured_at: snap.photoCapturedAt?.nonEmpty
+                )
+            },
+            handyman_notes: handymanNotes?.nonEmpty
+        )
+        let data = try JSONEncoder().encode(payload)
+        try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data
+        )
+    }
+
     /// T2.5 (post-overnight) — capture a homeowner's existing vendor
     /// on the home detail Vendors sub-tab. Wraps the existing
     /// `create_contractor_from_card` action which inserts a contractor
@@ -5310,13 +5403,15 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
     /// sheet on the Visit sub-tab. View flips on Add-finding tap; sheet
     /// flips back on save / cancel.
     @Published var showAddRecommendation = false
-    /// T2.7 — assessment id for the current visit. Returns the portal
-    /// session's `assessmentId` field when present. Today the
-    /// handyman-portal edge function doesn't surface this in
-    /// seed_payload; until that small server addition lands, this stays
-    /// nil and the Add-finding CTA stays hidden. Defensive forward-compat.
+    /// T2.7 + T2.8 (post-overnight) — assessment id for the current
+    /// visit, sourced from the portal payload's top-level assessmentId
+    /// field. Server-side handyman-portal looks up the most recent
+    /// non-terminal home_assessments row for the visit's household +
+    /// property and surfaces it here. Used to:
+    ///   (a) gate the Add-recommendation composer (T2.7)
+    ///   (b) call submit_assessment_data inside completeVisit (T2.8)
     var assessmentId: String? {
-        nil
+        payload?.assessmentId?.nonEmpty
     }
 
     let visit: HavenFieldVisit
@@ -5412,8 +5507,7 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             // feedback whatsoever. Now we surface the precondition so
             // the user knows why nothing happened. The deeper issue
             // (visits without portal sessions can't be completed end-to-end)
-            // is documented as the parallel-tables architectural finding
-            // in HANDYMAN_GAPS.md and needs product input.
+            // was the T0.A architectural finding — closed by T2.8 below.
             errorMessage = "This visit isn’t set up for live tracking yet. Tap Sync now first to load the visit checklist."
             return
         }
@@ -5422,6 +5516,35 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             ? HandymanRequestStatus.followUpRecommended.rawValue
             : HandymanRequestStatus.completed.rawValue
         draft.completedAt = ISO8601DateFormatter().string(from: Date())
+
+        // T2.8 (post-overnight) — T0.A=β bridge payoff. When this visit
+        // is associated with a home_assessments row, fire submit_assessment_data
+        // BEFORE the portal sync so the captures fan out to homeowner
+        // tables (home_systems / contractors / routines) AND the
+        // homeowner push fires. The portal sync after this call still
+        // writes the final report row for audit/log. Two-phase commit:
+        // if (1) fails, surface error and don't proceed to (2) — that
+        // way the assessment row stays in_progress and the visit isn't
+        // falsely marked complete.
+        if let assessmentId = assessmentId {
+            do {
+                try await HavenFieldService.shared.submitAssessmentData(
+                    assessmentId: assessmentId,
+                    capturedSystems: draft.systemsSnapshot,
+                    handymanNotes: [draft.fieldNotes, draft.homeownerNotes]
+                        .filter { !$0.isEmpty }
+                        .joined(separator: "\n\n")
+                        .nonEmpty
+                )
+            } catch {
+                errorMessage = friendlyServerError(
+                    from: error,
+                    fallback: "Couldn’t finalize the assessment. Your captures are saved locally; tap Complete visit again to retry."
+                )
+                return
+            }
+        }
+
         await sync(draft: draft, message: "Visit completed")
     }
 

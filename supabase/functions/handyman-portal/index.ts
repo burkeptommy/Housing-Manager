@@ -1226,6 +1226,38 @@ serve(async (req) => {
         propertyId: compactString(session.property_id) || null,
       });
 
+      // T2.7 + T2.8 (post-overnight) — surface the active home_assessments
+      // row id (when one exists) so the field app can:
+      //   (a) gate the Add-recommendation composer (T2.7)
+      //   (b) call submit_assessment_data on Complete-visit (T2.8 fan-out)
+      // Looks up the most recent non-terminal assessment for this
+      // household + property. Returns null when no live assessment is
+      // associated with the visit (e.g. a quote walk that was never
+      // dispatched as an assessment).
+      let assessmentId: string | null = null;
+      const householdId = compactString(session.household_id);
+      const propertyId = compactString(session.property_id);
+      if (householdId && propertyId) {
+        const { data: activeAssessment } = await supabase
+          .from("home_assessments")
+          .select("id")
+          .eq("household_id", householdId)
+          .eq("property_id", propertyId)
+          .in("status", [
+            "scheduled",
+            "en_route",
+            "in_progress",
+            "submitted",
+            "awaiting_review",
+          ])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeAssessment?.id) {
+          assessmentId = String(activeAssessment.id);
+        }
+      }
+
       await supabase
         .from("handyman_portal_sessions")
         .update({
@@ -1240,6 +1272,7 @@ serve(async (req) => {
         request: requestContext.request,
         messages: requestContext.messages,
         homeProfile,
+        assessmentId,
       });
     }
 
