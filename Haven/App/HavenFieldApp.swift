@@ -98,8 +98,111 @@ final class HavenFieldAppDelegate: NSObject, UIApplicationDelegate, UNUserNotifi
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        // T1.5 (post-overnight) — typed deep-link routing per push payload.
+        // Mirrors the homeowner pattern at HavenApp.swift:223-295. Server
+        // already accepts a generic `data?: Record<string,string>` field
+        // in send-push-notification (see send-push-notification/index.ts:22).
+        // The field app routes by userInfo["type"]:
+        //
+        //   homeowner_message / handyman_request_message
+        //     → Messages tab + open the related thread
+        //   quote_accepted_by_homeowner / quote_countered_by_homeowner /
+        //   quote_declined_by_homeowner
+        //     → Visits tab + open the related visit (status changed)
+        //   visit_confirmed_by_homeowner / visit_cancelled_by_homeowner /
+        //   visit_rescheduled_by_homeowner / visit_starting_soon
+        //     → Visits tab + open the related visit
+        //   homeowner_punch_added / visit_punch_item_added
+        //     → Visits tab + open the active visit's punch list
+        //   customer_link_accepted / customer_link_declined /
+        //   pairing_completed
+        //     → Homes tab + open the related home (if id provided)
+        //   chez_assessment_review_requested / assessment_corrections_*
+        //     → Visits tab (assessments live there until T2.1 lands)
+        //   anything else → generic dashboard refresh only
+        //
+        // Pre-T1.5 this handler did ONLY `.inboxItemUpdated` with no
+        // payload parsing. Tap a "quote accepted" push → land on whatever
+        // tab was already open. Now: handler routes to the right tab + entity.
+        let userInfo = response.notification.request.content.userInfo
+        routeFieldPushTap(userInfo: userInfo)
+        // Always also post the legacy refresh signal so any unrelated
+        // observer (e.g. inbox badges) still updates.
         NotificationCenter.default.post(name: .inboxItemUpdated, object: nil)
+        NotificationCenter.default.post(name: .havenFieldVisitChanged, object: nil)
         completionHandler()
+    }
+
+    private func routeFieldPushTap(userInfo: [AnyHashable: Any]) {
+        guard let type = userInfo["type"] as? String, !type.isEmpty else { return }
+        let requestId = (userInfo["request_id"] as? String) ?? (userInfo["requestId"] as? String)
+        let propertyId = (userInfo["property_id"] as? String) ?? (userInfo["propertyId"] as? String)
+
+        switch type {
+        case "homeowner_message",
+             "handyman_request_message",
+             "thread_message_received":
+            NotificationCenter.default.post(
+                name: .havenFieldSwitchTab,
+                object: nil,
+                userInfo: ["tab": "messages"]
+            )
+            if let requestId, !requestId.isEmpty {
+                NotificationCenter.default.post(
+                    name: .havenFieldOpenThread,
+                    object: nil,
+                    userInfo: ["request_id": requestId]
+                )
+            }
+
+        case "quote_accepted_by_homeowner",
+             "quote_countered_by_homeowner",
+             "quote_declined_by_homeowner",
+             "quote_viewed_by_homeowner",
+             "visit_confirmed_by_homeowner",
+             "visit_cancelled_by_homeowner",
+             "visit_rescheduled_by_homeowner",
+             "visit_alternate_dates_proposed",
+             "visit_starting_soon",
+             "homeowner_punch_added",
+             "visit_punch_item_added",
+             "follow_up_requested",
+             "chez_assessment_review_requested",
+             "chez_assessment_corrections_received":
+            NotificationCenter.default.post(
+                name: .havenFieldSwitchTab,
+                object: nil,
+                userInfo: ["tab": "visits"]
+            )
+            if let requestId, !requestId.isEmpty {
+                NotificationCenter.default.post(
+                    name: .havenFieldOpenVisit,
+                    object: nil,
+                    userInfo: ["request_id": requestId]
+                )
+            }
+
+        case "customer_link_accepted",
+             "customer_link_declined",
+             "pairing_completed":
+            NotificationCenter.default.post(
+                name: .havenFieldSwitchTab,
+                object: nil,
+                userInfo: ["tab": "homes"]
+            )
+            if let propertyId, !propertyId.isEmpty {
+                NotificationCenter.default.post(
+                    name: .havenFieldOpenHome,
+                    object: nil,
+                    userInfo: ["property_id": propertyId]
+                )
+            }
+
+        default:
+            // Unknown type: fall through to the generic refresh signals
+            // already posted by the caller. Don't try to guess routing.
+            break
+        }
     }
 }
 

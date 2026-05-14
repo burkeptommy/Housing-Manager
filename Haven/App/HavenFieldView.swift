@@ -27,6 +27,22 @@ extension Notification.Name {
     /// (Today-screen pill, FieldPartRequestsListView) refreshes its
     /// queue without prop-drilling a callback through every entry point.
     static let havenFieldPartRequestChanged = Notification.Name("havenFieldPartRequestChanged")
+
+    /// T1.5 (post-overnight) — APNs deep-link routing primitives. The
+    /// AppDelegate's `userNotificationCenter(_:didReceive:)` switches
+    /// on `userInfo["type"]` and posts the appropriate name; the field
+    /// root view + tabs subscribe to react.
+    ///
+    /// These mirror the homeowner-side pattern at HavenApp.swift:223-295
+    /// (which has typed handyman_* / chez_* / vehicle_recall / etc.
+    /// routing). Pre-T1.5 the field-app handler was anemic — it only
+    /// posted `.inboxItemUpdated` with no payload parsing. Tap a
+    /// "quote accepted" push → land on whatever tab was already open.
+    /// Now: tap routes to the right tab + opens the right entity.
+    static let havenFieldSwitchTab = Notification.Name("havenFieldSwitchTab")
+    static let havenFieldOpenVisit = Notification.Name("havenFieldOpenVisit")
+    static let havenFieldOpenThread = Notification.Name("havenFieldOpenThread")
+    static let havenFieldOpenHome = Notification.Name("havenFieldOpenHome")
 }
 
 /// Bounds-safe subscript so closure-based bindings in
@@ -5338,6 +5354,28 @@ struct HavenFieldRootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .havenFieldVisitChanged)) { _ in
             Task { await viewModel.refresh() }
+        }
+        // T1.5 (post-overnight) — typed deep-link routing from APNs.
+        // AppDelegate posts `.havenFieldSwitchTab` with userInfo["tab"]
+        // set to one of "home" / "visits" / "crew" / "clients" / "messages".
+        // We swap selectedTab and let downstream observers
+        // (.havenFieldOpenVisit / .havenFieldOpenThread / .havenFieldOpenHome)
+        // handle the entity-level deep link via the visit detail / thread
+        // / home pickers' own onReceive handlers.
+        .onReceive(NotificationCenter.default.publisher(for: .havenFieldSwitchTab)) { note in
+            guard let tabKey = note.userInfo?["tab"] as? String else { return }
+            switch tabKey {
+            case "home":     viewModel.selectedTab = .home
+            case "visits":   viewModel.selectedTab = .visits
+            case "crew":
+                if !isSoloWorkspace { viewModel.selectedTab = .crew }
+            case "clients", "homes":
+                viewModel.selectedTab = .clients
+            case "messages":
+                viewModel.selectedTab = .messages
+            default:
+                break
+            }
         }
         // Sprint #3 R3-E-4: defensive — if the selected tab gets stuck
         // on .crew (e.g. user was on a 2-member workspace, the second
