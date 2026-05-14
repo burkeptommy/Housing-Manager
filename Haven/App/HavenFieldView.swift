@@ -5306,6 +5306,18 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
     @Published var syncMessage = "Up to date"
     @Published var selectedTab: VisitTab = .home
     @Published var errorMessage: String?
+    /// T2.7 (post-overnight) — controls the Add Recommendation composer
+    /// sheet on the Visit sub-tab. View flips on Add-finding tap; sheet
+    /// flips back on save / cancel.
+    @Published var showAddRecommendation = false
+    /// T2.7 — assessment id for the current visit. Returns the portal
+    /// session's `assessmentId` field when present. Today the
+    /// handyman-portal edge function doesn't surface this in
+    /// seed_payload; until that small server addition lands, this stays
+    /// nil and the Add-finding CTA stays hidden. Defensive forward-compat.
+    var assessmentId: String? {
+        nil
+    }
 
     let visit: HavenFieldVisit
     let home: HavenFieldHome?
@@ -11138,6 +11150,32 @@ private struct HavenFieldVisitWorkspaceView: View {
 
             FieldSectionCard(kicker: "Recommendations", title: "What else should the homeowner do?") {
                 VStack(spacing: 12) {
+                    // T2.7 (post-overnight) — composer entry. Pre-T2.7
+                    // the Recommendations card was read-only — handyman
+                    // could only TICK existing pre-canned items via the
+                    // toggleRecommendation path. Now '+ Add a finding'
+                    // opens a composer to capture observation / safety
+                    // / code / recommendation entries with optional
+                    // photo attachment, mapped to add_recommended_task.
+                    if viewModel.assessmentId?.nonEmpty != nil {
+                        Button {
+                            viewModel.showAddRecommendation = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                Text("Add a finding")
+                                    .font(HavenTypography.uiButton)
+                                Spacer()
+                            }
+                            .foregroundStyle(HavenColors.textOnAction)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(HavenColors.action)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
                     ForEach(viewModel.draft?.recommendations ?? []) { item in
                         Button {
                             viewModel.toggleRecommendation(item)
