@@ -17878,6 +17878,50 @@ function renderHouseholdWorkbenchDetail() {
     renderHouseholdWorkbenchDetail();
   });
 
+  // Phase 85.7 — Bulk propose Chez ownership. Sends one batched
+  // proposal containing every non-owned, non-pending entity on the
+  // current tab. Server caps at 50 entities per proposal.
+  el.auditFocused.querySelector("[data-workbench-bulk-propose]")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const tab = btn.dataset.tab;
+    const wb = state.households.workbench;
+    if (!wb || !tab) return;
+    const entities = proposableEntitiesForTab(wb, tab);
+    if (entities.length === 0) {
+      showAdminToast("No entities to propose on this tab.", { kind: "info" });
+      return;
+    }
+    const householdId = state.households.selectedId;
+    const preface = await openProposeOwnershipModal({
+      entityLabel: `${entities.length} ${tab === "vendors" ? "vendor" + (entities.length === 1 ? "" : "s") : tab}`,
+      entityType: "bulk",
+    });
+    if (preface === null) return;
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    try {
+      const result = await callChezConcierge({
+        action: "propose_ownership",
+        household_id: householdId,
+        entities,
+        preface: preface || undefined,
+      });
+      await loadHouseholdWorkbench(householdId);
+      renderHouseholdWorkbenchDetail();
+      const proposed = result?.proposed ?? entities.length;
+      const skippedCount = (result?.skipped_for_cooldown || []).length;
+      showAdminToast(
+        `Proposal sent to homeowner with ${proposed} ${tab === "vendors" ? "vendor" + (proposed === 1 ? "" : "s") : tab}.` + (skippedCount > 0 ? ` ${skippedCount} skipped (cooldown).` : ""),
+        { kind: "info" }
+      );
+    } catch (err) {
+      console.error("[bulk propose] failed", err);
+      btn.disabled = false;
+      btn.textContent = `Propose Chez ownership of ${entities.length} ${tab}`;
+      showAdminToast(`Couldn't send batched proposal: ${err.message || err}`, { kind: "error" });
+    }
+  });
+
   // Phase 85 PR 5C — entity row drill-in. Clicking the row (but not a
   // button inside) opens the focused-detail panel for that entity.
   // Action buttons inside the row e.stopPropagation in their own handler
@@ -18570,6 +18614,55 @@ function openProposeOwnershipModal({ entityLabel, entityType }) {
   });
 }
 
+// Phase 85.7: helpers for the bulk propose-ownership button on workbench
+// tab headers. countProposableInTab returns just the count for the chip
+// label; proposableEntitiesForTab returns the actual [{entity_type, entity_id}]
+// list shaped for the propose_ownership action payload. Bills (utilities)
+// route through entity_type "utility"; vendors route through "contractor".
+function _tabEntityType(tab) {
+  return tab === "tasks" ? "task"
+    : tab === "systems" ? "system"
+    : tab === "routines" ? "routine"
+    : tab === "vendors" ? "contractor"
+    : tab === "projects" ? "project"
+    : tab === "documents" ? "document"
+    : tab === "bills" ? "utility"
+    : tab === "vehicles" ? "vehicle"
+    : null;
+}
+function _tabCollection(wb, tab) {
+  return tab === "tasks" ? (wb.tasks || []).filter((t) => !t.is_archived)
+    : tab === "systems" ? (wb.home_systems || [])
+    : tab === "routines" ? (wb.routines || [])
+    : tab === "vendors" ? (wb.contractors || [])
+    : tab === "projects" ? (wb.projects || [])
+    : tab === "documents" ? (wb.documents || [])
+    : tab === "bills" ? (wb.utility_accounts || [])
+    : tab === "vehicles" ? (wb.vehicles || [])
+    : [];
+}
+function proposableEntitiesForTab(wb, tab) {
+  const eType = _tabEntityType(tab);
+  if (!eType) return [];
+  const rows = _tabCollection(wb, tab);
+  // Filter out: already owned, pending proposal, or archived. Server-side
+  // cooldown check will skip 60-day-declined entities at request time
+  // and surface them via the `skipped_for_cooldown` response field.
+  return rows
+    .filter((r) => !r.chez_owned && !r.pending_ownership_request_id)
+    .slice(0, 50)  // server cap
+    .map((r) => ({
+      entity_type: eType,
+      entity_id: r.id,
+      label: r.title || r.label || r.name || r.company_name || r.filename || r.provider_name
+            || (r.year && r.make ? `${r.year} ${r.make} ${r.model || ""}`.trim() : null)
+            || r.id.slice(0, 8),
+    }));
+}
+function countProposableInTab(wb, tab) {
+  return proposableEntitiesForTab(wb, tab).length;
+}
+
 // Phase 85.6: state-aware ownership pill. The same affordance renders in
 // four different states depending on the entity's current ownership +
 // any pending proposal:
@@ -18757,33 +18850,62 @@ function renderFocusedTaskHtml(t, wb) {
   `;
 }
 
+// Phase 85.7: System parity rebuild. Mirrors iOS SystemDetailView:
+// brand identity row, equipment spec card, service cadence with the
+// override origin (system frequency vs template default), components,
+// service history, warranties, linked tasks, and a preferred vendor
+// drill-in if one's set.
 function renderFocusedSystemHtml(s, wb, rel) {
   const childSystems = (wb.home_systems || []).filter((x) => x.parent_system_id === s.id);
   const linkedTasks = (wb.tasks || []).filter((t) => t.system_id === s.id && !t.is_archived);
+  // Service history can come from rel.services (focused load) OR wb.vehicle_service_records
+  // (none for non-vehicle systems). Defer to rel.
   const services = rel.services || [];
   const warranties = rel.warranties || [];
   const ownedBadge = s.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  const preferredVendor = s.preferred_vendor_id ? (wb.contractors || []).find((c) => c.id === s.preferred_vendor_id) : null;
+  // Computed: years since install + remaining lifespan estimate.
+  const installDate = s.install_date ? new Date(s.install_date) : null;
+  const ageYears = installDate ? Math.floor((Date.now() - installDate.getTime()) / (365.25 * 86400000)) : null;
+  // Service cadence — show "Every N days" or rough cadence in years.
+  const cadenceLabel = (() => {
+    const days = s.service_interval_days;
+    if (!days) return null;
+    if (days >= 330) return `Every ${Math.round(days / 365)}y`;
+    if (days >= 28) return `Every ${Math.round(days / 30)}mo`;
+    if (days >= 6) return `Every ${Math.round(days / 7)}w`;
+    return `Every ${days}d`;
+  })();
+  const cadenceSource = s.service_interval_source && s.service_interval_source !== "default" ? prettifyEnum(s.service_interval_source) : null;
+  // Section visibility: avoid dedupe-by-name issue ("Sump Pump · Sump Pump").
+  const headerTitle = (s.name && s.name !== s.category) ? s.name : s.category;
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
-        <h2>${escapeHtml(s.name || s.category)}</h2>
+        <h2>${escapeHtml(headerTitle || "System")}</h2>
         <div class="admin-focused__entity-meta">
           ${ownedBadge}
-          <span class="admin-pill admin-pill--note">${escapeHtml(s.category)}</span>
-          ${s.subtype ? `<span class="admin-pill">${escapeHtml(s.subtype)}</span>` : ""}
+          ${s.name && s.name !== s.category ? `<span class="admin-pill admin-pill--note">${escapeHtml(s.category)}</span>` : ""}
+          ${s.subtype ? `<span class="admin-pill">${escapeHtml(prettifyEnum(s.subtype))}</span>` : ""}
+          ${s.setup_state && s.setup_state !== "active" ? `<span class="admin-pill admin-pill--warning">${escapeHtml(prettifyEnum(s.setup_state))}</span>` : ""}
+          ${cadenceLabel ? `<span class="admin-pill">${escapeHtml(cadenceLabel)}</span>` : ""}
         </div>
       </header>
+
       <section class="admin-focused__field-grid">
-        <div><label>Manufacturer</label><strong>${escapeHtml(s.manufacturer || "—")}</strong></div>
-        <div><label>Model</label><strong>${escapeHtml(s.model_number || s.model || "—")}</strong></div>
-        <div><label>Serial</label><strong>${escapeHtml(s.serial_number || "—")}</strong></div>
-        <div><label>Installed</label><strong>${escapeHtml(s.install_date || "—")}</strong></div>
-        <div><label>Last service</label><strong>${s.last_service_date ? formatDateOnly(s.last_service_date) : "—"}</strong></div>
-        <div><label>Next service</label><strong>${s.next_maintenance_date ? formatDateOnly(s.next_maintenance_date) : "—"}</strong></div>
+        <div><label>Manufacturer</label><strong>${escapeHtml(s.manufacturer || "Not on file")}</strong></div>
+        <div><label>Model</label><strong>${escapeHtml(s.model_number || s.model || "Not on file")}</strong></div>
+        <div><label>Serial</label><strong>${escapeHtml(s.serial_number || "Not on file")}</strong></div>
+        <div><label>Installed</label><strong>${s.install_date ? formatDateOnly(s.install_date) + (ageYears !== null ? ` · ${ageYears}y old` : "") : "Not on file"}</strong></div>
+        <div><label>Last service</label><strong>${s.last_service_date ? formatDateOnly(s.last_service_date) : "Not on file"}</strong></div>
+        <div><label>Next service</label><strong>${s.next_maintenance_date ? formatDateOnly(s.next_maintenance_date) : "Not on file"}</strong></div>
+        ${cadenceLabel ? `<div><label>Service cadence</label><strong>${escapeHtml(cadenceLabel)}${cadenceSource ? ` <span class="admin-muted">(${escapeHtml(cadenceSource)})</span>` : ""}</strong></div>` : ""}
+        ${preferredVendor ? `<div><label>Preferred vendor</label><strong><button type="button" class="admin-link-inline" data-drill-link-type="contractor" data-drill-link-id="${escapeHtml(preferredVendor.id)}">${escapeHtml(preferredVendor.company_name)}</button></strong></div>` : ""}
       </section>
+
       ${s.notes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(s.notes)}</p></section>` : ""}
+
       <section class="admin-focused__actions">
-        <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_service" data-entity-type="system" data-entity-id="${escapeHtml(s.id)}">Log service</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_maintenance" data-entity-type="system" data-entity-id="${escapeHtml(s.id)}">Schedule maintenance</button>
@@ -18792,6 +18914,7 @@ function renderFocusedSystemHtml(s, wb, rel) {
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
       </section>
+
       ${childSystems.length > 0 ? `
         <section class="admin-focused__list-block">
           <h3>Components · ${childSystems.length}</h3>
@@ -18801,36 +18924,35 @@ function renderFocusedSystemHtml(s, wb, rel) {
                 <strong>${escapeHtml(c.name || c.category)}</strong>
                 <span class="admin-muted">${escapeHtml(c.manufacturer || "")}${c.model_number ? " · " + escapeHtml(c.model_number) : ""}</span>
               </div>
-            </div>
-          `).join("")}
-        </section>
-      ` : ""}
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
+
       ${linkedTasks.length > 0 ? `
         <section class="admin-focused__list-block">
-          <h3>Tasks · ${linkedTasks.length}</h3>
+          <h3>Maintenance tasks · ${linkedTasks.length}</h3>
           ${linkedTasks.slice(0, 8).map((t) => `
             <div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}">
               <div class="admin-households__entity-main">
                 <strong>${escapeHtml(t.title)}</strong>
-                <span class="admin-muted">${escapeHtml(t.frequency || "")}${t.next_due_date ? " · due " + formatDateOnly(t.next_due_date) : ""}</span>
+                <span class="admin-muted">${escapeHtml(prettifyEnum(t.frequency) || "")}${t.next_due_date ? " · Due " + formatDateOnly(t.next_due_date) : ""}</span>
               </div>
-            </div>
-          `).join("")}
-        </section>
-      ` : ""}
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
+
       ${services.length > 0 ? `
         <section class="admin-focused__list-block">
           <h3>Service history · ${services.length}</h3>
-          ${services.slice(0, 8).map((sv) => `
+          ${services.slice(0, 10).map((sv) => `
             <div class="admin-households__entity-row">
               <div class="admin-households__entity-main">
                 <strong>${escapeHtml(sv.service_type || "Service")}${sv.cost ? " · $" + formatCompact(sv.cost) : ""}</strong>
-                <span class="admin-muted">${escapeHtml(formatDateOnly(sv.service_date))}${sv.description ? " · " + escapeHtml(sv.description) : ""}</span>
+                <span class="admin-muted">${sv.service_date ? formatDateOnly(sv.service_date) : ""}${sv.description ? " · " + escapeHtml(String(sv.description).slice(0, 80)) : ""}</span>
               </div>
-            </div>
-          `).join("")}
-        </section>
-      ` : ""}
+            </div>`).join("")}
+        </section>` : ""}
+
       ${warranties.length > 0 ? `
         <section class="admin-focused__list-block">
           <h3>Warranties · ${warranties.length}</h3>
@@ -18838,46 +18960,78 @@ function renderFocusedSystemHtml(s, wb, rel) {
             <div class="admin-households__entity-row">
               <div class="admin-households__entity-main">
                 <strong>${escapeHtml(w.coverage_type || "Warranty")}</strong>
-                <span class="admin-muted">${w.expires_at ? "Expires " + formatDateOnly(w.expires_at) : ""}</span>
+                <span class="admin-muted">${w.expires_at ? "Expires " + formatDateOnly(w.expires_at) : "No expiry on file"}${w.provider ? " · " + escapeHtml(w.provider) : ""}</span>
               </div>
-            </div>
-          `).join("")}
-        </section>
-      ` : ""}
+            </div>`).join("")}
+        </section>` : ""}
     </article>
   `;
 }
 
+// Phase 85.7: Routine parity rebuild. Mirrors iOS RoutineDetailView:
+// brand-led header (vendor logo/name + service kind), schedule card
+// (cadence + days + time + active months), vendor card with drill-in,
+// cost summary, visit history (computed total + recent list), linked
+// one-off tasks, notes.
 function renderFocusedRoutineHtml(r, wb, rel) {
   const vendor = (wb.contractors || []).find((c) => c.id === r.vendor_id);
   const visits = rel.visits || [];
+  // Linked one-off tasks (iOS shows these under "Linked tasks").
+  const linkedTasks = (wb.tasks || []).filter((t) => t.routine_id === r.id && !t.is_archived);
   const ownedBadge = r.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
-  const cadenceLabel = `${r.cadence_type || ""}${r.cadence_interval_days ? ` (${r.cadence_interval_days}d)` : ""}`;
+  const cadenceLabel = (() => {
+    const type = prettifyEnum(r.cadence_type);
+    if (!type) return "—";
+    if (r.cadence_interval_days && type !== "Weekly") return `${type} (${r.cadence_interval_days}d)`;
+    return type;
+  })();
   const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const dows = (Array.isArray(r.days_of_week) && r.days_of_week.length > 0)
     ? r.days_of_week.map((d) => dayLabels[((d - 1) % 7 + 7) % 7]).join(" · ")
-    : "—";
+    : null;
+  // Cost rollup from visits.
+  const totalSpent = visits.reduce((s, v) => s + (Number(v.actual_cost_cents) || 0), 0) / 100;
+  const completedVisits = visits.filter((v) => v.visit_state === "completed" || v.status === "completed");
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
-        <h2>${escapeHtml(r.label || r.routine_kind)}</h2>
+        <h2>${escapeHtml(r.label || prettifyEnum(r.routine_kind) || "Routine")}</h2>
         <div class="admin-focused__entity-meta">
           ${ownedBadge}
-          <span class="admin-pill admin-pill--note">${escapeHtml(r.routine_kind)}</span>
-          ${r.setup_state ? `<span class="admin-pill">${escapeHtml(r.setup_state)}</span>` : ""}
+          <span class="admin-pill admin-pill--note">${escapeHtml(prettifyEnum(r.routine_kind))}</span>
+          <span class="admin-pill">${escapeHtml(cadenceLabel)}</span>
+          ${r.setup_state && r.setup_state !== "active" ? `<span class="admin-pill admin-pill--warning">${escapeHtml(prettifyEnum(r.setup_state))}</span>` : ""}
         </div>
       </header>
+
       <section class="admin-focused__field-grid">
         <div><label>Cadence</label><strong>${escapeHtml(cadenceLabel)}</strong></div>
-        <div><label>Days</label><strong>${escapeHtml(dows)}</strong></div>
-        <div><label>Time</label><strong>${escapeHtml(r.time_of_day || "any time")}</strong></div>
-        <div><label>Vendor</label><strong>${escapeHtml(vendor?.company_name || "—")}</strong></div>
+        ${dows ? `<div><label>Days</label><strong>${escapeHtml(dows)}</strong></div>` : ""}
+        <div><label>Time</label><strong>${escapeHtml(r.time_of_day || "Any time")}</strong></div>
         <div><label>Active months</label><strong>${escapeHtml(activeMonthsLabel(r.active_months))}</strong></div>
-        <div><label>Cost / visit</label><strong>${r.cost_per_visit_cents ? "$" + formatCompact(r.cost_per_visit_cents / 100) : "—"}</strong></div>
+        <div><label>Cost / visit</label><strong>${r.cost_per_visit_cents ? "$" + formatCompact(r.cost_per_visit_cents / 100) : "Not set"}</strong></div>
+        ${r.next_visit_date ? `<div><label>Next visit</label><strong>${formatDateOnly(r.next_visit_date)}</strong></div>` : ""}
       </section>
+
+      ${vendor ? `
+        <section class="admin-focused__list-block">
+          <h3>Vendor</h3>
+          <div class="admin-households__entity-row is-clickable" data-drill-entity-type="contractor" data-drill-entity-id="${escapeHtml(vendor.id)}">
+            <div class="admin-households__entity-main">
+              <strong>${escapeHtml(vendor.company_name)}</strong>
+              <span class="admin-muted">${escapeHtml(vendor.category || "")}${vendor.phone ? " · " + formatPhoneNumber(vendor.phone) : ""}</span>
+            </div>
+            <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+          </div>
+        </section>` : `
+        <section class="admin-focused__list-block">
+          <h3>Vendor</h3>
+          <p class="admin-muted">No vendor linked to this routine. Visits will need to be coordinated manually.</p>
+        </section>`}
+
       ${r.notes ? `<section class="admin-focused__notes-block"><h3>Notes</h3><p>${escapeHtml(r.notes)}</p></section>` : ""}
+
       <section class="admin-focused__actions">
-        <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="schedule_visit" data-entity-type="routine" data-entity-id="${escapeHtml(r.id)}">Schedule next visit</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_visit" data-entity-type="routine" data-entity-id="${escapeHtml(r.id)}">Log a visit</button>
@@ -18886,29 +19040,55 @@ function renderFocusedRoutineHtml(r, wb, rel) {
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
       </section>
+
       ${visits.length > 0 ? `
         <section class="admin-focused__list-block">
-          <h3>Recent visits · ${visits.length}</h3>
+          <h3>Visit history · ${visits.length} ${completedVisits.length > 0 ? "· $" + formatCompact(totalSpent) + " total" : ""}</h3>
           ${visits.slice(0, 12).map((v) => `
             <div class="admin-households__entity-row">
               <div class="admin-households__entity-main">
-                <strong>${escapeHtml(formatDateOnly(v.scheduled_date))}${v.actual_cost_cents ? " · $" + formatCompact(v.actual_cost_cents / 100) : ""}</strong>
-                <span class="admin-muted">${escapeHtml(v.visit_state || v.status || "")}${v.notes ? " · " + escapeHtml(v.notes) : ""}</span>
+                <strong>${v.scheduled_date ? formatDateOnly(v.scheduled_date) : "—"}${v.actual_cost_cents ? " · $" + formatCompact(v.actual_cost_cents / 100) : ""}</strong>
+                <span class="admin-muted">${escapeHtml(prettifyEnum(v.visit_state || v.status) || "")}${v.notes ? " · " + escapeHtml(String(v.notes).slice(0, 80)) : ""}</span>
               </div>
-            </div>
-          `).join("")}
-        </section>
-      ` : `<p class="admin-muted">No visits recorded yet.</p>`}
+            </div>`).join("")}
+        </section>` : `
+        <section class="admin-focused__list-block">
+          <h3>Visit history</h3>
+          <p class="admin-muted">No visits logged yet. Use "Log a visit" above to record completed work.</p>
+        </section>`}
+
+      ${linkedTasks.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Linked tasks · ${linkedTasks.length}</h3>
+          ${linkedTasks.slice(0, 6).map((t) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(t.title)}</strong>
+                <span class="admin-muted">${t.next_due_date ? "Due " + formatDateOnly(t.next_due_date) : "Unscheduled"}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
     </article>
   `;
 }
 
+// Phase 85.7: Contractor (Vendor) parity rebuild. Mirrors iOS
+// ContractorDetailView: contact card, source provenance, coverage
+// (linked systems / routines / vehicles / tasks), engagement log.
 function renderFocusedContractorHtml(c, wb, rel) {
   const linkedSystems = (wb.home_systems || []).filter((s) => s.preferred_vendor_id === c.id);
   const linkedRoutines = (wb.routines || []).filter((r) => r.vendor_id === c.id);
-  const linkedTasks = (wb.tasks || []).filter((t) => t.assigned_contractor_id === c.id);
+  const linkedTasks = (wb.tasks || []).filter((t) => t.assigned_contractor_id === c.id && !t.is_archived);
+  const linkedVehicles = (wb.vehicles || []).filter((v) => v.preferred_mechanic_id === c.id);
   const engagements = rel.engagements || [];
   const ownedBadge = c.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  // Coverage rollup — how many entities does this vendor cover?
+  const coverageCount = linkedSystems.length + linkedRoutines.length + linkedTasks.length + linkedVehicles.length;
+  // Engagement summary: count by direction.
+  const calls = engagements.filter((e) => e.channel === "call").length;
+  const emails = engagements.filter((e) => e.channel === "email").length;
+  const lastEngagement = engagements[0];
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
@@ -18917,16 +19097,18 @@ function renderFocusedContractorHtml(c, wb, rel) {
           ${ownedBadge}
           <span class="admin-pill admin-pill--note">${escapeHtml(c.category || "Vendor")}</span>
           ${c.chez_recommended_at ? `<span class="admin-pill">Sourced by Chez</span>` : ""}
+          ${coverageCount > 0 ? `<span class="admin-pill">${coverageCount} linked</span>` : ""}
         </div>
       </header>
       <section class="admin-focused__field-grid">
-        <div><label>Phone</label><strong>${escapeHtml(formatPhoneNumber(c.phone) || "Not on file")}</strong></div>
-        <div><label>Email</label><strong>${escapeHtml(c.email || "Not on file")}</strong></div>
-        <div><label>Website</label><strong>${escapeHtml(c.website || "Not on file")}</strong></div>
+        <div><label>Phone</label><strong>${c.phone ? `<a href="tel:${escapeHtml(c.phone)}" class="admin-link-inline">${escapeHtml(formatPhoneNumber(c.phone))}</a>` : "Not on file"}</strong></div>
+        <div><label>Email</label><strong>${c.email ? `<a href="mailto:${escapeHtml(c.email)}" class="admin-link-inline">${escapeHtml(c.email)}</a>` : "Not on file"}</strong></div>
+        <div><label>Website</label><strong>${c.website ? `<a href="${escapeHtml(c.website)}" target="_blank" rel="noopener" class="admin-link-inline">${escapeHtml(c.website)}</a>` : "Not on file"}</strong></div>
         <div><label>Source</label><strong>${escapeHtml(prettifyEnum(c.source) || "Manual entry")}</strong></div>
+        ${c.contact_name ? `<div><label>Primary contact</label><strong>${escapeHtml(c.contact_name)}</strong></div>` : ""}
+        ${lastEngagement ? `<div><label>Last engagement</label><strong>${escapeHtml(relativeTimeString(lastEngagement.created_at))} · ${escapeHtml(prettifyEnum(lastEngagement.channel))}</strong></div>` : ""}
       </section>
       <section class="admin-focused__actions">
-        <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="log_call" data-entity-type="contractor" data-entity-id="${escapeHtml(c.id)}">Log a call</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="send_message" data-entity-type="contractor" data-entity-id="${escapeHtml(c.id)}">Record message</button>
@@ -18938,47 +19120,69 @@ function renderFocusedContractorHtml(c, wb, rel) {
       ${linkedSystems.length > 0 ? `
         <section class="admin-focused__list-block">
           <h3>Linked systems · ${linkedSystems.length}</h3>
-          ${linkedSystems.map((s) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="system" data-drill-entity-id="${escapeHtml(s.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(s.name || s.category)}</strong><span class="admin-muted">${escapeHtml(s.category)}</span></div></div>`).join("")}
+          ${linkedSystems.map((s) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="system" data-drill-entity-id="${escapeHtml(s.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(s.name || s.category)}</strong><span class="admin-muted">${escapeHtml(s.category)}</span></div><span class="admin-households__entity-chevron" aria-hidden="true">›</span></div>`).join("")}
         </section>` : ""}
       ${linkedRoutines.length > 0 ? `
         <section class="admin-focused__list-block">
           <h3>Linked routines · ${linkedRoutines.length}</h3>
-          ${linkedRoutines.map((r) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="routine" data-drill-entity-id="${escapeHtml(r.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(r.label || r.routine_kind)}</strong><span class="admin-muted">${escapeHtml(r.cadence_type)}</span></div></div>`).join("")}
+          ${linkedRoutines.map((r) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="routine" data-drill-entity-id="${escapeHtml(r.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(r.label || prettifyEnum(r.routine_kind))}</strong><span class="admin-muted">${escapeHtml(prettifyEnum(r.cadence_type))}</span></div><span class="admin-households__entity-chevron" aria-hidden="true">›</span></div>`).join("")}
+        </section>` : ""}
+      ${linkedVehicles.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Mechanic for · ${linkedVehicles.length} ${linkedVehicles.length === 1 ? "vehicle" : "vehicles"}</h3>
+          ${linkedVehicles.map((v) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="vehicle" data-drill-entity-id="${escapeHtml(v.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml([v.year, v.make, v.model].filter(Boolean).join(" "))}</strong><span class="admin-muted">${escapeHtml(v.license_plate || "")}</span></div><span class="admin-households__entity-chevron" aria-hidden="true">›</span></div>`).join("")}
         </section>` : ""}
       ${linkedTasks.length > 0 ? `
         <section class="admin-focused__list-block">
           <h3>Open tasks · ${linkedTasks.length}</h3>
-          ${linkedTasks.slice(0, 8).map((t) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(t.title)}</strong><span class="admin-muted">${t.next_due_date ? "due " + formatDateOnly(t.next_due_date) : ""}</span></div></div>`).join("")}
+          ${linkedTasks.slice(0, 8).map((t) => `<div class="admin-households__entity-row is-clickable" data-drill-entity-type="task" data-drill-entity-id="${escapeHtml(t.id)}"><div class="admin-households__entity-main"><strong>${escapeHtml(t.title)}</strong><span class="admin-muted">${t.next_due_date ? "Due " + formatDateOnly(t.next_due_date) : "Unscheduled"}</span></div><span class="admin-households__entity-chevron" aria-hidden="true">›</span></div>`).join("")}
         </section>` : ""}
       ${engagements.length > 0 ? `
         <section class="admin-focused__list-block">
-          <h3>Recent engagements · ${engagements.length}</h3>
-          ${engagements.slice(0, 8).map((e) => `<div class="admin-households__entity-row"><div class="admin-households__entity-main"><strong>${escapeHtml(e.channel)} · ${escapeHtml(e.direction)}</strong><span class="admin-muted">${escapeHtml(relativeTimeString(e.created_at))}${e.subject ? " · " + escapeHtml(e.subject) : ""}</span></div></div>`).join("")}
-        </section>` : `<p class="admin-muted">No engagements logged yet. Log a call to start the timeline.</p>`}
+          <h3>Engagement history · ${engagements.length}${calls + emails > 0 ? ` · ${calls} calls, ${emails} emails` : ""}</h3>
+          ${engagements.slice(0, 10).map((e) => `<div class="admin-households__entity-row"><div class="admin-households__entity-main"><strong>${escapeHtml(prettifyEnum(e.channel))} · ${e.direction === "outbound" ? "Chez → Vendor" : "Vendor → Chez"}</strong><span class="admin-muted">${escapeHtml(relativeTimeString(e.created_at))}${e.subject ? " · " + escapeHtml(e.subject) : ""}${e.notes ? " · " + escapeHtml(String(e.notes).slice(0, 60)) : ""}</span></div></div>`).join("")}
+        </section>` : `
+        <section class="admin-focused__list-block">
+          <h3>Engagement history</h3>
+          <p class="admin-muted">No engagements logged yet. Use "Log a call" above to start the timeline.</p>
+        </section>`}
     </article>
   `;
 }
 
+// Phase 85.7: Project parity rebuild. Mirrors iOS ProjectDetailView:
+// timeline (start / target / actual), budget tracking, linked documents
+// (filtered from workbench), description, action chips.
 function renderFocusedProjectHtml(p, wb) {
   const ownedBadge = p.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  const linkedDocs = (wb.documents || []).filter((d) => d.project_id === p.id);
+  // Status pill tone — completed projects feel different from active ones.
+  const status = p.status || "planned";
+  const statusTone = status === "completed" ? "active" : status === "active" ? "active" : "muted";
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
         <h2>${escapeHtml(p.name)}</h2>
         <div class="admin-focused__entity-meta">
           ${ownedBadge}
-          <span class="admin-pill admin-pill--note">${escapeHtml(p.status || "planned")}</span>
-          ${p.project_type ? `<span class="admin-pill">${escapeHtml(p.project_type)}</span>` : ""}
+          <span class="admin-pill" data-tone="${statusTone}">${escapeHtml(prettifyEnum(status))}</span>
+          ${p.project_type ? `<span class="admin-pill admin-pill--note">${escapeHtml(prettifyEnum(p.project_type))}</span>` : ""}
+          ${p.entry_type === "historical" ? `<span class="admin-pill">Historical entry</span>` : ""}
         </div>
       </header>
+
       <section class="admin-focused__field-grid">
-        <div><label>Estimated budget</label><strong>${p.estimated_budget ? "$" + formatCompact(p.estimated_budget) : "—"}</strong></div>
-        <div><label>Active quote</label><strong>${escapeHtml(p.active_quote_id || "—")}</strong></div>
-        <div><label>Entry type</label><strong>${escapeHtml(p.entry_type || "planned")}</strong></div>
+        <div><label>Estimated budget</label><strong>${p.estimated_budget ? "$" + formatCompact(p.estimated_budget) : "Not set"}</strong></div>
+        ${p.total_spent ? `<div><label>Total spent</label><strong>$${formatCompact(p.total_spent)}</strong></div>` : ""}
+        ${p.start_date ? `<div><label>Started</label><strong>${formatDateOnly(p.start_date)}</strong></div>` : ""}
+        ${p.target_completion_date ? `<div><label>Target completion</label><strong>${formatDateOnly(p.target_completion_date)}</strong></div>` : ""}
+        ${p.completed_at ? `<div><label>Completed</label><strong>${formatDateOnly(p.completed_at)}</strong></div>` : ""}
+        ${p.active_quote_id ? `<div><label>Active quote</label><strong>${escapeHtml(String(p.active_quote_id).slice(0, 8))}</strong></div>` : ""}
       </section>
+
       ${p.description ? `<section class="admin-focused__notes-block"><h3>Description</h3><p>${escapeHtml(p.description)}</p></section>` : ""}
+
       <section class="admin-focused__actions">
-        <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="open_project_workbench" data-entity-type="project" data-entity-id="${escapeHtml(p.id)}">Open negotiation pane</button>
           ${renderOwnershipPill(p)}
@@ -18986,6 +19190,19 @@ function renderFocusedProjectHtml(p, wb) {
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
       </section>
+
+      ${linkedDocs.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Project documents · ${linkedDocs.length}</h3>
+          ${linkedDocs.slice(0, 10).map((d) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="document" data-drill-entity-id="${escapeHtml(d.id)}">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(d.filename || "Document")}</strong>
+                <span class="admin-muted">${escapeHtml(d.category || "Unfiled")}${d.created_at ? " · Uploaded " + formatDateOnly(d.created_at) : ""}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
     </article>
   `;
 }
@@ -19081,26 +19298,48 @@ function renderFocusedDocumentHtml(d, wb) {
   `;
 }
 
+// Phase 85.7: Utility (Bill) parity rebuild. Mirrors iOS UtilityDetailSheet:
+// provider identity, account/plan card, contact info, Chez audit timeline
+// (history of audits with variance findings), linked documents.
 function renderFocusedUtilityHtml(u, wb) {
   const ownedBadge = u.chez_owned ? `<span class="admin-pill admin-pill--owned">★ Chez owns</span>` : "";
+  const audits = (wb.utility_bill_audits || []).filter((a) => a.utility_account_id === u.id);
+  const lastAudit = audits[0];
+  // Linked documents — bills/statements forwarded to this account. Heuristic:
+  // documents with matching category like "Home Bill/Invoice" + matching
+  // utility provider name in the filename or notes.
+  const linkedDocs = (wb.documents || []).filter((d) => {
+    if (d.category !== "Home Bill/Invoice") return false;
+    const provider = (u.provider_name || "").toLowerCase();
+    if (!provider) return false;
+    const fname = (d.filename || "").toLowerCase();
+    return fname.includes(provider.split(" ")[0]);
+  });
+  // Total Chez audit savings: sum of variance_cents where variance is favorable (homeowner overcharged).
+  const totalVarianceCents = audits.reduce((s, a) => s + (Math.abs(Number(a.variance_cents)) || 0), 0);
   return `
     <article class="admin-focused__entity">
       <header class="admin-focused__entity-head">
-        <h2>${escapeHtml(u.provider_name || u.account_name || "(utility)")}</h2>
+        <h2>${escapeHtml(u.provider_name || u.account_name || "Utility")}</h2>
         <div class="admin-focused__entity-meta">
           ${ownedBadge}
           <span class="admin-pill admin-pill--note">${escapeHtml(prettifyEnum(u.utility_type || u.provider_type) || "Bill")}</span>
+          ${audits.length > 0 ? `<span class="admin-pill">${audits.length} audit${audits.length === 1 ? "" : "s"}</span>` : ""}
+          ${u.is_autopay ? `<span class="admin-pill">Auto-pay on</span>` : ""}
         </div>
       </header>
+
       <section class="admin-focused__field-grid">
-        <div><label>Account</label><strong>${escapeHtml(u.account_number || "Not on file")}</strong></div>
+        <div><label>Account #</label><strong>${escapeHtml(u.account_number || "Not on file")}</strong></div>
         <div><label>Plan</label><strong>${escapeHtml(u.plan_name || "Not on file")}</strong></div>
-        <div><label>Monthly</label><strong>${u.monthly_cost ? "$" + formatCompact(u.monthly_cost) : "Not on file"}</strong></div>
-        <div><label>Phone</label><strong>${escapeHtml(formatPhoneNumber(u.phone) || "Not on file")}</strong></div>
-        <div><label>Website</label><strong>${escapeHtml(u.website || "Not on file")}</strong></div>
+        <div><label>Monthly cost</label><strong>${u.monthly_cost ? "$" + formatCompact(u.monthly_cost) : "Not on file"}</strong></div>
+        <div><label>Phone</label><strong>${u.phone ? `<a href="tel:${escapeHtml(u.phone)}" class="admin-link-inline">${escapeHtml(formatPhoneNumber(u.phone))}</a>` : "Not on file"}</strong></div>
+        <div><label>Website</label><strong>${u.website ? `<a href="${escapeHtml(u.website)}" target="_blank" rel="noopener" class="admin-link-inline">${escapeHtml(u.website)}</a>` : "Not on file"}</strong></div>
+        ${u.due_date ? `<div><label>Next due</label><strong>${formatDateOnly(u.due_date)}</strong></div>` : ""}
+        ${lastAudit ? `<div><label>Last audit</label><strong>${formatDateOnly(lastAudit.created_at)}${lastAudit.variance_cents ? " · $" + formatCompact(Math.abs(Number(lastAudit.variance_cents)) / 100) + " variance" : ""}</strong></div>` : ""}
       </section>
+
       <section class="admin-focused__actions">
-        <h3>Actions</h3>
         <div class="admin-focused__action-row">
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="audit_bill" data-entity-type="utility" data-entity-id="${escapeHtml(u.id)}">Audit bill</button>
           <button type="button" class="admin-pill admin-pill--action" data-cockpit-action="workbench-action" data-action-id="draft_negotiation" data-entity-type="utility" data-entity-id="${escapeHtml(u.id)}">Draft negotiation</button>
@@ -19109,6 +19348,39 @@ function renderFocusedUtilityHtml(u, wb) {
           <button type="button" class="admin-pill" data-focused-add-note>+ Add admin note</button>
         </div>
       </section>
+
+      ${audits.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Chez audit history · ${audits.length}${totalVarianceCents > 0 ? ` · $${formatCompact(totalVarianceCents / 100)} found` : ""}</h3>
+          ${audits.slice(0, 10).map((a) => {
+            const variance = Number(a.variance_cents) || 0;
+            const periodLabel = a.bill_period_start ? formatDateOnly(a.bill_period_start) : "";
+            return `
+              <div class="admin-households__entity-row">
+                <div class="admin-households__entity-main">
+                  <strong>${escapeHtml(periodLabel || "Audit on " + formatDateOnly(a.created_at))}${a.bill_amount_cents ? " · $" + formatCompact(Number(a.bill_amount_cents) / 100) : ""}</strong>
+                  <span class="admin-muted">${a.finding ? escapeHtml(String(a.finding).slice(0, 120)) : "No finding noted"}${variance ? ` · $${formatCompact(Math.abs(variance) / 100)} variance` : ""}</span>
+                </div>
+              </div>`;
+          }).join("")}
+        </section>` : `
+        <section class="admin-focused__list-block">
+          <h3>Chez audit history</h3>
+          <p class="admin-muted">No audits yet. The "Audit bill" action above starts the first one.</p>
+        </section>`}
+
+      ${linkedDocs.length > 0 ? `
+        <section class="admin-focused__list-block">
+          <h3>Recent bills · ${linkedDocs.length}</h3>
+          ${linkedDocs.slice(0, 10).map((d) => `
+            <div class="admin-households__entity-row is-clickable" data-drill-entity-type="document" data-drill-entity-id="${escapeHtml(d.id)}">
+              <div class="admin-households__entity-main">
+                <strong>${escapeHtml(d.filename)}</strong>
+                <span class="admin-muted">${d.created_at ? "Forwarded " + formatDateOnly(d.created_at) : ""}${d.chez_filed_at ? " · Filed" : ""}</span>
+              </div>
+              <span class="admin-households__entity-chevron" aria-hidden="true">›</span>
+            </div>`).join("")}
+        </section>` : ""}
     </article>
   `;
 }
@@ -20064,6 +20336,16 @@ function renderHouseholdWorkbenchHtml(wb, tab) {
             title="${ownedOnly ? "Showing only Chez-owned. Click for all." : "Showing all entities. Click to filter Chez-owned only."}">
             ★ Chez owns ${ownedOnly ? "✓" : ""}
           </button>
+          ${(() => {
+            // Phase 85.7: Bulk propose-ownership button. Only renders when
+            // the current tab has 2+ non-owned, non-pending entities to
+            // propose. Single-entity proposals belong on the focused panel.
+            const proposableCount = countProposableInTab(wb, tab);
+            if (proposableCount < 2) return "";
+            return `<button type="button" class="admin-pill admin-pill--action" data-workbench-bulk-propose data-tab="${escapeHtml(tab)}" title="Send one Approve/Decline card listing every non-owned ${tab === "vendors" ? "vendor" : tab} on this tab">
+              Propose Chez ownership of ${proposableCount} ${tab === "vendors" ? "vendor" + (proposableCount === 1 ? "" : "s") : tab}
+            </button>`;
+          })()}
         </div>
       ` : ""}
 

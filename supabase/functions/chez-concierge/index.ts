@@ -4203,6 +4203,7 @@ async function handleFetchHouseholdWorkbench(
     documentsRes, utilitiesRes, vehiclesRes,
     casesRes, workbenchActionsRes, remindersRes, punchItemsRes,
     vehicleServiceRes, vehicleRecallsRes, bundleCustomSubitemsRes,
+    utilityBillAuditsRes,
   ] = await Promise.all([
     safe(service.from("households").select("*").eq("id", householdId).maybeSingle(), "household"),
     safe(service.from("properties").select("*").eq("household_id", householdId), "properties"),
@@ -4236,6 +4237,9 @@ async function handleFetchHouseholdWorkbench(
     // renders these as "Custom additions" under a bundle parent task.
     // Filtered to active rows (archived_at NULL, used_at NULL).
     safe(service.from("bundle_custom_subitems").select("*").eq("household_id", householdId).is("archived_at", null).is("used_at", null), "bundle_custom_subitems"),
+    // Phase 85.7: utility bill audit history. Powers the rebuilt Bill
+    // focused panel's "Chez audit timeline" section. One row per audit.
+    safe(service.from("utility_bill_audits").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(50), "utility_bill_audits"),
   ]);
 
   return json({
@@ -4258,6 +4262,7 @@ async function handleFetchHouseholdWorkbench(
     vehicle_service_records: ((vehicleServiceRes as { data?: unknown[] })?.data) ?? [],
     vehicle_recalls: ((vehicleRecallsRes as { data?: unknown[] })?.data) ?? [],
     bundle_custom_subitems: ((bundleCustomSubitemsRes as { data?: unknown[] })?.data) ?? [],
+    utility_bill_audits: ((utilityBillAuditsRes as { data?: unknown[] })?.data) ?? [],
   });
 }
 

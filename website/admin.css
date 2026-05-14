@@ -11000,3 +11000,178 @@ details.admin-chez__analysis-section pre {
   left: 0;
   color: var(--text-muted, #6F6A88);
 }
+
+/* ========================================================================
+   Phase 85.7 — Focused-detail panel visual polish
+   ========================================================================
+   The audit found the focused panel buttons looked nothing like the rest
+   of the portal because the admin-pill class is a 10.5pt ultra-bold ALL-
+   CAPS chip (meant for tags), not a button. Promote any pill inside an
+   action row to proper button styling so Schedule / Mark complete /
+   Propose ownership / etc. look like the action buttons elsewhere in
+   the portal. */
+.admin-focused__action-row .admin-pill,
+.admin-focused__entity .admin-focused__action-row button.admin-pill {
+  background: #FFF;
+  border: 1px solid var(--neutral-300, #D8DADF);
+  border-radius: 12px;
+  color: var(--text, #2A2252);
+  font: 600 13px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 9px 14px;
+  min-height: 38px;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+.admin-focused__action-row .admin-pill:hover {
+  background: var(--indigo-50, rgba(67, 75, 145, 0.05));
+  border-color: var(--text, #2A2252);
+}
+.admin-focused__action-row .admin-pill:active {
+  transform: scale(0.98);
+}
+.admin-focused__action-row .admin-pill[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* Primary action — salmon fill (matches admin-button--primary). */
+.admin-focused__action-row .admin-pill.admin-pill--action {
+  background: var(--brand-strong, #ED6955);
+  border-color: var(--brand-strong, #ED6955);
+  color: #FFF;
+  box-shadow: 0 6px 16px rgba(237, 105, 85, 0.25);
+}
+.admin-focused__action-row .admin-pill.admin-pill--action:hover {
+  background: #D85440;
+  border-color: #D85440;
+}
+/* Secondary / ghost — muted text on white. */
+.admin-focused__action-row .admin-pill.admin-pill--secondary,
+.admin-focused__action-row .admin-pill.admin-pill--ghost {
+  color: var(--text-muted, #6F6A88);
+}
+/* Danger — red outline (used by Revoke Chez ownership). */
+.admin-focused__action-row .admin-pill.admin-pill--danger {
+  background: #FFF;
+  border-color: #B83C2E;
+  color: #B83C2E;
+}
+.admin-focused__action-row .admin-pill.admin-pill--danger:hover {
+  background: rgba(184, 60, 46, 0.06);
+}
+
+/* Hide the redundant "Actions" header inside focused panels. The
+   buttons themselves are the affordance. */
+.admin-focused__entity .admin-focused__actions > h3 {
+  display: none;
+}
+
+/* Field grid + section block spacing — tighter, more elegant. */
+.admin-focused__entity {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px;
+}
+.admin-focused__entity-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+.admin-focused__entity-head h2 {
+  font: 700 22px var(--serif);
+  color: var(--text, #2A2252);
+  margin: 0;
+}
+.admin-focused__entity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+/* Meta pills (the small chips next to the title — "★ Chez owns",
+   category badge, etc.) keep their existing tiny-chip look since they
+   ARE tags, not buttons. */
+
+.admin-focused__field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 24px;
+  padding: 16px 18px;
+  background: rgba(67, 75, 145, 0.025);
+  border-radius: 14px;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+}
+.admin-focused__field-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-focused__field-grid label {
+  font: 600 10px var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #6F6A88);
+}
+.admin-focused__field-grid strong {
+  font: 500 14px var(--sans);
+  color: var(--text, #2A2252);
+}
+
+/* List block (Service history, Custom additions, etc.). */
+.admin-focused__list-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-focused__list-block > h3 {
+  font: 600 10px var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #6F6A88);
+  margin: 0 0 4px 0;
+}
+
+/* Notes block — homeowner notes / description / etc. */
+.admin-focused__notes-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-focused__notes-block h3 {
+  font: 600 10px var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #6F6A88);
+  margin: 0;
+}
+.admin-focused__notes-block p {
+  font: 400 14px var(--sans);
+  color: var(--text, #2A2252);
+  line-height: 1.55;
+  margin: 0;
+  padding: 12px 14px;
+  background: rgba(67, 75, 145, 0.025);
+  border-radius: 10px;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+}
+
+/* Action row layout. */
+.admin-focused__action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.admin-focused__action-row + .admin-focused__action-row {
+  margin-top: 6px;
+}
+
+/* "Back" pill at the top of error / synthetic focused panels — keeps
+   its compact pill look since it's navigation, not an action. */
+.admin-focused__head .admin-pill {
+  /* Override the action-row promotion: we're not inside __action-row. */
+}
