@@ -4905,6 +4905,76 @@ actor HavenFieldService {
         return try? JSONDecoder().decode(HavenFieldHomeVendor.self, from: bytes)
     }
 
+    /// T2.6 (post-overnight) — create a recurring routine on the
+    /// homeowner's `routines` table from the field. Wraps the
+    /// `create_routine_for_home` action. Server confirms the workspace
+    /// serves the household via `provider_contractor_links`, then
+    /// inserts via service-role with `onboarded_via='chez_field'`.
+    /// Returns Void since the parent refreshes via dashboard reload
+    /// to pick up the new routine row.
+    func createRoutineForHome(
+        workspaceId: String,
+        householdId: String,
+        propertyId: String?,
+        label: String,
+        routineKind: String,
+        cadenceType: String,
+        cadenceIntervalDays: Int?,
+        daysOfWeek: [Int],
+        activeMonths: [Int],
+        timeOfDay: String?,
+        startDate: String?,
+        vendorId: String?,
+        estimatedCostPerVisitCents: Int?,
+        chezOwned: Bool,
+        notes: String?
+    ) async throws {
+        struct Request: Encodable {
+            let action = "create_routine_for_home"
+            let workspaceId: String
+            let householdId: String
+            let propertyId: String?
+            let label: String
+            let routineKind: String
+            let cadenceType: String
+            let cadenceIntervalDays: Int?
+            let daysOfWeek: [Int]
+            let activeMonths: [Int]
+            let timeOfDay: String?
+            let startDate: String?
+            let vendorId: String?
+            let estimatedCostPerVisitCents: Int?
+            let chezOwned: Bool
+            let notes: String?
+        }
+        struct Response: Decodable {
+            let ok: Bool?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            householdId: householdId,
+            propertyId: propertyId,
+            label: label,
+            routineKind: routineKind,
+            cadenceType: cadenceType,
+            cadenceIntervalDays: cadenceIntervalDays,
+            daysOfWeek: daysOfWeek,
+            activeMonths: activeMonths,
+            timeOfDay: timeOfDay,
+            startDate: startDate,
+            vendorId: vendorId,
+            estimatedCostPerVisitCents: estimatedCostPerVisitCents,
+            chezOwned: chezOwned,
+            notes: notes
+        ))
+        _ = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+    }
+
     /// T3.7 (post-overnight) — look up a system's manual / spec sheet
     /// on demand. The `lookup-manual` Edge Function takes a
     /// home_system_id and returns the cached PDF (signed URL) when
@@ -12234,6 +12304,11 @@ private struct HavenFieldHomeProfileView: View {
     /// T2.5 (post-overnight) — Add vendor flow state.
     @State private var showAddVendor = false
     @State private var capturedVendors: [HavenFieldHomeVendor] = []
+    /// T2.6 (post-overnight) — RoutineCaptureSheet trigger + the
+    /// captured-this-session routines we render optimistically until
+    /// the next dashboard refresh hydrates the home's routines list.
+    @State private var showAddRoutine = false
+    @State private var capturedRoutineLabels: [String] = []
     /// T3.16 (post-overnight) — End-relationship confirmation +
     /// in-flight + error state.
     @State private var showEndRelationshipConfirm = false
@@ -12684,12 +12759,33 @@ private struct HavenFieldHomeProfileView: View {
         }
     }
 
-    /// T3.1 (post-overnight) — read-only Routines surface. Sourced
-    /// from the homeowner's `routines` table via the dashboard payload.
-    /// Write affordances (create / edit) land with T2.6
-    /// RoutineCaptureSheet in Phase C.
+    /// T3.1 (post-overnight) — Routines surface. Sourced from the
+    /// homeowner's `routines` table via the dashboard payload.
+    /// T2.6 (post-overnight) — added "+ Add a routine" CTA at the top
+    /// that opens HavenFieldRoutineCaptureSheet, modeled on the
+    /// homeowner-side RoutineEditSheet. Hides when we don't have
+    /// workspace + household to enforce server-side access guards.
     private var routinesTab: some View {
         VStack(alignment: .leading, spacing: 18) {
+            if let workspaceId, let householdId = home.householdId, !householdId.isEmpty {
+                Button {
+                    showAddRoutine = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text("Add a routine")
+                            .font(HavenTypography.uiButton)
+                        Spacer()
+                    }
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
             FieldSectionCard(kicker: "Routines", title: "Recurring services on file") {
                 if home.routines.isEmpty {
                     FieldEmptyState(
@@ -12812,6 +12908,27 @@ private struct HavenFieldHomeProfileView: View {
                         // entry takes over.
                         capturedVendors.insert(newVendor, at: 0)
                         showAddVendor = false
+                    }
+                )
+            }
+        }
+        // T2.6 (post-overnight) — RoutineCaptureSheet. Same access
+        // gating as Add vendor since both write to per-household tables
+        // via the same workspace-serves-household guard.
+        .sheet(isPresented: $showAddRoutine) {
+            if let workspaceId, let householdId = home.householdId {
+                HavenFieldRoutineCaptureSheet(
+                    workspaceId: workspaceId,
+                    householdId: householdId,
+                    propertyId: home.propertyId,
+                    availableVendors: home.vendors + capturedVendors,
+                    onCreated: {
+                        // Note the optimistic confirmation; the home
+                        // payload refreshes on the next dashboard pull
+                        // which will surface the new routine row.
+                        capturedRoutineLabels.insert("Routine added — refresh to see it.", at: 0)
+                        setBanner("Routine saved", kind: .success)
+                        showAddRoutine = false
                     }
                 )
             }
@@ -20753,6 +20870,340 @@ private struct HavenFieldAddVendorSheet: View {
             dismiss()
         } catch {
             errorMessage = friendlyServerError(from: error, fallback: "Couldn’t add the vendor. Please try again.")
+        }
+    }
+}
+
+/// T2.6 (post-overnight) — capture a recurring routine on the
+/// homeowner's `routines` table during a visit. Mirrors the
+/// homeowner-side `RoutineEditSheet` field set + UX, scaled down to
+/// the field-side common case (lawn care biweekly, cleaning every
+/// other Friday, pool weekly Apr–Oct, snow plow contract Dec–Mar).
+/// Vendor picker reads from the home's already-captured contractors
+/// so the field doesn't need to duplicate vendor entry; selecting
+/// "None / haven't picked yet" lands the routine in `pending_vendor`
+/// state which the homeowner can fill in later from the homeowner-
+/// side Routines list.
+private struct HavenFieldRoutineCaptureSheet: View {
+    let workspaceId: String
+    let householdId: String
+    let propertyId: String?
+    let availableVendors: [HavenFieldHomeVendor]
+    let onCreated: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var label: String = ""
+    @State private var routineKind: String = "landscaping"
+    @State private var cadenceType: String = "weekly"
+    @State private var weeksInterval: Int = 1
+    @State private var daysOfWeek: Set<Int> = [3] // Tue default
+    @State private var activeMonths: Set<Int> = Set(1...12)
+    @State private var includeTimeOfDay: Bool = false
+    @State private var timeOfDay: Date = {
+        var c = DateComponents(); c.hour = 9; c.minute = 0
+        return Calendar.current.date(from: c) ?? Date()
+    }()
+    @State private var startDate: Date = Date()
+    @State private var includeStartDate: Bool = false
+    @State private var vendorId: String? = nil
+    @State private var costInput: String = ""
+    @State private var notes: String = ""
+    @State private var chezOwned: Bool = false
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    /// Field-side simplified RoutineKind list — the most-captured
+    /// home services. Free-text label still lets the tech tag
+    /// anything beyond this list. Categories track the homeowner-
+    /// side `RoutineKind` enum's vendor-based cases.
+    private let kindOptions: [(value: String, label: String)] = [
+        ("landscaping", "Landscaping / lawn care"),
+        ("cleaning", "Cleaning service"),
+        ("pool_service", "Pool service"),
+        ("pest_control", "Pest control"),
+        ("snow_removal", "Snow removal"),
+        ("tree_service", "Tree service"),
+        ("pet_waste", "Pet waste pickup"),
+        ("mosquito_tick", "Mosquito & tick spray"),
+        ("trash", "Trash pickup"),
+        ("recycling", "Recycling pickup"),
+        ("compost", "Compost pickup"),
+        ("yard_waste", "Yard waste pickup"),
+        ("recurring_delivery", "Recurring delivery"),
+        ("other", "Other recurring service")
+    ]
+
+    private let cadenceOptions: [(value: String, label: String)] = [
+        ("weekly", "Every week"),
+        ("biweekly", "Every 2 weeks"),
+        ("triweekly", "Every 3 weeks"),
+        ("monthly", "Monthly"),
+        ("bimonthly", "Every 2 months"),
+        ("quarterly", "Quarterly"),
+        ("semiannual", "Twice a year"),
+        ("annual", "Once a year")
+    ]
+
+    private let weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"]
+    private let monthLabels = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Type") {
+                    Picker("Kind", selection: $routineKind) {
+                        ForEach(kindOptions, id: \.value) { opt in
+                            Text(opt.label).tag(opt.value)
+                        }
+                    }
+                    .onChange(of: routineKind) { _, newValue in
+                        if label.isEmpty {
+                            label = kindOptions.first(where: { $0.value == newValue })?.label ?? ""
+                        }
+                    }
+                }
+
+                Section("Label") {
+                    TextField("e.g. Renata's biweekly cleaning", text: $label)
+                        .textInputAutocapitalization(.sentences)
+                }
+
+                Section("Vendor") {
+                    Picker("Provider", selection: Binding(
+                        get: { vendorId ?? "" },
+                        set: { vendorId = $0.isEmpty ? nil : $0 }
+                    )) {
+                        Text("None / haven't picked yet").tag("")
+                        ForEach(availableVendors) { vendor in
+                            Text(vendor.companyName).tag(vendor.id)
+                        }
+                    }
+                    if vendorId == nil {
+                        Text("Routine lands in 'pending vendor' state. Homeowner can pick one later from their Routines list.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                Section("Cadence") {
+                    Picker("Repeats", selection: $cadenceType) {
+                        ForEach(cadenceOptions, id: \.value) { opt in
+                            Text(opt.label).tag(opt.value)
+                        }
+                    }
+
+                    if isWeeklyVariant {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Days")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            HStack(spacing: 6) {
+                                ForEach(0..<7, id: \.self) { idx in
+                                    let day = idx + 1 // ISO 1=Sunday
+                                    let isOn = daysOfWeek.contains(day)
+                                    Button {
+                                        if isOn { daysOfWeek.remove(day) }
+                                        else { daysOfWeek.insert(day) }
+                                    } label: {
+                                        Text(weekdayLabels[idx])
+                                            .font(.system(size: 12, weight: isOn ? .bold : .regular, design: .rounded))
+                                            .foregroundStyle(isOn ? HavenColors.textOnAction : HavenColors.textSecondary)
+                                            .frame(maxWidth: .infinity, minHeight: 36)
+                                            .background(isOn ? HavenColors.action : HavenColors.beige200.opacity(0.4))
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    } else {
+                        Toggle("Pin a start date", isOn: $includeStartDate)
+                        if includeStartDate {
+                            DatePicker("Next occurrence", selection: $startDate, displayedComponents: .date)
+                        }
+                    }
+
+                    Toggle("Time of day", isOn: $includeTimeOfDay)
+                    if includeTimeOfDay {
+                        DatePicker("Time", selection: $timeOfDay, displayedComponents: .hourAndMinute)
+                    }
+                }
+
+                Section("Active months") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 4) {
+                            ForEach(0..<12, id: \.self) { idx in
+                                let month = idx + 1
+                                let isOn = activeMonths.contains(month)
+                                Button {
+                                    if isOn { activeMonths.remove(month) }
+                                    else { activeMonths.insert(month) }
+                                } label: {
+                                    Text(monthLabels[idx])
+                                        .font(.system(size: 12, weight: isOn ? .bold : .regular, design: .rounded))
+                                        .foregroundStyle(isOn ? HavenColors.textOnNavy : HavenColors.textTertiary)
+                                        .strikethrough(!isOn, color: HavenColors.textTertiary.opacity(0.6))
+                                        .frame(maxWidth: .infinity, minHeight: 32)
+                                        .background(isOn ? HavenColors.navy : HavenColors.beige200.opacity(0.4))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        Text(activeMonthsSummary)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                presetMonthsButton("All", months: Set(1...12))
+                                presetMonthsButton("Apr-Nov", months: Set(4...11))
+                                presetMonthsButton("May-Sep", months: Set(5...9))
+                                presetMonthsButton("Dec-Mar", months: Set([12, 1, 2, 3]))
+                            }
+                        }
+                    }
+                }
+
+                Section("Cost (optional)") {
+                    HStack {
+                        Text("$")
+                            .foregroundStyle(HavenColors.textSecondary)
+                        TextField("Per visit", text: $costInput)
+                            .keyboardType(.decimalPad)
+                    }
+                    Text("Helps the homeowner forecast spend on this service.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+
+                Section {
+                    Toggle(isOn: $chezOwned) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Chez owns scheduling")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("Visits land on the calendar without per-visit asks.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
+                    .tint(HavenColors.action)
+                } header: { Text("Delegation") }
+
+                Section("Notes (optional)") {
+                    TextField("Anything to remember (e.g. doesn't mow on rainy days)", text: $notes, axis: .vertical)
+                        .lineLimit(2...6)
+                }
+
+                if let errorMessage, !errorMessage.isEmpty {
+                    Section {
+                        Text(errorMessage)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.critical)
+                    }
+                }
+            }
+            .navigationTitle("Add a routine")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isSaving ? "Saving…" : "Save") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving || !canSave)
+                }
+            }
+        }
+    }
+
+    private var isWeeklyVariant: Bool {
+        cadenceType == "weekly" || cadenceType == "biweekly" || cadenceType == "triweekly"
+    }
+
+    private var canSave: Bool {
+        !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (isWeeklyVariant ? !daysOfWeek.isEmpty : true)
+            && !activeMonths.isEmpty
+    }
+
+    private var activeMonthsSummary: String {
+        let sorted = Array(activeMonths).sorted()
+        if sorted == Array(1...12) { return "Active year-round" }
+        if sorted.isEmpty { return "Inactive — pick at least one month" }
+        let names = Calendar.current.shortMonthSymbols
+        if let first = sorted.first, let last = sorted.last,
+           sorted.count == (last - first + 1),
+           first >= 1, last <= 12 {
+            return "Active \(names[first - 1])–\(names[last - 1])"
+        }
+        let pieces = sorted.compactMap { m -> String? in
+            (m >= 1 && m <= 12) ? names[m - 1] : nil
+        }
+        return "Active " + pieces.joined(separator: ", ")
+    }
+
+    private func presetMonthsButton(_ title: String, months: Set<Int>) -> some View {
+        Button {
+            activeMonths = months
+        } label: {
+            Text(title)
+                .font(HavenTypography.uiLabelSmall)
+                .foregroundStyle(HavenColors.navy700)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(HavenColors.navy.opacity(0.06))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func save() async {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let costCents: Int? = {
+            let cleaned = costInput.replacingOccurrences(of: ",", with: "")
+            guard let dollars = Double(cleaned), dollars >= 0 else { return nil }
+            return Int(dollars * 100)
+        }()
+        let timeString: String? = {
+            guard includeTimeOfDay else { return nil }
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm:ss"
+            return f.string(from: timeOfDay)
+        }()
+        let startString: String? = {
+            guard includeStartDate, !isWeeklyVariant else { return nil }
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f.string(from: startDate)
+        }()
+        do {
+            try await HavenFieldService.shared.createRoutineForHome(
+                workspaceId: workspaceId,
+                householdId: householdId,
+                propertyId: propertyId,
+                label: trimmedLabel,
+                routineKind: routineKind,
+                cadenceType: cadenceType,
+                cadenceIntervalDays: nil,
+                daysOfWeek: isWeeklyVariant ? Array(daysOfWeek).sorted() : [],
+                activeMonths: Array(activeMonths).sorted(),
+                timeOfDay: timeString,
+                startDate: startString,
+                vendorId: vendorId,
+                estimatedCostPerVisitCents: costCents,
+                chezOwned: chezOwned,
+                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            )
+            onCreated()
+            dismiss()
+        } catch {
+            errorMessage = friendlyServerError(from: error, fallback: "Couldn’t save the routine. Please try again.")
         }
     }
 }

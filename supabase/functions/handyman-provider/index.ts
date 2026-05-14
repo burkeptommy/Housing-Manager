@@ -13325,6 +13325,115 @@ async function createContractorFromCardForProvider(
   return { ok: true, contractor: created };
 }
 
+/**
+ * T2.6 (post-overnight) — create a routine on the homeowner's `routines`
+ * table from the field. Same access-guard pattern as
+ * `create_contractor_from_card`: confirm the workspace actually serves
+ * the target household via provider_contractor_links → contractors.
+ *
+ * Inputs are the canonical `routines` columns (see Phase 55.1 schema).
+ * `vendorId` is optional — capture sheets often have a free-text vendor
+ * the field hasn't formalized yet, in which case this just stamps the
+ * routine without a contractor link. Defaults match the homeowner-side
+ * RoutineEditSheet so a routine captured by the handyman behaves
+ * indistinguishably from one the homeowner set up themselves.
+ */
+async function createRoutineForHomeForProvider(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const userId = compactString(user.id);
+  const workspaceId = compactString(body.workspaceId);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const householdId = compactString(body.householdId);
+  const propertyId = compactString(body.propertyId) || null;
+  if (!householdId) throw new Error("householdId is required");
+
+  const { data: linkRows } = await service
+    .from("provider_contractor_links")
+    .select("contractor_id, contractors!inner(household_id)")
+    .eq("workspace_id", workspaceId);
+  const servesHousehold = (linkRows ?? []).some((row: Record<string, unknown>) => {
+    const c = row.contractors as Record<string, unknown> | null;
+    return compactString(c?.household_id) === householdId;
+  });
+  if (!servesHousehold) {
+    throw new Error("Workspace does not serve this household");
+  }
+
+  const label = compactString(body.label);
+  const routineKind = compactString(body.routineKind);
+  if (!label) throw new Error("label is required");
+  if (!routineKind) throw new Error("routineKind is required");
+
+  const cadenceType = compactString(body.cadenceType) || "weekly";
+  const daysOfWeekRaw = Array.isArray(body.daysOfWeek) ? body.daysOfWeek : [];
+  const daysOfWeek = daysOfWeekRaw
+    .map((d) => Number(d))
+    .filter((d) => Number.isFinite(d) && d >= 1 && d <= 7);
+  const activeMonthsRaw = Array.isArray(body.activeMonths) ? body.activeMonths : [];
+  const activeMonths = activeMonthsRaw
+    .map((m) => Number(m))
+    .filter((m) => Number.isFinite(m) && m >= 1 && m <= 12);
+  const cadenceIntervalDays = typeof body.cadenceIntervalDays === "number"
+    ? body.cadenceIntervalDays
+    : null;
+  const timeOfDay = compactString(body.timeOfDay) || null;
+  const startDate = compactString(body.startDate) || null;
+  const vendorId = compactString(body.vendorId) || null;
+  const costCentsRaw = body.estimatedCostPerVisitCents;
+  const costCents = typeof costCentsRaw === "number" && costCentsRaw >= 0
+    ? costCentsRaw
+    : null;
+  const notes = compactString(body.notes) || null;
+  const chezOwned = body.chezOwned === true;
+
+  // Confirm vendor (if provided) belongs to this household. Prevents a
+  // routine landing with a vendor_id that the household can't see in
+  // their UI.
+  if (vendorId) {
+    const { data: vendorRow } = await service
+      .from("contractors")
+      .select("id, household_id")
+      .eq("id", vendorId)
+      .maybeSingle();
+    if (!vendorRow || compactString(vendorRow.household_id) !== householdId) {
+      throw new Error("Vendor not found in this household");
+    }
+  }
+
+  const insert: Record<string, unknown> = {
+    household_id: householdId,
+    property_id: propertyId,
+    label,
+    routine_kind: routineKind,
+    cadence_type: cadenceType,
+    cadence_interval_days: cadenceIntervalDays,
+    days_of_week: daysOfWeek.length > 0 ? daysOfWeek : null,
+    time_of_day: timeOfDay,
+    start_date: startDate,
+    active_months: activeMonths.length > 0 ? activeMonths : Array.from({ length: 12 }, (_, i) => i + 1),
+    vendor_id: vendorId,
+    estimated_cost_per_visit_cents: costCents,
+    notes,
+    setup_state: vendorId ? "active" : "pending_vendor",
+    scope: "property",
+    chez_owned: chezOwned,
+    chez_owned_at: chezOwned ? isoNow() : null,
+    onboarded_via: "chez_field",
+  };
+
+  const { data: created, error: insertError } = await service
+    .from("routines")
+    .insert(insert)
+    .select()
+    .single();
+  if (insertError) throw insertError;
+  return { ok: true, routine: created };
+}
+
 /** G47 — multi-handyman support: add a workspace member to an assessment. */
 async function addAssessmentMember(
   service: ServiceClient,
@@ -15339,6 +15448,17 @@ serve(async (req) => {
       // service-role client with `source = 'chez_field'`.
       if (action === "create_contractor_from_card") {
         const result = await createContractorFromCardForProvider(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // T2.6 (post-overnight) — create a routine on the homeowner's
+      // routines table from the field. Pairs with iOS RoutineCaptureSheet.
+      if (action === "create_routine_for_home") {
+        const result = await createRoutineForHomeForProvider(
           service,
           user as unknown as Record<string, unknown>,
           body,
