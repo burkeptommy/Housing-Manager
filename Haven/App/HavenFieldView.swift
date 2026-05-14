@@ -2536,6 +2536,12 @@ struct HavenFieldSystemSnapshot: Codable, Identifiable, Hashable {
     var cachedManualLinks: [HavenFieldLink]
     var labelPhotoName: String?
     var photoCapturedAt: String?
+    /// T2.4 (post-overnight) — visit-draft follow-up flag. Mirrors the
+    /// home_systems columns so the snapshot can travel through portal
+    /// sync + submit_assessment_data and land on the persisted row.
+    /// Defaults to `false` so existing snapshots round-trip cleanly.
+    var followupRequired: Bool
+    var followupReason: String?
 
     init(
         id: String,
@@ -2564,7 +2570,9 @@ struct HavenFieldSystemSnapshot: Codable, Identifiable, Hashable {
         scoreSummary: String? = nil,
         cachedManualLinks: [HavenFieldLink] = [],
         labelPhotoName: String? = nil,
-        photoCapturedAt: String? = nil
+        photoCapturedAt: String? = nil,
+        followupRequired: Bool = false,
+        followupReason: String? = nil
     ) {
         self.id = id
         self.systemId = systemId
@@ -2593,6 +2601,8 @@ struct HavenFieldSystemSnapshot: Codable, Identifiable, Hashable {
         self.cachedManualLinks = cachedManualLinks
         self.labelPhotoName = labelPhotoName
         self.photoCapturedAt = photoCapturedAt
+        self.followupRequired = followupRequired
+        self.followupReason = followupReason
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -2616,6 +2626,41 @@ struct HavenFieldSystemSnapshot: Codable, Identifiable, Hashable {
         case cachedManualLinks = "cached_manual_links"
         case labelPhotoName = "label_photo_name"
         case photoCapturedAt = "photo_captured_at"
+        case followupRequired = "followup_required"
+        case followupReason = "followup_reason"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? "local-\(UUID().uuidString)"
+        systemId = try? c.decodeIfPresent(String.self, forKey: .systemId)
+        name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
+        category = (try? c.decodeIfPresent(String.self, forKey: .category)) ?? ""
+        manufacturer = try? c.decodeIfPresent(String.self, forKey: .manufacturer)
+        modelNumber = try? c.decodeIfPresent(String.self, forKey: .modelNumber)
+        serialNumber = try? c.decodeIfPresent(String.self, forKey: .serialNumber)
+        installDate = try? c.decodeIfPresent(String.self, forKey: .installDate)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+        lastServiceDate = try? c.decodeIfPresent(String.self, forKey: .lastServiceDate)
+        nextServiceDue = try? c.decodeIfPresent(String.self, forKey: .nextServiceDue)
+        serviced = (try? c.decodeIfPresent(Bool.self, forKey: .serviced)) ?? false
+        needsSetup = (try? c.decodeIfPresent(Bool.self, forKey: .needsSetup)) ?? false
+        status = try? c.decodeIfPresent(String.self, forKey: .status)
+        subtype = try? c.decodeIfPresent(String.self, forKey: .subtype)
+        catalogEntryId = try? c.decodeIfPresent(String.self, forKey: .catalogEntryId)
+        catalogSeries = try? c.decodeIfPresent(String.self, forKey: .catalogSeries)
+        catalogModelName = try? c.decodeIfPresent(String.self, forKey: .catalogModelName)
+        catalogFeatures = (try? c.decodeIfPresent([String].self, forKey: .catalogFeatures)) ?? []
+        catalogFuelType = try? c.decodeIfPresent(String.self, forKey: .catalogFuelType)
+        catalogDisplayName = try? c.decodeIfPresent(String.self, forKey: .catalogDisplayName)
+        catalogSubtitle = try? c.decodeIfPresent(String.self, forKey: .catalogSubtitle)
+        reliabilityScore = try? c.decodeIfPresent(Int.self, forKey: .reliabilityScore)
+        scoreSummary = try? c.decodeIfPresent(String.self, forKey: .scoreSummary)
+        cachedManualLinks = (try? c.decodeIfPresent([HavenFieldLink].self, forKey: .cachedManualLinks)) ?? []
+        labelPhotoName = try? c.decodeIfPresent(String.self, forKey: .labelPhotoName)
+        photoCapturedAt = try? c.decodeIfPresent(String.self, forKey: .photoCapturedAt)
+        followupRequired = (try? c.decodeIfPresent(Bool.self, forKey: .followupRequired)) ?? false
+        followupReason = try? c.decodeIfPresent(String.self, forKey: .followupReason)
     }
 }
 
@@ -6088,7 +6133,12 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             scoreSummary: response.catalogMatch?.scores?.summary ?? existing.scoreSummary,
             cachedManualLinks: existing.cachedManualLinks,
             labelPhotoName: "Label photo",
-            photoCapturedAt: ISO8601DateFormatter().string(from: Date())
+            photoCapturedAt: ISO8601DateFormatter().string(from: Date()),
+            // T2.4 — preserve flag through the AI-extract patch so a
+            // re-photographed system that's already flagged stays
+            // flagged.
+            followupRequired: existing.followupRequired,
+            followupReason: existing.followupReason
         )
     }
 }
@@ -9884,7 +9934,39 @@ private struct HavenFieldVisitWorkspaceView: View {
             .presentationDetents([.medium])
         }
         .sheet(item: $selectedSystem) { system in
-            HavenFieldSystemDetailSheet(system: system)
+            // T2.4 (post-overnight) — flag-for-follow-up on visit-draft
+            // snapshots. The mutation lives on `viewModel.draft`; on
+            // confirm we patch the matching snapshot by id, persist
+            // to UserDefaults via HavenFieldCache, and let the next
+            // syncPortal() roundtrip carry it server-side. The
+            // submit_assessment_data fan-out (T2.8) reads
+            // followup_required + followup_reason and stamps
+            // home_systems.marked_for_followup_at on commit.
+            HavenFieldSystemDetailSheet(
+                system: system,
+                onMarkFollowup: { reason in
+                    if var draft = viewModel.draft {
+                        if let idx = draft.systemsSnapshot.firstIndex(where: { $0.id == system.id }) {
+                            draft.systemsSnapshot[idx].followupRequired = true
+                            draft.systemsSnapshot[idx].followupReason = reason
+                            viewModel.draft = draft
+                            viewModel.syncMessage = "Flagged for follow-up"
+                            HavenFieldCache.saveDraft(draft, token: viewModel.portalToken ?? "")
+                        }
+                    }
+                },
+                onClearFollowup: {
+                    if var draft = viewModel.draft {
+                        if let idx = draft.systemsSnapshot.firstIndex(where: { $0.id == system.id }) {
+                            draft.systemsSnapshot[idx].followupRequired = false
+                            draft.systemsSnapshot[idx].followupReason = nil
+                            viewModel.draft = draft
+                            viewModel.syncMessage = "Follow-up cleared"
+                            HavenFieldCache.saveDraft(draft, token: viewModel.portalToken ?? "")
+                        }
+                    }
+                }
+            )
         }
         .sheet(isPresented: $showCamera) {
             HavenFieldCameraPicker { image in
@@ -15288,10 +15370,26 @@ private struct FieldSystemCard: View {
                     .foregroundStyle(HavenColors.textSecondary)
                 }
                 Spacer()
-                if system.reliabilityScore != nil {
-                    Text("Reliability \(system.reliabilityScore ?? 0)")
-                        .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.action)
+                VStack(alignment: .trailing, spacing: 4) {
+                    if system.reliabilityScore != nil {
+                        Text("Reliability \(system.reliabilityScore ?? 0)")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                    }
+                    // T2.4 (post-overnight) — flagged-for-follow-up
+                    // pill so the tech can see at-a-glance which
+                    // captured systems still need attention next
+                    // visit.
+                    if system.followupRequired {
+                        Label("Follow-up", systemImage: "flag.fill")
+                            .labelStyle(.titleAndIcon)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.warning)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(HavenColors.warning.opacity(0.10))
+                            .clipShape(Capsule())
+                    }
                 }
             }
 
@@ -15299,6 +15397,20 @@ private struct FieldSystemCard: View {
                 Text(summary)
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
+            }
+            // T2.4 — render the reason inline below the score summary
+            // when the system is flagged. Caption-tier so it doesn't
+            // overpower the headline; the warning-colored quote glyph
+            // anchors it visually.
+            if system.followupRequired, let reason = system.followupReason?.nonEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "quote.bubble")
+                        .font(.system(size: 10))
+                        .foregroundStyle(HavenColors.warning)
+                    Text(reason)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
             }
 
             HStack(spacing: 10) {
@@ -19425,7 +19537,19 @@ private struct HavenFieldMessageComposer: View {
 
 private struct HavenFieldSystemDetailSheet: View {
     let system: HavenFieldSystemSnapshot
+    /// T2.4 (post-overnight) — optional callbacks. When present we
+    /// render the "Flag for follow-up" / "Clear follow-up" affordances
+    /// at the bottom of the sheet. Parent owns the mutation against
+    /// `draft.systemsSnapshot[i]` and the portal sync that follows.
+    var onMarkFollowup: ((String) -> Void)? = nil
+    var onClearFollowup: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    /// Local inline reason capture so we don't need to hop through a
+    /// second sheet. Mirrors the inline reason field on
+    /// HavenFieldFollowupSheet but renders right inside the detail
+    /// list when the user expands the section.
+    @State private var followupReasonDraft: String = ""
+    @State private var isComposingFollowup: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -19440,6 +19564,24 @@ private struct HavenFieldSystemDetailSheet: View {
                     }
                     if let manufacturer = system.manufacturer?.nonEmpty {
                         Label(manufacturer, systemImage: "wrench.and.screwdriver")
+                    }
+                }
+
+                if system.followupRequired {
+                    Section {
+                        Label {
+                            Text("Flagged for follow-up")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.warning)
+                        } icon: {
+                            Image(systemName: "flag.fill")
+                                .foregroundStyle(HavenColors.warning)
+                        }
+                        if let reason = system.followupReason?.nonEmpty {
+                            Text(reason)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
                     }
                 }
 
@@ -19488,6 +19630,61 @@ private struct HavenFieldSystemDetailSheet: View {
                 if let notes = system.notes?.nonEmpty {
                     Section("Notes") {
                         Text(notes)
+                    }
+                }
+
+                if onMarkFollowup != nil || onClearFollowup != nil {
+                    Section("Field actions") {
+                        if system.followupRequired {
+                            // Already flagged — only show the clear
+                            // affordance. Tech is wrapping it up.
+                            Button {
+                                onClearFollowup?()
+                                dismiss()
+                            } label: {
+                                Label("Clear follow-up flag", systemImage: "checkmark.circle")
+                                    .foregroundStyle(HavenColors.success)
+                            }
+                        } else if isComposingFollowup {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Why couldn't you finish today?")
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                TextField(
+                                    "e.g. tenant unavailable, attic locked",
+                                    text: $followupReasonDraft,
+                                    axis: .vertical
+                                )
+                                .lineLimit(2...4)
+                                HStack {
+                                    Button("Cancel") {
+                                        isComposingFollowup = false
+                                        followupReasonDraft = ""
+                                    }
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                    Spacer()
+                                    Button {
+                                        let trimmed = followupReasonDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        guard !trimmed.isEmpty else { return }
+                                        onMarkFollowup?(trimmed)
+                                        followupReasonDraft = ""
+                                        isComposingFollowup = false
+                                        dismiss()
+                                    } label: {
+                                        Label("Flag", systemImage: "flag.fill")
+                                            .foregroundStyle(HavenColors.warning)
+                                    }
+                                    .disabled(followupReasonDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                }
+                            }
+                        } else {
+                            Button {
+                                isComposingFollowup = true
+                            } label: {
+                                Label("Flag for follow-up", systemImage: "flag")
+                                    .foregroundStyle(HavenColors.warning)
+                            }
+                        }
                     }
                 }
             }

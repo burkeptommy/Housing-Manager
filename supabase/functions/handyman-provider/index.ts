@@ -11501,6 +11501,19 @@ async function ingestAssessment(service: ServiceClient, assessmentId: string) {
     const equipmentPhotos = Array.isArray(s.equipment_plate_photos) ? s.equipment_plate_photos : [];
     const isDecommissioned = s.is_decommissioned === true;
     const decommissionReason = compactString(s.decommissioned_reason) || null;
+    // T2.4 (post-overnight) — visit-draft followup flag fan-out. The
+    // tech flagged the system mid-visit because they couldn't finish
+    // (panel locked, tenant out). Stamp marked_for_followup_at +
+    // followup_reason on home_systems so the next prep checklist
+    // surfaces it. Cleared automatically on subsequent capture if
+    // the flag is dropped.
+    const followupRequired = s.followup_required === true
+      || s.markedForFollowup === true
+      || compactString(s.marked_for_followup_at) !== ""
+      || compactString(s.markedForFollowupAt) !== "";
+    const followupReason = compactString(s.followup_reason)
+      || compactString(s.followupReason)
+      || null;
 
     // find-or-create by (household, property, category, model). Supplement
     // mode patches existing rows; first-time mode skips duplicates.
@@ -11530,6 +11543,15 @@ async function ingestAssessment(service: ServiceClient, assessmentId: string) {
         update.decommissioned_at = isoNow();
         update.decommissioned_reason = decommissionReason;
       }
+      // T2.4 — propagate follow-up flag from snapshot. Setting both
+      // columns nulls them when the tech cleared the flag mid-visit.
+      if (followupRequired) {
+        update.marked_for_followup_at = isoNow();
+        update.followup_reason = followupReason;
+      } else if (s.followup_required === false) {
+        update.marked_for_followup_at = null;
+        update.followup_reason = null;
+      }
       await service.from("home_systems").update(update).eq("id", existing.id);
       continue;
     }
@@ -11554,6 +11576,10 @@ async function ingestAssessment(service: ServiceClient, assessmentId: string) {
       is_active: !isDecommissioned,
       decommissioned_at: isDecommissioned ? isoNow() : null,
       decommissioned_reason: isDecommissioned ? decommissionReason : null,
+      // T2.4 — flag carries through to the new home_systems row when
+      // the tech captured + flagged the system in the same visit.
+      marked_for_followup_at: followupRequired ? isoNow() : null,
+      followup_reason: followupRequired ? followupReason : null,
     });
   }
 
