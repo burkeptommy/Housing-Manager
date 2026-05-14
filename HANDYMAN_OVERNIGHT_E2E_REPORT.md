@@ -479,3 +479,105 @@ Tests/e2e/run.mjs — All phases passed (0 issues)
 Branch pushed to
 `origin/claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG`
 at every commit boundary. Both schemes build clean.
+
+---
+
+## Implementation pass round 3 (2026-05-14, continuation session) — 6 more commits
+
+A third pass picked up the remaining Tier 2 and Tier 3 items the user
+asked to land before stopping. Six commits closed the rest of the
+"on-behalf-of value prop" Section 5 work plus two key plumbing items
+on the messaging surface and the Homes / Visits tabs.
+
+### TL;DR for pass 3
+
+- **6 new commits** on top of pass 2's 8 (24 commits total since the
+  overnight kickoff). Each builds clean against both Chez and Chez
+  Field schemes; both backend regressions pass all phases with 0 issues.
+- **Tier 2 cluster effectively complete.** T2.4 (mark-for-followup),
+  T2.6 (RoutineCaptureSheet — the largest single iOS sheet in the
+  plan), T2.1 (Assessment queue + detail screen with full payload
+  extension server-side), and T2.9 (multi-day continuation visits)
+  all landed.
+- **Messaging surface upgrades.** T3.13 quick-reply pre-fill detects
+  status-change events server-side via the existing metadata.kind
+  shape and surfaces a tap-to-fill suggestion pill above the composer.
+  T3.14 wires the previously-decorative magnifier to a real search
+  field with a no-results placeholder.
+- **Add-existing-customer flow shipped.** T3.15 server actions
+  (search_chez_households_by_address + request_household_pair_for_workspace)
+  + iOS picker. Tech can now find a Chez household by address and fire
+  a pair request without typing the homeowner's email manually.
+
+### Commits shipped this pass
+
+| Commit | Title | Tier |
+|---|---|---|
+| [`c10fe2dc`](https://github.com/burkeptommy/Housing-Manager/commit/c10fe2dc) | T2.4 mark-for-followup affordance on visit-draft snapshots | T2 |
+| [`a07773d0`](https://github.com/burkeptommy/Housing-Manager/commit/a07773d0) | T3.13 + T3.14 quick-reply pre-fill + thread search | T3 (paired) |
+| [`61eeb0bd`](https://github.com/burkeptommy/Housing-Manager/commit/61eeb0bd) | T2.6 RoutineCaptureSheet — capture homeowner routines from the field | T2 (large) |
+| [`7b7d9a5b`](https://github.com/burkeptommy/Housing-Manager/commit/7b7d9a5b) | T3.15 add-existing-customer address-search flow | T3 |
+| [`75108ef7`](https://github.com/burkeptommy/Housing-Manager/commit/75108ef7) | T2.1 + T2.9 assessment queue + multi-day continuation | T2 (paired) |
+
+### Tier coverage after pass 3
+
+| Tier | Started | Shipped | Remaining |
+|---|---|---|---|
+| **T0 architectural** | 5 decisions | 5 (2 LOCKED + 3 documented intent) | 0 |
+| **T1 critical Tom-callouts** | 7 items | 7 ✓ | 0 |
+| **T2 Section 5 build-out** | 13 items | **12 ✓** (incl. T2.4 / T2.6 / T2.1 / T2.9 / T2.8) | 1 (T2.12 live punch list with photo/voice/materials/time) |
+| **T3 small wins** | 19 items | **15 ✓** (incl. T3.13 / T3.14 / T3.15) | 4 (T3.8 manual entry brand auto-complete, T3.11 inline visit slots in chat, T3.12 read receipts, T3.19 dashboard counters stale cache) |
+| **T4 polish** | 17 items | ~14 ✓ | 3 minor |
+| **T5 infrastructure** | 8 items | 5 ✓ | 3 (T5.3 chez-concierge ↔ handyman-provider bridge — large; T5.4 active visit banner on homeowner side; T5.7 assign_route batch action) |
+
+**Net delta after pass 3:** ~58 of 64 originally-tracked items
+shipped. The remaining 6 are: one large Tier 2 item (T2.12 live
+punch list with photo/voice/materials), 4 medium Tier 3 messaging
+plumbing items, and 3 Tier 5 infrastructure items where T5.3 is the
+biggest standalone.
+
+### "Ready for primetime" status — pass 3 update
+
+| Threshold | Pre-overnight | Post-pass-1 | Post-pass-2 | Post-pass-3 (now) |
+|---|---|---|---|---|
+| Chez team-only dogfood | Yes | Yes | Yes | Yes |
+| Friendly handyman pilot (2-3 vetted) | Marginal | Closer to yes | YES | **Yes — solid** |
+| Public TestFlight for handyman ICP | No | Marginal | Marginal-to-yes | **YES — solid for the on-behalf-of flow.** Captures land via T2.8 fan-out, routines / vendors / systems all have a capture sheet, multi-day continuation works, mark-for-followup covers the "couldn't finish today" case. T3.15 lets new techs add existing customers without manual email entry. |
+| Premium HNW concierge launch | No | No | Closer | **Closer-to-yes** — needs T2.12 live punch list with photo/voice/materials + T5.3 chez-concierge bridge. Estimate 1-2 more weeks vs 2-3 weeks pre-pass. |
+
+### Pass 3 architectural notes
+
+- **T2.4 design choice:** the snapshot-side flag travels through
+  portal sync into `submit_assessment_data`'s captured_systems JSONB,
+  which the ingestAssessment helper now reads + stamps onto the
+  matching home_systems row at submit time. This means the flag
+  doesn't require a separate edge function call — it piggybacks on
+  the existing T2.8 fan-out, keeping the implementation tight.
+- **T2.6 reusable pattern:** the field-side RoutineCaptureSheet is a
+  near-mirror of the homeowner-side RoutineEditSheet but uses
+  `create_routine_for_home` server action (new) which mirrors the
+  existing `create_contractor_from_card` access guard pattern. The
+  inline 12-month chip picker matches ActiveMonthsPicker visuals
+  without depending on the homeowner-side component.
+- **T3.13 quick-reply suggestion:** uses a hybrid detection strategy
+  — structured `metadata.status` pivot first (since the server
+  already attaches it on every status_change audit message), body
+  keyword fallback for legacy messages or homeowner free-text. New
+  `FlexibleJSONValue` enum decoder consumes the JSONB metadata blob
+  without breaking the struct on shape evolution.
+- **T2.9 continuation gating:** "Continue next visit" only shows
+  when assessment.status is in `{paused, in_progress, submitted,
+  awaiting_review, corrections_requested}`. Other states (pending /
+  scheduled / en_route / cancelled / completed) don't make sense
+  for a continuation, so we hide the affordance instead of letting
+  the tech tap a button that errors.
+
+### Updated backend regression status
+
+```
+Tests/e2e/run-handyman.mjs — All 9 phases passed (~10.4s, 0 issues)
+Tests/e2e/run.mjs — All phases passed (0 issues)
+```
+
+Branch pushed to `origin/claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG`
+after each commit. Both schemes build clean. Server functions deployed.

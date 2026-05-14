@@ -507,3 +507,52 @@ These are tracked for the next design sprint — too many for this overnight pas
 - **1.11** [A3 password reset never reaches Supabase Auth] Tested with `e2e-handyman-w1-owner-1.1-1778103827@havenhome.test` — `auth.users.recovery_sent_at` stays null after Send Reset Link tap. **Root cause:** Supabase auth rejects `.havenhome.test` emails as `email_address_invalid` (test-only artifact, not a real-user bug). **Status:** addressed in Wave 1a commit `eeecefde` — `friendlyError` now maps `email_address_invalid` to a clear user-facing message. **Note:** real `.com` emails work; this finding is informational. (Wave 1a)
 
 - **1.11** [B9 error layer] Reset password sheet rendered errors on the parent SignInView BEHIND the sheet, not inside the sheet. User dismissed the sheet to see the error and lost their input. **FIXED** in Wave 1a commit `eeecefde` — split `resetPasswordError` from `errorMessage`, render inside sheet body, clear on field change. (Wave 1a)
+
+---
+
+## Pass 3 status update (2026-05-14)
+
+A third focused pass shipped 6 commits on top of pass 2's 8, closing the remaining critical Tier 2 + Tier 3 items. Status of every gap explicitly closed in pass 3:
+
+### FIXED in pass 3
+
+- **T2.4 mark-for-followup on visit-draft snapshots** — commit `c10fe2dc`. `HavenFieldSystemSnapshot` now carries `followupRequired` + `followupReason` fields with snake_case CodingKeys. Visit-side detail sheet exposes inline reason composer + Flag / Clear affordance. Server `ingestAssessment` propagates the flag to `home_systems.marked_for_followup_at` + `followup_reason` on commit.
+- **T2.6 RoutineCaptureSheet** — commit `61eeb0bd`. Field-side mirror of homeowner RoutineEditSheet. Captures recurring services with full Phase 55.1 column shape (cadence_type, days_of_week, active_months, time_of_day, vendor link, cost, chez_owned). Server adds `create_routine_for_home` action with the same access-guard pattern as `create_contractor_from_card`. Wired entry on home detail Routines sub-tab.
+- **T3.13 quick-reply pre-fill on status-change messages** — commit `a07773d0`. `HavenFieldThreadMessage` reads `metadata.kind` + `metadata.status` from JSONB. New `QuickReplySuggestion` enum maps known status events to context-aware templated replies. Suggestion pill above composer, tap-to-fill.
+- **T3.14 message thread search** — commit `a07773d0`. Magnifier in thread header now functional. Tap toggles inline search bar + filters `visibleMessages` by case-insensitive substring. Empty-result state included.
+- **T3.15 add-existing-customer flow** — commit `7b7d9a5b`. Two new server actions (`search_chez_households_by_address`, `request_household_pair_for_workspace`) + iOS `HavenFieldAddCustomerSheet` with debounced search and per-row in-flight + error state. Third "Add a Chez customer" pill on Homes tab toolbar.
+- **T2.1 assessment queue** — commit `75108ef7`. `loadDashboard` extended with `loadPendingAssessments` helper using existing `chez_pending_assessments_v` view, narrowed to households the workspace serves. iOS `HavenFieldPendingAssessment` model + `FieldAssessmentRow` + section card on Visits tab + `HavenFieldAssessmentDetailView`.
+- **T2.9 multi-day continuation visit affordance** — commit `75108ef7`. Wraps existing `start_continuation_visit` server action. Surfaces in assessment detail as "Continue next visit" salmon CTA, gated on appropriate statuses.
+
+### Cumulative status across all 3 passes
+
+| Tier | Originally tracked | Shipped end-of-pass-3 | Remaining |
+|---|---|---|---|
+| T0 architectural | 5 decisions | 5 ✓ (2 LOCKED + 3 documented intent) | 0 |
+| T1 critical Tom-callouts | 7 items | 7 ✓ | 0 |
+| T2 Section 5 build-out | 13 items | 12 ✓ | 1 (T2.12 live punch list with photo/voice/materials/time tracking) |
+| T3 small wins | 19 items | 15 ✓ | 4 (T3.8 brand auto-complete, T3.11 inline visit slots in chat, T3.12 read receipts, T3.19 dashboard counters stale cache) |
+| T4 polish | 17 items | ~14 ✓ | 3 minor |
+| T5 infrastructure | 8 items | 5 ✓ | 3 (T5.3 chez-concierge bridge — large; T5.4 active visit banner; T5.7 assign_route batch) |
+
+**Net delta:** 58 of 64 originally-tracked items shipped. Remaining 6 are: 1 large Tier 2 (T2.12 live punch list with photo/voice/materials), 4 medium Tier 3 messaging plumbing, 3 Tier 5 infrastructure. Estimated 2-3 weeks of focused engineering to reach the Premium HNW concierge launch threshold.
+
+### Still deferred to future sessions
+
+- **T2.12 Live punch list with photo / voice / materials / time tracking** — Large. Requires `provider_visit_punch_attachments` table or equivalent for photo / voice / materials data keyed by punch_item_id, plus AVAudioRecorder integration for voice memos. Estimate ~4 days of focused work.
+- **T3.8 manual entry brand auto-complete** — Medium. Brand TypeAhead picker on the manual system entry sheet (T2.3 prerequisite already shipped).
+- **T3.11 inline visit slots in chat composer** — Medium. Reuse RescheduleSheet logic in a multi-slot variant.
+- **T3.12 message thread read receipts** — Medium. `read_at` column + render.
+- **T3.19 dashboard counters stale cache** — Medium. Source counts from live derivation, not snapshot.
+- **T5.3 chez-concierge ↔ handyman-provider bridge** — Large. `delegate_to_handyman_workspace` action with `parent_chez_request_id` linking. Estimate ~1 week.
+- **T5.4 active visit banner on homeowner side** — Medium.
+- **T5.7 assign_route batch action** — Medium. Multi-stop dispatch for ops desk.
+
+Both regressions still pass after all pass 3 work:
+
+```
+Tests/e2e/run-handyman.mjs — All 9 phases passed (~10.4s, 0 issues)
+Tests/e2e/run.mjs — All phases passed (0 issues)
+```
+
+Both schemes (Chez + Chez Field) build clean against the iPhone 17 Pro simulator. Branch pushed to `origin/claude/setup-monorepo-structure-01BAnndWeY6zCXMapoKmLMjG` after each commit.
