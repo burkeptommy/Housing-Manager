@@ -3997,6 +3997,58 @@ actor HavenFieldService {
         return response.system
     }
 
+    /// T1.2 (post-overnight) — fill in missing brand / model / serial /
+    /// install date / notes on an existing home_systems row. Uses the
+    /// `update_home_system` action. The server-side handler PATCHES by
+    /// id (A4 edit-no-duplicate guard); only fields explicitly sent are
+    /// touched. Sending an empty string clears a field; omitting a key
+    /// leaves it untouched.
+    ///
+    /// Wave 2a / 3b found that existing-system rows are read-only on
+    /// iOS, which made the only path "Add new" → duplicate row. With
+    /// this method wired, the system detail sheet can finally close the
+    /// loop: handyman taps Edit → fills in missing fields → save PATCHES
+    /// the row in place.
+    func updateHomeSystem(
+        workspaceId: String,
+        systemId: String,
+        name: String? = nil,
+        manufacturer: String? = nil,
+        modelNumber: String? = nil,
+        serialNumber: String? = nil,
+        installDate: String? = nil,
+        notes: String? = nil
+    ) async throws -> HavenFieldHomeSystem? {
+        struct Request: Encodable {
+            let action = "update_home_system"
+            let workspaceId: String
+            let systemId: String
+            let name: String?
+            let manufacturer: String?
+            let modelNumber: String?
+            let serialNumber: String?
+            let installDate: String?
+            let notes: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            systemId: systemId,
+            name: name,
+            manufacturer: manufacturer,
+            modelNumber: modelNumber,
+            serialNumber: serialNumber,
+            installDate: installDate,
+            notes: notes
+        ))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: HavenFieldSystemUpdateResponse.self
+        )
+        return response.system
+    }
+
     /// Wave M3 — record a voice memo against a system. AVAudioRecorder
     /// writes m4a; the view reads bytes, base64-encodes, posts. Single
     /// voice note per system — re-recording overwrites the previous
@@ -17943,6 +17995,9 @@ private struct HavenFieldHomeSystemDetailSheet: View {
     var onMarkFollowup: (() -> Void)? = nil
     var onDecommission: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    /// T1.2 (post-overnight) — Edit button reveals the inline edit form.
+    /// Sheet stays in place; on save the form closes back to the detail.
+    @State private var isEditing = false
 
     var body: some View {
         NavigationStack {
@@ -18062,6 +18117,16 @@ private struct HavenFieldHomeSystemDetailSheet: View {
 
                 if workspaceId != nil && !system.isDecommissioned {
                     Section("Field actions") {
+                        // T1.2 (post-overnight) — Edit kicks off the
+                        // inline edit form. A4 edit-no-duplicate guard
+                        // is enforced server-side: update_home_system
+                        // PATCHES the row by id, never inserts.
+                        Button {
+                            isEditing = true
+                        } label: {
+                            Label("Edit details", systemImage: "pencil")
+                                .foregroundStyle(HavenColors.action)
+                        }
                         Button {
                             dismiss()
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -18089,6 +18154,145 @@ private struct HavenFieldHomeSystemDetailSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .sheet(isPresented: $isEditing) {
+                if let workspaceId {
+                    HavenFieldHomeSystemEditSheet(
+                        system: system,
+                        workspaceId: workspaceId,
+                        onSaved: { updated in
+                            isEditing = false
+                            onChanged?(updated)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/// T1.2 (post-overnight) — editable form for `home_systems` rows.
+/// Opens from `HavenFieldHomeSystemDetailSheet`'s "Edit details" row.
+/// On save, calls `update_home_system` server-side which PATCHES the
+/// existing row by id (A4 guard) — never inserts a duplicate. The
+/// onSaved closure routes back to the parent so the row + sheet
+/// re-render with the fresh values. Mirrors the homeowner-side
+/// system-detail edit pattern but scoped to the field-app workspace
+/// auth (workspace member must serve the household via at least one
+/// linked contractor).
+private struct HavenFieldHomeSystemEditSheet: View {
+    let system: HavenFieldHomeSystem
+    let workspaceId: String
+    let onSaved: (HavenFieldHomeSystem) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var manufacturer: String
+    @State private var modelNumber: String
+    @State private var serialNumber: String
+    @State private var installDate: String
+    @State private var notes: String
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    init(
+        system: HavenFieldHomeSystem,
+        workspaceId: String,
+        onSaved: @escaping (HavenFieldHomeSystem) -> Void
+    ) {
+        self.system = system
+        self.workspaceId = workspaceId
+        self.onSaved = onSaved
+        _name = State(initialValue: system.name)
+        _manufacturer = State(initialValue: system.manufacturer ?? "")
+        _modelNumber = State(initialValue: system.modelNumber ?? "")
+        _serialNumber = State(initialValue: system.serialNumber ?? "")
+        _installDate = State(initialValue: system.installDate ?? "")
+        _notes = State(initialValue: system.notes ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("System") {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.words)
+                    if let category = system.category?.nonEmpty {
+                        LabeledContent("Category", value: category)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                Section("Identity") {
+                    TextField("Manufacturer", text: $manufacturer)
+                        .textInputAutocapitalization(.words)
+                    TextField("Model number", text: $modelNumber)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                    TextField("Serial number", text: $serialNumber)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                    TextField("Install date (YYYY-MM-DD, optional)", text: $installDate)
+                        .keyboardType(.numbersAndPunctuation)
+                        .autocorrectionDisabled()
+                }
+
+                Section("Notes") {
+                    TextField("Anything worth noting for the homeowner", text: $notes, axis: .vertical)
+                        .lineLimit(3...8)
+                }
+
+                if let errorMessage, !errorMessage.isEmpty {
+                    Section {
+                        Text(errorMessage)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.critical)
+                    }
+                }
+            }
+            .navigationTitle("Edit system")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isSaving ? "Saving…" : "Save") {
+                        Task { await save() }
+                    }
+                    .disabled(isSaving || !canSave)
+                }
+            }
+        }
+    }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func save() async {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            // Send only fields the user actually filled in (or cleared
+            // intentionally). Empty string clears; nil omits — server
+            // honors both. We always send name since it's required.
+            let updated = try await HavenFieldService.shared.updateHomeSystem(
+                workspaceId: workspaceId,
+                systemId: system.id,
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                manufacturer: manufacturer.trimmingCharacters(in: .whitespacesAndNewlines),
+                modelNumber: modelNumber.trimmingCharacters(in: .whitespacesAndNewlines),
+                serialNumber: serialNumber.trimmingCharacters(in: .whitespacesAndNewlines),
+                installDate: installDate.trimmingCharacters(in: .whitespacesAndNewlines),
+                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            if let updated {
+                onSaved(updated)
+            }
+            dismiss()
+        } catch {
+            errorMessage = friendlyServerError(from: error, fallback: "Couldn’t save changes. Please try again.")
         }
     }
 }
