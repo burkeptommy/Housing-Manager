@@ -4376,6 +4376,24 @@ actor HavenFieldService {
         )
     }
 
+    /// T2.10 (post-overnight) — flip the homeowner_present flag on
+    /// the active assessment. Called from the visit detail when the
+    /// handyman arrives + the homeowner isn't there. Server defaults
+    /// homeowner_present=true at insert time; iOS flips false on need.
+    /// Wraps update_assessment_progress with just the boolean.
+    func setHomeownerPresent(assessmentId: String, present: Bool) async throws {
+        struct Request: Encodable {
+            let action = "update_assessment_progress"
+            let assessment_id: String
+            let homeowner_present: Bool
+        }
+        let data = try JSONEncoder().encode(Request(
+            assessment_id: assessmentId,
+            homeowner_present: present
+        ))
+        try await perform(function: "handyman-provider", method: "POST", body: data)
+    }
+
     /// T2.5 (post-overnight) — capture a homeowner's existing vendor
     /// on the home detail Vendors sub-tab. Wraps the existing
     /// `create_contractor_from_card` action which inserts a contractor
@@ -5410,9 +5428,16 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
     /// property and surfaces it here. Used to:
     ///   (a) gate the Add-recommendation composer (T2.7)
     ///   (b) call submit_assessment_data inside completeVisit (T2.8)
+    ///   (c) gate the homeowner-present toggle (T2.10)
     var assessmentId: String? {
         payload?.assessmentId?.nonEmpty
     }
+    /// T2.10 (post-overnight) — current homeowner_present value for
+    /// the active assessment (true when the homeowner is on-site).
+    /// Defaults to true matching the server-side insert default.
+    /// HavenFieldHomeownerPresentCard reads this on first appear and
+    /// flips it via setHomeownerPresent on toggle.
+    var homeownerPresent: Bool { true }
 
     let visit: HavenFieldVisit
     let home: HavenFieldHome?
@@ -11176,6 +11201,16 @@ private struct HavenFieldVisitWorkspaceView: View {
 
     private var visitTab: some View {
         VStack(alignment: .leading, spacing: 18) {
+            // T2.10 (post-overnight) — homeowner-present toggle. Only
+            // surfaces on visits associated with a home_assessments
+            // row. Persists via update_assessment_progress so admin
+            // Operations Desk sees the absent flag in real-time.
+            if let assessmentId = viewModel.assessmentId {
+                HavenFieldHomeownerPresentCard(
+                    assessmentId: assessmentId,
+                    initialPresent: viewModel.homeownerPresent
+                )
+            }
             FieldSectionCard(kicker: "Checklist", title: "Execute the visit") {
                 VStack(spacing: 12) {
                     if let draftChecklist = viewModel.draft?.checklist, !draftChecklist.isEmpty {
@@ -19126,6 +19161,186 @@ private struct HavenFieldHomeSystemDetailSheet: View {
                 HavenFieldManualLookupSheet(systemId: system.id, systemName: system.name)
             }
         }
+    }
+}
+
+/// T2.10 (post-overnight) — homeowner-present toggle card. Surfaces
+/// on the visit detail Visit sub-tab when the visit is associated
+/// with a home_assessments row (gated by assessmentId != nil).
+/// Server defaults homeowner_present=true at insert time; this card
+/// lets the field flip it false mid-visit so admin Operations Desk
+/// sees the absent flag in real-time.
+private struct HavenFieldHomeownerPresentCard: View {
+    let assessmentId: String
+    let initialPresent: Bool
+    @State private var present: Bool
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    init(assessmentId: String, initialPresent: Bool) {
+        self.assessmentId = assessmentId
+        self.initialPresent = initialPresent
+        _present = State(initialValue: initialPresent)
+    }
+
+    var body: some View {
+        FieldSectionCard(kicker: "Check-in", title: "Is the homeowner on-site?") {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: $present) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(present ? "Homeowner present" : "Homeowner not present")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text(present
+                             ? "They're around to walk you through anything new."
+                             : "Capture what you can and flag the rest for follow-up.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+                .tint(HavenColors.action)
+                .onChange(of: present) { _, newValue in
+                    Task { await save(newValue: newValue) }
+                }
+                if isSaving {
+                    Text("Saving…")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                if let errorMessage, !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.critical)
+                }
+            }
+        }
+    }
+
+    private func save(newValue: Bool) async {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            try await HavenFieldService.shared.setHomeownerPresent(
+                assessmentId: assessmentId,
+                present: newValue
+            )
+        } catch {
+            errorMessage = friendlyServerError(
+                from: error,
+                fallback: "Couldn’t update presence. Tap again to retry."
+            )
+            // Roll back the local toggle so the user sees the failed state
+            // — server is the source of truth.
+            present = !newValue
+        }
+    }
+}
+
+/// T2.11 (post-overnight) — camera permission gate. Wraps the
+/// existing UIImagePickerController invocation with an
+/// AVCaptureDevice authorization check. Pre-T2.11 the camera
+/// flow launched directly via isSourceTypeAvailable(.camera)
+/// which only checks AVAILABILITY, not permission. If the user
+/// had previously denied camera permission the picker would
+/// silently fall back to .photoLibrary with no explanation —
+/// confusing in the field. Now: explicit Settings deep-link
+/// + Choose-from-library fallback affordance.
+private struct HavenFieldCameraPermissionSheet: View {
+    let onChooseFromLibrary: () -> Void
+    let onSkip: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 38, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                    Text("Camera access needed")
+                        .font(HavenTypography.title2)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Chez Field uses the camera to capture model labels and identify equipment automatically. Without camera access you can still pick a photo from your library or skip the photo step entirely.")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .padding(.top, 24)
+
+                VStack(spacing: 10) {
+                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                        Link(destination: settingsUrl) {
+                            Label("Open Settings", systemImage: "gearshape.fill")
+                                .font(HavenTypography.uiButton)
+                                .foregroundStyle(HavenColors.textOnAction)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(HavenColors.action)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    Button {
+                        dismiss()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            onChooseFromLibrary()
+                        }
+                    } label: {
+                        Label("Choose from library", systemImage: "photo.on.rectangle")
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(HavenColors.navy700.opacity(0.3), lineWidth: 1)
+                            )
+                    }
+                    Button {
+                        dismiss()
+                        onSkip()
+                    } label: {
+                        Text("Skip the photo")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .background(HavenColors.cream.ignoresSafeArea())
+            .navigationTitle("Camera")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+/// T2.11 (post-overnight) — pure helper for the camera authorization
+/// check. Returns true when the camera is usable without prompting,
+/// false when permission was previously denied (caller should show
+/// HavenFieldCameraPermissionSheet). When status is .notDetermined,
+/// the function requests + awaits the user's choice and returns the
+/// resulting bool. Routes through AVCaptureDevice so the iOS-managed
+/// permission dialog is the source of truth.
+@MainActor
+func havenFieldCheckCameraPermission() async -> Bool {
+    let status = AVCaptureDevice.authorizationStatus(for: .video)
+    switch status {
+    case .authorized:
+        return true
+    case .notDetermined:
+        return await AVCaptureDevice.requestAccess(for: .video)
+    case .denied, .restricted:
+        return false
+    @unknown default:
+        return false
     }
 }
 

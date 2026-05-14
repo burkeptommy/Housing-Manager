@@ -11277,6 +11277,19 @@ async function updateAssessmentProgress(
   if (typeof body.handyman_notes === "string") {
     updates.handyman_notes = body.handyman_notes;
   }
+  // T2.10 (post-overnight) — homeowner_present toggle. Field handyman
+  // flips this from the visit detail when the homeowner isn't onsite.
+  // Defaults to true at insert time; this lets the field flip it to
+  // false mid-visit so admin Operations Desk sees the absent flag.
+  if (typeof body.homeowner_present === "boolean") {
+    updates.homeowner_present = body.homeowner_present;
+  }
+  // T2.10 — homeowner access notes (gate codes / lockbox / dog notes
+  // captured ON-SITE, distinct from homeowner_concerns which the
+  // homeowner provides at request time).
+  if (typeof body.homeowner_access_notes === "string") {
+    updates.homeowner_access_notes = body.homeowner_access_notes;
+  }
   if (Object.keys(updates).length === 0) {
     return { ok: true, no_op: true };
   }
