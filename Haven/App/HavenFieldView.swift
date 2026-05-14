@@ -84,6 +84,12 @@ struct HavenFieldDashboard: Decodable {
     var messages: [HavenFieldMessageThread]
     var recentWork: [HavenFieldVisit]
     var teamMembers: [HavenFieldTeamMember]
+    /// T2.1 (post-overnight) — pending home_assessments rows scoped to
+    /// this workspace. Surfaced on the iOS Visits tab as a separate
+    /// "Pending assessments" section so the field tech sees what's
+    /// waiting before drilling into a specific visit. Defaults empty
+    /// so older payloads without the field decode fine.
+    var assessments: [HavenFieldPendingAssessment]
 
     init(
         needsWorkspace: Bool,
@@ -95,7 +101,8 @@ struct HavenFieldDashboard: Decodable {
         homes: [HavenFieldHome] = [],
         messages: [HavenFieldMessageThread] = [],
         recentWork: [HavenFieldVisit] = [],
-        teamMembers: [HavenFieldTeamMember] = []
+        teamMembers: [HavenFieldTeamMember] = [],
+        assessments: [HavenFieldPendingAssessment] = []
     ) {
         self.needsWorkspace = needsWorkspace
         self.currentUser = currentUser
@@ -107,6 +114,7 @@ struct HavenFieldDashboard: Decodable {
         self.messages = messages
         self.recentWork = recentWork
         self.teamMembers = teamMembers
+        self.assessments = assessments
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -120,6 +128,7 @@ struct HavenFieldDashboard: Decodable {
         case messages
         case recentWork
         case teamMembers
+        case assessments
     }
 
     init(from decoder: Decoder) throws {
@@ -139,6 +148,105 @@ struct HavenFieldDashboard: Decodable {
         messages = (try? container.decodeIfPresent([HavenFieldMessageThread].self, forKey: .messages)) ?? []
         recentWork = (try? container.decodeIfPresent([HavenFieldVisit].self, forKey: .recentWork)) ?? []
         teamMembers = (try? container.decodeIfPresent([HavenFieldTeamMember].self, forKey: .teamMembers)) ?? []
+        assessments = (try? container.decodeIfPresent([HavenFieldPendingAssessment].self, forKey: .assessments)) ?? []
+    }
+}
+
+/// T2.1 (post-overnight) — projection of a `home_assessments` row
+/// (via `chez_pending_assessments_v` view) for the field-side
+/// pending list. Matches the JSON shape `loadPendingAssessments`
+/// emits in handyman-provider/index.ts. Resilient decode per the
+/// codebase rule.
+struct HavenFieldPendingAssessment: Codable, Identifiable, Hashable {
+    let id: String
+    let status: String
+    let sessionCount: Int
+    let sessionLabel: String
+    let householdId: String
+    let householdName: String
+    let propertyId: String
+    let addressLine: String
+    let city: String
+    let state: String
+    let zipCode: String
+    let handymanMemberId: String
+    let handymanFirstName: String
+    let visitAssignmentId: String
+    let scheduledAt: String?
+    let enRouteAt: String?
+    let startedAt: String?
+    let submittedAt: String?
+    let ingestedAt: String?
+    let routeDate: String
+    let windowStartTime: String
+    let windowEndTime: String
+    let createdAt: String?
+
+    var statusLabel: String {
+        switch status {
+        case "pending": return "Pending"
+        case "scheduled": return "Scheduled"
+        case "en_route": return "En route"
+        case "in_progress": return "In progress"
+        case "submitted": return "Submitted — awaiting review"
+        case "awaiting_review": return "Awaiting review"
+        case "corrections_requested": return "Needs corrections"
+        case "paused": return "Paused"
+        default: return status.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    var addressOneLine: String {
+        let parts = [addressLine.nonEmpty, city.nonEmpty, [state.nonEmpty, zipCode.nonEmpty].compactMap { $0 }.joined(separator: " ").nonEmpty]
+        return parts.compactMap { $0 }.joined(separator: ", ")
+    }
+
+    var isMultiVisit: Bool { sessionCount > 1 }
+
+    var statusTint: Color {
+        switch status {
+        case "in_progress", "en_route": return HavenColors.action
+        case "submitted", "awaiting_review": return HavenColors.success
+        case "corrections_requested": return HavenColors.critical
+        case "paused": return HavenColors.warning
+        default: return HavenColors.navy700
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, status, sessionCount, sessionLabel
+        case householdId, householdName, propertyId
+        case addressLine, city, state, zipCode
+        case handymanMemberId, handymanFirstName, visitAssignmentId
+        case scheduledAt, enRouteAt, startedAt, submittedAt, ingestedAt
+        case routeDate, windowStartTime, windowEndTime, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "pending"
+        sessionCount = (try? c.decodeIfPresent(Int.self, forKey: .sessionCount)) ?? 1
+        sessionLabel = (try? c.decodeIfPresent(String.self, forKey: .sessionLabel)) ?? "First visit"
+        householdId = (try? c.decodeIfPresent(String.self, forKey: .householdId)) ?? ""
+        householdName = (try? c.decodeIfPresent(String.self, forKey: .householdName)) ?? "Chez household"
+        propertyId = (try? c.decodeIfPresent(String.self, forKey: .propertyId)) ?? ""
+        addressLine = (try? c.decodeIfPresent(String.self, forKey: .addressLine)) ?? ""
+        city = (try? c.decodeIfPresent(String.self, forKey: .city)) ?? ""
+        state = (try? c.decodeIfPresent(String.self, forKey: .state)) ?? ""
+        zipCode = (try? c.decodeIfPresent(String.self, forKey: .zipCode)) ?? ""
+        handymanMemberId = (try? c.decodeIfPresent(String.self, forKey: .handymanMemberId)) ?? ""
+        handymanFirstName = (try? c.decodeIfPresent(String.self, forKey: .handymanFirstName)) ?? ""
+        visitAssignmentId = (try? c.decodeIfPresent(String.self, forKey: .visitAssignmentId)) ?? ""
+        scheduledAt = try? c.decodeIfPresent(String.self, forKey: .scheduledAt)
+        enRouteAt = try? c.decodeIfPresent(String.self, forKey: .enRouteAt)
+        startedAt = try? c.decodeIfPresent(String.self, forKey: .startedAt)
+        submittedAt = try? c.decodeIfPresent(String.self, forKey: .submittedAt)
+        ingestedAt = try? c.decodeIfPresent(String.self, forKey: .ingestedAt)
+        routeDate = (try? c.decodeIfPresent(String.self, forKey: .routeDate)) ?? ""
+        windowStartTime = (try? c.decodeIfPresent(String.self, forKey: .windowStartTime)) ?? ""
+        windowEndTime = (try? c.decodeIfPresent(String.self, forKey: .windowEndTime)) ?? ""
+        createdAt = try? c.decodeIfPresent(String.self, forKey: .createdAt)
     }
 }
 
@@ -5017,6 +5125,33 @@ actor HavenFieldService {
         )
     }
 
+    /// T2.9 (post-overnight) — open a continuation visit on a paused
+    /// home_assessments row. Server bumps session_count, marks status
+    /// 'paused' if not already, and returns the new visit assignment
+    /// id so the iOS app can route the tech into the next visit's
+    /// portal session.
+    func startContinuationVisit(
+        assessmentId: String
+    ) async throws -> String? {
+        struct Request: Encodable {
+            let action = "start_continuation_visit"
+            let assessment_id: String
+        }
+        struct Response: Decodable {
+            let ok: Bool?
+            let visit_assignment_id: String?
+            let session_count: Int?
+        }
+        let data = try JSONEncoder().encode(Request(assessment_id: assessmentId))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.visit_assignment_id
+    }
+
     /// T3.15 (post-overnight) — search for an existing Chez household
     /// by address fragment. Result rows pre-flag any households
     /// already linked to this workspace so the UI can grey out the
@@ -7154,6 +7289,32 @@ private struct HavenFieldVisitsTab: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                        }
+                    }
+
+                    // T2.1 (post-overnight) — pending assessments
+                    // section. Only renders when the workspace has
+                    // active assessments to surface; otherwise hides
+                    // entirely so it doesn't bloat the visits tab for
+                    // workspaces that don't run on-behalf-of assessments.
+                    if let assessments = viewModel.dashboard?.assessments, !assessments.isEmpty {
+                        FieldSectionCard(
+                            kicker: "Assessments",
+                            title: "Pending home assessments \u{2022} \(assessments.count)"
+                        ) {
+                            VStack(spacing: 12) {
+                                ForEach(assessments) { assessment in
+                                    NavigationLink {
+                                        HavenFieldAssessmentDetailView(
+                                            assessment: assessment,
+                                            workspaceId: viewModel.dashboard?.workspace?.id
+                                        )
+                                    } label: {
+                                        FieldAssessmentRow(assessment: assessment)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                         }
                     }
 
@@ -15385,6 +15546,251 @@ private struct FieldRequestQueueRow: View {
     private var requestInitials: String {
         let base = home?.name ?? visit.property?.name ?? visit.title.fieldDisplayTitle
         return base.fieldInitials
+    }
+}
+
+/// T2.1 (post-overnight) — single-line row for the Pending assessments
+/// list on the Visits tab. Surfaces household + status + visit number
+/// chip when this is a multi-day continuation. Mirrors the
+/// FieldRequestQueueRow visual cadence for layout consistency.
+private struct FieldAssessmentRow: View {
+    let assessment: HavenFieldPendingAssessment
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            FieldAvatarBadge(initials: assessment.householdName.fieldInitials)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(assessment.householdName)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 8)
+                    if assessment.isMultiVisit {
+                        Text(assessment.sessionLabel)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.action)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(HavenColors.action.opacity(0.10))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                if !assessment.addressOneLine.isEmpty {
+                    Text(assessment.addressOneLine)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+
+                HStack(spacing: 8) {
+                    Text(assessment.statusLabel.uppercased())
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(assessment.statusTint)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(assessment.statusTint.opacity(0.10))
+                        .clipShape(Capsule())
+                    if let scheduled = assessment.scheduledAt?.fieldRelativeTime {
+                        Text(scheduled)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    } else if !assessment.routeDate.isEmpty {
+                        Text(assessment.routeDate.fieldShortDate ?? assessment.routeDate)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    Spacer()
+                    if !assessment.handymanFirstName.isEmpty {
+                        Label(assessment.handymanFirstName, systemImage: "person.fill")
+                            .labelStyle(.titleAndIcon)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+/// T2.1 + T2.9 (post-overnight) — assessment detail view. Pulled
+/// from the dashboard payload (lightweight projection only — full
+/// assessment state lives server-side). Renders status, schedule,
+/// address, primary handyman, and exposes T2.9's "Save & continue
+/// next visit" affordance for paused / submitted-multi-day flows.
+/// Drilling further into captured systems / contractors / routines
+/// requires opening the matching visit (the tap on the visit card
+/// loads the portal session).
+private struct HavenFieldAssessmentDetailView: View {
+    let assessment: HavenFieldPendingAssessment
+    let workspaceId: String?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var isStartingContinuation = false
+    @State private var continuationError: String?
+    @State private var continuationVisitId: String?
+    @State private var continuationSuccessMessage: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                FieldSectionCard(kicker: "Assessment", title: assessment.householdName) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !assessment.addressOneLine.isEmpty {
+                            HStack(spacing: 8) {
+                                Image(systemName: "location.fill")
+                                    .foregroundStyle(HavenColors.navy700)
+                                Text(assessment.addressOneLine)
+                                    .font(HavenTypography.body)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Spacer()
+                            }
+                        }
+                        HStack(spacing: 8) {
+                            Text(assessment.statusLabel.uppercased())
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(assessment.statusTint)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(assessment.statusTint.opacity(0.12))
+                                .clipShape(Capsule())
+                            if assessment.isMultiVisit {
+                                Text(assessment.sessionLabel)
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.action)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(HavenColors.action.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
+
+                FieldSectionCard(kicker: "Schedule", title: "Visit timing") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let scheduled = assessment.scheduledAt?.fieldRelativeTime {
+                            LabeledContent("Scheduled", value: scheduled)
+                        }
+                        if !assessment.routeDate.isEmpty {
+                            LabeledContent("Route date", value: assessment.routeDate.fieldShortDate ?? assessment.routeDate)
+                        }
+                        if !assessment.windowStartTime.isEmpty || !assessment.windowEndTime.isEmpty {
+                            let window = [assessment.windowStartTime.nonEmpty, assessment.windowEndTime.nonEmpty]
+                                .compactMap { $0 }.joined(separator: " – ")
+                            LabeledContent("Window", value: window.isEmpty ? "—" : window)
+                        }
+                        if let started = assessment.startedAt?.fieldRelativeTime {
+                            LabeledContent("Started", value: started)
+                        }
+                        if let submitted = assessment.submittedAt?.fieldRelativeTime {
+                            LabeledContent("Submitted", value: submitted)
+                        }
+                    }
+                }
+
+                if !assessment.handymanFirstName.isEmpty {
+                    FieldSectionCard(kicker: "Tech", title: "Assigned to") {
+                        HStack(spacing: 12) {
+                            FieldAvatarBadge(initials: assessment.handymanFirstName.fieldInitials)
+                            Text(assessment.handymanFirstName)
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer()
+                        }
+                    }
+                }
+
+                // T2.9 — multi-day continuation. Surfaces "Continue
+                // next visit" only when the assessment is in a state
+                // where a continuation makes sense (paused, in_progress,
+                // corrections_requested, or already multi-visit).
+                if showContinuationAffordance {
+                    FieldSectionCard(kicker: "Continuation", title: "Save and continue next visit") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Open a follow-up visit on this assessment so the homeowner sees a 'Visit \(assessment.sessionCount + 1) of estimated' progress chip and the captures so far survive.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            if let continuationSuccessMessage {
+                                Label(continuationSuccessMessage, systemImage: "checkmark.circle.fill")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.success)
+                            }
+                            if let continuationError {
+                                Text(continuationError)
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.critical)
+                            }
+                            Button {
+                                Task { await openContinuation() }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if isStartingContinuation {
+                                        ProgressView().controlSize(.small)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 14, weight: .semibold))
+                                    }
+                                    Text(isStartingContinuation ? "Opening…" : "Continue next visit")
+                                        .font(HavenTypography.uiButton)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity)
+                                .foregroundStyle(HavenColors.textOnAction)
+                                .background(HavenColors.action)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isStartingContinuation)
+                        }
+                    }
+                }
+
+                FieldSectionCard(kicker: "Tip", title: "What's captured here?") {
+                    Text("Captured systems, contractors, and routines roll up into the homeowner's home record at submit time. Open the matching visit from the schedule to add or edit captures.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 20)
+            .padding(.bottom, 140)
+        }
+        .background(HavenColors.cream.ignoresSafeArea())
+        .navigationTitle("Assessment")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var showContinuationAffordance: Bool {
+        switch assessment.status {
+        case "paused", "in_progress", "submitted", "awaiting_review", "corrections_requested":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func openContinuation() async {
+        isStartingContinuation = true
+        continuationError = nil
+        defer { isStartingContinuation = false }
+        do {
+            let visitId = try await HavenFieldService.shared.startContinuationVisit(
+                assessmentId: assessment.id
+            )
+            continuationVisitId = visitId
+            continuationSuccessMessage = "Continuation opened. Pull to refresh on the Visits tab to see it."
+            Haptics.success()
+        } catch {
+            continuationError = friendlyServerError(from: error, fallback: "Couldn’t open the continuation. Please try again.")
+        }
     }
 }
 

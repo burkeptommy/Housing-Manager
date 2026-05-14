@@ -3135,7 +3135,112 @@ async function loadDashboard(
     // Wave S — every workspace this user can switch into. Single-workspace
     // users get a length=1 array; the SPA hides the dropdown affordance.
     availableWorkspaces,
+    // T2.1 (post-overnight) — pending assessments for this workspace.
+    // Loaded via the chez_pending_assessments_v view, which already
+    // filters status NOT IN ('completed', 'cancelled') and joins
+    // household / property / handyman context. Surfaces on the iOS
+    // Visits tab as a "Pending assessments" section so the field tech
+    // can see what's waiting before drilling into a visit.
+    assessments: await loadPendingAssessments(service, workspaceId, contractorIds),
   };
+}
+
+/**
+ * T2.1 (post-overnight) — fetch pending assessments scoped to a
+ * workspace. The chez_pending_assessments_v view filters status
+ * out for completed / cancelled. We narrow further to households
+ * the workspace serves (via provider_contractor_links → contractors →
+ * household_id) so a tech doesn't see other workspaces' assessments
+ * even if their household happened to forward through Chez.
+ */
+async function loadPendingAssessments(
+  service: ServiceClient,
+  workspaceId: string,
+  contractorIds: string[],
+) {
+  if (!workspaceId) return [] as Array<Record<string, unknown>>;
+
+  // First gather household IDs this workspace serves.
+  const { data: contractorRows } = contractorIds.length
+    ? await service
+        .from("contractors")
+        .select("id, household_id")
+        .in("id", contractorIds)
+    : { data: [] as Array<Record<string, unknown>> };
+  const servedHouseholdIds = Array.from(new Set(
+    (contractorRows ?? [])
+      .map((row: Record<string, unknown>) => compactString(row.household_id))
+      .filter(Boolean)
+  ));
+
+  // Either: assessment is assigned directly to a workspace member, OR
+  // it's tied to a household this workspace serves AND not yet
+  // assigned (so dispatch can claim it). We surface both cases.
+  const { data: workspaceMembers } = await service
+    .from("provider_workspace_members")
+    .select("id, user_id")
+    .eq("workspace_id", workspaceId);
+  const memberIds = (workspaceMembers ?? [])
+    .map((row: Record<string, unknown>) => compactString(row.id))
+    .filter(Boolean);
+
+  if (memberIds.length === 0 && servedHouseholdIds.length === 0) {
+    return [] as Array<Record<string, unknown>>;
+  }
+
+  // Pull from the view + filter in-memory. View returns the joined
+  // household + property + member data already, so this is one round
+  // trip. For very large workspaces we'd add a paginated DB-side
+  // filter; the field MVP shape is small (10-50 active assessments).
+  const { data: pending, error } = await service
+    .from("chez_pending_assessments_v")
+    .select("*")
+    .order("scheduled_at", { ascending: true, nullsFirst: false })
+    .limit(50);
+  if (error) {
+    console.error("[handyman-provider] loadPendingAssessments error:", error);
+    return [] as Array<Record<string, unknown>>;
+  }
+
+  const memberSet = new Set(memberIds);
+  const householdSet = new Set(servedHouseholdIds);
+  return (pending ?? [])
+    .filter((row: Record<string, unknown>) => {
+      const memberId = compactString(row.handyman_member_id);
+      const householdId = compactString(row.household_id);
+      // Either assigned to one of our techs, or unassigned for a
+      // household we serve (dispatch case).
+      if (memberId && memberSet.has(memberId)) return true;
+      if (!memberId && householdId && householdSet.has(householdId)) return true;
+      return false;
+    })
+    .map((row: Record<string, unknown>) => ({
+      id: compactString(row.id),
+      status: compactString(row.status) || "pending",
+      sessionCount: numberValue(row.session_count) || 1,
+      sessionLabel: numberValue(row.session_count) > 1
+        ? `Visit ${numberValue(row.session_count)}`
+        : "First visit",
+      householdId: compactString(row.household_id),
+      householdName: compactString(row.household_name) || "Chez household",
+      propertyId: compactString(row.property_id),
+      addressLine: compactString(row.address_line_1),
+      city: compactString(row.city),
+      state: compactString(row.state),
+      zipCode: compactString(row.zip_code),
+      handymanMemberId: compactString(row.handyman_member_id),
+      handymanFirstName: compactString(row.handyman_first_name),
+      visitAssignmentId: compactString(row.visit_assignment_id),
+      scheduledAt: row.scheduled_at ?? null,
+      enRouteAt: row.en_route_at ?? null,
+      startedAt: row.started_at ?? null,
+      submittedAt: row.submitted_at ?? null,
+      ingestedAt: row.ingested_at ?? null,
+      routeDate: compactString(row.route_date),
+      windowStartTime: compactString(row.window_start_time),
+      windowEndTime: compactString(row.window_end_time),
+      createdAt: row.created_at ?? null,
+    }));
 }
 
 function invoiceStatusLabel(status: string): string {
