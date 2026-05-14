@@ -7673,6 +7673,224 @@ function serializePairingRequest(row: Record<string, unknown>, companyName: stri
   };
 }
 
+/**
+ * T3.15 (post-overnight) — search for an existing Chez household by
+ * address fragment. Lets the field handyman pair with a customer
+ * who's already on Chez without typing in their email manually.
+ *
+ * Matches on properties.street_address || city || zip_code via ILIKE.
+ * Joins family_members to surface the primary contact (homeowner of
+ * record) so the iOS UI can render a tappable preview before sending
+ * a pair request. Capped at 8 results to prevent runaway queries.
+ *
+ * Auth: requires workspace membership but does NOT require pre-existing
+ * household linkage (the whole point is to find unlinked Chez households).
+ * Returns the minimum data needed for the field-side picker — no
+ * sensitive household data leaks beyond addr + first/last name.
+ */
+async function searchChezHouseholdsByAddress(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const userId = compactString(user.id);
+  const workspaceId = compactString(body.workspaceId);
+  await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const rawQuery = compactString(body.query);
+  if (rawQuery.length < 3) throw new Error("Search needs at least 3 characters");
+
+  const fragment = `%${rawQuery.replace(/[%_]/g, "")}%`;
+  const { data: properties, error: propErr } = await service
+    .from("properties")
+    .select("id, household_id, street, city, state, zip_code, name")
+    .or(`street.ilike.${fragment},city.ilike.${fragment},zip_code.ilike.${fragment},name.ilike.${fragment}`)
+    .limit(8);
+  if (propErr) throw propErr;
+
+  const householdIds = Array.from(new Set(
+    (properties ?? [])
+      .map((row: Record<string, unknown>) => compactString(row.household_id))
+      .filter(Boolean)
+  ));
+  if (householdIds.length === 0) return { matches: [] };
+
+  // Surface only the primary client's first name + last name so the
+  // tech can confirm "yes that's the Smith household at 123 Maple."
+  // No phone / email leaks until the homeowner accepts the pair.
+  const { data: familyMembers } = await service
+    .from("family_members")
+    .select("household_id, relationship, first_name, last_name, member_type, deleted_at")
+    .in("household_id", householdIds)
+    .is("deleted_at", null);
+
+  const primaryByHousehold = new Map<string, { firstName: string; lastName: string }>();
+  for (const row of familyMembers ?? []) {
+    const hid = compactString(row.household_id);
+    if (!hid) continue;
+    const memberType = (compactString(row.member_type) || "family").toLowerCase();
+    if (memberType === "home_manager" || memberType === "staff") continue;
+    const isPrimary = (compactString(row.relationship) || "").toLowerCase() === "primary client";
+    if (isPrimary || !primaryByHousehold.has(hid)) {
+      primaryByHousehold.set(hid, {
+        firstName: compactString(row.first_name),
+        lastName: compactString(row.last_name),
+      });
+    }
+  }
+
+  // Filter out properties already paired to this workspace via
+  // provider_contractor_links → contractors → household_id (the same
+  // guard pattern used by create_contractor_from_card). Hide already-
+  // paired homes from the search so the field doesn't waste taps on
+  // a request that would no-op.
+  const { data: linkRows } = await service
+    .from("provider_contractor_links")
+    .select("contractors!inner(household_id)")
+    .eq("workspace_id", workspaceId);
+  const linkedHouseholdIds = new Set<string>();
+  for (const row of linkRows ?? []) {
+    const c = row.contractors as Record<string, unknown> | null;
+    const hid = compactString(c?.household_id);
+    if (hid) linkedHouseholdIds.add(hid);
+  }
+
+  const matches = (properties ?? [])
+    .map((row: Record<string, unknown>) => {
+      const householdId = compactString(row.household_id);
+      const primary = primaryByHousehold.get(householdId);
+      const householdName = primary
+        ? [primary.firstName, primary.lastName].filter(Boolean).join(" ").trim()
+        : "";
+      return {
+        propertyId: compactString(row.id),
+        householdId,
+        householdName: householdName || "Chez household",
+        propertyName: compactString(row.name) || "Home",
+        streetAddress: compactString(row.street),
+        city: compactString(row.city),
+        state: compactString(row.state),
+        zipCode: compactString(row.zip_code),
+        alreadyPaired: householdId ? linkedHouseholdIds.has(householdId) : false,
+      };
+    })
+    .filter((m) => m.householdId && m.propertyId);
+
+  return { matches };
+}
+
+/**
+ * T3.15 (post-overnight) — fire a pair request scoped to a known Chez
+ * household + property. Same downstream path as createPairingRequest
+ * but auto-fills homeowner email/phone from the matched household so
+ * the tech doesn't have to type anything beyond "request to pair."
+ *
+ * Validates that the workspace isn't already paired with this household
+ * (per the same provider_contractor_links → contractors guard) so we
+ * don't send a duplicate noisy request.
+ */
+async function requestHouseholdPairForWorkspace(
+  service: ServiceClient,
+  user: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  const userId = compactString(user.id);
+  const workspaceId = compactString(body.workspaceId);
+  const membership = await assertWorkspaceAccess(service, userId, workspaceId);
+
+  const householdId = compactString(body.householdId);
+  const propertyId = compactString(body.propertyId);
+  if (!householdId) throw new Error("householdId is required");
+  if (!propertyId) throw new Error("propertyId is required");
+
+  // Already paired? bail with a friendly error.
+  const { data: linkRows } = await service
+    .from("provider_contractor_links")
+    .select("contractors!inner(household_id)")
+    .eq("workspace_id", workspaceId);
+  const isPaired = (linkRows ?? []).some((row: Record<string, unknown>) => {
+    const c = row.contractors as Record<string, unknown> | null;
+    return compactString(c?.household_id) === householdId;
+  });
+  if (isPaired) throw new Error("This household is already on your roster");
+
+  // Property metadata for the home_name + address columns.
+  const { data: property, error: propErr } = await service
+    .from("properties")
+    .select("id, name, street, city, state, zip_code, household_id")
+    .eq("id", propertyId)
+    .maybeSingle();
+  if (propErr) throw propErr;
+  if (!property || compactString(property.household_id) !== householdId) {
+    throw new Error("Property does not belong to this household");
+  }
+
+  // Resolve the primary client's email + phone for the pair request.
+  const { data: members } = await service
+    .from("family_members")
+    .select("relationship, first_name, last_name, email, phone, member_type, deleted_at")
+    .eq("household_id", householdId)
+    .is("deleted_at", null);
+  let homeownerEmail: string | null = null;
+  let homeownerPhone: string | null = null;
+  let homeownerName: string | null = null;
+  for (const row of members ?? []) {
+    const memberType = (compactString(row.member_type) || "family").toLowerCase();
+    if (memberType === "home_manager" || memberType === "staff") continue;
+    const isPrimary = (compactString(row.relationship) || "").toLowerCase() === "primary client";
+    const candidateEmail = normalizedEmail(row.email);
+    const candidatePhone = compactString(row.phone);
+    const candidateName = [compactString(row.first_name), compactString(row.last_name)]
+      .filter(Boolean).join(" ");
+    if (isPrimary) {
+      homeownerEmail = candidateEmail || null;
+      homeownerPhone = candidatePhone || null;
+      homeownerName = candidateName || null;
+      break;
+    }
+    if (!homeownerEmail && candidateEmail) homeownerEmail = candidateEmail;
+    if (!homeownerPhone && candidatePhone) homeownerPhone = candidatePhone;
+    if (!homeownerName && candidateName) homeownerName = candidateName;
+  }
+
+  // Without an email or phone, the pair request has no destination.
+  // The createPairingRequest path errors here too — surface the same
+  // intent with friendlier copy.
+  if (!homeownerEmail && !homeownerPhone) {
+    throw new Error("This household has no contact info on file. Pair via business card capture instead.");
+  }
+
+  const workspace = (membership.provider_workspaces as Record<string, unknown> | undefined) ?? {};
+  const companyName = compactString(workspace.company_name) || "Chez Field";
+  const accessCode = shortAccessCode("CHEZ");
+  const homeName = compactString(property.name) || "Home";
+
+  const { data, error } = await service
+    .from("provider_home_pairing_requests")
+    .insert({
+      workspace_id: workspaceId,
+      created_by_user_id: userId,
+      homeowner_name: homeownerName,
+      homeowner_email: homeownerEmail,
+      homeowner_phone: homeownerPhone,
+      home_name: homeName,
+      address_line: compactString(property.street) || null,
+      city: compactString(property.city) || null,
+      state: compactString(property.state) || null,
+      postal_code: compactString(property.zip_code) || null,
+      notes: compactString(body.notes) || null,
+      access_code: accessCode,
+      status: "pending_homeowner",
+    })
+    .select()
+    .single();
+  if (error || !data) throw error ?? new Error("Could not create pair request");
+
+  return {
+    pairingRequest: serializePairingRequest(data as Record<string, unknown>, companyName),
+  };
+}
+
 async function createPairingRequest(
   service: ServiceClient,
   user: Record<string, unknown>,
@@ -13751,6 +13969,31 @@ serve(async (req) => {
 
       if (action === "create_pairing_request") {
         const result = await createPairingRequest(service, user as unknown as Record<string, unknown>, body);
+        return json(result);
+      }
+
+      // T3.15 (post-overnight) — search for existing Chez households
+      // by address fragment so the field tech can pair without
+      // typing in the homeowner's email manually.
+      if (action === "search_chez_households_by_address") {
+        const result = await searchChezHouseholdsByAddress(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
+        return json(result);
+      }
+
+      // T3.15 (post-overnight) — fire a pair request scoped to a
+      // specific household + property. Same downstream as
+      // create_pairing_request but auto-resolves the homeowner's
+      // contact info from family_members.
+      if (action === "request_household_pair_for_workspace") {
+        const result = await requestHouseholdPairForWorkspace(
+          service,
+          user as unknown as Record<string, unknown>,
+          body,
+        );
         return json(result);
       }
 

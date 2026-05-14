@@ -1976,6 +1976,48 @@ struct HavenFieldHomeVendor: Codable, Identifiable, Hashable {
 /// surfaced — those are between the homeowner and Chez (operator
 /// channel choice). Fully resilient decoder so a partial / mis-shaped
 /// JSON blob doesn't take the home payload down.
+/// T3.15 (post-overnight) — minimal projection of an existing Chez
+/// household match returned by `search_chez_households_by_address`.
+/// All fields resilient because the server may not have a primary
+/// client on file (e.g. invite still pending). `alreadyPaired` lets
+/// the picker grey out rows already on the workspace's roster.
+struct HavenFieldChezHouseholdSearchResult: Codable, Identifiable, Hashable {
+    let propertyId: String
+    let householdId: String
+    let householdName: String
+    let propertyName: String
+    let streetAddress: String
+    let city: String
+    let state: String
+    let zipCode: String
+    let alreadyPaired: Bool
+
+    var id: String { propertyId }
+
+    var addressLine: String {
+        let parts = [streetAddress.nonEmpty, city.nonEmpty, [state.nonEmpty, zipCode.nonEmpty].compactMap { $0 }.joined(separator: " ").nonEmpty]
+        return parts.compactMap { $0 }.joined(separator: ", ")
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case propertyId, householdId, householdName, propertyName
+        case streetAddress, city, state, zipCode, alreadyPaired
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        propertyId = (try? c.decodeIfPresent(String.self, forKey: .propertyId)) ?? ""
+        householdId = (try? c.decodeIfPresent(String.self, forKey: .householdId)) ?? ""
+        householdName = (try? c.decodeIfPresent(String.self, forKey: .householdName)) ?? "Chez household"
+        propertyName = (try? c.decodeIfPresent(String.self, forKey: .propertyName)) ?? "Home"
+        streetAddress = (try? c.decodeIfPresent(String.self, forKey: .streetAddress)) ?? ""
+        city = (try? c.decodeIfPresent(String.self, forKey: .city)) ?? ""
+        state = (try? c.decodeIfPresent(String.self, forKey: .state)) ?? ""
+        zipCode = (try? c.decodeIfPresent(String.self, forKey: .zipCode)) ?? ""
+        alreadyPaired = (try? c.decodeIfPresent(Bool.self, forKey: .alreadyPaired)) ?? false
+    }
+}
+
 struct HavenFieldChezProfile: Codable, Hashable {
     let spendingTiers: SpendingTiers?
     let vendorPreferences: VendorPreferences?
@@ -4975,6 +5017,69 @@ actor HavenFieldService {
         )
     }
 
+    /// T3.15 (post-overnight) — search for an existing Chez household
+    /// by address fragment. Result rows pre-flag any households
+    /// already linked to this workspace so the UI can grey out the
+    /// row instead of letting the tech send a no-op pair request.
+    func searchChezHouseholdsByAddress(
+        workspaceId: String,
+        query: String
+    ) async throws -> [HavenFieldChezHouseholdSearchResult] {
+        struct Request: Encodable {
+            let action = "search_chez_households_by_address"
+            let workspaceId: String
+            let query: String
+        }
+        struct Response: Decodable {
+            let matches: [HavenFieldChezHouseholdSearchResult]?
+        }
+        let data = try JSONEncoder().encode(Request(workspaceId: workspaceId, query: query))
+        let response = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+        return response.matches ?? []
+    }
+
+    /// T3.15 (post-overnight) — fire a pair request scoped to a known
+    /// Chez household + property. Server auto-fills homeowner
+    /// email/phone from family_members; tech doesn't have to type
+    /// anything beyond the optional notes.
+    func requestHouseholdPair(
+        workspaceId: String,
+        householdId: String,
+        propertyId: String,
+        notes: String?
+    ) async throws {
+        struct Request: Encodable {
+            let action = "request_household_pair_for_workspace"
+            let workspaceId: String
+            let householdId: String
+            let propertyId: String
+            let notes: String?
+        }
+        struct Response: Decodable {
+            let pairingRequest: HavenFieldPairingRequestStub?
+        }
+        struct HavenFieldPairingRequestStub: Decodable {
+            let id: String?
+        }
+        let data = try JSONEncoder().encode(Request(
+            workspaceId: workspaceId,
+            householdId: householdId,
+            propertyId: propertyId,
+            notes: notes
+        ))
+        _ = try await perform(
+            function: "handyman-provider",
+            method: "POST",
+            body: data,
+            expecting: Response.self
+        )
+    }
+
     /// T3.7 (post-overnight) — look up a system's manual / spec sheet
     /// on demand. The `lookup-manual` Edge Function takes a
     /// home_system_id and returns the cached PDF (signed URL) when
@@ -7259,6 +7364,10 @@ private struct HavenFieldClientsTab: View {
     @State private var showNearbyCustomers: Bool = false
     /// Wave M10 — destination for the business-card capture flow.
     @State private var showBusinessCardCapture: Bool = false
+    /// T3.15 (post-overnight) — Add-customer address picker. Lets the
+    /// tech search existing Chez households by address fragment and
+    /// fire a pair request without needing the homeowner's email.
+    @State private var showAddCustomerPicker: Bool = false
 
     private var sortedHomes: [HavenFieldHome] {
         (viewModel.dashboard?.homes ?? []).sorted {
@@ -7301,28 +7410,46 @@ private struct HavenFieldClientsTab: View {
                 // Wave M10 — two side-by-side CTAs above the home list.
                 // "Closest customer" routes to the map view; "Add
                 // existing vendor" opens the business-card capture flow.
-                HStack(spacing: 10) {
-                    Button {
-                        showNearbyCustomers = true
-                    } label: {
-                        FieldClientsToolbarPill(
-                            icon: "location.fill",
-                            label: "Closest customer"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Show closest customer to me")
+                // T3.15 (post-overnight) — third pill: "Add a customer"
+                // opens the address-search picker for existing Chez
+                // households.
+                VStack(spacing: 10) {
+                    HStack(spacing: 10) {
+                        Button {
+                            showNearbyCustomers = true
+                        } label: {
+                            FieldClientsToolbarPill(
+                                icon: "location.fill",
+                                label: "Closest customer"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Show closest customer to me")
 
-                    Button {
-                        showBusinessCardCapture = true
-                    } label: {
-                        FieldClientsToolbarPill(
-                            icon: "rectangle.stack.badge.plus",
-                            label: "Add existing vendor"
-                        )
+                        Button {
+                            showBusinessCardCapture = true
+                        } label: {
+                            FieldClientsToolbarPill(
+                                icon: "rectangle.stack.badge.plus",
+                                label: "Add existing vendor"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Add existing vendor by business card")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Add existing vendor by business card")
+
+                    if let workspaceId = viewModel.dashboard?.workspace?.id, !workspaceId.isEmpty {
+                        Button {
+                            showAddCustomerPicker = true
+                        } label: {
+                            FieldClientsToolbarPill(
+                                icon: "person.badge.plus",
+                                label: "Add a Chez customer"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Search Chez households by address and request to pair")
+                    }
                 }
 
                 if !sortedHomes.isEmpty {
@@ -7407,6 +7534,20 @@ private struct HavenFieldClientsTab: View {
                 workspaceId: viewModel.dashboard?.workspace?.id,
                 homes: sortedHomes
             )
+        }
+        // T3.15 (post-overnight) — Add-customer search sheet. Refresh
+        // the dashboard on dismiss so any newly-paired homes (best
+        // case where the homeowner accepts immediately) materialize
+        // in the Homes list.
+        .sheet(isPresented: $showAddCustomerPicker) {
+            if let workspaceId = viewModel.dashboard?.workspace?.id, !workspaceId.isEmpty {
+                HavenFieldAddCustomerSheet(
+                    workspaceId: workspaceId,
+                    onCompleted: {
+                        Task { await viewModel.refresh() }
+                    }
+                )
+            }
         }
     }
 
@@ -20870,6 +21011,254 @@ private struct HavenFieldAddVendorSheet: View {
             dismiss()
         } catch {
             errorMessage = friendlyServerError(from: error, fallback: "Couldn’t add the vendor. Please try again.")
+        }
+    }
+}
+
+/// T3.15 (post-overnight) — search-by-address picker that lets the
+/// field handyman pair with an existing Chez household without
+/// typing in the homeowner's email. Renders a debounced search field
+/// at the top + result list with per-row "Request to pair" / "Already
+/// paired" affordances. Server fires a `provider_home_pairing_requests`
+/// row + email/SMS to the homeowner; their accept hooks the household
+/// onto this workspace.
+private struct HavenFieldAddCustomerSheet: View {
+    let workspaceId: String
+    var onCompleted: (() -> Void)? = nil
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var query: String = ""
+    @State private var debouncedQuery: String = ""
+    @State private var matches: [HavenFieldChezHouseholdSearchResult] = []
+    @State private var isSearching: Bool = false
+    @State private var searchError: String?
+    @State private var inFlightPropertyId: String?
+    @State private var requestedPropertyIds: Set<String> = []
+    @State private var perRowError: [String: String] = [:]
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 0) {
+                searchField
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 6)
+                if let searchError {
+                    Text(searchError)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.critical)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                }
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        if isSearching {
+                            ProgressView("Searching Chez customers…")
+                                .padding(.top, 40)
+                                .frame(maxWidth: .infinity)
+                        } else if !debouncedQuery.isEmpty && matches.isEmpty {
+                            VStack(alignment: .center, spacing: 10) {
+                                Image(systemName: "house.slash")
+                                    .font(.system(size: 28, weight: .light))
+                                    .foregroundStyle(HavenColors.textSecondary.opacity(0.6))
+                                Text("No matches")
+                                    .font(HavenTypography.headline)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text("No Chez household matches \u{201C}\(debouncedQuery)\u{201D}. Try a street, town, or zip.")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 24)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 60)
+                        } else if matches.isEmpty {
+                            VStack(alignment: .center, spacing: 10) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 28, weight: .light))
+                                    .foregroundStyle(HavenColors.textSecondary.opacity(0.6))
+                                Text("Search by address")
+                                    .font(HavenTypography.headline)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text("Type a street, town, or zip to find a Chez household to pair with. They'll get a notification asking them to accept.")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 24)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 60)
+                        } else {
+                            ForEach(matches) { match in
+                                resultRow(match)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
+            }
+            .navigationTitle("Add a customer")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") {
+                        dismiss()
+                        onCompleted?()
+                    }
+                }
+            }
+            .onChange(of: query) { _, _ in
+                Task {
+                    let snapshot = query
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    if snapshot == query {
+                        debouncedQuery = snapshot.trimmingCharacters(in: .whitespacesAndNewlines)
+                        await runSearch()
+                    }
+                }
+            }
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(HavenColors.textSecondary)
+            TextField("Street, town, or zip", text: $query)
+                .textFieldStyle(.plain)
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+                .submitLabel(.search)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.words)
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                    debouncedQuery = ""
+                    matches = []
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(HavenColors.textSecondary.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(HavenColors.creamLight)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(HavenColors.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func resultRow(_ match: HavenFieldChezHouseholdSearchResult) -> some View {
+        let isInFlight = inFlightPropertyId == match.propertyId
+        let isRequested = requestedPropertyIds.contains(match.propertyId)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: match.alreadyPaired ? "checkmark.circle.fill" : "house.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(match.alreadyPaired ? HavenColors.success : HavenColors.navy700)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(match.householdName)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text(match.addressLine)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+            }
+
+            if match.alreadyPaired {
+                Text("Already on your roster")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.success)
+            } else if isRequested {
+                Label("Pair request sent", systemImage: "paperplane.fill")
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(HavenColors.success)
+            } else {
+                Button {
+                    Task { await sendPairRequest(for: match) }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isInFlight {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        Text(isInFlight ? "Sending…" : "Request to pair")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .background(HavenColors.action)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(isInFlight)
+            }
+
+            if let perError = perRowError[match.propertyId] {
+                Text(perError)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.critical)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(HavenColors.surface)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(HavenColors.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .opacity(match.alreadyPaired ? 0.7 : 1.0)
+    }
+
+    private func runSearch() async {
+        let trimmed = debouncedQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 3 else {
+            matches = []
+            searchError = nil
+            return
+        }
+        isSearching = true
+        searchError = nil
+        defer { isSearching = false }
+        do {
+            let results = try await HavenFieldService.shared.searchChezHouseholdsByAddress(
+                workspaceId: workspaceId,
+                query: trimmed
+            )
+            matches = results
+        } catch {
+            searchError = friendlyServerError(from: error, fallback: "Couldn’t search Chez households. Please try again.")
+            matches = []
+        }
+    }
+
+    private func sendPairRequest(for match: HavenFieldChezHouseholdSearchResult) async {
+        inFlightPropertyId = match.propertyId
+        perRowError.removeValue(forKey: match.propertyId)
+        defer { inFlightPropertyId = nil }
+        do {
+            try await HavenFieldService.shared.requestHouseholdPair(
+                workspaceId: workspaceId,
+                householdId: match.householdId,
+                propertyId: match.propertyId,
+                notes: nil
+            )
+            requestedPropertyIds.insert(match.propertyId)
+        } catch {
+            perRowError[match.propertyId] = friendlyServerError(from: error, fallback: "Couldn’t send the pair request. Please try again.")
         }
     }
 }
