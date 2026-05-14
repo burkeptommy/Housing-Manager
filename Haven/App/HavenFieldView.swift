@@ -6,6 +6,8 @@ import PhotosUI
 import AVFoundation
 import PencilKit
 import Supabase
+// T5.1 + T5.2 (post-overnight) — offline + photo retry infrastructure.
+import Network
 
 // MARK: - Native Haven Field
 
@@ -2722,6 +2724,268 @@ enum HavenFieldCache {
     static func saveDraft(_ draft: HavenFieldVisitDraft, token: String) {
         guard let data = try? JSONEncoder().encode(draft) else { return }
         UserDefaults.standard.set(data, forKey: draftKey(for: token))
+    }
+}
+
+/// T5.1 + T5.2 (post-overnight) — connectivity monitor + photo
+/// upload retry queue. Closes Wave 2c findings 5.54 + 5.56 + Wave
+/// 5 finding 14.4.
+///
+/// Pre-T5.1/2 the Field app had no visible offline indicator (sync
+/// errors silently flipped `syncMessage="Offline draft"` deep in
+/// the visit detail with no top-level signal) and lost photo bytes
+/// on network failure (no retry queue, no local persistence). HNW
+/// estates in Westchester have notoriously bad cell coverage
+/// especially in basements + mechanical rooms — losing the model
+/// plate photo because of one tower-out moment is a critical
+/// data-loss bug.
+///
+/// Two concerns split:
+///   - HavenFieldNetworkMonitor watches NWPathMonitor + publishes
+///     isReachable. HavenFieldRootView observes + renders an
+///     OfflineBanner above the tab bar when unreachable.
+///   - HavenFieldPhotoUploadQueue persists failed JPEG uploads to
+///     FileManager + retries on reconnect. Surfaces the count via
+///     pendingCount so the OfflineBanner can show "+ N photos
+///     waiting" when relevant.
+@MainActor
+final class HavenFieldNetworkMonitor: ObservableObject {
+    static let shared = HavenFieldNetworkMonitor()
+    @Published var isReachable: Bool = true
+    @Published var pendingPhotoCount: Int = 0
+
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "haven.field.network.monitor")
+
+    private init() {
+        // Initialize with optimistic-true so the banner doesn't flash
+        // on cold start before the first path update lands. NWPathMonitor
+        // delivers the current state immediately on start anyway.
+        monitor.pathUpdateHandler = { [weak self] path in
+            let reachable = path.status == .satisfied
+            Task { @MainActor in
+                guard let self else { return }
+                let wasReachable = self.isReachable
+                self.isReachable = reachable
+                // On reconnect, kick off a retry sweep of any queued
+                // photo uploads. Drain happens asynchronously; if it
+                // fails for a given upload the photo stays queued.
+                if reachable && !wasReachable {
+                    await HavenFieldPhotoUploadQueue.shared.retryPending()
+                }
+            }
+        }
+        monitor.start(queue: queue)
+        // Sync initial pending count from disk on init so the banner
+        // renders correctly on cold start when there were leftover
+        // photos from a previous session.
+        Task { @MainActor in
+            self.pendingPhotoCount = HavenFieldPhotoUploadQueue.shared.diskCount()
+        }
+    }
+
+    deinit {
+        monitor.cancel()
+    }
+
+    /// Called by HavenFieldPhotoUploadQueue whenever it enqueues or
+    /// dequeues an item so the banner can show "+ N waiting" without
+    /// observing the queue actor directly.
+    func updatePendingCount(_ count: Int) {
+        pendingPhotoCount = count
+    }
+}
+
+/// T5.2 (post-overnight) — pending photo upload queue. When an
+/// identify-equipment / add-system-from-photo call fails on network
+/// error, the JPEG bytes get persisted to FileManager.documents
+/// under a queue directory. On reconnect (NWPathMonitor signals
+/// reachable) the queue iterates + retries each upload. On success,
+/// the file is deleted; on persistent failure, it stays for the
+/// next reconnect attempt.
+///
+/// Pre-T5.2 the Field app's identifySystem / addSystemFromPhoto
+/// catch handlers just set errorMessage and discarded the JPEG.
+/// Lost data + no recovery.
+actor HavenFieldPhotoUploadQueue {
+    static let shared = HavenFieldPhotoUploadQueue()
+
+    /// Queue entry — what we need to retry the upload later.
+    struct PendingUpload: Codable {
+        /// Filename relative to the queue directory.
+        let filename: String
+        /// Workspace context the original call had.
+        let workspaceId: String?
+        /// Visit context (portal token) when the original call was
+        /// part of an active visit.
+        let portalToken: String?
+        /// Free-form context the caller wants surfaced when the retry
+        /// succeeds (e.g. system category or visit identifier).
+        let category: String?
+        /// When the upload was first queued (debug only).
+        let queuedAt: Date
+    }
+
+    private init() {}
+
+    private var queueDirectory: URL? {
+        let fm = FileManager.default
+        guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let queueDir = docs.appendingPathComponent("HavenFieldPhotoQueue", isDirectory: true)
+        if !fm.fileExists(atPath: queueDir.path) {
+            try? fm.createDirectory(at: queueDir, withIntermediateDirectories: true)
+        }
+        return queueDir
+    }
+
+    private var indexUrl: URL? {
+        queueDirectory?.appendingPathComponent("index.json", isDirectory: false)
+    }
+
+    /// Read-only count from disk. Safe to call from any thread; uses
+    /// FileManager.fileExists which is thread-safe.
+    nonisolated func diskCount() -> Int {
+        let fm = FileManager.default
+        guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return 0 }
+        let queueDir = docs.appendingPathComponent("HavenFieldPhotoQueue", isDirectory: true)
+        let indexUrl = queueDir.appendingPathComponent("index.json", isDirectory: false)
+        guard let data = try? Data(contentsOf: indexUrl),
+              let entries = try? JSONDecoder().decode([PendingUpload].self, from: data) else {
+            return 0
+        }
+        return entries.count
+    }
+
+    private func loadIndex() -> [PendingUpload] {
+        guard let indexUrl,
+              let data = try? Data(contentsOf: indexUrl),
+              let entries = try? JSONDecoder().decode([PendingUpload].self, from: data) else {
+            return []
+        }
+        return entries
+    }
+
+    private func saveIndex(_ entries: [PendingUpload]) {
+        guard let indexUrl,
+              let data = try? JSONEncoder().encode(entries) else { return }
+        try? data.write(to: indexUrl, options: .atomic)
+        Task { @MainActor in
+            HavenFieldNetworkMonitor.shared.updatePendingCount(entries.count)
+        }
+    }
+
+    /// Persist a failed JPEG upload to disk + add it to the queue.
+    /// Caller invokes this from the catch block of identifySystem /
+    /// addSystemFromPhoto when the underlying error is a network
+    /// failure (use friendlyServerError categorization).
+    func enqueue(jpeg: Data, workspaceId: String?, portalToken: String?, category: String?) {
+        guard let queueDirectory else { return }
+        let filename = "\(UUID().uuidString).jpg"
+        let url = queueDirectory.appendingPathComponent(filename, isDirectory: false)
+        try? jpeg.write(to: url, options: .atomic)
+        var entries = loadIndex()
+        entries.append(PendingUpload(
+            filename: filename,
+            workspaceId: workspaceId,
+            portalToken: portalToken,
+            category: category,
+            queuedAt: Date()
+        ))
+        saveIndex(entries)
+    }
+
+    /// Iterate pending uploads + re-attempt each. On success, remove
+    /// from the queue. Called by HavenFieldNetworkMonitor on reconnect.
+    func retryPending() async {
+        let entries = loadIndex()
+        guard !entries.isEmpty else { return }
+        var remaining: [PendingUpload] = []
+        for entry in entries {
+            guard let queueDirectory else {
+                remaining.append(entry)
+                continue
+            }
+            let url = queueDirectory.appendingPathComponent(entry.filename)
+            guard let jpeg = try? Data(contentsOf: url) else {
+                continue // file vanished; drop the entry silently
+            }
+            // Best-effort retry. We intentionally don't re-attach to
+            // a specific draft because the user may have moved on; the
+            // identify call is enough to land the data on the catalog
+            // side. If the user is still on the visit detail when
+            // retry succeeds, a manual refresh picks up the new
+            // catalog entry.
+            do {
+                let base64 = jpeg.base64EncodedString()
+                _ = try await HavenSupabase.identifyEquipment(
+                    imageBase64: base64,
+                    category: entry.category
+                )
+                try? FileManager.default.removeItem(at: url)
+            } catch {
+                // Network probably still flaky; leave it queued.
+                remaining.append(entry)
+            }
+        }
+        saveIndex(remaining)
+    }
+}
+
+/// T5.1 (post-overnight) — offline / pending-upload banner. Renders
+/// above the floating tab bar when offline OR when the photo queue
+/// has items waiting. Uses the existing HavenColors.warning palette
+/// (amber-tinted, not salmon — per CLAUDE.md salmon discipline).
+private struct HavenFieldOfflineBanner: View {
+    @ObservedObject var monitor = HavenFieldNetworkMonitor.shared
+
+    var body: some View {
+        if !monitor.isReachable {
+            bannerView(
+                icon: "wifi.slash",
+                tint: HavenColors.warning,
+                title: "You're offline",
+                subtitle: monitor.pendingPhotoCount > 0
+                    ? "\(monitor.pendingPhotoCount) photo\(monitor.pendingPhotoCount == 1 ? "" : "s") waiting. Edits save locally; we'll sync when you're back."
+                    : "Edits save locally. We'll sync when you're back online."
+            )
+        } else if monitor.pendingPhotoCount > 0 {
+            bannerView(
+                icon: "arrow.triangle.2.circlepath",
+                tint: HavenColors.action,
+                title: "Catching up",
+                subtitle: "\(monitor.pendingPhotoCount) photo\(monitor.pendingPhotoCount == 1 ? "" : "s") syncing in the background."
+            )
+        }
+    }
+
+    private func bannerView(icon: String, tint: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text(subtitle)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(tint.opacity(0.10))
+        .overlay(
+            Rectangle()
+                .fill(tint.opacity(0.4))
+                .frame(height: 1),
+            alignment: .top
+        )
     }
 }
 
@@ -5664,6 +5928,16 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             await sync(draft: draft, message: "System synced")
         } catch {
             errorMessage = friendlyServerError(from: error, fallback: "Couldn’t identify the equipment. Please try again or enter manually.")
+            // T5.2 (post-overnight) — persist the JPEG to the offline
+            // retry queue if the failure looks network-related so the
+            // bytes aren't lost. NWPathMonitor will drain on reconnect.
+            await Self.maybeQueuePhoto(
+                jpeg: imageData,
+                error: error,
+                workspaceId: workspaceId,
+                portalToken: portalToken,
+                category: draft.systemsSnapshot[index].category
+            )
         }
     }
 
@@ -5686,7 +5960,44 @@ final class HavenFieldVisitWorkspaceModel: ObservableObject {
             await sync(draft: draft, message: "System synced")
         } catch {
             errorMessage = friendlyServerError(from: error, fallback: "Couldn’t add the system. Please try again or enter manually.")
+            // T5.2 — persist on network failure (see identifySystem).
+            await Self.maybeQueuePhoto(
+                jpeg: imageData,
+                error: error,
+                workspaceId: workspaceId,
+                portalToken: portalToken,
+                category: nil
+            )
         }
+    }
+
+    /// T5.2 (post-overnight) — shared helper that classifies an error
+    /// as 'network-flaky' vs 'genuine server reject', and only queues
+    /// the JPEG for retry in the former case. Avoids hoarding bytes
+    /// for genuine 4xx-style failures (e.g. workspace doesn't serve
+    /// the household — retrying won't help).
+    private static func maybeQueuePhoto(
+        jpeg: Data,
+        error: Error,
+        workspaceId: String?,
+        portalToken: String?,
+        category: String?
+    ) async {
+        let raw = error.localizedDescription.lowercased()
+        let isNetworkFlaky =
+            raw.contains("network") ||
+            raw.contains("offline") ||
+            raw.contains("internet") ||
+            raw.contains("-1009") ||
+            raw.contains("-1011") ||
+            raw.contains("timed out")
+        guard isNetworkFlaky else { return }
+        await HavenFieldPhotoUploadQueue.shared.enqueue(
+            jpeg: jpeg,
+            workspaceId: workspaceId,
+            portalToken: portalToken,
+            category: category
+        )
     }
 
     private func mergedDraft(from payload: HavenFieldPortalPayload) -> HavenFieldVisitDraft {
@@ -5880,11 +6191,18 @@ struct HavenFieldRootView: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !viewModel.bottomTabBarHidden {
-                HavenFieldTabBar(
-                    selectedTab: $viewModel.selectedTab,
-                    showCrewTab: !isSoloWorkspace
-                )
+            VStack(spacing: 0) {
+                // T5.1 (post-overnight) — offline / pending-upload banner.
+                // Renders above the floating tab bar when offline OR when
+                // the photo queue has items waiting. Singleton observer
+                // pattern via HavenFieldNetworkMonitor.shared.
+                HavenFieldOfflineBanner()
+                if !viewModel.bottomTabBarHidden {
+                    HavenFieldTabBar(
+                        selectedTab: $viewModel.selectedTab,
+                        showCrewTab: !isSoloWorkspace
+                    )
+                }
             }
         }
         .tint(HavenColors.action)
