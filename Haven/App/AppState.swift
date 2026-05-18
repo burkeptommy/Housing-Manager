@@ -298,6 +298,14 @@ final class AppState: ObservableObject {
                         await Self.migrateHandymanTierTasksToPunchItemsOnceIfNeeded()
                         await Self.migrateHandymanVisitsToRemindersOnceIfNeeded()
 
+                        // Round 4 (May 2026): one-time backfill that
+                        // archives the auto-seeded twin of any duplicate
+                        // routine pair created by Q15b before the race
+                        // condition fix. Burke household had 3 dupe
+                        // pairs (Blue Fox / Orkin / ADT); other quiz
+                        // households built before the fix will too.
+                        await Self.archiveDuplicateRoutinesOnceIfNeeded()
+
                         // Chez v1: legacy service-row backfill. Archives
                         // any home_systems row whose category is a
                         // service (Pet Waste, Cleaning, Trash, Snow
@@ -872,6 +880,90 @@ final class AppState: ObservableObject {
         if archived > 0 {
             print("[AppState] HandymanVisits migration: archived \(archived) seasonal visit tasks")
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+    }
+
+    /// Round 4 (May 2026): one-time backfill that archives the
+    /// `cadence_source: "auto_seeded"` twin of duplicate routine pairs
+    /// created by the pre-fix Q15b race condition.
+    ///
+    /// Background: until commit AAA the House Quiz's Q15b answer mapper
+    /// fired BOTH `RoutineSeeder.seedIfNeeded` (via
+    /// `DatabaseService.createContractor`'s fire-and-forget Task) AND
+    /// `HouseQuizAnswerMapper.ensureVendorRoutineForCategory` for each
+    /// captured contractor. The two paths raced on their dedup
+    /// fetch+insert and BOTH succeeded, producing two active routines
+    /// for the same vendor (Burke household had Blue Fox / Orkin / ADT
+    /// dupe pairs — same vendor_id, same routine_kind, both
+    /// `archived_at: NULL`). The new code passes `skipRoutineSeed: true`
+    /// from the quiz so only the explicit path runs — but existing
+    /// installs already have the dupes on file.
+    ///
+    /// This pass groups active routines by `(household_id, vendor_id,
+    /// routine_kind)`, and for any group with >1 active row, archives
+    /// the one with `cadenceSource == "auto_seeded"` (the older seed)
+    /// and keeps the `"quiz"` row (the user's explicit Q15b answer).
+    /// Conservative: if BOTH have the same source, neither is "obviously
+    /// the duplicate" so we leave both alone — the homeowner can
+    /// manually resolve. Idempotent via UserDefaults gate.
+    @MainActor
+    static func archiveDuplicateRoutinesOnceIfNeeded() async {
+        let key = "hasArchivedDuplicateRoutinesRound4_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        // Need household scope. The fetchRoutines(householdId:) signature
+        // requires an explicit household id; pull it from the current user.
+        guard let user = try? await db.fetchCurrentUser(),
+              let householdId = user.householdId else { return }
+
+        let routines: [RoutineRow]
+        do {
+            routines = try await db.fetchRoutines(householdId: householdId)
+        } catch {
+            print("[AppState] DupeRoutines migration: fetch failed: \(error)")
+            return
+        }
+
+        // Group active routines by (vendor_id, routine_kind). Skip rows
+        // without a vendor — handyman-recurring etc. are governed by
+        // their own uniqueness rules (the partial unique index in
+        // Phase 66's schema).
+        struct DupeKey: Hashable {
+            let vendorId: UUID
+            let routineKind: String
+        }
+        var groups: [DupeKey: [RoutineRow]] = [:]
+        for routine in routines {
+            guard routine.archivedAt == nil,
+                  let vendorId = routine.vendorId else { continue }
+            let dkey = DupeKey(vendorId: vendorId, routineKind: routine.routineKind)
+            groups[dkey, default: []].append(routine)
+        }
+
+        var archived = 0
+        for (_, members) in groups where members.count > 1 {
+            // Keep the `quiz` source row; archive the `auto_seeded` one.
+            // If the set doesn't look exactly like one of each, leave it
+            // alone — we can't safely pick which to drop.
+            let autoSeeded = members.filter { $0.cadenceSource == "auto_seeded" }
+            let quiz = members.filter { $0.cadenceSource == "quiz" }
+            guard !autoSeeded.isEmpty, !quiz.isEmpty else { continue }
+
+            for toArchive in autoSeeded {
+                do {
+                    try await db.archiveRoutine(id: toArchive.id)
+                    archived += 1
+                } catch {
+                    print("[AppState] DupeRoutines migration: archive failed for \(toArchive.id): \(error)")
+                }
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+        if archived > 0 {
+            print("[AppState] DupeRoutines migration: archived \(archived) auto-seeded duplicates")
+            NotificationCenter.default.post(name: .routineChanged, object: nil)
         }
     }
 

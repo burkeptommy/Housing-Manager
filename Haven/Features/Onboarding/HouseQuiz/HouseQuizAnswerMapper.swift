@@ -844,7 +844,14 @@ final class HouseQuizAnswerMapper {
                             // contractors table has no rating/review/certified
                             // columns yet — when we add them, this can move.
                             insert.notes = parsed.attributionNotes()
-                            let createdContractor = try? await db.createContractor(insert)
+                            // Round 4: pass `skipRoutineSeed: true` so
+                            // `RoutineSeeder.seedIfNeeded` does NOT
+                            // fire-and-forget alongside our explicit
+                            // `ensureVendorRoutineForCategory` below.
+                            // Without this skip, both paths race on the
+                            // dedup fetch+insert and Burke-style duplicate
+                            // routines land in the routines table.
+                            let createdContractor = try? await db.createContractor(insert, skipRoutineSeed: true)
 
                             // Phase 63: the handyman chip is special — when
                             // the user provides a named handyman, link them

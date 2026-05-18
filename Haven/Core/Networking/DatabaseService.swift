@@ -1074,7 +1074,10 @@ final class DatabaseService {
             .value
     }
 
-    func createContractor(_ contractor: ContractorInsert) async throws -> ContractorRow {
+    func createContractor(
+        _ contractor: ContractorInsert,
+        skipRoutineSeed: Bool = false
+    ) async throws -> ContractorRow {
         let created: ContractorRow = try await from("contractors")
             .insert(contractor)
             .select()
@@ -1086,8 +1089,21 @@ final class DatabaseService {
         // landscaping, pool, pest, pet waste, mosquito & tick).
         // Fire-and-forget — routine seeding should never block the
         // contractor creation itself.
-        Task { @MainActor in
-            await RoutineSeeder.shared.seedIfNeeded(for: created)
+        //
+        // Round 4 (May 2026, friend feedback): the House Quiz's Q15b
+        // mapper ALSO creates routines explicitly via
+        // `ensureVendorRoutineForCategory` after creating contractors.
+        // Both this fire-and-forget seeder AND the mapper's explicit
+        // call would race on the dedup fetch+insert, producing TWO
+        // active routines per Q15b vendor (Burke household had this
+        // for Blue Fox / Orkin / ADT — 6 dupe routines total). The
+        // quiz mapper now passes `skipRoutineSeed: true` so only the
+        // explicit path runs; manual contractor adds outside the quiz
+        // (Contacts directory, etc.) still fire the seeder as before.
+        if !skipRoutineSeed {
+            Task { @MainActor in
+                await RoutineSeeder.shared.seedIfNeeded(for: created)
+            }
         }
         // Phase 67 (C1): when a contractor is added in a category that had
         // gaps marked by the reconciler v2, clear the

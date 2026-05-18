@@ -446,24 +446,50 @@ struct RoutineRow: Codable, Identifiable {
             return weeks % interval == 0 && candidate >= anchorDay
 
         case .monthly, .bimonthly, .quarterly, .semiannual, .annual, .customDays:
-            let intervalDays: Int = {
-                switch cadence {
-                case .monthly: return 30
-                case .bimonthly: return 60
-                case .quarterly: return 91
-                case .semiannual: return 182
-                case .annual: return 365
-                case .customDays: return cadenceIntervalDays ?? 30
-                default: return 30
-                }
-            }()
             guard let nextDate = formatter.date(from: nextExpectedDate) else { return false }
             let nextDay = calendar.startOfDay(for: nextDate)
-            // Candidate matches if it lands exactly on a scheduled
-            // interval from next_expected_date (forward or back).
-            let comps = calendar.dateComponents([.day], from: nextDay, to: candidate)
-            let delta = abs(comps.day ?? 0)
-            return delta % intervalDays == 0
+
+            // Round 4 (May 2026, friend feedback): a routine with
+            // `cadence_type: annual` and `next_expected_date: 2026-05-16`
+            // was rendering "upcoming visits" for May 16, 2027 AND
+            // May 15, 2028 — because the previous `delta % 365 == 0`
+            // math drifts one day per leap year. The friend saw it as
+            // back-to-back "May 15" / "May 16" rows (the year is hidden
+            // in the UI) and reasonably read it as a duplicate bug.
+            //
+            // Calendar arithmetic handles leap years correctly: monthly
+            // anniversaries land on the same day-of-month, annual ones
+            // on the same month + day, etc. Custom-days remains literal
+            // day-interval math because the user explicitly chose a
+            // fixed-day cadence.
+            if cadence == .customDays {
+                let intervalDays = cadenceIntervalDays ?? 30
+                let comps = calendar.dateComponents([.day], from: nextDay, to: candidate)
+                let delta = abs(comps.day ?? 0)
+                return delta % intervalDays == 0
+            }
+
+            // Anniversary-style cadences: compute the month interval and
+            // check the candidate's month+day matches the anchor's on
+            // every `monthInterval`-th month from the anchor.
+            let monthInterval: Int = {
+                switch cadence {
+                case .monthly: return 1
+                case .bimonthly: return 2
+                case .quarterly: return 3
+                case .semiannual: return 6
+                case .annual: return 12
+                default: return 1
+                }
+            }()
+            let anchorComps = calendar.dateComponents([.month, .day], from: nextDay)
+            let candComps = calendar.dateComponents([.month, .day], from: candidate)
+            guard anchorComps.day == candComps.day else { return false }
+            let monthsDiff = calendar.dateComponents([.month], from: nextDay, to: candidate).month ?? 0
+            // Active on the anchor itself (monthsDiff == 0) and on every
+            // future anniversary. We don't go backward — past anniversaries
+            // aren't "active" for upcoming-visit projection.
+            return monthsDiff >= 0 && monthsDiff % monthInterval == 0
         }
     }
 

@@ -689,6 +689,12 @@ struct DashboardView: View {
                 if let assessment = viewModel.homeAssessment {
                     AssessmentPrepQuizSheet(
                         assessment: assessment,
+                        // Round 4: pass the primary property so year-built
+                        // and square-footage prefill from the ATTOM data
+                        // captured at signup instead of asking the user to
+                        // re-enter it.
+                        property: viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId })
+                            ?? viewModel.properties.first,
                         onSave: { attributes in
                             try? await HavenSupabase.updatePreVisitData(
                                 assessmentId: assessment.id,

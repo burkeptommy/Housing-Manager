@@ -552,11 +552,16 @@ struct RoutineDetailView: View {
                 Text(visit.title)
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textPrimary)
-                Text(MaintenanceDateFormatting.shortDate(visit.scheduledDate))
+                // Round 4: projected routine visits can land >12 months
+                // out (annual cadences in particular). Use `shortDateSmart`
+                // so the year shows when needed — without it the friend
+                // saw "May 16" + "May 16" / "May 15" rows and couldn't
+                // tell they were a year apart.
+                Text(MaintenanceDateFormatting.shortDateSmart(visit.scheduledDate))
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
                 if let end = visit.targetWindowEnd, end != visit.scheduledDate {
-                    Text("By \(MaintenanceDateFormatting.shortDate(end))")
+                    Text("By \(MaintenanceDateFormatting.shortDateSmart(end))")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textSecondary)
                 } else if visit.isProjected {

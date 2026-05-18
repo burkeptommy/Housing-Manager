@@ -17,9 +17,32 @@ enum MaintenanceDateFormatting {
         isoFormatter.date(from: isoDate)
     }
 
+    private static let shortWithYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }()
+
     static func shortDate(_ isoDate: String) -> String {
         guard let date = date(from: isoDate) else { return isoDate }
         return shortFormatter.string(from: date)
+    }
+
+    /// Round 4 (May 2026, friend feedback): the friend saw "May 16" and
+    /// "May 15" back-to-back on the ADT routine detail and reasonably
+    /// read them as duplicate-day visits. They were actually a year apart
+    /// (2027-05-16 and 2028-05-15 — the latter wrong by 1 day, fixed
+    /// separately by the leap-year math change). For projected routine
+    /// visits and any date that might be >12 months out, prefer this
+    /// formatter so the year is visible when it matters. Returns "MMM d"
+    /// for dates in the current year, "MMM d, yyyy" otherwise.
+    static func shortDateSmart(_ isoDate: String) -> String {
+        guard let date = date(from: isoDate) else { return isoDate }
+        let calendar = Calendar.current
+        if calendar.component(.year, from: date) == calendar.component(.year, from: Date()) {
+            return shortFormatter.string(from: date)
+        }
+        return shortWithYearFormatter.string(from: date)
     }
 
     static func dueLabel(for isoDate: String) -> String {

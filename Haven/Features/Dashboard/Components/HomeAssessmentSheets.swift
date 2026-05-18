@@ -162,8 +162,12 @@ struct AssessmentPrepNotesSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Anything we should know?")
-                    .font(HavenTypography.title2)
+                // Round 4 (May 2026): the inline "Anything we should know?"
+                // title was rendered below a navigationTitle of "Notes for
+                // contractor" with no top padding, so the sheet's drag
+                // handle + safe-area visually clipped the inline heading.
+                // Folded into navigationTitle below; the descriptive copy
+                // stays inline as the subtitle.
                 Text("Notes for your contractor. Examples: \"Boiler is in the basement closet,\" \"Side gate code is 1234,\" \"Dog is friendly.\"")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
@@ -203,7 +207,7 @@ struct AssessmentPrepNotesSheet: View {
                 Spacer()
             }
             .padding(20)
-            .navigationTitle("Notes for contractor")
+            .navigationTitle("Anything we should know?")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -321,6 +325,16 @@ struct AssessmentPrepPhotosSheet: View {
 
 struct AssessmentPrepQuizSheet: View {
     let assessment: HomeAssessmentRow
+    /// Round 4 (May 2026, friend feedback): the friend opened this sheet
+    /// expecting year-built / square-footage prefilled from the ATTOM
+    /// data captured at signup. The sheet only read from
+    /// `assessment.capturedAttributes`, which is empty on first open, so
+    /// every field came up blank — a usability gap when the data was
+    /// sitting on the property row the whole time. Accepting `PropertyRow`
+    /// here lets us seed from `property.yearBuilt` /
+    /// `property.squareFootage` as a fallback when no captured value
+    /// exists yet. Optional so legacy callers compile unchanged.
+    var property: PropertyRow? = nil
     let onSave: ([String: String]) async -> Void
 
     @State private var yearBuilt: String = ""
@@ -398,9 +412,24 @@ struct AssessmentPrepQuizSheet: View {
             }
             .task {
                 let attrs = assessment.capturedAttributes ?? [:]
-                yearBuilt = attrs["year_built"]?.stringValue ?? ""
-                sqFt = attrs["square_footage"]?.stringValue ?? ""
-                hasPets = attrs["has_pets"]?.stringValue == "true"
+                // Round 4: when no captured value exists yet, fall back to
+                // the property record's ATTOM-pulled year/sqft so the
+                // homeowner doesn't have to re-enter data we already have.
+                yearBuilt = attrs["year_built"]?.stringValue
+                    ?? property?.yearBuilt.map(String.init)
+                    ?? ""
+                sqFt = attrs["square_footage"]?.stringValue
+                    ?? property?.squareFootage.map(String.init)
+                    ?? ""
+                // Also fall back to property attributes for pets — Q15b
+                // captures this onto `properties.attributes` via
+                // ensureAutoCreatedSystems. Avoids the user re-toggling
+                // a switch they already set during the quiz.
+                if let attrValue = attrs["has_pets"]?.stringValue {
+                    hasPets = attrValue == "true"
+                } else if let propValue = property?.attributes?["has_pets"]?.stringValue {
+                    hasPets = propValue == "true"
+                }
                 parkingInstructions = attrs["parking_instructions"]?.stringValue ?? ""
                 specialAccess = attrs["special_access"]?.stringValue ?? ""
             }
