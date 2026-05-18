@@ -888,6 +888,25 @@ final class HouseQuizAnswerMapper {
                                 )
                             }
 
+                            // Round 5 (May 2026, friend feedback): the
+                            // vendor was getting linked to the ROUTINE
+                            // but NOT to the matching home_systems row.
+                            // Result: PropertyDetailView's "Systems
+                            // needing details" sheet kept showing
+                            // "Landscaping — needs Service vendor" even
+                            // though Blue Fox was captured in Q15b and
+                            // surfaced everywhere else. Stamp
+                            // home_systems.preferred_contractor_id so
+                            // every surface that reads from the system
+                            // (system details, gap sweeps, task
+                            // reconciler) sees the vendor link.
+                            if let contractor = createdContractor {
+                                await linkContractorToMatchingSystems(
+                                    contractor: contractor,
+                                    category: category
+                                )
+                            }
+
                             // Phase 60.2 (F2): flip any already-materialized
                             // maintenance tasks in this category to vendor-
                             // managed now that the contractor is captured.
@@ -1901,6 +1920,44 @@ final class HouseQuizAnswerMapper {
     /// routine is a lazy-created singleton managed by
     /// `fetchOrCreateHandymanRoutine` (seeded from the household's
     /// `preferred_handyman_contractor_id`).
+    /// Round 5 (May 2026, friend feedback): stamp
+    /// `home_systems.preferred_contractor_id` on every top-level system
+    /// whose canonical category matches the contractor's. Burke saw
+    /// "Landscaping needs a service vendor" in the Systems Needing
+    /// Details sheet even after capturing Blue Fox in Q15b — the chip
+    /// flow created the contractor and a vendor-linked routine but
+    /// never set `preferred_contractor_id` on the existing
+    /// home_systems row. Surfaces that read from the system (the
+    /// recap sheet, vendor coverage sheet, task reconciler's matching
+    /// contractor lookup, ContractorDetailView's "X system covered by
+    /// this vendor" line) all key off this column.
+    ///
+    /// Skips systems that already have a `preferred_contractor_id` so
+    /// re-runs / back-nav don't clobber a user's explicit pick. Uses
+    /// `SystemCategoryRegistry.canonical(category:)` on both sides so
+    /// "Plumbing & Heating" / "Plumbing" / "plumbing" variants all
+    /// collapse to a single match.
+    private func linkContractorToMatchingSystems(
+        contractor: ContractorRow,
+        category: String
+    ) async {
+        guard let targetCanonical = SystemCategoryRegistry.canonical(category: category) else { return }
+
+        let systems = (try? await db.fetchHomeSystems(propertyId: propertyId)) ?? []
+        for system in systems {
+            // Top-level only; child systems inherit coverage from their parent.
+            guard system.parentSystemId == nil else { continue }
+            // Don't clobber a user's explicit pick.
+            guard system.preferredContractorId == nil else { continue }
+            guard let systemCanonical = SystemCategoryRegistry.canonical(category: system.category),
+                  systemCanonical == targetCanonical else { continue }
+
+            var update = HomeSystemUpdate()
+            update.preferredContractorId = contractor.id
+            _ = try? await db.updateHomeSystem(id: system.id, update)
+        }
+    }
+
     private func ensureVendorRoutineForCategory(
         kind: RoutineKind,
         category: String,

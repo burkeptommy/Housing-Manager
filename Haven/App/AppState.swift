@@ -306,6 +306,17 @@ final class AppState: ObservableObject {
                         // households built before the fix will too.
                         await Self.archiveDuplicateRoutinesOnceIfNeeded()
 
+                        // Round 5 (May 2026): one-time backfill that
+                        // links contractors to matching home_systems
+                        // rows via `preferred_contractor_id`. The Q15b
+                        // mapper used to create the contractor + a
+                        // vendor-linked routine but never set the
+                        // system's preferred_contractor_id, so the
+                        // Systems Needing Details sheet showed
+                        // "Landscaping needs a service vendor" even
+                        // after the user captured Blue Fox.
+                        await Self.linkExistingContractorsToSystemsOnceIfNeeded()
+
                         // Chez v1: legacy service-row backfill. Archives
                         // any home_systems row whose category is a
                         // service (Pet Waste, Cleaning, Trash, Snow
@@ -964,6 +975,72 @@ final class AppState: ObservableObject {
         if archived > 0 {
             print("[AppState] DupeRoutines migration: archived \(archived) auto-seeded duplicates")
             NotificationCenter.default.post(name: .routineChanged, object: nil)
+        }
+    }
+
+    /// Round 5 (May 2026, friend feedback): one-time backfill that
+    /// stamps `home_systems.preferred_contractor_id` with the matching
+    /// household contractor when one exists.
+    ///
+    /// Background: until Round 5's Q15b fix the captured contractor
+    /// was linked to its `routines.vendor_id` but never to the
+    /// matching home_systems row's `preferred_contractor_id`. Result:
+    /// the Systems Needing Details sheet showed "Landscaping —
+    /// needs Service vendor" even though Blue Fox was already
+    /// captured and surfaced as the routine's vendor.
+    ///
+    /// Strategy: for every system without `preferred_contractor_id`,
+    /// find every contractor in the household whose canonical category
+    /// matches the system's canonical category. If EXACTLY one match,
+    /// link it. If multiple matches, skip — we can't safely pick
+    /// which contractor to designate as preferred. Skips child
+    /// systems (parent owns coverage). Idempotent via UserDefaults
+    /// gate.
+    @MainActor
+    static func linkExistingContractorsToSystemsOnceIfNeeded() async {
+        let key = "hasLinkedExistingContractorsToSystemsRound5_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let systems: [HomeSystemRow]
+        let contractors: [ContractorRow]
+        do {
+            systems = try await db.fetchHomeSystems()
+            contractors = try await db.fetchContractors()
+        } catch {
+            print("[AppState] SystemContractorLink migration: fetch failed: \(error)")
+            return
+        }
+
+        // Bucket contractors by canonical category (skip rows without one).
+        var byCategory: [String: [ContractorRow]] = [:]
+        for contractor in contractors {
+            guard let canonical = SystemCategoryRegistry.canonical(category: contractor.category) else { continue }
+            byCategory[canonical, default: []].append(contractor)
+        }
+
+        var linked = 0
+        for system in systems {
+            guard system.parentSystemId == nil else { continue }
+            guard system.preferredContractorId == nil else { continue }
+            guard let systemCanonical = SystemCategoryRegistry.canonical(category: system.category) else { continue }
+            guard let matches = byCategory[systemCanonical], matches.count == 1 else { continue }
+            let contractor = matches[0]
+
+            var update = HomeSystemUpdate()
+            update.preferredContractorId = contractor.id
+            do {
+                _ = try await db.updateHomeSystem(id: system.id, update)
+                linked += 1
+            } catch {
+                print("[AppState] SystemContractorLink migration: link failed for \(system.id): \(error)")
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+        if linked > 0 {
+            print("[AppState] SystemContractorLink migration: linked \(linked) systems to their household contractors")
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
         }
     }
 

@@ -26,19 +26,44 @@ struct HomeAssessmentPendingCard: View {
     let onReschedule: () -> Void
     let onSwitchToDIY: () -> Void
     var onTapTrustProfile: (() -> Void)? = nil
+    /// Round 5 (May 2026, friend feedback): tapping the card opens the
+    /// new AssessmentDetailSheet (visit details + prep checklist).
+    /// Optional so legacy / preview call sites keep working.
+    var onTapCard: (() -> Void)? = nil
 
     var body: some View {
+        Button {
+            if let onTapCard {
+                onTapCard()
+            }
+        } label: {
+            cardContent
+        }
+        .buttonStyle(.plain)
+        .disabled(onTapCard == nil)
+    }
+
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 14) {
-            statusHeader
+            HStack {
+                statusHeader
+                if onTapCard != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.action.opacity(0.6))
+                }
+            }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(headline)
                     .font(HavenTypography.title3)
                     .foregroundStyle(HavenColors.textPrimary)
+                    .multilineTextAlignment(.leading)
                 Text(subtitle)
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.leading)
             }
 
             // Phase 85: prefer the richer PreVisitTrustCard when a
@@ -67,6 +92,7 @@ struct HomeAssessmentPendingCard: View {
             RoundedRectangle(cornerRadius: HavenTheme.radiusLarge, style: .continuous)
                 .stroke(HavenColors.action.opacity(0.25), lineWidth: 1)
         )
+        .contentShape(Rectangle())
     }
 
     // MARK: - Subviews

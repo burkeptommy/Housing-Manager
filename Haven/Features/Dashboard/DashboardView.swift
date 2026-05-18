@@ -40,6 +40,10 @@ struct DashboardView: View {
     @State private var showAssessmentPrepNotesSheet = false
     @State private var showAssessmentPrepPhotosSheet = false
     @State private var showAssessmentPrepQuizSheet = false
+    /// Round 5 — consolidated assessment detail sheet (visit info +
+    /// prep checklist + actions). Opens when the user taps anywhere on
+    /// the HomeAssessmentPendingCard.
+    @State private var showAssessmentDetailSheet = false
     @State private var showAssessmentReview = false
     @State private var findVendorSystemName: String?
     @State private var findVendorItem: VendorActionItem?
@@ -709,6 +713,24 @@ struct DashboardView: View {
                     .presentationDetents([.large])
                 }
             }
+            // Round 5 (May 2026): consolidated assessment detail sheet.
+            // Opens when the user taps the HomeAssessmentPendingCard.
+            // Reuses the existing prep state vars + reschedule/cancel
+            // flow — this sheet is pure presentation, no DB writes.
+            .sheet(isPresented: $showAssessmentDetailSheet) {
+                if let assessment = viewModel.homeAssessment {
+                    AssessmentDetailSheet(
+                        assessment: assessment,
+                        handymanFirstName: nil,
+                        onReschedule: { showAssessmentRescheduleSheet = true },
+                        onSwitchToDIY: { confirmAssessmentCancel = true },
+                        onOpenNotes: { showAssessmentPrepNotesSheet = true },
+                        onOpenPhotos: { showAssessmentPrepPhotosSheet = true },
+                        onOpenPrepQuiz: { showAssessmentPrepQuizSheet = true }
+                    )
+                    .presentationDetents([.large])
+                }
+            }
             .sheet(isPresented: $showAssessmentReview) {
                 if let assessment = viewModel.homeAssessment {
                     AssessmentReviewView(
@@ -864,20 +886,17 @@ struct DashboardView: View {
                 },
                 onSwitchToDIY: {
                     confirmAssessmentCancel = true
+                },
+                // Round 5: whole card tap opens the consolidated detail
+                // sheet (visit info + prep checklist + actions). The
+                // standalone HomeAssessmentPrepCard below is gone — its
+                // 3 prep rows are now inside the detail sheet, cutting
+                // dashboard bulk roughly in half for this surface.
+                onTapCard: {
+                    Haptics.light()
+                    showAssessmentDetailSheet = true
                 }
             )
-
-            // Phase 84.5 — Pre-visit prep card (only
-            // before the visit starts; hide once handyman
-            // is en route or beyond).
-            if assessment.status == .pending || assessment.status == .scheduled {
-                HomeAssessmentPrepCard(
-                    assessment: assessment,
-                    onOpenNotes: { showAssessmentPrepNotesSheet = true },
-                    onOpenPhotos: { showAssessmentPrepPhotosSheet = true },
-                    onOpenPrepQuiz: { showAssessmentPrepQuizSheet = true }
-                )
-            }
         }
 
         // Phase 66: One-time "We reorganized your
