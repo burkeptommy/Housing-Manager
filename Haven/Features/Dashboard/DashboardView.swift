@@ -226,6 +226,16 @@ struct DashboardView: View {
             // destination accessed via "See full year ↗" inside
             // the hub.
             MaintenanceHubView()
+        } else if destination == "coverage" {
+            // Round 3 (May 2026): focused vendor-coverage view.
+            // Replaces the Spring readiness card's old route to
+            // MaintenanceHubView. Sections: Covered / Needs a Vendor /
+            // Snoozed or Dismissed / Not Counted. Solves the
+            // "3 of 3 systems covered" vs "22 systems" labeling
+            // mismatch by surfacing every category in one of the
+            // four sections.
+            CoverageView()
+                .environmentObject(viewModel)
         } else if destination == "maintenance_calendar" {
             // Phase 54A: "View full schedule" on the dashboard
             // lands users in the Calendar layout of the canonical
@@ -717,6 +727,24 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .chezHomeAssessmentChanged)) { _ in
                 Task { await viewModel.loadHomeAssessment() }
             }
+            // Round 3: CoverageView's "Find a pro" / "I have one" buttons
+            // post these notifications so we can reuse DashboardView's
+            // existing FindLocalVendorSheet / AddVendorSheet plumbing
+            // without duplicating sheet hosting on the pushed view.
+            .onReceive(NotificationCenter.default.publisher(for: .openCoverageFindVendor)) { note in
+                guard let systemName = note.userInfo?["system_name"] as? String else { return }
+                navigationPath = NavigationPath()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    findVendorItem = VendorActionItem(systemName: systemName)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openCoverageAddVendor)) { note in
+                guard let systemName = note.userInfo?["system_name"] as? String else { return }
+                navigationPath = NavigationPath()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    addVendorItem = VendorActionItem(systemName: systemName)
+                }
+            }
             .fullScreenCover(isPresented: $showMergeResolution) {
                 if let preview = mergePreviewResponse,
                    let requestId = pendingMergeRequest?["id"] as? String {
@@ -983,9 +1011,14 @@ struct DashboardView: View {
                 activeVendorCount: viewModel.activeVendorCount,
                 nextVisit: viewModel.nextScheduledService,
                 uncoveredSystemNames: viewModel.uncoveredCoverageItems.map(\.systemName),
+                dismissedCount: viewModel.dismissedCoverageCategories.count,
                 onTap: {
                     Haptics.light()
-                    navigationPath.append("maintenance")
+                    // Round 3 (May 2026): route to the focused coverage view
+                    // instead of the property-scoped MaintenanceHubView. The
+                    // user's mental model when tapping "Your home is covered"
+                    // is "show me what's covered" — not the task queue.
+                    navigationPath.append("coverage")
                 },
                 onFindVendor: {
                     Haptics.medium()

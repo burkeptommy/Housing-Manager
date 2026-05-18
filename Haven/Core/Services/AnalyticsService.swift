@@ -122,6 +122,10 @@ enum AnalyticsEvent: String {
     /// Coverage gap. `months` payload carries the snooze duration
     /// (3 / 6 / 12 / 36) so we can see which durations users pick.
     case coverageItemSnoozed = "coverage_item_snoozed"
+    /// Round 3 (May 2026) — "Restore" tap in CoverageView's SNOOZED
+    /// section. Pulls a previously-dismissed category back into the
+    /// active NEEDS A VENDOR list.
+    case coverageItemRestored = "coverage_item_restored"
     /// Phase 54B — handyman punch list analytics.
     case handymanPunchItemAdded = "handyman_punch_item_added"
     case handymanPunchItemRemoved = "handyman_punch_item_removed"

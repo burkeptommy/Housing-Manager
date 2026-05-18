@@ -23,6 +23,7 @@
 		0326FD44FCE080733A4C44E1 /* CadenceSuggestionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D1F12E86441667044EB0CA /* CadenceSuggestionCard.swift */; };
 		036A7C0D59B66531701BEB29 /* PostQuizVendorDelegationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D14107FB62C5DAF2C386909 /* PostQuizVendorDelegationSheet.swift */; };
 		038CF652E7729B5C165541F7 /* ScenarioInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9012FA4EC01B35BA7E18DE0D /* ScenarioInputView.swift */; };
+		03ECBB6E3A8B2572B479EFCF /* CoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D1CBC659B112EFF610EB4A2 /* CoverageView.swift */; };
 		0428E083B15B3ABE554BD130 /* PropertyDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E68BAC14F9D97FFE5C7B429 /* PropertyDetailViewModel.swift */; };
 		042CB79C3DC8D6E009DDC2F7 /* VendorScheduleStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A186CE2A32E3F44ACD44049A /* VendorScheduleStrip.swift */; };
 		046687F3BFCD17675067C969 /* HomeAssessmentSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A5B5010F96AEA87C5D406C /* HomeAssessmentSheets.swift */; };
@@ -836,6 +837,7 @@
 		E8D9DE977462730A5C637EDF /* PropertyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */; };
 		E928DC6DA425315A8A35198F /* ReBookChezHandymanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BF95AD2500F28695B6944E1 /* ReBookChezHandymanCard.swift */; };
 		E94F05549E0C8276D54AE19A /* RoutineSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6C3D46692851751F6A5572 /* RoutineSeeder.swift */; };
+		E9AB20C8A86A25FCC0B34E1A /* CoverageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D1CBC659B112EFF610EB4A2 /* CoverageView.swift */; };
 		E9D74841D67AEA6E14554262 /* HavenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32EA73709C3E322D4BD3954 /* HavenApp.swift */; };
 		EA1B8A078E31DA26613CDD91 /* VINScannerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A79F1CBC5C229985B274954 /* VINScannerSheet.swift */; };
 		EA3F79997F4787B9D43DFCF8 /* ChezRequestDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B0859BC2304D638726648EE /* ChezRequestDetailViewModel.swift */; };
@@ -960,6 +962,7 @@
 		0BF95AD2500F28695B6944E1 /* ReBookChezHandymanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReBookChezHandymanCard.swift; sourceTree = "<group>"; };
 		0C974A2E1B5CDD0A6A822DD8 /* SubscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionView.swift; sourceTree = "<group>"; };
 		0D0451B033C02044D1EDA105 /* OnboardingSteps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSteps.swift; sourceTree = "<group>"; };
+		0D1CBC659B112EFF610EB4A2 /* CoverageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverageView.swift; sourceTree = "<group>"; };
 		0DB386522CE4AF7EE8845F7F /* InviteResultConfirmationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteResultConfirmationCard.swift; sourceTree = "<group>"; };
 		0EE909F83D728399C6776DEA /* PropertyDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDetailView.swift; sourceTree = "<group>"; };
 		0F5239A1D6C6A2839467DD32 /* TaskRoutingPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskRoutingPicker.swift; sourceTree = "<group>"; };
@@ -1824,6 +1827,7 @@
 			isa = PBXGroup;
 			children = (
 				DDFD67E18CB39D83E24998DA /* Components */,
+				A4445472470AABF878C4DDA6 /* Views */,
 				ECE835BCE77ED8E444413FFC /* ActivityLogView.swift */,
 				F676C1BCF5799F544342A088 /* AddressCompletionSheet.swift */,
 				1BD17A1F78FA47CF93E12C47 /* DashboardView.swift */,
@@ -2021,6 +2025,14 @@
 				AD37ABE3A51A3F657F826F50 /* YearAtAGlanceCard.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		A4445472470AABF878C4DDA6 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				0D1CBC659B112EFF610EB4A2 /* CoverageView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		A4793901DBD400C328F644C8 /* Models */ = {
@@ -2719,6 +2731,7 @@
 				D6C24B5E0149330101E43C69 /* ContractorPickerSheet.swift in Sources */,
 				D6343234A3E4CFB2317F5211 /* ContractorViewModel.swift in Sources */,
 				1F39207381ECD6E8E904428C /* CostTierView.swift in Sources */,
+				03ECBB6E3A8B2572B479EFCF /* CoverageView.swift in Sources */,
 				E33BB6002DCDC5BE5B6682F0 /* CoveredDriverPickerSheet.swift in Sources */,
 				0481BDDFE4978139AC4B4263 /* DashboardView.swift in Sources */,
 				18E8E8B52A410592926204CA /* DashboardViewModel.swift in Sources */,
@@ -3186,6 +3199,7 @@
 				5931E0623E891998A620F46B /* ContractorPickerSheet.swift in Sources */,
 				733174286991BA1825C504F2 /* ContractorViewModel.swift in Sources */,
 				5FF06B131D765ED5F02B3E89 /* CostTierView.swift in Sources */,
+				E9AB20C8A86A25FCC0B34E1A /* CoverageView.swift in Sources */,
 				542AD47334E80DE75E6DD03F /* CoveredDriverPickerSheet.swift in Sources */,
 				1F79A512D610636196ED2F3F /* DashboardView.swift in Sources */,
 				986B7A568D88ABEE7B3A4936 /* DashboardViewModel.swift in Sources */,

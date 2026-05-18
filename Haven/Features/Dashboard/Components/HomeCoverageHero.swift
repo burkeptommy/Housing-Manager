@@ -11,6 +11,12 @@ struct HomeCoverageHero: View {
     let activeVendorCount: Int
     let nextVisit: (vendorName: String, date: String, taskTitle: String)?
     let uncoveredSystemNames: [String]
+    /// Round 3 (May 2026): number of coverage categories the user has
+    /// dismissed (permanent "Not applicable") or snoozed ("Remind me
+    /// later"). Renders as a small "X categories you set aside · Review →"
+    /// line below the hero so dismissed work doesn't disappear from
+    /// the homeowner's view. Defaults 0 so legacy callers compile.
+    var dismissedCount: Int = 0
     let onTap: () -> Void
     let onFindVendor: () -> Void
 
@@ -104,7 +110,7 @@ struct HomeCoverageHero: View {
                     Text("Your home is covered")
                         .font(HavenTypography.fraunces(size: 20, weight: 700))
                         .foregroundStyle(HavenColors.textOnNavy)
-                    Text("\(coveredCount) of \(totalCount) systems are covered")
+                    Text("\(coveredCount) of \(totalCount) service categories are covered")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textOnNavy.opacity(0.7))
                 }
@@ -114,7 +120,11 @@ struct HomeCoverageHero: View {
                 nextServiceRow(next)
             }
 
-            Text("Covered means Chez knows who services the system, when the work happens, and how to track it.")
+            if dismissedCount > 0 {
+                dismissedTallyRow
+            }
+
+            Text("Covered means Chez knows who services the category, when the work happens, and how to track it.")
                 .font(HavenTypography.uiCaption)
                 .foregroundStyle(HavenColors.textOnNavy.opacity(0.62))
         }
@@ -146,7 +156,7 @@ struct HomeCoverageHero: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(coveredCount) of \(totalCount) systems are covered")
+                    Text("\(coveredCount) of \(totalCount) service categories are covered")
                         .font(HavenTypography.fraunces(size: 20, weight: 700))
                         .foregroundStyle(HavenColors.textOnNavy)
                     Text("\(uncoveredCount) need a vendor before Chez can manage them")
@@ -157,6 +167,10 @@ struct HomeCoverageHero: View {
 
             if let next = nextVisit {
                 nextServiceRow(next)
+            }
+
+            if dismissedCount > 0 {
+                dismissedTallyRow
             }
 
             if !uncoveredSystemNames.isEmpty {
@@ -186,6 +200,26 @@ struct HomeCoverageHero: View {
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textOnNavy.opacity(0.62))
             }
+        }
+    }
+
+    /// Round 3 — small "you set these aside" callout below the hero so
+    /// dismissed coverage categories stay visible from the dashboard
+    /// instead of vanishing silently. Tap routes into the focused
+    /// CoverageView (same `onTap` as the card body — the destination
+    /// renders a SNOOZED OR DISMISSED section with Restore actions).
+    private var dismissedTallyRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "tray.full")
+                .font(.system(size: 12))
+                .foregroundStyle(HavenColors.textOnNavy.opacity(0.5))
+            Text("\(dismissedCount) categor\(dismissedCount == 1 ? "y" : "ies") set aside")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textOnNavy.opacity(0.7))
+            Spacer()
+            Text("Review →")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textOnNavy.opacity(0.9))
         }
     }
 
