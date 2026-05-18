@@ -317,42 +317,25 @@ final class DocumentUploadManager: ObservableObject {
                 }
             }
 
-            // Detect quotes/estimates (FUTURE work) for project linking
-            let quoteCategories = ["Contractor Quote", "Repair Estimate"]
-            let isQuote = quoteCategories.contains(categoryValue)
-
-            // Step 7: Create inbox item for the activity feed
-            let vehicleCategories = ["Auto Insurance", "Vehicle Title"]
-            let isVehicleDoc = vehicleCategories.contains(categoryValue)
-            let needsAction = isInvoice || isVehicleDoc || isQuote
-
-            var inboxSummary = analysis.summary
-            var inboxType = "document_stored"
-            var actionType: String? = nil
-
-            if isQuote {
-                inboxSummary = "Contractor quote detected. Create a project or add to an existing one."
-                inboxType = "contractor_quote"
-                actionType = "quote_received"
-            } else if isVehicleDoc {
-                inboxSummary = "Vehicle document detected. Review to link to your vehicles."
-                actionType = "review_vehicle_doc"
-            } else if isInvoice {
-                inboxSummary = "Invoice detected. Scan to update maintenance tasks and systems."
-                actionType = "review_invoice"
+            // Route quotes / invoices / vehicle docs into the inbox so the
+            // user gets a needs-action prompt. The mapping lives in
+            // `InboxItemFromDocument` so the foreground upload path
+            // (`DocumentUploadViewModel`) and this background path stay
+            // in sync. Errors no longer get swallowed by `try?` — silent
+            // failures here are how the Property-tab upload bug shipped.
+            do {
+                try await InboxItemFromDocument.create(
+                    householdId: householdId,
+                    documentId: doc.id,
+                    title: aiTitle,
+                    attachmentFilename: item.fileName,
+                    categoryValue: categoryValue,
+                    analysisSummary: analysis.summary,
+                    db: db
+                )
+            } catch {
+                print("[UploadManager] inbox routing failed for \(item.fileName): \(error)")
             }
-
-            try? await db.createInboxItem(
-                householdId: householdId,
-                type: inboxType,
-                title: aiTitle,
-                summary: inboxSummary,
-                relatedDocumentId: doc.id,
-                needsAction: needsAction,
-                actionType: actionType,
-                attachmentFilename: item.fileName
-            )
-            NotificationCenter.default.post(name: .inboxItemUpdated, object: nil)
 
         } catch {
             queue[index].error = error.localizedDescription

@@ -176,6 +176,12 @@ struct FoundationalAnswers: Codable, Equatable {
 
     /// Q24 vehicles — VINs and basic info
     var vehicles: [FoundationalVehicle]
+    /// Round 2 (May 2026): explicit "I'll add cars later" breadcrumb.
+    /// Distinguishes the user who actively skipped vehicles from the
+    /// user who just tapped Next without engaging. Optional so
+    /// existing persisted state (without the field) decodes cleanly
+    /// — nil and false both mean "not explicitly skipped."
+    var vehiclesSkipped: Bool?
 
     /// Q26 insurance carriers
     var autoInsuranceCarrier: String?
@@ -198,6 +204,7 @@ struct FoundationalAnswers: Codable, Equatable {
         self.topPriority = nil
         self.preferenceTier = nil
         self.vehicles = []
+        self.vehiclesSkipped = nil
         self.autoInsuranceCarrier = nil
         self.homeInsuranceCarrier = nil
         self.trashPickupDays = []

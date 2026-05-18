@@ -12,56 +12,132 @@ import PhotosUI
 
 struct AssessmentRescheduleSheet: View {
     let assessment: HomeAssessmentRow
-    let onSubmit: (String?) async -> Void
+    /// Round 2 (May 2026): signature gained a `preferredDates` payload
+    /// so the homeowner can actually PROPOSE new dates instead of just
+    /// asking Chez to coordinate. Backwards-compatible because the only
+    /// caller (DashboardView) is being updated alongside.
+    let onSubmit: (_ notes: String?, _ preferredDates: [String]?) async -> Void
 
+    @State private var primaryDate: Date = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+    @State private var includeBackup: Bool = false
+    @State private var backupDate: Date = Calendar.current.date(byAdding: .day, value: 10, to: Date()) ?? Date()
     @State private var notes: String = ""
     @State private var isSubmitting = false
     @Environment(\.dismiss) private var dismiss
 
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withFullDate]
+        return f
+    }()
+
+    private var earliestSelectableDate: Date {
+        Calendar.current.startOfDay(for: Date())
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Need to move your visit?")
-                    .font(HavenTypography.title2)
-                Text("Tell Chez when works better. We'll get back to you with a new window.")
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textSecondary)
-
-                TextEditor(text: $notes)
-                    .frame(minHeight: 120)
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(HavenColors.creamLight)
-                    )
-
-                Button {
-                    Task {
-                        isSubmitting = true
-                        await onSubmit(notes.isEmpty ? nil : notes)
-                        isSubmitting = false
-                        dismiss()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Need to move your visit?")
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("Propose a new date and we'll work to lock it in. Chez handles the back-and-forth with the handyman team.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                } label: {
-                    HStack {
-                        if isSubmitting { ProgressView().tint(HavenColors.textOnAction) }
-                        Text("Send to Chez")
-                            .font(HavenTypography.uiButton)
-                            .foregroundStyle(HavenColors.textOnAction)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("PREFERRED DATE")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        DatePicker(
+                            "Preferred date",
+                            selection: $primaryDate,
+                            in: earliestSelectableDate...,
+                            displayedComponents: [.date]
+                        )
+                        .labelsHidden()
+                        .datePickerStyle(.graphical)
+                        .tint(HavenColors.action)
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(HavenColors.creamLight)
+                        )
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
-                            .fill(HavenColors.action)
-                    )
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle(isOn: $includeBackup) {
+                            Text("Offer a backup date")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                        .tint(HavenColors.action)
+
+                        if includeBackup {
+                            DatePicker(
+                                "Backup date",
+                                selection: $backupDate,
+                                in: earliestSelectableDate...,
+                                displayedComponents: [.date]
+                            )
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            .tint(HavenColors.action)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ANYTHING WE SHOULD KNOW?")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        TextEditor(text: $notes)
+                            .frame(minHeight: 88)
+                            .padding(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(HavenColors.creamLight)
+                            )
+                    }
+
+                    Button {
+                        Task {
+                            isSubmitting = true
+                            var dates: [String] = [Self.isoFormatter.string(from: primaryDate)]
+                            if includeBackup {
+                                dates.append(Self.isoFormatter.string(from: backupDate))
+                            }
+                            await onSubmit(
+                                notes.isEmpty ? nil : notes,
+                                dates
+                            )
+                            isSubmitting = false
+                            dismiss()
+                        }
+                    } label: {
+                        HStack {
+                            if isSubmitting { ProgressView().tint(HavenColors.textOnAction) }
+                            Text("Send to Chez")
+                                .font(HavenTypography.uiButton)
+                                .foregroundStyle(HavenColors.textOnAction)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                                .fill(HavenColors.action)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSubmitting)
                 }
-                .buttonStyle(.plain)
-                .disabled(isSubmitting)
-
-                Spacer()
+                .padding(20)
             }
-            .padding(20)
             .navigationTitle("Reschedule")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

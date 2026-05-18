@@ -27,6 +27,11 @@ struct InvestmentSummaryCard: View {
     /// Phase 18g — when the source is `ai_comps`, tapping the info icon
     /// beneath the value reveals Claude's reasoning paragraph in a sheet.
     @State private var showAIReasoning = false
+    /// Tapping the data-provenance icon under the value caption opens a
+    /// short explainer of where the estimate comes from (ATTOM / RentCast /
+    /// other public-records sources). Answers "what are you using for that
+    /// assessment?" without making the user dig.
+    @State private var showValuationSourceInfo = false
     /// Build 84 — drives the inline loading state on the "Refresh from
     /// public records" empty-state button while the ATTOM lookup is in flight.
     @State private var isRefreshingPublicRecords: Bool = false
@@ -109,6 +114,17 @@ struct InvestmentSummaryCard: View {
             && (property.estimatedValueReasoning?.isEmpty == false)
     }
 
+    /// Show the data-provenance info icon on every non-manual source.
+    /// Manual values are the user's own — no explainer needed. AI-comps
+    /// sources still get the icon alongside the existing AI reasoning
+    /// icon because the questions are different: AI reasoning answers
+    /// "how did the model arrive at this number," data provenance
+    /// answers "where does the underlying data come from."
+    private var hasValuationSourceInfo: Bool {
+        guard let source = property.estimatedValueSource else { return false }
+        return source != "manual"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
             Text("INVESTMENT SUMMARY")
@@ -159,6 +175,9 @@ struct InvestmentSummaryCard: View {
         .sheet(isPresented: $showAIReasoning) {
             aiReasoningSheet
         }
+        .sheet(isPresented: $showValuationSourceInfo) {
+            valuationSourceSheet
+        }
     }
 
     // Phase 18g — sheet that explains how the AI value was derived. Shows
@@ -207,6 +226,76 @@ struct InvestmentSummaryCard: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { showAIReasoning = false }
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    // Data-provenance explainer — answers "what are you using for that
+    // assessment" without forcing the user to ask. Mirrors `aiReasoningSheet`
+    // structure: NavigationStack → ScrollView → Done toolbar, medium detent.
+    private var valuationSourceSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        Text("PRIMARY SOURCE")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("ATTOM Data Solutions")
+                            .font(HavenTypography.fraunces(size: 20, weight: 600))
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("A B2B real-estate data provider used by mortgage originators and financial-planning tools like Quicken and Mint. ATTOM blends public records, assessor data, and recent comparable sales to produce its Automated Valuation Model (AVM).")
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Divider().overlay(HavenColors.beige300)
+
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        Text("FALLBACK SOURCE")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("RentCast")
+                            .font(HavenTypography.fraunces(size: 20, weight: 600))
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("If ATTOM doesn't have your address, we fall back to RentCast, which sources from MLS listings and broker feeds.")
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Divider().overlay(HavenColors.beige300)
+
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        Text("WHY THIS MIGHT DIFFER FROM ZILLOW OR REDFIN")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("Zillow and Redfin lean heavily on MLS listing volume, which can be thin in low-turnover neighborhoods. ATTOM weights closed sales and tax-assessor data more directly. Neither method is the definitive answer — that's why we show a range below the headline number, so the uncertainty stays visible.")
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Text("This is an estimate, not an appraisal. For an exact value, consult a licensed real estate appraiser.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .padding(.top, HavenTheme.spacing8)
+                }
+                .padding(HavenTheme.pageMargin)
+            }
+            .background(HavenColors.background)
+            .navigationTitle("Where this comes from")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showValuationSourceInfo = false }
                         .foregroundStyle(HavenColors.textPrimary)
                 }
             }
@@ -276,6 +365,21 @@ struct InvestmentSummaryCard: View {
                                     .foregroundStyle(HavenColors.navy700)
                             }
                             .buttonStyle(.plain)
+                        }
+                        // Data-provenance icon — opens the "Where this comes
+                        // from" sheet explaining ATTOM / RentCast / public
+                        // records. Hidden for manual values.
+                        if hasValuationSourceInfo {
+                            Button {
+                                Haptics.light()
+                                showValuationSourceInfo = true
+                            } label: {
+                                Image(systemName: "questionmark.circle")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(HavenColors.navy700)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Where this value comes from")
                         }
                     }
                     // Phase 95 — confidence chip directly under the source

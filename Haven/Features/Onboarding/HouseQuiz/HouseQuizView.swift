@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Identifiable payload for the "Why we ask" sheet driven by `.sheet(item:)`.
+/// Pairs the question id (uniqueness key) with the rationale text the sheet
+/// renders. Kept fileprivate so it doesn't leak into the broader namespace.
+fileprivate struct WhyAskedSheetData: Identifiable {
+    let questionId: String
+    let text: String
+    var id: String { questionId }
+}
+
 /// Full-screen modal: walks the user through the 30-question House Quiz with
 /// per-answer feedback, milestone fun-facts, save-for-later, skip-forever,
 /// and document upload bypass.
@@ -44,6 +53,16 @@ struct HouseQuizView: View {
     @State private var showSaveForLaterConfirm = false
     @State private var showSkipForeverConfirm = false
     @State private var showDocumentUpload = false
+    /// One-time security reassurance sheet shown before the first document
+    /// upload in the quiz. Gated by `hasSeenQuizSecurityReassurance`
+    /// UserDefaults flag. On dismiss with `pendingUploadAfterSecurity`
+    /// set, the document upload sheet auto-opens so the user lands in
+    /// the upload flow without a second tap.
+    @State private var showSecurityReassurance = false
+    @State private var pendingUploadAfterSecurity = false
+    /// Driven by tapping the "Why we ask" info icon next to a question
+    /// title. Non-nil presents a sheet with the question's rationale.
+    @State private var whyAskedSheet: WhyAskedSheetData? = nil
     @State private var pendingProviderForAnswer: String?
 
     /// Q28 expanded household-type selection. nil until the user picks couple
@@ -606,6 +625,47 @@ struct HouseQuizView: View {
                     )
                 }
             }
+            // Security reassurance — fires once before the first document
+            // upload in the quiz. Sets the seen flag + chains into the
+            // upload sheet via `onDismiss` so the user lands in upload
+            // without a second tap.
+            .sheet(isPresented: $showSecurityReassurance, onDismiss: {
+                if pendingUploadAfterSecurity {
+                    pendingUploadAfterSecurity = false
+                    showDocumentUpload = true
+                }
+            }) {
+                SecurityReassuranceCard(onContinue: {
+                    UserDefaults.standard.set(true, forKey: Self.securityReassuranceSeenKey)
+                    pendingUploadAfterSecurity = true
+                    showSecurityReassurance = false
+                })
+            }
+            // "Why we ask" rationale sheet, driven by tapping the info
+            // icon next to a question title. Medium detent so it sits
+            // alongside the question rather than fully covering it.
+            .sheet(item: $whyAskedSheet) { data in
+                NavigationStack {
+                    ScrollView {
+                        Text(data.text)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(HavenTheme.pageMargin)
+                    }
+                    .background(HavenColors.background)
+                    .navigationTitle("Why we ask")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { whyAskedSheet = nil }
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                    }
+                }
+                .presentationDetents([.medium])
+            }
             // Phase 85 — Self-serve walk-through full-screen cover.
             // Triggered from the path-decision screen's "Keep going"
             // tap target. On dismiss, the walk-through view marks
@@ -710,6 +770,20 @@ struct HouseQuizView: View {
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active, viewModel.hasUnsyncedAnswers else { return }
             Task { await viewModel.retryPendingPersist() }
+        }
+    }
+
+    /// UserDefaults key gating the one-time security reassurance sheet.
+    private static let securityReassuranceSeenKey = "hasSeenQuizSecurityReassurance"
+
+    /// Open the document upload sheet, gating on the security reassurance
+    /// sheet the first time. Subsequent uploads in the quiz go straight
+    /// to `DocumentUploadView`.
+    private func requestDocumentUpload() {
+        if UserDefaults.standard.bool(forKey: Self.securityReassuranceSeenKey) {
+            showDocumentUpload = true
+        } else {
+            showSecurityReassurance = true
         }
     }
 
@@ -1135,10 +1209,30 @@ struct HouseQuizView: View {
                 // Falls back to the question's fallbackTitle when any
                 // token can't be resolved. Tokens are never shipped as
                 // literal braces to the UI.
-                Text(q.personalizedTitle(using: viewModel.propertyFactBundle))
-                    .font(HavenTypography.fraunces(size: 24, weight: 600))
-                    .foregroundStyle(HavenColors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .top, spacing: 8) {
+                    Text(q.personalizedTitle(using: viewModel.propertyFactBundle))
+                        .font(HavenTypography.fraunces(size: 24, weight: 600))
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // "Why we ask" affordance — only rendered when the
+                    // question definition supplies a `whyAsked` rationale.
+                    // Tap opens a small sheet that explains the purpose.
+                    if let why = q.whyAsked {
+                        Button {
+                            Haptics.light()
+                            whyAskedSheet = WhyAskedSheetData(questionId: q.id, text: why)
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(HavenColors.navy700)
+                                .padding(.top, 4)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Why we ask")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let subtitle = q.subtitle {
                     Text(subtitle)
@@ -1165,7 +1259,7 @@ struct HouseQuizView: View {
                 if q.documentUploadCategory != nil {
                     Button {
                         Haptics.light()
-                        showDocumentUpload = true
+                        requestDocumentUpload()
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "doc.viewfinder")
@@ -3149,7 +3243,7 @@ struct HouseQuizView: View {
                     Task { await viewModel.recordAnswer("skipped") }
                 },
                 onInsuranceUpload: {
-                    showDocumentUpload = true
+                    requestDocumentUpload()
                 }
             )
         }
@@ -5117,6 +5211,17 @@ struct HouseQuizView: View {
                         try? await DatabaseService.shared.dismissCategory(
                             householdId: viewModel.property.householdId,
                             category: item.id
+                        )
+                    }
+                },
+                onSnoozeItem: { item, months in
+                    coverageUncovered.removeAll { $0.id == item.id }
+                    let until = Calendar.current.date(byAdding: .month, value: months, to: Date()) ?? Date()
+                    Task {
+                        try? await DatabaseService.shared.snoozeCategory(
+                            householdId: viewModel.property.householdId,
+                            category: item.id,
+                            until: until
                         )
                     }
                 },

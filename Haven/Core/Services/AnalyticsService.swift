@@ -118,6 +118,10 @@ enum AnalyticsEvent: String {
     /// want to see anymore (e.g. a legacy "Washer & Dryer" system that
     /// shouldn't be surfaced as needing a dedicated pro).
     case coverageItemDismissed = "coverage_item_dismissed"
+    /// Round 2 (May 2026) — "Remind me later" snooze on a Vendor
+    /// Coverage gap. `months` payload carries the snooze duration
+    /// (3 / 6 / 12 / 36) so we can see which durations users pick.
+    case coverageItemSnoozed = "coverage_item_snoozed"
     /// Phase 54B — handyman punch list analytics.
     case handymanPunchItemAdded = "handyman_punch_item_added"
     case handymanPunchItemRemoved = "handyman_punch_item_removed"
@@ -464,6 +468,12 @@ enum AnalyticsEvent: String {
     /// path complete event so we can track usage of the
     /// post-onboarding revise path.
     case foundationalAnswersRevised = "foundational_answers_revised"
+    /// Round 2 (May 2026) — fired when the homeowner taps the
+    /// explicit Skip button on the foundational vehicles step.
+    /// Distinct from "just tapped Next with no vehicles," which
+    /// leaves no breadcrumb. Used for drop-off analytics on the
+    /// 8-step foundational form.
+    case foundationalVehiclesSkipped = "foundational_vehicles_skipped"
     /// Phase 95 (gap #40) — fired when the homeowner taps a
     /// category in `RecommendedSystemsView`. `category` payload
     /// holds the canonical category key, `tier` is universal /

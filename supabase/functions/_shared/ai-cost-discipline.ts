@@ -106,6 +106,14 @@ export interface AiCallOptions {
   user_id?: string | null;
   /// Per-call temperature (default leaves Anthropic default in place).
   temperature?: number;
+  /// Optional Anthropic tools. When non-empty, the helper forwards them
+  /// to the Messages API and surfaces tool_use blocks back to the caller
+  /// via `content_blocks` + `stop_reason`. Callers are responsible for
+  /// running their own agentic loop: execute the tool, append a
+  /// `tool_result` message, and call the helper again. The helper does
+  /// not loop on its own — that decision (and the loop bound) belongs
+  /// to the call site.
+  tools?: any[];
 }
 
 export interface AiCallResult {
@@ -115,6 +123,14 @@ export interface AiCallResult {
   output_tokens: number;
   cache_read_tokens: number;
   cache_creation_tokens: number;
+  /// Raw content blocks from the Anthropic response. Most callers can
+  /// ignore this and just read `.text`. Tool-using callers need the
+  /// full array to extract `tool_use` blocks (id, name, input).
+  content_blocks: any[];
+  /// Anthropic's stop reason. "end_turn" / "max_tokens" mean the
+  /// assistant finished; "tool_use" means the caller needs to execute
+  /// the tool(s) and continue the loop.
+  stop_reason: string | null;
 }
 
 let _dailyTotalUsd: number | null = null;
@@ -201,6 +217,7 @@ export async function callClaudeWithDiscipline(opts: AiCallOptions): Promise<AiC
       };
       if (systemBlocks) body.system = systemBlocks;
       if (opts.temperature !== undefined) body.temperature = opts.temperature;
+      if (opts.tools && opts.tools.length > 0) body.tools = opts.tools;
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "x-api-key": opts.apiKey,
@@ -216,7 +233,8 @@ export async function callClaudeWithDiscipline(opts: AiCallOptions): Promise<AiC
       });
       if (resp.ok) {
         const data = await resp.json() as {
-          content?: Array<{ text?: string }>;
+          content?: Array<any>;
+          stop_reason?: string;
           usage?: {
             input_tokens?: number;
             output_tokens?: number;
@@ -224,7 +242,15 @@ export async function callClaudeWithDiscipline(opts: AiCallOptions): Promise<AiC
             cache_creation_input_tokens?: number;
           };
         };
-        const text = data.content?.[0]?.text?.trim() ?? "";
+        const contentBlocks: any[] = Array.isArray(data.content) ? data.content : [];
+        // Concatenate every `text` block — tool_use responses can
+        // sandwich text around a tool call, and earlier code that only
+        // read content[0].text silently dropped the rest.
+        const text = contentBlocks
+          .filter((b: any) => b?.type === "text" && typeof b?.text === "string")
+          .map((b: any) => b.text)
+          .join("")
+          .trim();
         const usage = data.usage ?? {};
         const result: AiCallResult = {
           text,
@@ -233,6 +259,8 @@ export async function callClaudeWithDiscipline(opts: AiCallOptions): Promise<AiC
           output_tokens: usage.output_tokens ?? 0,
           cache_read_tokens: usage.cache_read_input_tokens ?? 0,
           cache_creation_tokens: usage.cache_creation_input_tokens ?? 0,
+          content_blocks: contentBlocks,
+          stop_reason: data.stop_reason ?? null,
         };
         // Fire-and-forget telemetry.
         if (opts.supabase) {

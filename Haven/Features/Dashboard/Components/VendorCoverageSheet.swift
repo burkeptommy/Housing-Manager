@@ -26,6 +26,12 @@ struct VendorCoverageSheet: View {
     /// Fired when the user swipes or taps "Not applicable, dismiss"
     /// on a gap card. Parent persists to `dismissed_categories`.
     var onDismissItem: ((VendorCoverageItem) -> Void)?
+    /// Round 2 (May 2026): "Remind me later" snooze callback. Parent
+    /// upserts a `dismissed_categories` row with `snoozed_until` set so
+    /// the gap resurfaces when the timestamp passes. Distinct from
+    /// `onDismissItem` (permanent dismissal). Second arg is the number
+    /// of months to snooze.
+    var onSnoozeItem: ((VendorCoverageItem, Int) -> Void)?
     /// Phase 56.1: Fired from the celebratory empty state's
     /// "Manage all your vendors" link. Parent dismisses the sheet and
     /// routes to Property → Contacts.
@@ -36,6 +42,9 @@ struct VendorCoverageSheet: View {
     /// Local optimistic filter so the swiped/tapped row disappears
     /// immediately, without waiting for the dismissal round-trip.
     @State private var locallyDismissed: Set<String> = []
+    /// Active snooze-duration picker, keyed by item id. Non-nil shows
+    /// the picker sheet for that specific gap.
+    @State private var snoozeTargetItem: VendorCoverageItem? = nil
 
     private var visibleUncovered: [VendorCoverageItem] {
         uncoveredItems.filter { !locallyDismissed.contains($0.id) }
@@ -76,7 +85,32 @@ struct VendorCoverageSheet: View {
                     }
                 }
             }
+            .confirmationDialog(
+                "Remind me later",
+                isPresented: Binding(
+                    get: { snoozeTargetItem != nil },
+                    set: { if !$0 { snoozeTargetItem = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: snoozeTargetItem
+            ) { item in
+                Button("In 3 months") { applySnooze(item: item, months: 3) }
+                Button("In 6 months") { applySnooze(item: item, months: 6) }
+                Button("In 1 year") { applySnooze(item: item, months: 12) }
+                Button("In 3 years") { applySnooze(item: item, months: 36) }
+                Button("Cancel", role: .cancel) { snoozeTargetItem = nil }
+            } message: { item in
+                Text("When should we bring up \(item.systemName) again?")
+            }
         }
+    }
+
+    private func applySnooze(item: VendorCoverageItem, months: Int) {
+        _ = withAnimation {
+            locallyDismissed.insert(item.id)
+        }
+        onSnoozeItem?(item, months)
+        snoozeTargetItem = nil
     }
 
     // MARK: - Header
@@ -177,26 +211,43 @@ struct VendorCoverageSheet: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-                Haptics.light()
-                _ = withAnimation {
-                    locallyDismissed.insert(item.id)
+            // Round 2 (May 2026): two tertiary affordances side-by-side
+            // for the homeowner's "I don't want this gap now" options.
+            // "Remind me later" = temporary snooze for vendors they might
+            // need in the future (e.g. roofer, 3+ years out). "Not
+            // applicable" = permanent dismissal. Both work via the same
+            // `dismissed_categories` row — snooze just adds an expiry.
+            HStack(spacing: HavenTheme.spacing12) {
+                Button {
+                    Haptics.light()
+                    snoozeTargetItem = item
+                } label: {
+                    Text("Remind me later")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
                 }
-                onDismissItem?(item)
-            } label: {
-                // BUG-016 fix: bumped from `textTertiary` (~2.5:1
-                // contrast on tinted card background, below WCAG AA
-                // 4.5:1 floor) to `textSecondary` which passes. Also
-                // renamed "Not applicable, dismiss" → "Not applicable"
-                // so the affordance reads as a statement rather than
-                // a redundant comma-joined instruction.
-                Text("Not applicable")
-                    .font(HavenTypography.uiLabelSmall)
-                    .foregroundStyle(HavenColors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 8)
+                .buttonStyle(.plain)
+
+                Button {
+                    Haptics.light()
+                    _ = withAnimation {
+                        locallyDismissed.insert(item.id)
+                    }
+                    onDismissItem?(item)
+                } label: {
+                    // BUG-016 fix: bumped from `textTertiary` (~2.5:1
+                    // contrast on tinted card background, below WCAG AA
+                    // 4.5:1 floor) to `textSecondary` which passes.
+                    Text("Not applicable")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(HavenTheme.spacing16)
         .background(HavenColors.action.opacity(0.06))

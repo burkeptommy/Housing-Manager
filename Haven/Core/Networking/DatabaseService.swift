@@ -3126,6 +3126,28 @@ final class DatabaseService {
             .execute()
     }
 
+    /// Round 2 (May 2026): "Circle back" / Remind-me-later snooze for
+    /// the Vendor Coverage Sheet. Same underlying table as the
+    /// permanent dismissal but with `snoozed_until` set so the row
+    /// resurfaces when the timestamp passes. Delete-then-insert so
+    /// toggling between Not-applicable and Remind-me-later keeps one
+    /// row per (household, category) instead of accumulating duplicates.
+    func snoozeCategory(householdId: UUID, category: String, until: Date) async throws {
+        try await from("dismissed_categories")
+            .delete()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("category", value: category)
+            .execute()
+        let insert = DismissedCategoryInsert(
+            householdId: householdId,
+            category: category,
+            snoozedUntil: until
+        )
+        try await from("dismissed_categories")
+            .insert(insert)
+            .execute()
+    }
+
     func undismissCategory(category: String) async throws {
         let user = try await fetchCurrentUser()
         guard let householdId = user.householdId else { return }

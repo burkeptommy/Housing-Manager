@@ -3109,21 +3109,52 @@ struct DismissedCategoryRow: Codable, Identifiable {
     let householdId: UUID
     let category: String
     let createdAt: Date?
+    /// Round 2 (May 2026): when set, the row is a temporary snooze
+    /// ("Remind me later") rather than a permanent dismissal
+    /// ("Not applicable"). Resurfaces in the Vendor Coverage sheet
+    /// once `snoozed_until` is in the past. A nil value preserves
+    /// pre-Round-2 permanent-dismissal semantics.
+    let snoozedUntil: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, category
         case householdId = "household_id"
         case createdAt = "created_at"
+        case snoozedUntil = "snoozed_until"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        category = try c.decode(String.self, forKey: .category)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        snoozedUntil = try? c.decodeIfPresent(Date.self, forKey: .snoozedUntil)
+    }
+
+    /// True when the row is a temporary snooze that hasn't yet expired.
+    /// Permanent dismissals (snoozedUntil == nil) always return false.
+    func isActiveSnooze(now: Date = Date()) -> Bool {
+        guard let until = snoozedUntil else { return false }
+        return until > now
     }
 }
 
 struct DismissedCategoryInsert: Codable {
     let householdId: UUID
     let category: String
+    let snoozedUntil: Date?
+
+    init(householdId: UUID, category: String, snoozedUntil: Date? = nil) {
+        self.householdId = householdId
+        self.category = category
+        self.snoozedUntil = snoozedUntil
+    }
 
     enum CodingKeys: String, CodingKey {
         case householdId = "household_id"
         case category
+        case snoozedUntil = "snoozed_until"
     }
 }
 

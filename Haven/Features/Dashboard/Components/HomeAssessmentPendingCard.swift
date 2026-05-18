@@ -221,6 +221,17 @@ struct HomeAssessmentPendingCard: View {
         }
     }
 
+    /// Friendly date line built from `assessment.scheduledAt`. Returns
+    /// `nil` when no date is set so the subtitle can fall back to the
+    /// generic "we'll text you" copy. Format examples: "Saturday, May 24."
+    /// or "Tuesday, June 3."
+    private var formattedScheduledLine: String? {
+        guard let scheduledAt = assessment.scheduledAt else { return nil }
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d"
+        return "Scheduled for \(f.string(from: scheduledAt))."
+    }
+
     private var headline: String {
         switch assessment.status {
         case .pending:
@@ -250,10 +261,29 @@ struct HomeAssessmentPendingCard: View {
     }
 
     private var subtitle: String {
+        // Round 2 feedback (May 2026): the friend reported the card never
+        // shows when the handyman is coming — just "we're assigning" with
+        // no date. When `assessment.scheduledAt` is populated (which can
+        // happen before the status flips from `.pending` to `.scheduled`),
+        // surface the date directly so the homeowner knows the plan.
+        let scheduledLine = formattedScheduledLine
         switch assessment.status {
         case .pending:
-            return "We'll text you the morning of your visit. Free of charge."
+            if let line = scheduledLine {
+                return "\(line) We'll text you the morning of your visit. Free of charge."
+            }
+            // Round 2 (May 2026): the friend on TestFlight Build N saw
+            // "Your handyman is being assigned" with no sense of when.
+            // When `scheduledAt` isn't set yet, give the homeowner an
+            // honest expected window so they're not left wondering
+            // whether a date is coming today or in two weeks. This
+            // matches the SLA we promise in the Chez handyman copy
+            // elsewhere ("usually within 3 business days").
+            return "Usually within 3 business days. We'll text you with the visit date once it's confirmed. Free of charge."
         case .scheduled:
+            if let line = scheduledLine {
+                return "\(line) We'll text you the morning of. No prep needed. Just be home."
+            }
             return "We'll text you the morning of. No prep needed. Just be home."
         case .enRoute:
             return "ETA shortly. They'll capture your systems, vendors, and routines."

@@ -1362,11 +1362,35 @@ struct MaintenanceScheduleView: View {
     /// this bucket — they render under their parent routine on the
     /// Maintenance hub instead. Keeps the "one task, one home" invariant
     /// when the user drills down into the Timeline from the hub.
+    ///
+    /// Hide already-completed-this-cycle rows: when a recurring task has
+    /// been completed (`lastCompletedDate != nil`) and its next due date
+    /// is more than 14 days out, the user just did it and showing it in
+    /// "To Schedule" reads as "you still have to do this" instead of
+    /// "you're done for now." Fresh long-cycle tasks with no completion
+    /// history still surface so they're not invisible until their cycle.
+    /// They reappear in this bucket when `nextDueDate` is within 14 days.
+    /// Explicit stats-pill filters (e.g. "Later") still let users see
+    /// the full set; this only affects the default unfiltered view.
     private var personalBucketTasks: [MaintenanceTaskDBRow] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = Calendar.current.startOfDay(for: .now)
+        let twoWeeksOut = Calendar.current.date(byAdding: .day, value: 14, to: today) ?? today
+
         let base = viewModel.filteredTasks.filter { task in
             if task.parentRoutineId != nil { return false }
             let isVendor = task.assignmentType?.lowercased() == "vendor"
-            if !isVendor { return true }  // personal/either/DIY → always yours
+            if !isVendor {
+                // personal/either/DIY → yours unless completed this cycle and far out
+                if task.lastCompletedDate != nil,
+                   activeStatsPillFilter == nil,
+                   let due = formatter.date(from: task.nextDueDate),
+                   due > twoWeeksOut {
+                    return false
+                }
+                return true
+            }
             // Vendor task: yours only if NOT confirmed
             return !isVendorTaskConfirmed(task)
         }

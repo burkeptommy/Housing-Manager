@@ -203,6 +203,9 @@ struct FoundationalQuestionsForm: View {
                 vehicleRow(index: idx)
             }
             Button {
+                // Adding a vehicle clears any prior explicit-skip state
+                // so the breadcrumb reflects the homeowner's latest intent.
+                answers.vehiclesSkipped = false
                 answers.vehicles.append(FoundationalVehicle(vin: nil, year: nil, make: nil, model: nil))
             } label: {
                 HStack {
@@ -221,6 +224,45 @@ struct FoundationalQuestionsForm: View {
             Text("You can add more later. They stay attached to your household.")
                 .font(HavenTypography.uiLabelSmall)
                 .foregroundStyle(HavenColors.textSecondary)
+
+            // Round 2 (May 2026): the Next button at the bottom of the
+            // form already accepts an empty vehicle list, but tapping it
+            // leaves no record of WHY — was the user actively skipping
+            // or just not engaging? The explicit Skip captures intent so
+            // drop-off analytics can distinguish the two, and the value
+            // surfaces in the homeowner's record as "I'll add cars later"
+            // rather than "didn't answer."
+            if answers.vehicles.isEmpty {
+                Button {
+                    answers.vehiclesSkipped = true
+                    Analytics.track(.foundationalVehiclesSkipped, [:])
+                } label: {
+                    HStack(spacing: 6) {
+                        if answers.vehiclesSkipped == true {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(HavenColors.action)
+                        }
+                        Text(answers.vehiclesSkipped == true ? "I'll add cars later" : "Skip — I'll add cars later")
+                            .font(HavenTypography.uiLabelMedium)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                            .strokeBorder(
+                                answers.vehiclesSkipped == true
+                                    ? HavenColors.action.opacity(0.4)
+                                    : HavenColors.border,
+                                lineWidth: 1
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
         }
     }
 

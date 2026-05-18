@@ -857,8 +857,14 @@ final class HouseQuizViewModel: ObservableObject {
         )
         await persist(answer: answer, for: q)
 
-        // Brief pause so the user sees the chip selection state.
-        try? await Task.sleep(nanoseconds: 350_000_000)
+        // Brief pause so the user sees the chip selection state before
+        // the screen transitions. Dropped from 350ms to 150ms now that
+        // persist() returns synchronously after the local state update
+        // (Round 2 feedback — the friend reported the quiz felt slow
+        // and Q36 didn't seem to auto-advance). 150ms is the sweet
+        // spot: visible enough to register the selection, fast enough
+        // that the next question feels immediate.
+        try? await Task.sleep(nanoseconds: 150_000_000)
 
         // Show feedback if available; otherwise advance.
         if let fb = HouseQuizFeedbackLibrary.feedback(for: q.id, answerId: answerId) {
@@ -910,12 +916,13 @@ final class HouseQuizViewModel: ObservableObject {
 
         // Build 86: brief pause so the user sees the picker row's navy
         // tint + checkmark feedback before the quiz transitions away.
-        // Mirrors the pause `recordAnswer` already has — Tom's wife
-        // reported tapping a provider produced no visual change because
-        // the picker tore down before the row's selected state had time
-        // to render. The visual update happens in
+        // Round 2 (May 2026) — dropped from 350ms to 150ms now that
+        // persist() returns synchronously after the local state update;
+        // the picker's row state lights up immediately and we just
+        // need a short hold so the eye catches it before the transition.
+        // The visual update happens in
         // `UtilityProviderSearchPicker.providerRow` via `tappedProviderId`.
-        try? await Task.sleep(nanoseconds: 350_000_000)
+        try? await Task.sleep(nanoseconds: 150_000_000)
 
         if let fb = HouseQuizFeedbackLibrary.feedback(for: q.id, answerId: "selected") {
             pendingFeedback = fb
@@ -1195,38 +1202,79 @@ final class HouseQuizViewModel: ObservableObject {
     // MARK: - Internals
 
     private func persist(answer: HouseQuizAnswer, for question: HouseQuizQuestion) async {
-        isSaving = true
-        defer { isSaving = false }
-
-        // Apr 7, 2026 (build 82): capture the prior answer BEFORE we
-        // overwrite local state. If the user is CHANGING a previously
-        // answered question (e.g. asphalt → tile roof), we need to run
-        // the reconciler after the new answer is applied so stale
-        // home_systems / maintenance_tasks from the old answer get
-        // cleaned up. Without this, switching answers leaves orphan
-        // tasks in the property — the user ends up with both asphalt
-        // AND tile roof inspections on their schedule. The reconciler
-        // is idempotent and knows how to soft-delete tasks whose
-        // template doesn't match the current confirmed subtype.
+        // Friend-feedback Round 2 (May 2026): the quiz felt slow because
+        // every answer awaited mapper.apply + persistState (~1-3s of
+        // network + DB work) before recordAnswer's caller could advance
+        // the screen. Local state IS updated synchronously, but the
+        // caller couldn't continue until ALL the async work finished —
+        // so even though `state.answers[question.id]` lit up instantly
+        // in memory, the user saw a long pause before the next question.
+        //
+        // The fix splits persist into two phases:
+        //   • applyAnswerLocally — synchronous local state update,
+        //     runs to completion before this function returns.
+        //   • Detached background Task — mapper.apply + persistState +
+        //     completion/change-reconciler logic. Fires while the UI
+        //     advances. The user-facing screen no longer waits on
+        //     network I/O for routine answers.
+        //
+        // The completion path keeps awaiting `finalReconcileTask` via
+        // `loadFinaleTotals` (Build 90 already does this), so the
+        // cinematic reveal still computes off real reconciled totals.
         let priorAnswer = state.answers[question.id]
         let isAnswerChange = priorAnswer != nil
             && (priorAnswer?.answerId != answer.answerId
                 || priorAnswer?.selectedIds != answer.selectedIds
                 || priorAnswer?.customText != answer.customText)
 
-        // 1. Update local state immediately.
+        // Phase A — synchronous local state update. UI reads state.answers
+        // immediately, so the chip / picker / value-meter visually
+        // reflects the new answer before this function returns.
         state.answers[question.id] = answer
         state.savedForLater.removeAll { $0 == question.id }
         state.skipped.removeAll { $0 == question.id }
-
-        // Phase 60.3: accrete the protection meter by the per-question
-        // delta. Only fires on FIRST answer (not when the user edits an
-        // answer they've already locked in) so the meter is monotonic.
         if priorAnswer == nil {
             accreteValueMeter(for: question.id, answer: answer)
         }
 
-        // 2. Fire the answer mapper for DB side-effects. Capture any
+        // Phase B — background work. Kicked off here, not awaited so
+        // persist() returns immediately. The slow mapper apply + JSONB
+        // write run "in parallel" with the caller's advance().
+        //
+        // Threading note: this is `Task {}` (not `Task.detached`) so it
+        // inherits the @MainActor context from the view model. Every
+        // mutation inside `applyAnswerBackgroundWork` is therefore
+        // serialized through MainActor — even when two rapid answers
+        // both spawn a Phase B task, MainActor reentrancy guarantees
+        // the `reconciliationTotals = …merging(…)` read-modify-write
+        // is atomic (no await between read and write inside the
+        // synchronous block on the actor). The network call inside
+        // (`mapper.apply`) yields the actor, but neither task can
+        // corrupt the other's state — only ordering is non-deterministic,
+        // and the union-merge tolerates either order.
+        Task { [weak self] in
+            await self?.applyAnswerBackgroundWork(
+                answer: answer,
+                for: question,
+                priorAnswer: priorAnswer,
+                isAnswerChange: isAnswerChange
+            )
+        }
+    }
+
+    /// The slow part of persist — mapper apply, JSONB write, and the
+    /// completion / change-reconciler branches. Detached from persist's
+    /// hot path so the quiz screen advances immediately on answer tap.
+    private func applyAnswerBackgroundWork(
+        answer: HouseQuizAnswer,
+        for question: HouseQuizQuestion,
+        priorAnswer: HouseQuizAnswer?,
+        isAnswerChange: Bool
+    ) async {
+        isSaving = true
+        defer { isSaving = false }
+
+        // 1. Fire the answer mapper for DB side-effects. Capture any
         //    reconciler changes so the completion summary can show real
         //    numbers without faking them.
         let result = await mapper.apply(question: question, answer: answer)
@@ -1234,7 +1282,7 @@ final class HouseQuizViewModel: ObservableObject {
             reconciliationTotals = reconciliationTotals.merging(result)
         }
 
-        // 3. Persist quiz state JSONB.
+        // 2. Persist quiz state JSONB.
         await persistState()
 
         // 4. Phase 17b — once the user has answered everything, run a

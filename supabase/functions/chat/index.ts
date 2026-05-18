@@ -29,6 +29,148 @@ async function encryptMessage(plaintext: string, keyBase64: string): Promise<str
   return btoa(String.fromCharCode(...combined));
 }
 
+// Round 2 Phase 9b (May 2026): Alfred's single escalation tool. When the
+// homeowner asks Alfred to handle something that needs human action AND
+// has surfaced enough concrete detail (vendor name, task description, or
+// a clear ask), Alfred uses this tool to actually file the concierge
+// request. Without it, Alfred used to generate "I'll send this to your
+// concierge" text with no side effect — the user saw the promise but the
+// admin portal got nothing.
+const alfredTools = [
+  {
+    name: "submit_concierge_request",
+    description: "Escalate the homeowner's request to Chez concierge so a human handles it end-to-end (vendor calls, scheduling, follow-up, etc.). Only call this when the homeowner has EXPLICITLY asked you to take action, OR when the conversation has accumulated enough specifics (vendor, task, dates) that the operator can act without going back to ask. For casual chit-chat or vague asks, do NOT use this tool — instead tell them to tap 'Ask Chez (real person)' in the toolbar menu.",
+    input_schema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          enum: [
+            "find_vendor",
+            "get_quote",
+            "schedule_visit",
+            "coordinate_task",
+            "find_handyman",
+            "general",
+          ],
+          description: "Which Chez request lane this belongs to. find_vendor = find a new pro, get_quote = price a project, schedule_visit = book/move an appointment, coordinate_task = manage between existing vendors, find_handyman = needs the handyman specifically, general = anything else.",
+        },
+        summary: {
+          type: "string",
+          description: "One-sentence headline for the admin queue (under 90 chars).",
+        },
+        description: {
+          type: "string",
+          description: "Full request body: who the homeowner is, what they need, any context from the conversation (vendor names, addresses, dates, dollar amounts). Write it as a brief the operator can act on without re-reading the chat.",
+        },
+      },
+      required: ["category", "summary", "description"],
+    },
+  },
+];
+
+/// Execute a tool call from Alfred. Returns a `{ text, isError }` pair
+/// suitable for inclusion in a `tool_result` content block. Errors are
+/// surfaced to Claude so it can apologize / fall back gracefully rather
+/// than crashing the conversation.
+async function executeAlfredTool(
+  name: string,
+  input: any,
+  ctx: {
+    supabaseUrl: string;
+    serviceRoleKey: string;
+    authHeader: string | null;
+    householdId: string;
+    userId: string | null;
+  }
+): Promise<{ text: string; isError?: boolean }> {
+  if (name !== "submit_concierge_request") {
+    return { text: `Unknown tool: ${name}`, isError: true };
+  }
+
+  const category = typeof input?.category === "string" ? input.category : "general";
+  const summary = typeof input?.summary === "string" ? input.summary.trim() : "";
+  const description = typeof input?.description === "string" ? input.description.trim() : "";
+
+  if (!summary || !description) {
+    return {
+      text: "Could not submit — tool input was missing summary or description. Ask the homeowner to clarify the request and try again.",
+      isError: true,
+    };
+  }
+
+  try {
+    // Forward to chez-concierge with the homeowner's JWT so the
+    // submit action runs as the user. This preserves the existing
+    // auth path — chez-concierge's `submit` handler enforces
+    // household ownership, RLS, push targeting, and the email
+    // backstop. Falling back to service-role would mean
+    // re-implementing all of that here.
+    const conciergeUrl = `${ctx.supabaseUrl}/functions/v1/chez-concierge`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (ctx.authHeader) {
+      headers["Authorization"] = ctx.authHeader;
+    } else {
+      // No JWT available (rare — chat route requires auth) — use
+      // service role as a fallback so submission still works.
+      headers["Authorization"] = `Bearer ${ctx.serviceRoleKey}`;
+      headers["apikey"] = ctx.serviceRoleKey;
+    }
+    // chez-concierge's submit handler resolves the household via the
+    // authenticated user (householdIdForUser), so household_id is not
+    // a top-level field. Extra context goes in the `context` object
+    // where the admin portal can read it.
+    const submitBody = {
+      action: "submit",
+      category,
+      summary,
+      description,
+      context: {
+        source: "alfred_chat",
+        chat_household_id: ctx.householdId,
+      },
+    };
+    const resp = await fetch(conciergeUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(submitBody),
+    });
+    const respText = await resp.text();
+    if (!resp.ok) {
+      console.warn("[chat] chez-concierge submit failed:", resp.status, respText.slice(0, 300));
+      return {
+        text: `Submission failed (status ${resp.status}). Tell the homeowner you couldn't file it from chat and ask them to tap 'Ask Chez (real person)' in the toolbar so they can submit manually.`,
+        isError: true,
+      };
+    }
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(respText);
+    } catch (_e) {
+      // Not JSON — succeed quietly, the row still landed.
+    }
+    // chez-concierge returns `{ ok: true, request: { id, ... } }`.
+    const requestId =
+      parsed?.request?.id ??
+      parsed?.request_id ??
+      parsed?.id ??
+      null;
+    return {
+      text: requestId
+        ? `Concierge request submitted. Reference: ${requestId}. Tell the homeowner it's been sent and they'll hear from the team within 24 business hours.`
+        : "Concierge request submitted. Tell the homeowner it's been sent and they'll hear from the team within 24 business hours.",
+    };
+  } catch (e) {
+    console.warn("[chat] tool execution exception:", e);
+    return {
+      text: "Submission failed with an error. Tell the homeowner to tap 'Ask Chez (real person)' in the toolbar to submit manually.",
+      isError: true,
+    };
+  }
+}
+
 interface ChatRequest {
   message: string;
   conversation_history: Array<{
@@ -154,25 +296,30 @@ serve(async (req: Request) => {
     // Call Claude API
     console.log("Calling Claude API for chat with model claude-sonnet-4-6...");
 
-    // Phase 95 — route through cost-discipline helper. Alfred is the
-    // most likely repeat-fire offender in the iOS app (multi-turn chat
-    // re-sends the full household context every turn). Switching to
-    // haiku-4-5 default + cache_system: true (5-min ephemeral cache
-    // for the dossier injection) cuts per-turn input cost ~90% in
-    // multi-turn conversations.
+    // Round 2 Phase 9b (May 2026): Alfred now has a real tool for
+    // escalating to Chez concierge. Previously Alfred would say "I'll
+    // create a case" without any action firing — the user saw the
+    // promise but nothing landed in the admin portal. The tool routes
+    // through the existing `chez-concierge` Edge Function (submit
+    // action) so every side effect (admin push, SendGrid backstop,
+    // inbox item) fires identically to a homeowner-initiated request.
     //
-    // max_tokens dropped from 2048 → 1024. Most Alfred answers are
-    // 1-3 short paragraphs; 1024 is plenty.
-    const aiResult = await callClaudeWithDiscipline({
+    // Loop bound at 3 iterations to stop runaway tool-use; a single
+    // submit_concierge_request call is the only tool today, so the
+    // typical flow is: turn 1 text → turn 2 tool_use → execute →
+    // turn 3 final text with the concierge ID.
+    const conversationMessages: Array<{ role: "user" | "assistant"; content: any }> = [...messages];
+    let aiResult = await callClaudeWithDiscipline({
       supabase,
       apiKey: anthropicApiKey,
       tag: "chat",
       max_tokens: 1024,
       system: finalSystemPrompt,
       cache_system: true,
-      messages,
+      messages: conversationMessages,
       household_id: body.household_id,
       user_id: userId ?? null,
+      tools: alfredTools,
     });
     if (!aiResult) {
       return new Response(
@@ -183,7 +330,64 @@ serve(async (req: Request) => {
         { status: 502, headers: responseHeaders }
       );
     }
-    const reply = aiResult.text || "I apologize, but I wasn't able to generate a response. Please try again.";
+
+    let toolLoopIterations = 0;
+    while (aiResult && aiResult.stop_reason === "tool_use" && toolLoopIterations < 3) {
+      toolLoopIterations += 1;
+      const toolUses = (aiResult.content_blocks ?? []).filter(
+        (b: any) => b?.type === "tool_use"
+      );
+      if (toolUses.length === 0) break;
+
+      // Append the assistant's mixed text+tool_use turn to the message
+      // history exactly as Anthropic returned it. This is required by
+      // the API contract — tool_result must reference the preceding
+      // assistant content block.
+      conversationMessages.push({
+        role: "assistant",
+        content: aiResult.content_blocks,
+      });
+
+      const toolResults: any[] = [];
+      for (const tu of toolUses) {
+        const result = await executeAlfredTool(
+          tu.name,
+          tu.input,
+          {
+            supabaseUrl,
+            serviceRoleKey,
+            authHeader,
+            householdId: body.household_id,
+            userId,
+          }
+        );
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: tu.id,
+          content: result.text,
+          is_error: result.isError === true,
+        });
+      }
+      conversationMessages.push({
+        role: "user",
+        content: toolResults,
+      });
+
+      aiResult = await callClaudeWithDiscipline({
+        supabase,
+        apiKey: anthropicApiKey,
+        tag: "chat",
+        max_tokens: 1024,
+        system: finalSystemPrompt,
+        cache_system: true,
+        messages: conversationMessages,
+        household_id: body.household_id,
+        user_id: userId ?? null,
+        tools: alfredTools,
+      });
+    }
+
+    const reply = aiResult?.text || "I apologize, but I wasn't able to generate a response. Please try again.";
 
     // Persist both messages to chat_messages table (encrypted at rest if key provided)
     const now = new Date().toISOString();
@@ -758,9 +962,16 @@ When declining, say something warm like:
 Be generous in interpretation. If there's any reasonable connection to their home, family, finances, or lifestyle, help them. Only decline requests that are clearly and unambiguously outside scope — like "help me debug this React component" or "write my history essay" or "explain quantum physics."
 
 CONCIERGE HANDOFF:
-If the user asks for something that requires human action — like booking travel, scheduling real appointments, finding specific local vendors, coordinating with professionals, or anything you can't complete yourself — offer to connect them with their Chez concierge.
+If the user asks for something that requires human action — like booking travel, scheduling real appointments, finding specific local vendors, coordinating with professionals, or anything you can't complete yourself — route it to Chez concierge.
 
-Say something like: "I can connect you with your Chez concierge for this — they can [specific thing]. Want me to send them a message with the details?"
+You have a tool for this: \`submit_concierge_request\`. Use it when the user has explicitly asked you to take action AND the conversation has surfaced enough concrete detail (vendor name, task description, dates, or a clear ask) that the operator can act without asking the user follow-ups. After using the tool, briefly confirm the handoff and mention the team will be in touch within 24 business hours.
+
+Do NOT use the tool when:
+- The ask is vague or exploratory ("can you help with my plumber?" with no problem stated) — get one more specific detail first
+- The user is just venting or chatting — don't escalate based on tone
+- You're unsure whether the user wants Chez involved — ask "Want me to send this to Chez to handle for you?" first, then submit only after they confirm
+
+For cases where the tool isn't the right move (vague asks, "tell Chez later," etc.), point the user to the manual path: "Tap the menu in the top-right of this chat and pick 'Ask Chez (real person)' — you'll get a composer pre-loaded for your request."
 
 Things the concierge handles:
 - Finding and vetting local vendors and service providers
@@ -771,7 +982,7 @@ Things the concierge handles:
 - Getting quotes for home projects
 - Any task that requires human judgment, phone calls, or coordination
 
-You can help PREPARE for these tasks (draft emails, research options, organize information) but let the concierge EXECUTE them. When handing off, include a summary of the conversation context so the concierge team has full context.`;
+You can help PREPARE these tasks (draft emails, research options, organize information) and you can hand them off via the tool when the user is ready. The concierge EXECUTES.`;
 
   return { systemPrompt, referencedDocumentIds, equipmentContext };
 }

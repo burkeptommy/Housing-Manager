@@ -633,14 +633,19 @@ struct DashboardView: View {
                 if let assessment = viewModel.homeAssessment {
                     AssessmentRescheduleSheet(
                         assessment: assessment,
-                        onSubmit: { notes in
+                        onSubmit: { notes, preferredDates in
                             try? await HavenSupabase.requestAssessmentReschedule(
-                                assessmentId: assessment.id, notes: notes, preferredDates: nil)
-                            Analytics.track(.homeAssessmentRescheduleRequested, [:])
+                                assessmentId: assessment.id,
+                                notes: notes,
+                                preferredDates: preferredDates
+                            )
+                            Analytics.track(.homeAssessmentRescheduleRequested, [
+                                "has_preferred_dates": (preferredDates?.isEmpty == false)
+                            ])
                             await viewModel.loadHomeAssessment()
                         }
                     )
-                    .presentationDetents([.medium])
+                    .presentationDetents([.medium, .large])
                 }
             }
             .sheet(isPresented: $showAssessmentPrepNotesSheet) {
@@ -1689,6 +1694,22 @@ struct DashboardView: View {
                     await viewModel.refresh()
                 }
             },
+            onSnoozeItem: { item, months in
+                guard let householdId = viewModel.primaryHouseholdId else { return }
+                let until = Calendar.current.date(byAdding: .month, value: months, to: Date()) ?? Date()
+                Task {
+                    try? await DatabaseService.shared.snoozeCategory(
+                        householdId: householdId,
+                        category: item.id,
+                        until: until
+                    )
+                    Analytics.track(.coverageItemSnoozed, [
+                        "category": item.id,
+                        "months": months
+                    ])
+                    await viewModel.refresh()
+                }
+            },
             onManageVendors: {
                 // Phase 56.1: dismiss the sheet, switch to the Property
                 // tab, and land on the Contacts sub-tab. Matches the
@@ -1999,14 +2020,27 @@ struct DashboardView: View {
     private func houseQuizHeroCard(for property: PropertyRow) -> some View {
         let state = property.houseQuizState ?? HouseQuizState()
         let total = HouseQuizQuestionLibrary.allQuestions.count
-        let answered = state.answers.count
+        // Round 2 feedback (May 2026): saved-for-later questions live in
+        // `state.answers` too, so `state.answers.count` includes them and
+        // the label would read "28 of 28 done · 1 saved for later" with a
+        // Continue Quiz CTA — mathematically contradictory. Subtract the
+        // saved set so "done" only means "answered for real." Matches the
+        // HouseQuizViewModel.progressLabel logic from Build 85.
         let saved = state.savedForLater.count
+        let answered = max(0, state.answers.count - saved)
         let completion = total > 0 ? Double(answered) / Double(total) : 0
-        let isResume = answered > 0
+        let isResume = answered > 0 || saved > 0
         let title = "Start Quiz for \(property.name)"
-        let progressLabel = isResume
-            ? "\(answered) of \(total) done · \(saved) saved for later"
-            : "\(total) quick questions, about 5 minutes."
+        let progressLabel: String
+        if isResume {
+            if saved > 0 {
+                progressLabel = "\(answered) of \(total) answered · \(saved) saved for later"
+            } else {
+                progressLabel = "\(answered) of \(total) answered"
+            }
+        } else {
+            progressLabel = "\(total) quick questions, about 5 minutes."
+        }
 
         return HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing12) {

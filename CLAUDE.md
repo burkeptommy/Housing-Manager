@@ -161,7 +161,7 @@ households (Phase 80.1: chez_profile JSONB), users, family_members (avatar_url, 
 
 See `supabase/functions/CLAUDE.md` for detailed patterns and full inventory. Key groups:
 
-**Core AI:** `analyze-document` (also rewrites `documents.visible_to_home_managers` based on the AI-suggested category — manual upload paths set placeholder categories at insert time, this is the place that stamps the real value), `chat`, `gap-analysis`, `simulate-scenario`, `proactive-scan`
+**Core AI:** `analyze-document` (also rewrites `documents.visible_to_home_managers` based on the AI-suggested category — manual upload paths set placeholder categories at insert time, this is the place that stamps the real value), `chat` (Phase 9b friend-feedback Round 2: now has a single `submit_concierge_request` tool that forwards to `chez-concierge` action `submit` with the homeowner's JWT — runs a 3-iteration agentic loop via the cost-discipline helper's new `tools` param), `gap-analysis`, `simulate-scenario`, `proactive-scan`
 **Invoice:** `process-invoice` (home + vehicle invoice intelligence; Phase 50 added explicit follow-up extraction with `suggested_due_date` and a `cadence_detected: { interval_days, confidence, quoted_text }` block for explicit recurring service plans)
 **Property/Equipment:** `search-equipment`, `identify-equipment`, `lookup-manual`, `score-equipment`, `research-project`, `project-feasibility`, `property-lookup`, `visualize-room`
 **Quotes:** `analyze-quote`, `draft-negotiation-email`
@@ -248,7 +248,9 @@ All Edge Function calls go through `HavenSupabase.callEdgeFunction()` in `Supaba
 
 **Add-or-discover section:** Five `addOrDiscoverRow` entries at the bottom of Contacts — Add a vendor, Browse specialty systems, Add a custom system, Add a routine, See recommended services. Each wires to existing sheet state (`showAddVendor` / `showAddSystem` / `showWeeklyCadences` / `showRecommendedServices`). Consolidates the discovery actions that used to live in Vendor Coverage.
 
-**Vendor Coverage sheet (post-Phase 56):** `VendorCoverageSheet` is now gap-resolution only. Signature: `uncoveredItems` + `totalSystemCount` + `onFindVendor` + `onAddVendor` + `onDismissItem` + `onManageVendors`. No covered list, no discovery CTAs. Gap cards use `HavenColors.action.opacity(0.06)` background with `HavenColors.action.opacity(0.3)` border, two inline action buttons ("Find a pro" navy fill, "I have one" navy subtle), plus smaller "Not applicable, dismiss" affordance. Empty state celebrates "All N systems have a vendor lined up" with a subtle `"Manage all your vendors →"` link that posts `.switchToTab` (tab 1) + `.navigateToPropertySection` (section "contacts").
+**Vendor Coverage sheet (post-Phase 56):** `VendorCoverageSheet` is now gap-resolution only. Signature: `uncoveredItems` + `totalSystemCount` + `onFindVendor` + `onAddVendor` + `onDismissItem` + `onSnoozeItem` + `onManageVendors`. No covered list, no discovery CTAs. Gap cards use `HavenColors.action.opacity(0.06)` background with `HavenColors.action.opacity(0.3)` border, two inline action buttons ("Find a pro" navy fill, "I have one" navy subtle), plus smaller "Remind me later" / "Not applicable" affordances side-by-side. Empty state celebrates "All N systems have a vendor lined up" with a subtle `"Manage all your vendors →"` link that posts `.switchToTab` (tab 1) + `.navigateToPropertySection` (section "contacts").
+
+**Friend Feedback Round 2 (May 2026) — snooze on dismissed_categories:** the `dismissed_categories` table gained a `snoozed_until TIMESTAMPTZ` column (migration `20261318_dismissed_categories_snooze.sql`). A row with `snoozed_until = NULL` is a permanent "Not applicable" dismissal (legacy behavior); a row with `snoozed_until > now()` is an active "Remind me later" snooze (3/6/12/36 months). `DashboardViewModel`'s gap-suppression filter excludes expired snoozes so categories resurface automatically when the timestamp passes. The `DatabaseService.snoozeCategory(householdId:category:until:)` method uses delete-then-insert so toggling between snooze and permanent dismissal stays one row per `(household, category)`. `DismissedCategoryRow.isActiveSnooze(now:)` is the canonical predicate.
 
 **Clipboard detection in AddVendorSheet:** `ClipboardSuggestion` enum (`.url(String)` / `.phone(String)` / `.unknown(String)`). `detectClipboardContent()` fires from `.onAppear`, inspects `UIPasteboard.general.string` once (no polling, honors iOS 14+ pasteboard toast), classifies via URL prefix (http / https / www) or digit-count heuristic (7-15 digits). Banner renders above the three import options with icon + title + preview + "Use it" primary button + dismiss X. `applyClipboardSuggestion(_:)` routes URLs to `WebsiteImportView(prefilledUrl:)` (new init parameter with `nil` default) and phone numbers to the manual form with `importedVendor.phone` prefilled.
 
@@ -604,6 +606,25 @@ Settings → Household Staff → AddHouseholdStaffSheet remains the manual entry
 
 **Key files:** `DuplicateDetectionService.swift`, `DocumentUploadManager.swift`, `DocumentUploadViewModel.swift`, `DuplicateResolutionSheet.swift`, `receive-email/index.ts`, `process-inbox-item/index.ts`.
 
+## Document Upload → Inbox Routing (Friend Feedback Round 2)
+
+Every document upload that lands on a needs-action category (contractor quote, repair estimate, invoice, auto insurance, vehicle title) MUST flow through the inbox so the homeowner gets the right follow-up prompt (project linking, invoice scan, vehicle attach). Until May 2026 there were TWO upload paths in the app and only ONE created inbox items — the foreground Property → Documents tab silently dropped quotes into the doc list with no inbox follow-up.
+
+**Single source of truth:** `Haven/Core/Services/InboxItemFromDocument.swift`. The `plan(categoryValue:analysisSummary:)` static returns the `(type, summary, actionType, needsAction)` shape for the inbox item, or nil when the category doesn't warrant one (deeds, mortgage statements, photos — those just sit in the vault). The `create(...)` static performs the actual insert + posts `.inboxItemUpdated`.
+
+**Both upload paths call the helper:**
+- `DocumentUploadViewModel` (foreground sheet — every `+ Upload` button in the Property/System/Project/Contractor/Utility/Vehicle surfaces, single-file + batch branches)
+- `DocumentUploadManager` (background batch — camera scan, email forwards, other queued ingest)
+
+**Don't add a third path that re-implements the category → inbox mapping.** New upload surfaces MUST route through `InboxItemFromDocument` so the routing stays in one place. The original bug shipped because the helper didn't exist — two parallel implementations drifted, and the foreground one never got the contractor-quote branch.
+
+**Categories that produce inbox items:**
+- `["Contractor Quote", "Repair Estimate"]` → `type: contractor_quote`, `actionType: quote_received`, `needsAction: true`
+- `["Auto Insurance", "Vehicle Title"]` → `type: document_stored`, `actionType: review_vehicle_doc`, `needsAction: true`
+- `["Home Bill/Invoice", "Project Invoice", "Repair Invoice", "Utility Bill"]` → `type: document_stored`, `actionType: review_invoice`, `needsAction: true`
+
+Errors are surfaced (not silently swallowed) — `DocumentUploadManager` previously wrapped `createInboxItem` in `try?` which is how the bug went undetected for months. Both call sites now log on failure.
+
 ## Utility Bill Detection
 
 `receive-email` fuzzy-matches `billVendor` against `utility_providers` catalog. For matches, embeds provider info in inbox metadata with `add_utility_provider` action type. `InboxItemDetailView` shows branded prompt card. `AddUtilitySheet` accepts prefill parameters (name, slug, type, account number, cost, phone, website).
@@ -850,6 +871,8 @@ Single function with action discriminator. Auth via `getAuthenticatedUser` + `is
 | `propose` (80.1) | admin only | Insert structured proposal message (`vendor` / `date_slot` / `cost` / `quote` shape) on a request thread; bumps `pending_proposal_count` |
 | `decide_proposal` (80.1) | homeowner | Approve / decline / counter; stamps `proposal.status`, decrements counter, fires admin push/email |
 | `delegate_task` (80.2) | homeowner | Smart-route: vendorless task → `find_vendor` request; with vendor → `coordinate_task` request. Creates parent thread with rich system message, stamps `task.chez_request_id` back |
+
+**Alfred handoff path (Phase 9b, May 2026):** the `chat` Edge Function (Alfred) defines a `submit_concierge_request` tool that wraps action `submit`. When the homeowner explicitly asks Alfred to take action AND the conversation has enough specifics, Alfred calls the tool — `chat/index.ts` forwards the request to `chez-concierge` carrying the homeowner's JWT, so every existing side effect (admin push, SendGrid backstop, RLS, inbox routing) fires identically to a homeowner-initiated request. The tool loop is bounded at 3 iterations. Alfred's system prompt requires the user to have shown explicit intent before the tool fires — vague asks get pointed at the manual "Ask Chez (real person)" button instead. The cost-discipline helper (`_shared/ai-cost-discipline.ts`) gained an optional `tools` param + returns `content_blocks` + `stop_reason` so any future Edge Function can run the same agentic-loop pattern.
 
 ### iOS surface (`Haven/Features/ChezRequests/`)
 

@@ -191,7 +191,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "propane_furnace_central_ac", label: "Propane furnace + central AC", icon: "flame"),
                 AnswerOption(id: "electric_baseboard", label: "Electric baseboard (no central system)", icon: "bolt.fill"),
                 AnswerOption(id: "not_sure", label: "Not sure / other", icon: "questionmark.circle"),
-            ]
+            ],
+            whyAsked: "Your heating system drives a lot of downstream logic: which service intervals apply to your equipment, whether we surface fuel-delivery questions next, and who we route to for tune-ups. It also lets us flag manufacturer recalls if anything's open on your unit."
         ),
         // Phase 67E/F admin feedback (f2d119cc + b348f04c + f5992eea):
         // Q4 "How did you get this home?" and Q5 "Do you have a mortgage?"
@@ -217,7 +218,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "private_well", label: "Private well", icon: "drop.triangle.fill"),
                 AnswerOption(id: "shared_well", label: "Shared well", icon: "drop.circle.fill"),
                 AnswerOption(id: "not_sure", label: "Not sure", icon: "questionmark.circle"),
-            ]
+            ],
+            whyAsked: "Well, municipal, or shared water determines what shows up on your maintenance plan. Wells need annual lab testing and pump service. Municipal homes mostly need a utility account and softener maintenance if you have one. We won't ask about a well you don't have."
         ),
         HouseQuizQuestion(
             id: "q7_sewer_septic",
@@ -230,7 +232,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "septic", label: "Septic", icon: "arrow.down.to.line"),
                 AnswerOption(id: "other", label: "Other (compost toilet, off-grid, etc.)", icon: "leaf"),
                 AnswerOption(id: "not_sure", label: "Not sure"),
-            ]
+            ],
+            whyAsked: "Septic households get triennial pumping reminders, inspection cycles, and grease/load advisories on your maintenance plan. Sewer households skip every one of those. We won't pester you about a tank you don't own."
         ),
         HouseQuizQuestion(
             id: "q8_water_heater",
@@ -334,7 +337,8 @@ enum HouseQuizQuestionLibrary {
             ],
             providerFollowUpAnswerIds: ["pro"],
             providerTypes: ["landscaping"],
-            providerSearchPlaceholder: "TruGreen, BrightView, your local crew..."
+            providerSearchPlaceholder: "TruGreen, BrightView, your local crew...",
+            whyAsked: "Your lawn answer shapes a lot of downstream questions and routines. Hardscape, garden, and no-lawn properties skip irrigation and lawn-care questions entirely. We never want to recommend lawn services to someone who doesn't have grass."
         ),
         // Phase 67D (A5): Q12 progressive disclosure — pool kind + chemistry
         // on one screen. Hot-tub-only and none paths skip chemistry. The
@@ -354,7 +358,8 @@ enum HouseQuizQuestionLibrary {
             ],
             providerFollowUpAnswerIds: ["in_ground", "above_ground", "hot_tub", "both"],
             providerTypes: ["pool_service"],
-            providerSearchPlaceholder: "Leslie's, Pinch A Penny, your pool company..."
+            providerSearchPlaceholder: "Leslie's, Pinch A Penny, your pool company...",
+            whyAsked: "Pools, hot tubs, and spas have completely different chemistry, opening/closing schedules, and equipment service cycles. Knowing which (or both) you have lets us schedule the right vendors at the right times and skip the rest."
         ),
         HouseQuizQuestion(
             id: "q13_pest",
@@ -368,12 +373,19 @@ enum HouseQuizQuestionLibrary {
                 // range from monthly to quarterly depending on region/
                 // vendor. The `id` stays "quarterly_pro" so persisted
                 // answers and back-navigation continue to round-trip.
+                //
+                // Round 2 (May 2026): dropped the "Termite bond" option —
+                // user feedback was that nobody knows the difference
+                // between a termite bond and a recurring pro contract, so
+                // we just route all pest-control engagements through the
+                // recurring-pro chip. The mapper still defensively handles
+                // the legacy `termite_bond` answer id so any persisted
+                // saved-for-later state from earlier installs round-trips.
                 AnswerOption(id: "quarterly_pro", label: "Recurring pro service"),
-                AnswerOption(id: "termite_bond", label: "Termite bond"),
                 AnswerOption(id: "diy", label: "DIY"),
                 AnswerOption(id: "none", label: "None"),
             ],
-            providerFollowUpAnswerIds: ["quarterly_pro", "termite_bond"],
+            providerFollowUpAnswerIds: ["quarterly_pro"],
             providerTypes: ["pest_control"],
             providerSearchPlaceholder: "Terminix, Orkin, your local exterminator..."
         ),
@@ -497,7 +509,8 @@ enum HouseQuizQuestionLibrary {
                 // Basements, Connecticut Basement Systems.
                 AnswerOption(id: "waterproofing", label: "Waterproofing & basement", icon: "drop.fill"),
             ],
-            dynamicSkip: { _ in false }  // never skip — empty answers are allowed
+            dynamicSkip: { _ in false },  // never skip — empty answers are allowed
+            whyAsked: "Adding the people already taking care of your home lets us coordinate their visits, link their invoices automatically when they email you, and stop asking you who handles what. Skip any you don't have — we'll fill the gaps later."
         ),
     ]
 
@@ -566,7 +579,8 @@ enum HouseQuizQuestionLibrary {
                     // forward-resumed quiz still has something useful.
                     return ["oil", "propane", "natural_gas"]
                 }
-            }
+            },
+            whyAsked: "Capturing your fuel supplier lets us prefill the utility account and link future delivery receipts automatically — forward an invoice and we'll attach it to the right account. If your supplier offers an auto-pay or seasonal pricing plan, we can also surface renewal questions at the right time."
         ),
         HouseQuizQuestion(
             id: "q20_other_fuels",
@@ -621,7 +635,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "whole_home", label: "Whole-home", icon: "powerplug.fill"),
                 AnswerOption(id: "portable", label: "Portable", icon: "bolt.fill"),
                 AnswerOption(id: "none", label: "None", icon: "minus.circle"),
-            ]
+            ],
+            whyAsked: "Generators have manufacturer-specific service intervals — annual oil, spark plugs, transfer switch testing — that don't follow generic HVAC schedules. Without the type and fuel we'd either over-generalize or skip critical service. If you have one, we want to know."
         ),
         // Phase 67D (A2): Q23 vehicle count dropped — count is implicit in
         // the vehicle-add flow which already supports adding multiple
@@ -632,7 +647,8 @@ enum HouseQuizQuestionLibrary {
             title: "Add your primary vehicle",
             subtitle: "Type, scan, or upload an insurance card. You can add more vehicles later from the garage.",
             kind: .vehicleAdd,
-            documentUploadCategory: .autoInsurance
+            documentUploadCategory: .autoInsurance,
+            whyAsked: "Vehicles get the same routine-coordination layer as your home — recalls flag the moment NHTSA publishes them, oil changes and tire rotations live alongside your home maintenance, and registration and inspection renewals surface before they lapse. Skip this if you'd rather add cars later."
         ),
         // Phase 67D (A8): Q25 + Q25b merged into one progressive screen.
         // Garage type chips up top; EV charger toggle revealed below when
@@ -676,7 +692,8 @@ enum HouseQuizQuestionLibrary {
             subtitle: "Auto and homeowners. Skip either if you don't have one yet.",
             kind: .dualInsurance,
             documentUploadCategory: .autoInsurance,
-            providerTypes: ["auto_insurance", "home_insurance"]
+            providerTypes: ["auto_insurance", "home_insurance"],
+            whyAsked: "Capturing your carriers lets us track renewal dates, surface bundled-discount opportunities if you have separate carriers, and auto-link any claims documents you forward to your inbox. We never share policy details with anyone."
         ),
         HouseQuizQuestion(
             id: "q28_household",
@@ -690,7 +707,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "family_with_kids", label: "Family with kids"),
                 AnswerOption(id: "multi_generational", label: "Multi-generational"),
                 AnswerOption(id: "other", label: "Other"),
-            ]
+            ],
+            whyAsked: "Who lives here drives task assignment, family calendar visibility, and what your dashboard surfaces. Adding a spouse or home manager lets them log in with their own access. Adding kids or expecting members triggers age-appropriate reminders down the road."
         ),
         // Phase 67D (A10): Q28b dropped. Pets capture moves into Q28's
         // existing caretakers multi-step flow as a final sub-step. The
@@ -718,7 +736,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "hidden_problems", label: "Hidden problems"),
                 AnswerOption(id: "surprise_costs", label: "Surprise costs"),
                 AnswerOption(id: "good_contractors", label: "Finding good contractors"),
-            ]
+            ],
+            whyAsked: "Your priorities shape which proactive nudges, recommendations, and Chez offers we surface throughout the year. Worried about surprise costs? We'll lead with cost forecasting and quote analysis. Resale-focused? We'll prioritize the maintenance-vs-value math."
         ),
         // Build 88: 3-tier vendor preference picker. Replaces the old 1-10
         // slider that users found confusing. Three clear options that match
@@ -740,7 +759,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "diy", label: "I handle it", icon: "wrench.and.screwdriver.fill"),
                 AnswerOption(id: "mixed", label: "Mix of both", icon: "person.2.fill"),
                 AnswerOption(id: "hire_out", label: "Hire it out", icon: "briefcase.fill"),
-            ]
+            ],
+            whyAsked: "This is the big one. Your answer routes every flippable task — anything that could go either way — between your personal to-do list and your vendor coordination queue. DIY tier keeps almost everything on your list. Hire-out tier sends almost everything to vendors. Mix routes by effort. You can change it anytime in Settings."
         ),
     ]
 }

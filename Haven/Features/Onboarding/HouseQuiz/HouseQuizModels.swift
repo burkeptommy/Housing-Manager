@@ -614,6 +614,13 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     /// braces to the UI.
     let fallbackTitle: String?
 
+    /// Optional "why we ask" rationale. When non-nil, the question renders
+    /// a small info-circle icon next to the title; tapping opens a sheet
+    /// with this text. Populate for questions where the purpose isn't
+    /// already obvious from the title or subtitle (e.g. Q4 purchase price,
+    /// Q7 sewer source, Q36 vendor preference tier). Nil = no icon.
+    let whyAsked: String?
+
     init(
         id: String,
         section: HouseQuizSection,
@@ -633,7 +640,8 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         sliderMin: Int = 1,
         sliderMax: Int = 10,
         sliderLeftLabel: String? = nil,
-        sliderRightLabel: String? = nil
+        sliderRightLabel: String? = nil,
+        whyAsked: String? = nil
     ) {
         self.id = id
         self.section = section
@@ -657,6 +665,7 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         self.sliderMax = sliderMax
         self.sliderLeftLabel = sliderLeftLabel
         self.sliderRightLabel = sliderRightLabel
+        self.whyAsked = whyAsked
     }
 
     /// Convenience for picker code that wants the canonical "primary" type

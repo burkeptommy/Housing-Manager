@@ -515,6 +515,26 @@ final class DocumentUploadViewModel: ObservableObject {
             }
 
             uploadProgress = 1.0
+
+            // Route quotes / invoices / vehicle docs into the inbox so the
+            // user gets a needs-action prompt (project linking, invoice scan,
+            // vehicle attach). Without this, foreground-uploaded contractor
+            // quotes silently land in Documents with no follow-up — exactly
+            // the bug Tom's friend reported in May 2026.
+            do {
+                try await InboxItemFromDocument.create(
+                    householdId: householdId,
+                    documentId: doc.id,
+                    title: aiTitle,
+                    attachmentFilename: selectedFileName,
+                    categoryValue: categoryValue,
+                    analysisSummary: analysis.summary,
+                    db: db
+                )
+            } catch {
+                print("[DocumentUploadViewModel] inbox routing failed: \(error)")
+            }
+
             Analytics.track(.documentUploadCompleted, [
                 "category": categoryValue,
                 "has_duplicate": showDuplicateAlert,
@@ -684,6 +704,23 @@ final class DocumentUploadViewModel: ObservableObject {
                         if homeLinkedGroups.contains(matched.sectionGroup), properties.count == 1 {
                             _ = try await db.updateDocument(id: doc.id, DocumentUpdate(propertyId: properties[0].id))
                         }
+                    }
+
+                    // Batch-upload inbox routing — same gate as the single-file
+                    // path so quotes / invoices / vehicle docs uploaded as part
+                    // of a multi-doc batch all surface in the inbox.
+                    do {
+                        try await InboxItemFromDocument.create(
+                            householdId: householdId,
+                            documentId: doc.id,
+                            title: aiTitle,
+                            attachmentFilename: uploadItems[i].fileName,
+                            categoryValue: categoryValue,
+                            analysisSummary: analysis.summary,
+                            db: db
+                        )
+                    } catch {
+                        print("[DocumentUploadViewModel] batch inbox routing failed: \(error)")
                     }
 
                     uploadItems[i].isComplete = true
