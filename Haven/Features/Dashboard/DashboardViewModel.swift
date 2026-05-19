@@ -128,10 +128,11 @@ final class DashboardViewModel: ObservableObject {
 
     /// Phase 56.2: One-liner seasonal context tip for the compact
     /// greeting. Surfaces the next upcoming vendor visit when one is
-    /// within 7 days (highest signal), otherwise falls back to
-    /// month-driven Northeast-climate copy. Returns nil when there's
-    /// nothing contextually relevant to say — the greeting renders
-    /// without it, which is fine.
+    /// within 7 days (highest signal), otherwise falls back to a
+    /// month-driven seasonal tip composed from the categories the
+    /// household actually has. A no-pool / no-irrigation homeowner
+    /// should never see "Pool opening season. Irrigation systems
+    /// should be checked." Returns nil when nothing relevant applies.
     var seasonalContextTip: String? {
         let calendar = Calendar.current
         let now = Date()
@@ -151,26 +152,82 @@ final class DashboardViewModel: ObservableObject {
             }
         }
 
-        // Northeast-climate seasonal fallbacks. Static copy for v1;
-        // future iteration can make these data-driven from the user's
-        // actual systems and climate zone.
+        // Seasonal tips, gated on the household's actual systems so we
+        // never reference a category the homeowner doesn't have.
+        let hasHVAC = hasAnySystem(matching: ["hvac"])
+        let hasLandscaping = hasAnySystem(matching: ["landscaping", "lawn"])
+        let hasPool = hasAnySystem(matching: ["pool", "spa", "hot tub"])
+        let hasIrrigation = hasAnySystem(matching: ["irrigation", "sprinkler"])
+        let hasGutters = hasAnySystem(matching: ["gutter", "roof"])
+        let hasSnow = hasAnySystem(matching: ["snow"])
+        let hasGenerator = hasAnySystem(matching: ["generator"])
+
         switch calendar.component(.month, from: now) {
         case 3, 4:
-            return "Spring prep season. Time to schedule HVAC tune-ups and lawn care startup."
+            let parts: [String] = [
+                hasHVAC ? "HVAC tune-ups" : nil,
+                hasLandscaping ? "lawn care startup" : nil
+            ].compactMap { $0 }
+            guard !parts.isEmpty else { return nil }
+            return "Spring prep season. Time to schedule \(Self.joinList(parts))."
         case 5:
-            return "Pool opening season. Irrigation systems should be checked before Memorial Day."
+            let parts: [String] = [
+                hasPool ? "pool opening" : nil,
+                hasIrrigation ? "irrigation startup" : nil
+            ].compactMap { $0 }
+            guard !parts.isEmpty else { return nil }
+            return "Memorial Day prep. Time for \(Self.joinList(parts))."
         case 6, 7, 8:
+            guard activeVendorCount > 0 else { return nil }
             return "Peak maintenance season. Most of your vendors are running."
         case 9:
-            return "Fall prep. Gutter cleaning, HVAC heating check, and snow contracts ahead."
+            let parts: [String] = [
+                hasGutters ? "gutter cleaning" : nil,
+                hasHVAC ? "HVAC heating check" : nil,
+                hasSnow ? "snow contracts" : nil
+            ].compactMap { $0 }
+            guard !parts.isEmpty else { return nil }
+            return "Fall prep season. Time for \(Self.joinList(parts))."
         case 10:
-            return "Snow removal contracts close soon. Generator service before first frost."
+            var parts: [String] = []
+            if hasSnow { parts.append("Snow removal contracts close soon.") }
+            if hasGenerator { parts.append("Generator service before first frost.") }
+            guard !parts.isEmpty else { return nil }
+            return parts.joined(separator: " ")
         case 11:
-            return "Winterization window. Irrigation blowout, exterior paint touch-up."
+            guard hasIrrigation else { return nil }
+            return "Winterization window. Schedule your irrigation blowout."
         case 12, 1, 2:
-            return "Winter mode. Indoor maintenance only. Good time to plan spring projects."
+            return "Winter mode. Good time to plan spring projects."
         default:
             return nil
+        }
+    }
+
+    /// True when any of the household's home systems has a category
+    /// containing one of the given lowercased substrings. Substring
+    /// match (rather than equality) so legacy variants like
+    /// `"Pool/Spa"` and `"Hot Tub"` both pick up `"pool"` / `"spa"`.
+    private func hasAnySystem(matching loweredKeywords: [String]) -> Bool {
+        guard !homeSystems.isEmpty else { return false }
+        for system in homeSystems {
+            let lowered = system.category.lowercased()
+            for keyword in loweredKeywords where lowered.contains(keyword) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Oxford-comma joiner. 1 → "a", 2 → "a and b", 3+ → "a, b, and c".
+    private static func joinList(_ items: [String]) -> String {
+        switch items.count {
+        case 0: return ""
+        case 1: return items[0]
+        case 2: return "\(items[0]) and \(items[1])"
+        default:
+            let head = items.dropLast().joined(separator: ", ")
+            return "\(head), and \(items.last!)"
         }
     }
 

@@ -9068,7 +9068,7 @@ private struct FieldPartRequestRow: View {
             }
 
             if let eta = request.supplierEta, !eta.isEmpty {
-                Text("ETA \(eta.fieldShortDate ?? eta)")
+                Text("ETA \(eta.fieldShortDate)")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
             }
@@ -13069,7 +13069,7 @@ private struct HavenFieldHomeProfileView: View {
     /// workspace + household to enforce server-side access guards.
     private var routinesTab: some View {
         VStack(alignment: .leading, spacing: 18) {
-            if let workspaceId, let householdId = home.householdId, !householdId.isEmpty {
+            if workspaceId != nil, let householdId = home.householdId, !householdId.isEmpty {
                 Button {
                     showAddRoutine = true
                 } label: {
@@ -13159,7 +13159,7 @@ private struct HavenFieldHomeProfileView: View {
             // T2.5 — capture button. Only visible when we know the
             // workspace + household, since the server enforces both
             // for create_contractor_from_card.
-            if let workspaceId, let householdId = home.householdId, !householdId.isEmpty {
+            if workspaceId != nil, let householdId = home.householdId, !householdId.isEmpty {
                 Button {
                     showAddVendor = true
                 } label: {
@@ -15066,14 +15066,12 @@ private struct FieldEndOfDayView: View {
         let today = summary.today
         let stops = today.stopsCompleted
         let stopWord = stops == 1 ? "stop" : "stops"
-        var parts: [String] = ["\(stops) \(stopWord)"]
-        if today.totalClockMinutes > 0 {
-            parts.append("\(Self.formatClockMinutes(today.totalClockMinutes)) on the clock")
-        }
-        if today.revenueInvoicedCents > 0 {
-            parts.append("\(Self.formatCents(today.revenueInvoicedCents)) invoiced")
-        }
-        return VStack(alignment: .leading, spacing: 12) {
+        let parts: [String] = [
+            "\(stops) \(stopWord)",
+            today.totalClockMinutes > 0 ? "\(Self.formatClockMinutes(today.totalClockMinutes)) on the clock" : nil,
+            today.revenueInvoicedCents > 0 ? "\(Self.formatCents(today.revenueInvoicedCents)) invoiced" : nil
+        ].compactMap { $0 }
+        VStack(alignment: .leading, spacing: 12) {
             Text(weekdayLabel.uppercased())
                 .font(HavenTypography.uiSectionHeader)
                 .kerning(1.2)
@@ -15597,7 +15595,7 @@ private struct FieldAssessmentRow: View {
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     } else if !assessment.routeDate.isEmpty {
-                        Text(assessment.routeDate.fieldShortDate ?? assessment.routeDate)
+                        Text(assessment.routeDate.fieldShortDate)
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textSecondary)
                     }
@@ -15679,7 +15677,7 @@ private struct HavenFieldAssessmentDetailView: View {
                             LabeledContent("Scheduled", value: scheduled)
                         }
                         if !assessment.routeDate.isEmpty {
-                            LabeledContent("Route date", value: assessment.routeDate.fieldShortDate ?? assessment.routeDate)
+                            LabeledContent("Route date", value: assessment.routeDate.fieldShortDate)
                         }
                         if !assessment.windowStartTime.isEmpty || !assessment.windowEndTime.isEmpty {
                             let window = [assessment.windowStartTime.nonEmpty, assessment.windowEndTime.nonEmpty]

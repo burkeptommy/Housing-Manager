@@ -53,7 +53,7 @@ final class WalkthroughViewModel: ObservableObject {
     /// the high-value fields filled). Drives the per-card progress bar.
     func captureProgress(for system: HomeSystemRow) -> Double {
         var filled: Double = 0
-        var total: Double = 5  // manufacturer / model / installDate / condition / notes-or-photos
+        let total: Double = 5  // manufacturer / model / installDate / condition / notes-or-photos
         if system.manufacturer?.isEmpty == false { filled += 1 }
         if system.modelNumber?.isEmpty == false { filled += 1 }
         if system.installDate != nil { filled += 1 }

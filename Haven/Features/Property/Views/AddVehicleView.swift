@@ -515,7 +515,7 @@ struct AddVehicleView: View {
                     ))
                 } catch {
                     recallFailures += 1
-                    print("[AddVehicle] Recall save failed for \(recall.nhtsaCampaignNumber): \(error)")
+                    print("[AddVehicle] Recall save failed for \(recall.nhtsaCampaignNumber ?? "unknown"): \(error)")
                 }
             }
 
