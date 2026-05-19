@@ -1447,14 +1447,21 @@ struct DashboardView: View {
                     .foregroundStyle(HavenColors.textSecondary)
             }
 
-            if let tip = viewModel.seasonalContextTip {
+            if let subtitle = viewModel.greetingSubtitle {
+                let tint: Color = {
+                    switch subtitle.tone {
+                    case .urgent:    return HavenColors.warning
+                    case .scheduled: return HavenColors.navy700
+                    case .ambient:   return HavenColors.textTertiary
+                    }
+                }()
                 HStack(spacing: 6) {
-                    Image(systemName: seasonalIcon)
+                    Image(systemName: subtitle.icon)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(HavenColors.textTertiary)
-                    Text(tip)
+                        .foregroundStyle(tint)
+                    Text(subtitle.text)
                         .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textTertiary)
+                        .foregroundStyle(tint)
                 }
             }
         }
@@ -1561,17 +1568,6 @@ struct DashboardView: View {
                 .foregroundStyle(HavenColors.textTertiary)
         }
         .padding(.vertical, HavenTheme.spacing12)
-    }
-
-    private var seasonalIcon: String {
-        let month = Calendar.current.component(.month, from: Date())
-        switch month {
-        case 3, 4, 5: return "leaf.fill"
-        case 6, 7, 8: return "sun.max.fill"
-        case 9, 10, 11: return "wind"
-        case 12, 1, 2: return "snowflake"
-        default: return "calendar"
-        }
     }
 
     /// Phase 56.2: trailing "View full schedule →" link. Extracted from

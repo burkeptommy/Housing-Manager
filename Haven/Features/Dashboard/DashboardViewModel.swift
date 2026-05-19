@@ -126,21 +126,60 @@ final class DashboardViewModel: ObservableObject {
         return Double(coveredSystemCount) / Double(totalVendorSystemCount)
     }
 
-    /// Phase 56.2: One-liner seasonal context tip for the compact
-    /// greeting. Surfaces the next upcoming vendor visit when one is
-    /// within 7 days (highest signal), otherwise falls back to a
-    /// month-driven seasonal tip composed from the categories the
-    /// household actually has. A no-pool / no-irrigation homeowner
-    /// should never see "Pool opening season. Irrigation systems
-    /// should be checked." Returns nil when nothing relevant applies.
-    var seasonalContextTip: String? {
+    /// Tone bucket for the compact-greeting subtitle. The view picks
+    /// color + emphasis from the tone so the view model doesn't need
+    /// to know about HavenColors.
+    enum GreetingTone {
+        case urgent      // overdue work — warning color
+        case scheduled   // visits + week tasks — navy
+        case ambient     // seasonal / quiet — textTertiary
+    }
+
+    /// Compact-greeting subtitle: text + SF Symbol + tone. The view
+    /// renders this below the "Good afternoon, Tom · Tuesday, May 19"
+    /// line.
+    struct GreetingSubtitle {
+        let text: String
+        let icon: String
+        let tone: GreetingTone
+    }
+
+    /// Priority cascade for the greeting subtitle. Surfaces the
+    /// highest-signal piece of context the household has right now:
+    /// overdue → vendor visit this week → tasks due this week → next
+    /// vendor visit beyond a week → seasonal tip gated on actual
+    /// systems → nothing. Each branch returns nil to fall through to
+    /// the next; only one subtitle renders.
+    var greetingSubtitle: GreetingSubtitle? {
         let calendar = Calendar.current
         let now = Date()
+        let today = calendar.startOfDay(for: now)
 
-        // Upcoming vendor visit in the next week takes precedence.
+        // 1. Overdue tasks — the most urgent signal wins.
+        let overdueCount = overdueMaintenanceTasks.count
+        if overdueCount == 1, let task = overdueMaintenanceTasks.first {
+            let trimmed = task.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return GreetingSubtitle(
+                    text: "\(trimmed) is overdue.",
+                    icon: "exclamationmark.triangle.fill",
+                    tone: .urgent
+                )
+            }
+        }
+        if overdueCount > 0 {
+            return GreetingSubtitle(
+                text: "\(overdueCount) tasks overdue.",
+                icon: "exclamationmark.triangle.fill",
+                tone: .urgent
+            )
+        }
+
+        // 2. Vendor visit within the next 7 days — concrete schedule
+        // beats seasonal copy.
         if let next = upcomingVendorVisits.first,
            let scheduled = Self.havenDateParser.date(from: next.task.nextDueDate) {
-            let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: scheduled)).day ?? 99
+            let days = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: scheduled)).day ?? 99
             if days >= 0 && days <= 7, let vendor = next.vendorName {
                 let when: String
                 switch days {
@@ -148,9 +187,93 @@ final class DashboardViewModel: ObservableObject {
                 case 1: when = "tomorrow"
                 default: when = "in \(days) days"
                 }
-                return "\(vendor) visit coming up \(when)."
+                return GreetingSubtitle(
+                    text: "\(vendor) visit coming up \(when).",
+                    icon: "calendar.badge.clock",
+                    tone: .scheduled
+                )
             }
         }
+
+        // 3. Tasks due this week — name the single one if there's
+        // only one, otherwise summarize the count.
+        if dueThisWeekTasks.count == 1, let task = dueThisWeekTasks.first {
+            let trimmed = task.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return GreetingSubtitle(
+                    text: "\(trimmed) due this week.",
+                    icon: "checklist",
+                    tone: .scheduled
+                )
+            }
+        }
+        if dueThisWeekTasks.count > 1 {
+            return GreetingSubtitle(
+                text: "\(dueThisWeekTasks.count) tasks due this week.",
+                icon: "checklist",
+                tone: .scheduled
+            )
+        }
+
+        // 4. Next scheduled vendor visit beyond a week — gives the
+        // homeowner a calendar anchor when nothing else is pressing.
+        if let next = nextScheduledService {
+            let formatted = Self.formatFriendlyDate(next.date) ?? next.date
+            return GreetingSubtitle(
+                text: "Next vendor visit: \(next.vendorName) · \(formatted).",
+                icon: "calendar",
+                tone: .scheduled
+            )
+        }
+
+        // 5. Seasonal tip — the existing system-gated logic.
+        if let text = seasonalSubtitleText() {
+            return GreetingSubtitle(
+                text: text,
+                icon: seasonalIconForCurrentMonth(),
+                tone: .ambient
+            )
+        }
+
+        // 6. Quiet — let the greeting render alone.
+        return nil
+    }
+
+    /// Compact "MMM d" formatter for the next-vendor-visit subtitle.
+    private static let friendlyDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        f.timeZone = .current
+        return f
+    }()
+
+    /// Parse a "yyyy-MM-dd" date string and re-format as "May 30".
+    /// Returns nil if the input isn't parseable; the caller falls
+    /// back to the raw string in that case.
+    private static func formatFriendlyDate(_ raw: String) -> String? {
+        guard let d = havenDateParser.date(from: raw) else { return nil }
+        return friendlyDateFormatter.string(from: d)
+    }
+
+    /// SF Symbol for the ambient/seasonal subtitle, picked from the
+    /// current month. Mirrors the old `seasonalIcon` in DashboardView.
+    private func seasonalIconForCurrentMonth() -> String {
+        switch Calendar.current.component(.month, from: Date()) {
+        case 3, 4, 5: return "leaf.fill"
+        case 6, 7, 8: return "sun.max.fill"
+        case 9, 10, 11: return "wind"
+        case 12, 1, 2: return "snowflake"
+        default: return "calendar"
+        }
+    }
+
+    /// Seasonal subtitle text, composed from the categories the
+    /// household actually has. A no-pool / no-irrigation homeowner
+    /// should never see pool / irrigation copy. Returns nil when no
+    /// relevant phrase applies for the current month.
+    private func seasonalSubtitleText() -> String? {
+        let calendar = Calendar.current
+        let now = Date()
 
         // Seasonal tips, gated on the household's actual systems so we
         // never reference a category the homeowner doesn't have. Match
