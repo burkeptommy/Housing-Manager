@@ -80,6 +80,16 @@ struct HomeAssessmentPendingCard: View {
                 handymanRow
             }
 
+            // Phase 96 — surface the homeowner's preferences on file
+            // (initial booking window + reschedule-proposed dates) so
+            // the pending card stops reading like a black box. Tom's
+            // feedback: "it just says being assigned but doesn't give
+            // me a timeframe of when itll be scheduled and also
+            // doesnt let me select dates I prefer."
+            if let summary = preferencesSummary {
+                preferencesPanel(summary)
+            }
+
             actionRow
         }
         .padding(16)
@@ -179,7 +189,7 @@ struct HomeAssessmentPendingCard: View {
         } else {
             HStack(spacing: 10) {
                 Button(action: onReschedule) {
-                    Text("Reschedule")
+                    Text(rescheduleButtonLabel)
                         .font(HavenTypography.uiLabel)
                         .foregroundStyle(HavenColors.textPrimary)
                         .frame(maxWidth: .infinity)
@@ -305,6 +315,13 @@ struct HomeAssessmentPendingCard: View {
             // whether a date is coming today or in two weeks. This
             // matches the SLA we promise in the Chez handyman copy
             // elsewhere ("usually within 3 business days").
+            //
+            // Phase 96: also surface how long the request has been in
+            // flight (computed from createdAt) so the SLA feels
+            // concrete instead of abstract.
+            if let elapsed = elapsedSinceRequest {
+                return "\(elapsed) Usually confirmed within 3 business days. We'll text you the visit date. Free of charge."
+            }
             return "Usually within 3 business days. We'll text you with the visit date once it's confirmed. Free of charge."
         case .scheduled:
             if let line = scheduledLine {
@@ -328,5 +345,117 @@ struct HomeAssessmentPendingCard: View {
         case .cancelled:
             return "You can switch back to Chez handling it from Settings."
         }
+    }
+
+    // MARK: - Phase 96: preferences + elapsed-since-request
+
+    /// "Requested 4 hours ago" / "Requested yesterday" — gives the
+    /// "usually within 3 business days" SLA something concrete to
+    /// stand on. Anchor preference: rescheduleRequestedAt (the most
+    /// recent customer-initiated event) → createdAt (the original
+    /// request). Nil when neither is available.
+    private var elapsedSinceRequest: String? {
+        let anchor = assessment.rescheduleRequestedAt ?? assessment.createdAt
+        guard let anchor else { return nil }
+        let elapsed = Date().timeIntervalSince(anchor)
+        guard elapsed >= 0 else { return nil }
+        let minutes = Int(elapsed / 60)
+        let hours = Int(elapsed / 3600)
+        let days = Int(elapsed / 86_400)
+        let phrase: String
+        if days >= 2 {
+            phrase = "\(days) days ago"
+        } else if days == 1 {
+            phrase = "yesterday"
+        } else if hours >= 2 {
+            phrase = "\(hours) hours ago"
+        } else if hours == 1 {
+            phrase = "1 hour ago"
+        } else if minutes >= 5 {
+            phrase = "\(minutes) minutes ago"
+        } else {
+            phrase = "just now"
+        }
+        return "Requested \(phrase)."
+    }
+
+    /// One-line summary of the homeowner's preferences on file —
+    /// preferred dates (from reschedule sheet) take precedence over
+    /// the initial booking window. Returns nil when nothing is
+    /// recorded; the panel is hidden in that case.
+    private var preferencesSummary: String? {
+        var parts: [String] = []
+        if let dates = assessment.preferredDates, !dates.isEmpty {
+            let formatted = dates.compactMap(Self.formatPreferredDate)
+            if !formatted.isEmpty {
+                parts.append(formatted.joined(separator: " or "))
+            }
+        } else if let start = assessment.preferredWindowStart,
+                  !start.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let formatted = Self.formatPreferredDate(start) {
+            parts.append("Any time after \(formatted)")
+        }
+        if let tod = assessment.preferredTimeOfDay?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !tod.isEmpty {
+            parts.append(tod)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Parse YYYY-MM-DD or full ISO-8601 + reformat as "Thu, May 22".
+    /// Returns nil if the input isn't parseable.
+    private static func formatPreferredDate(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let dateOnly = DateFormatter()
+        dateOnly.dateFormat = "yyyy-MM-dd"
+        dateOnly.timeZone = .current
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withFullDate]
+        let parsed: Date? = dateOnly.date(from: trimmed) ?? iso.date(from: trimmed)
+        guard let date = parsed else { return nil }
+        let out = DateFormatter()
+        out.dateFormat = "EEE, MMM d"
+        out.timeZone = .current
+        return out.string(from: date)
+    }
+
+    /// Phase 96 — when there's no scheduled date yet, "Reschedule" reads
+    /// wrong (nothing TO reschedule). Use the proactive label instead.
+    private var rescheduleButtonLabel: String {
+        assessment.scheduledAt == nil ? "Suggest dates" : "Reschedule"
+    }
+
+    /// Inline panel inserted between the handyman row and the action
+    /// row. Reads as "Your preferred dates · Thu, May 22 or Fri, May 23
+    /// · morning."
+    @ViewBuilder
+    private func preferencesPanel(_ summary: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "calendar")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(HavenColors.action)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Your preferred dates")
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Text(summary)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(HavenColors.creamLight)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(HavenColors.action.opacity(0.15), lineWidth: 1)
+        )
     }
 }

@@ -5466,6 +5466,20 @@ struct HomeAssessmentRow: Codable, Identifiable {
     let rescheduleRequestedAt: Date?
     let rescheduleRequestNotes: String?
 
+    /// Phase 96 — homeowner-proposed visit dates. Populated by the
+    /// Reschedule sheet (primary + optional backup) and any future
+    /// proactive picker on the pending card. Ordered "yyyy-MM-dd"
+    /// strings. Operations Desk reads them when assigning a handyman.
+    let preferredDates: [String]?
+
+    /// Phase 95 — earliest date the homeowner is OK with a visit
+    /// (initial booking intent). "yyyy-MM-dd" string. Null = ASAP.
+    let preferredWindowStart: String?
+
+    /// Phase 95 — free-text time-of-day window from the booking sheet
+    /// (typically "morning" / "afternoon" / "flexible").
+    let preferredTimeOfDay: String?
+
     let handymanNotes: String?
     let adminNotes: String?
 
@@ -5513,6 +5527,9 @@ struct HomeAssessmentRow: Codable, Identifiable {
         case cancellationReason = "cancellation_reason"
         case rescheduleRequestedAt = "reschedule_requested_at"
         case rescheduleRequestNotes = "reschedule_request_notes"
+        case preferredDates = "preferred_dates"
+        case preferredWindowStart = "preferred_window_start"
+        case preferredTimeOfDay = "preferred_time_of_day"
         case handymanNotes = "handyman_notes"
         case adminNotes = "admin_notes"
         case isFree = "is_free"
@@ -5568,6 +5585,10 @@ struct HomeAssessmentRow: Codable, Identifiable {
 
         rescheduleRequestedAt = try? c.decodeIfPresent(Date.self, forKey: .rescheduleRequestedAt)
         rescheduleRequestNotes = try? c.decodeIfPresent(String.self, forKey: .rescheduleRequestNotes)
+
+        preferredDates = try? c.decodeIfPresent([String].self, forKey: .preferredDates)
+        preferredWindowStart = try? c.decodeIfPresent(String.self, forKey: .preferredWindowStart)
+        preferredTimeOfDay = try? c.decodeIfPresent(String.self, forKey: .preferredTimeOfDay)
 
         handymanNotes = try? c.decodeIfPresent(String.self, forKey: .handymanNotes)
         adminNotes = try? c.decodeIfPresent(String.self, forKey: .adminNotes)

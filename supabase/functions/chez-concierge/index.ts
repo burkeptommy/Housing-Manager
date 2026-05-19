@@ -5272,6 +5272,26 @@ async function handleRequestHomeAssessment(
   const addrSummary = [propAddr.address_line_1, propAddr.city, propAddr.state].filter(Boolean).join(", ");
   const summary = `Home assessment requested${addrSummary ? ` (${addrSummary})` : ""}`;
   const slaDueAt = await businessHoursDue(service);
+  // Phase 96 — read the booking-time preferences off home_assessments
+  // (handyman-provider's request_home_assessment writes them when the
+  // homeowner picks a window) so the chez_request context surfaces them
+  // on the admin cockpit's case panel from day one. Soft-fail to nulls
+  // if the read errors out; the home_assessments row is the source of
+  // truth either way.
+  let preferredWindowStart: string | null = null;
+  let preferredTimeOfDay: string | null = null;
+  try {
+    const { data: prefs } = await service
+      .from("home_assessments")
+      .select("preferred_window_start, preferred_time_of_day")
+      .eq("id", a.id)
+      .maybeSingle();
+    const p = prefs as { preferred_window_start: string | null; preferred_time_of_day: string | null } | null;
+    preferredWindowStart = p?.preferred_window_start ?? null;
+    preferredTimeOfDay = p?.preferred_time_of_day ?? null;
+  } catch (e) {
+    console.warn("[chez-concierge] read assessment prefs failed", e);
+  }
   const { data: req } = await service
     .from("chez_requests")
     .insert({
@@ -5284,6 +5304,11 @@ async function handleRequestHomeAssessment(
         assessment_id: a.id,
         property_id: propertyId,
         notes: payload.notes ?? "",
+        // Phase 96 — booking-time scheduling preferences (the admin
+        // cockpit surfaces these on the case panel via
+        // renderAssessmentPreferencesBanner).
+        preferred_window_start: preferredWindowStart,
+        preferred_time_of_day: preferredTimeOfDay,
       },
       status: "open",
       sla_due_at: slaDueAt,
@@ -5393,14 +5418,58 @@ async function handleRequestAssessmentReschedule(
     return json({ error: "not authorized" }, 403);
   }
 
+  // Phase 96 — clean + persist preferred_dates alongside the timestamp
+  // and notes. Previously this array was used only to populate the
+  // push notification body and then discarded, so the operator had no
+  // way to see the homeowner's preferences once the push was dismissed.
+  const cleanedPreferredDates: string[] = (payload.preferred_dates ?? [])
+    .map((d) => (typeof d === "string" ? d.trim() : ""))
+    .filter((d) => d.length > 0);
+
   await service.from("home_assessments")
     .update({
       reschedule_requested_at: new Date().toISOString(),
       reschedule_request_notes: payload.notes ?? null,
+      preferred_dates: cleanedPreferredDates.length > 0
+        ? cleanedPreferredDates
+        : null,
     })
     .eq("id", assessmentId);
 
-  const preferredText = (payload.preferred_dates ?? []).join(", ");
+  // Phase 96 — also patch the matching chez_request context so the
+  // admin Operations Desk sees the preferences inline on the case
+  // panel without an extra fetch. The request was created with
+  // `context._kind === "home_assessment_request"` and a populated
+  // `context.assessment_id` when the homeowner first booked; we
+  // merge preferred_dates + reschedule_request_notes +
+  // reschedule_requested_at into that blob in place. Idempotent on
+  // re-submits (overwrites the same keys).
+  try {
+    const { data: matchedRequests } = await service
+      .from("chez_requests")
+      .select("id, context")
+      .filter("context->>_kind", "eq", "home_assessment_request")
+      .filter("context->>assessment_id", "eq", assessmentId);
+    for (const row of (matchedRequests ?? []) as Array<{ id: string; context: Record<string, unknown> | null }>) {
+      const merged = {
+        ...(row.context ?? {}),
+        preferred_dates: cleanedPreferredDates.length > 0 ? cleanedPreferredDates : null,
+        reschedule_request_notes: payload.notes ?? null,
+        reschedule_requested_at: new Date().toISOString(),
+      };
+      await service
+        .from("chez_requests")
+        .update({ context: merged })
+        .eq("id", row.id);
+    }
+  } catch (e) {
+    // Soft-fail: the home_assessments update above is the source of
+    // truth. Context patching is purely a convenience for the admin
+    // panel surface; if it fails we still have the row data + push.
+    console.warn("[chez-concierge] context patch on reschedule failed", e);
+  }
+
+  const preferredText = cleanedPreferredDates.join(", ");
   await sendPush(serviceUrl, serviceRoleKey, adminUserIds(),
     "Reschedule requested",
     `Customer asked to reschedule their assessment.${preferredText ? ` Preferred: ${preferredText}` : ""}`,

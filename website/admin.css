@@ -9079,6 +9079,46 @@ details.admin-chez__analysis-section pre {
 .cockpit-composer__buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 .cockpit-composer__feedback { margin: 8px 0 0; font-size: 11px; }
 
+/* Phase 96 — homeowner scheduling preferences banner on
+ * home_assessment_request case panels. Sits between the conversation
+ * and quick actions so the operator sees the homeowner's window before
+ * tapping "Assign handyman". */
+.cockpit-prefs {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(237, 105, 85, 0.06);
+  border: 1px solid rgba(237, 105, 85, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cockpit-prefs__title {
+  font: 600 11px / 1 var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--salmon-dark, #D14E3E);
+  margin-bottom: 4px;
+}
+.cockpit-prefs__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 13px / 1.4 var(--sans);
+}
+.cockpit-prefs__row--block {
+  flex-direction: column;
+  gap: 2px;
+}
+.cockpit-prefs__label {
+  font-weight: 600;
+  color: var(--text-muted, #6F6A88);
+  min-width: 130px;
+}
+.cockpit-prefs__value {
+  color: var(--text-primary, #453A70);
+}
+
 .cockpit-quickactions {
   display: flex;
   gap: 6px;

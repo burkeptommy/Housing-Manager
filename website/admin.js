@@ -7151,6 +7151,8 @@ function renderConciergeConversationHtml(req, messages) {
         </form>
       `}
 
+      ${isHomeAssessmentRequest(req) ? renderAssessmentPreferencesBanner(req) : ""}
+
       <div class="cockpit-quickactions">
         <button type="button" class="cockpit-btn cockpit-btn--ghost cockpit-btn--sm" data-cockpit-action="open-proposal-builder">Manual proposal</button>
         ${isHomeAssessmentRequest(req)
@@ -7175,6 +7177,69 @@ function isHomeAssessmentRequest(req) {
   const ctx = req.context;
   if (ctx._kind !== "home_assessment_request") return false;
   return typeof ctx.assessment_id === "string" && ctx.assessment_id.length > 0;
+}
+
+// Phase 96 — homeowner-supplied scheduling preferences. Surface them on
+// the case panel for home_assessment_request cases so the operator can
+// schedule within the homeowner's window without digging into the home
+// assessment row directly. Data lives at req.context.{preferred_dates,
+// reschedule_request_notes, reschedule_requested_at} (patched server-
+// side by chez-concierge's request_assessment_reschedule handler).
+// Returns "" when nothing is on file so the empty case stays uncluttered.
+function renderAssessmentPreferencesBanner(req) {
+  const ctx = (req && req.context) || {};
+  const dates = Array.isArray(ctx.preferred_dates) ? ctx.preferred_dates : [];
+  const notes = typeof ctx.reschedule_request_notes === "string"
+    ? ctx.reschedule_request_notes.trim()
+    : "";
+  const requestedAt = typeof ctx.reschedule_requested_at === "string"
+    ? ctx.reschedule_requested_at
+    : "";
+  // Also surface the initial booking window when present — set when the
+  // homeowner first books, persisted on home_assessments. Stored on
+  // context as {preferred_window_start, preferred_time_of_day} when the
+  // booking edge function patches the request.
+  const windowStart = typeof ctx.preferred_window_start === "string"
+    ? ctx.preferred_window_start
+    : "";
+  const timeOfDay = typeof ctx.preferred_time_of_day === "string"
+    ? ctx.preferred_time_of_day
+    : "";
+  if (dates.length === 0 && !notes && !windowStart && !timeOfDay) return "";
+
+  const fmtDate = (raw) => {
+    if (typeof raw !== "string" || !raw) return "";
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  };
+
+  const datesRow = dates.length > 0
+    ? `<div class="cockpit-prefs__row"><span class="cockpit-prefs__label">Preferred dates</span><span class="cockpit-prefs__value">${dates.map((d) => escapeHtml(fmtDate(d))).join(" · ")}</span></div>`
+    : (windowStart
+        ? `<div class="cockpit-prefs__row"><span class="cockpit-prefs__label">Earliest date</span><span class="cockpit-prefs__value">${escapeHtml(fmtDate(windowStart))}</span></div>`
+        : "");
+  const todRow = timeOfDay
+    ? `<div class="cockpit-prefs__row"><span class="cockpit-prefs__label">Time of day</span><span class="cockpit-prefs__value">${escapeHtml(timeOfDay)}</span></div>`
+    : "";
+  const notesRow = notes
+    ? `<div class="cockpit-prefs__row cockpit-prefs__row--block"><span class="cockpit-prefs__label">Note from homeowner</span><span class="cockpit-prefs__value">${escapeHtml(notes)}</span></div>`
+    : "";
+  const requestedRow = requestedAt
+    ? `<div class="cockpit-prefs__row"><span class="cockpit-prefs__label">Reschedule requested</span><span class="cockpit-prefs__value">${escapeHtml(formatDateTime(requestedAt))}</span></div>`
+    : "";
+
+  return `
+    <div class="cockpit-prefs">
+      <div class="cockpit-prefs__title">
+        <span>📅 Homeowner preferences</span>
+      </div>
+      ${datesRow}
+      ${todRow}
+      ${notesRow}
+      ${requestedRow}
+    </div>
+  `;
 }
 
 // Heuristic tone-assessment (no AI round trip). Looks for warmth tokens,
