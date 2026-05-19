@@ -379,6 +379,20 @@ final class DashboardViewModel: ObservableObject {
     /// dashboard reloads.
     @Published var dismissedCoverageCategories: Set<String> = []
 
+    /// Round 3 (May 2026) — full dismissed-row state for the focused
+    /// CoverageView. The Set above is just category names for the
+    /// suppression check; the focused view needs the timestamps so it
+    /// can split permanent vs snoozed and show "Reminds again Nov 18"
+    /// per row.
+    @Published var dismissedCoverageRows: [DismissedCategoryRow] = []
+
+    /// Round 3 — top-level home_systems that are intentionally excluded
+    /// from vendor coverage counting (Appliance, Crawl Space, Sump Pump,
+    /// Garage Door, etc.). Surfaced in CoverageView's NOT COUNTED
+    /// section so users can see exactly which systems exist without
+    /// being counted toward the coverage ratio.
+    @Published var notCountedSystems: [HomeSystemRow] = []
+
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -1239,7 +1253,43 @@ final class DashboardViewModel: ObservableObject {
         // respects prior user "Hide" swipes on rows they don't want to see.
         let systems = (try? await DatabaseService.shared.fetchHomeSystems()) ?? []
         let dismissed = (try? await DatabaseService.shared.fetchDismissedCategories()) ?? []
-        dismissedCoverageCategories = Set(dismissed.map(\.category))
+        // Friend feedback Round 2 — respect the snooze TTL added by the
+        // Round 2 Vendor Coverage "Remind me later" feature. `now` is
+        // already declared in `loadVendorVisits`; use a distinct name
+        // here to avoid redeclaration.
+        let dismissalCheckAt = Date()
+        let suppressing: [DismissedCategoryRow] = dismissed.filter { row in
+            if let until = row.snoozedUntil {
+                return until > dismissalCheckAt  // active snooze still suppresses
+            }
+            return true  // permanent dismissal
+        }
+        dismissedCoverageCategories = Set(suppressing.map { $0.category })
+
+        // Round 3 — surface the full dismissed-row state for the focused
+        // CoverageView. Permanent dismissals + active snoozes both go
+        // here; expired-snooze rows we filter out (they're no longer
+        // suppressing anyone and rendering them as "Reminds again"
+        // would mislead about a date that's already passed).
+        dismissedCoverageRows = dismissed
+            .filter { row in
+                if let until = row.snoozedUntil {
+                    return until > dismissalCheckAt
+                }
+                return true
+            }
+            .sorted { $0.category < $1.category }
+
+        // Round 3 — NOT COUNTED set: top-level systems whose category
+        // SystemCategoryRegistry intentionally excludes from coverage
+        // (hidden category names + showInVendorCoverage:false). Solves
+        // "but I have 22 systems!" by listing the categories explicitly
+        // rather than silently dropping them from the coverage ratio.
+        notCountedSystems = systems
+            .filter { $0.parentSystemId == nil }
+            .filter { !SystemCategoryRegistry.showInVendorCoverage(category: $0.category, parentSystemId: nil) }
+            .sorted { $0.category < $1.category }
+
         computeCoverage(allTasks: allTasks, contractors: contractors, systems: systems)
     }
 

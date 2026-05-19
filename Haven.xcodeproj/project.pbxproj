@@ -486,7 +486,6 @@
 		84C5B7DB9882AC1305773BE4 /* HouseQuizTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E305136BBADF35A4473FE8 /* HouseQuizTransition.swift */; };
 		84D034B797C487155A3F3C3E /* SystemGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C235D5924950601DBEC89D /* SystemGroup.swift */; };
 		84E263024BA7EB0EB1C27CC4 /* TrustedContactDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5964DD20089AE2FA96DD6B3F /* TrustedContactDetailView.swift */; };
-		84FD05A8CBA41E39DC4DEF8F /* GuidedAssessmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 800954EB4564B197E8AEE609 /* GuidedAssessmentView.swift */; };
 		85414C4D42B8169B70DF198E /* HavenFieldCrewChatTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F4C0E9441B3FE3C52CAE43 /* HavenFieldCrewChatTab.swift */; };
 		859215987971D6716E999BB9 /* RequestAssessmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E56265BF2A2E74DD788D6CDE /* RequestAssessmentView.swift */; };
 		85EDC669E036389F6A00F5B6 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F21E2347101F280AF6E2FC /* AppState.swift */; };
@@ -573,7 +572,6 @@
 		9DF30C5BE1F70AECA342366C /* ChezFieldProviderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E36E247122A75318F575D3 /* ChezFieldProviderCard.swift */; };
 		9E1BAF02B5A1152E991C1CC5 /* AddressAutocompleteField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D454019B1D9DF0E175C34AB /* AddressAutocompleteField.swift */; };
 		9E4725CE79D66B889D139F24 /* DuplicateDismissalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233D55DE28A313B5BEEAF39C /* DuplicateDismissalStore.swift */; };
-		9EA1156F28355E5A68D05E6A /* GuidedAssessmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 800954EB4564B197E8AEE609 /* GuidedAssessmentView.swift */; };
 		9EDF63ACEDEC411FB6500535 /* HandymanVisitDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */; };
 		9F12E4B6C07097C0BEC5A124 /* FamilyMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27E0CEC5981CD9DDE2C1B6D /* FamilyMember.swift */; };
 		9F4697D0830BD830312A7C82 /* FrequencyPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8097FAE3CDDC7B7D6B43462 /* FrequencyPickerSheet.swift */; };
@@ -1179,7 +1177,6 @@
 		7D01DDF4F64847EE3ACA4603 /* HookContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookContent.swift; sourceTree = "<group>"; };
 		7D8D097C2BF6F956A8DA7876 /* AssessmentPendingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssessmentPendingCard.swift; sourceTree = "<group>"; };
 		7EE222CAEC72CDB421341443 /* ScenarioLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioLoadingView.swift; sourceTree = "<group>"; };
-		800954EB4564B197E8AEE609 /* GuidedAssessmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuidedAssessmentView.swift; sourceTree = "<group>"; };
 		80692DF12B6F07485A0AA35A /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
 		81BD018DF1C202052DD92D84 /* JailbreakDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JailbreakDetection.swift; sourceTree = "<group>"; };
 		83AADE9042AEE29A1723D203 /* DocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCard.swift; sourceTree = "<group>"; };
@@ -2047,7 +2044,6 @@
 		A5FF84789EB236108BF1F8C5 /* Assessment */ = {
 			isa = PBXGroup;
 			children = (
-				800954EB4564B197E8AEE609 /* GuidedAssessmentView.swift */,
 			);
 			path = Assessment;
 			sourceTree = "<group>";
@@ -2808,7 +2804,6 @@
 				F3B1AD08159C74877B12E0AC /* GapAlert.swift in Sources */,
 				539BBB8FD239711CC12A0194 /* GapAnalysisView.swift in Sources */,
 				3774C65A00E721AD8728FFC0 /* GooglePlacesService.swift in Sources */,
-				84FD05A8CBA41E39DC4DEF8F /* GuidedAssessmentView.swift in Sources */,
 				6A1626C33780EB1FE119D247 /* HNWSubtypeReviewCard.swift in Sources */,
 				73C95F69A9EC90729CCE459C /* HandymanChatSheet.swift in Sources */,
 				F2D831C4ED1191FC151925B5 /* HandymanComponents.swift in Sources */,
@@ -3278,7 +3273,6 @@
 				635AEB4A8FA3A878A0FAEC92 /* GapAlert.swift in Sources */,
 				D71F9AC9940E3D9FD2260EC5 /* GapAnalysisView.swift in Sources */,
 				0F1F01E5D2C68643B54ADFE0 /* GooglePlacesService.swift in Sources */,
-				9EA1156F28355E5A68D05E6A /* GuidedAssessmentView.swift in Sources */,
 				4C956BED394A6E6DB82D398A /* HNWSubtypeReviewCard.swift in Sources */,
 				E478BBF5F328BF9306D6B545 /* HandymanChatSheet.swift in Sources */,
 				5E974096458D7BC7183FD61F /* HandymanComponents.swift in Sources */,
