@@ -11174,3 +11174,31 @@ details.admin-chez__analysis-section pre {
 .admin-focused__head .admin-pill {
   /* Override the action-row promotion: we're not inside __action-row. */
 }
+
+/* ========================================================================
+   Phase 85.8 — Concierge queue card household label
+   ========================================================================
+   Operator scans the queue rail with eyes-down; surfaces which house
+   each case belongs to at the top of every card. Pre-fix the card
+   showed category + ID + title + SLA but no household identity at all.
+   The label is a thin top-row ribbon so it doesn't eat much vertical
+   space but is the first thing read. */
+.cockpit-queue__case-household {
+  font: 600 11px var(--sans);
+  color: var(--text, #2A2252);
+  letter-spacing: 0.01em;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cockpit-queue__case-homeowner {
+  font-weight: 400;
+  color: var(--text-muted, #6F6A88);
+}
+.cockpit-queue__case.is-active .cockpit-queue__case-household {
+  color: var(--brand-strong, #ED6955);
+}

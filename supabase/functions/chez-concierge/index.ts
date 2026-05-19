@@ -4120,7 +4120,10 @@ async function handleFetchHouseholdsList(
   };
 
   const [householdsRes, requestsRes, routinesRes, contractorsRes, tasksRes, systemsRes, projectsRes] = await Promise.all([
-    safe(service.from("households").select("id, name, created_at, chez_ownership_groups").order("created_at", { ascending: false }), "households"),
+    // Phase 85.8: filter out soft-archived households (240 fully-empty
+    // test rows from the 5/18 sweep). archived_at IS NULL keeps the
+    // active set tight + the queue rail clean.
+    safe(service.from("households").select("id, name, created_at, chez_ownership_groups").is("archived_at", null).order("created_at", { ascending: false }), "households"),
     safe(service.from("chez_requests").select("id, household_id, status, last_message_at, sla_due_at"), "requests"),
     safe(service.from("routines").select("id, household_id, chez_owned").eq("chez_owned", true), "routines"),
     safe(service.from("contractors").select("id, household_id, chez_owned").eq("chez_owned", true), "contractors"),

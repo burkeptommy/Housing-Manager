@@ -1634,9 +1634,14 @@ async function loadAdminData() {
       // SELECT only succeeds for the household scope unless the caller
       // is admin. If `chezError` non-null we silently fall back to []
       // so the rest of the admin tooling stays functional.
+      //
+      // Phase 85.8: embed the household name + primary user so the
+      // concierge queue rail can show "The Tester Family" on every
+      // case card without lazy-loading dossiers. PostgREST handles the
+      // join via the foreign-key relationship.
       supabase
         .from("chez_requests")
-        .select("*")
+        .select("*, household:households(id, name), user:users!chez_requests_user_id_fkey(id, full_name, email)")
         .order("last_message_at", { ascending: false })
         .limit(200),
     ]);
@@ -5409,10 +5414,24 @@ function renderConciergeQueueCaseHtml(req, isActive) {
     : req.unread_for_admin
     ? "↩ awaiting your reply"
     : "· no new replies";
+  // Phase 85.8: surface the household name on every queue card so the
+  // operator can scan "which house is this from?" at a glance, without
+  // having to drill in. Falls back to the dossier cache when the embed
+  // didn't load (older code path / cache invalidation race).
+  const householdName = (req.household && req.household.name)
+    || (state.chezDossiersByHousehold || {})[req.household_id]?.household?.name
+    || `Household ${String(req.household_id || "").slice(0, 8)}`;
+  // If we have the homeowner's name (via the embed), surface it as a
+  // secondary line: operators recognize the homeowner by name in many
+  // cases ("Margaret Ashley") more than by household label.
+  const homeownerName = (req.user && (req.user.full_name || req.user.email)) || "";
 
   return `
     <button type="button" class="cockpit-queue__case ${isActive ? "is-active" : ""}" data-cockpit-case-id="${escapeHtml(req.id)}">
       ${isActive ? `<span class="cockpit-queue__case-accent"></span>` : ""}
+      <div class="cockpit-queue__case-household">
+        🏠 ${escapeHtml(householdName)}${homeownerName ? `<span class="cockpit-queue__case-homeowner"> · ${escapeHtml(homeownerName)}</span>` : ""}
+      </div>
       <div class="cockpit-queue__case-top">
         <span class="cockpit-queue__case-icon">${CHEZ_CATEGORY_ICONS[cat] || "💬"}</span>
         <span class="cockpit-queue__case-type">${escapeHtml(catLabel)}</span>
