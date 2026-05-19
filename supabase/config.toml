@@ -227,6 +227,14 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Branded password-recovery email. The hosted Supabase project also needs
+# this template pasted into Authentication → Email Templates → Reset Password
+# (the dashboard is the source of truth for production; this section only
+# affects local `supabase start` runs).
+[auth.email.template.recovery]
+subject = "Reset your Chez password"
+content_path = "./supabase/templates/recover.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

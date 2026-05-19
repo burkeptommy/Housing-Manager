@@ -296,7 +296,14 @@ final class AuthService: ObservableObject {
 
     func resetPassword(email: String) async throws {
         Analytics.track(.authPasswordResetRequested)
-        try await HavenSupabase.auth.resetPasswordForEmail(email)
+        // Pin the redirect to getchez.com so the email link can't fall back
+        // to whatever Site URL the Supabase dashboard happens to have set
+        // (it was still pointing at the legacy havenhome.dev domain, which
+        // sent users to a dead page). The matching landing page lives at
+        // website/reset-password.html and handles token_hash / implicit /
+        // PKCE recovery shapes.
+        let redirect = URL(string: "https://getchez.com/reset-password")
+        try await HavenSupabase.auth.resetPasswordForEmail(email, redirectTo: redirect)
     }
 
     /// Complete onboarding by linking the user to a household.
