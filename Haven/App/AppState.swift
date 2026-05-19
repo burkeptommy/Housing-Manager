@@ -298,6 +298,18 @@ final class AppState: ObservableObject {
                         await Self.migrateHandymanTierTasksToPunchItemsOnceIfNeeded()
                         await Self.migrateHandymanVisitsToRemindersOnceIfNeeded()
 
+                        // Phase 97 (May 2026): re-date existing bundle
+                        // tasks whose `next_due_date` was computed using
+                        // the first member's `seasonalTiming` (which
+                        // contradicted the bundle's own season for
+                        // mixed-season bundles like Roofing:spring).
+                        // The new logic parses the season from the
+                        // bundleId and overrides; this migration applies
+                        // the same correction to rows already on file.
+                        // User-touched rows (lastCompleted / scheduled)
+                        // are skipped.
+                        await Self.backfillBundleDatesP97OnceIfNeeded()
+
                         // Round 4 (May 2026): one-time backfill that
                         // archives the auto-seeded twin of any duplicate
                         // routine pair created by Q15b before the race
@@ -898,6 +910,97 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(true, forKey: key)
         if archived > 0 {
             print("[AppState] HandymanVisits migration: archived \(archived) seasonal visit tasks")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+    }
+
+    /// Phase 97 — one-time backfill that recomputes bundle-task
+    /// `nextDueDate` values using the bundle's own season (parsed from
+    /// the bundleId) instead of the first member's seasonalTiming.
+    ///
+    /// Tom flagged that "Spring Landscaping Service" was scheduled
+    /// Aug 16 and "Fall Landscaping Service" Aug 20 — 4 days apart
+    /// despite being opposite-season bundles. Root cause: the bundle
+    /// creation path called `initialDueDate(for: firstTemplate)` and
+    /// the first member of `Roofing:spring` is "Annual roof inspection"
+    /// (seasonalTiming Fall, safetyFloor true → 56-day lead → Oct 1
+    /// - 56 = Aug 6). Phase 97 fixed that for new bundles by adding a
+    /// `seasonalTimingOverride` parsed from the bundleId. This
+    /// migration applies the same fix to bundle tasks already on file.
+    ///
+    /// Conservative: skips rows the user has touched (lastCompletedDate
+    /// or scheduledDate set) and rows whose templateId doesn't decode
+    /// to a known seasonal bundle (no colon, or unrecognized suffix).
+    @MainActor
+    static func backfillBundleDatesP97OnceIfNeeded() async {
+        let key = "hasBackfilledBundleDatesP97_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let tasks: [MaintenanceTaskDBRow]
+        do {
+            tasks = try await db.fetchMaintenanceTasks()
+        } catch {
+            print("[AppState] P97 bundle-date backfill: fetch failed: \(error)")
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = .current
+
+        var updated = 0
+        for task in tasks {
+            // Preserve user-touched rows. lastCompletedDate carries
+            // service history; scheduledDate means the homeowner
+            // picked a date and we shouldn't surprise them.
+            if task.lastCompletedDate != nil { continue }
+            if task.scheduledDate != nil { continue }
+            guard let templateId = task.templateId else { continue }
+            // Bundle ids contain a colon and a known seasonal suffix
+            // (the seasonFromBundleId helper returns nil for non-
+            // seasonal bundle ids like "Septic System:triennial",
+            // which we skip — those don't have a season to override).
+            guard let season = MaintenanceTaskReconciler.seasonFromBundleId(templateId) else { continue }
+            // Pull the bundle's first template from the library so we
+            // get the lead-time / safetyFloor / frequency inputs.
+            // `MaintenanceTemplates.allTemplates` is grouped by system
+            // category — flatten and find the first member with the
+            // matching bundleId. Skip the task if the templateId no
+            // longer matches any shipped template (e.g. an older
+            // bundle the library dropped).
+            let firstMember: MaintenanceTemplate? = {
+                for (_, group) in MaintenanceTemplates.allTemplates {
+                    if let m = group.first(where: { $0.bundleId == templateId }) {
+                        return m
+                    }
+                }
+                return nil
+            }()
+            guard let firstMember else { continue }
+
+            let newDate = MaintenanceTaskReconciler.initialDueDate(
+                for: firstMember,
+                seasonalTimingOverride: season
+            )
+            let newDateString = formatter.string(from: newDate)
+            // Skip the update when nothing changed — avoids touching
+            // updated_at unnecessarily.
+            if task.nextDueDate == newDateString { continue }
+
+            var update = MaintenanceTaskUpdate()
+            update.nextDueDate = newDateString
+            do {
+                _ = try await db.updateMaintenanceTask(id: task.id, update)
+                updated += 1
+            } catch {
+                print("[AppState] P97 bundle-date backfill: update failed for \(task.id): \(error)")
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+        if updated > 0 {
+            print("[AppState] P97 bundle-date backfill: re-dated \(updated) bundle tasks")
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         }
     }

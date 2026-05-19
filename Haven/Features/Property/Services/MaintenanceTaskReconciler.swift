@@ -559,7 +559,19 @@ enum MaintenanceTaskReconciler {
                     needsVendor = true
                 }
 
-                let nextDue = initialDueDate(for: firstTemplate)
+                // Phase 97 — derive the bundle's season from its ID
+                // (e.g. "Landscaping:spring" → "Spring", "Pool/Spa:closing"
+                // → "Fall"). This overrides whatever seasonalTiming the
+                // first member happens to be tagged with, so a bundle's
+                // intent (encoded in the id) wins over individual member
+                // contradictions. Returns nil for non-seasonal bundles
+                // like "Septic System:triennial" — those fall back to
+                // the template's own seasonalTiming.
+                let bundleSeason = Self.seasonFromBundleId(bundleId)
+                let nextDue = initialDueDate(
+                    for: firstTemplate,
+                    seasonalTimingOverride: bundleSeason
+                )
                 if shouldCreateParent {
                     var insert = MaintenanceTaskInsert(
                         householdId: householdId,
@@ -1367,9 +1379,38 @@ enum MaintenanceTaskReconciler {
     /// For sub-annual frequencies (Weekly, Monthly, Quarterly, etc.),
     /// seasonal timing is ignored and the standard `today + interval` math
     /// applies — those are pace tasks, not seasonal tasks.
+
+    /// Phase 97 — extract the season from a bundle id like
+    /// `"Landscaping:spring"` so bundle-task scheduling uses the
+    /// bundle's intent instead of the first member's possibly-
+    /// contradictory `seasonalTiming`. Returns nil for non-seasonal
+    /// bundle suffixes (e.g. `"Septic System:triennial"`) — those
+    /// fall back to the template's own seasonal tag.
+    ///
+    /// Recognized suffixes:
+    ///   ":spring" / ":fall" / ":summer" / ":winter" → matching season
+    ///   ":opening" → "Spring" (pool/spa opening convention)
+    ///   ":closing" → "Fall" (pool/spa closing convention)
+    static func seasonFromBundleId(_ bundleId: String) -> String? {
+        guard let colonRange = bundleId.range(of: ":", options: .backwards) else {
+            return nil
+        }
+        let suffix = String(bundleId[colonRange.upperBound...]).lowercased()
+        switch suffix {
+        case "spring":  return "Spring"
+        case "fall":    return "Fall"
+        case "summer":  return "Summer"
+        case "winter":  return "Winter"
+        case "opening": return "Spring"
+        case "closing": return "Fall"
+        default:        return nil
+        }
+    }
+
     static func initialDueDate(
         for template: MaintenanceTemplate,
-        today: Date = Date()
+        today: Date = Date(),
+        seasonalTimingOverride: String? = nil
     ) -> Date {
         let calendar = Calendar.current
 
@@ -1386,8 +1427,17 @@ enum MaintenanceTaskReconciler {
             }
         }()
 
+        // Phase 97 — `seasonalTimingOverride` lets bundle scheduling
+        // ignore the first member's seasonalTiming and use the
+        // bundle's named season (parsed from `bundleId`) instead. The
+        // first member of `Roofing:spring` happened to have
+        // `seasonalTiming: "Fall"` which gave the bundle a Fall
+        // anchor — "Roof and Gutter Service" surfaced in early August
+        // for May homeowners. Bundles encode their season in the id,
+        // so that's the source of truth.
+        let timingSource = seasonalTimingOverride ?? template.seasonalTiming
         guard isAnnualOrLonger,
-              let timing = template.seasonalTiming?.lowercased(),
+              let timing = timingSource?.lowercased(),
               !timing.isEmpty else {
             return calendar.date(byAdding: template.interval, to: today) ?? today
         }
