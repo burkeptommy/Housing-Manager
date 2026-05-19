@@ -217,13 +217,32 @@ final class DashboardViewModel: ObservableObject {
 
         // 4. Next scheduled vendor visit beyond a week — gives the
         // homeowner a calendar anchor when nothing else is pressing.
+        // Skip the literal "Vendor" placeholder (used when no specific
+        // contractor is linked) — "Next vendor visit: Vendor · Aug 6"
+        // reads as broken rather than informative. Reframe around the
+        // task title instead.
         if let next = nextScheduledService {
             let formatted = Self.formatFriendlyDate(next.date) ?? next.date
-            return GreetingSubtitle(
-                text: "Next vendor visit: \(next.vendorName) · \(formatted).",
-                icon: "calendar",
-                tone: .scheduled
-            )
+            let vendor = next.vendorName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isPlaceholder = vendor.isEmpty || vendor.caseInsensitiveCompare("Vendor") == .orderedSame
+            if !isPlaceholder {
+                return GreetingSubtitle(
+                    text: "Next vendor visit: \(vendor) · \(formatted).",
+                    icon: "calendar",
+                    tone: .scheduled
+                )
+            }
+            let title = next.taskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !title.isEmpty {
+                return GreetingSubtitle(
+                    text: "Next service: \(title) · \(formatted).",
+                    icon: "calendar",
+                    tone: .scheduled
+                )
+            }
+            // Both vendor and title are unusable — fall through to
+            // the seasonal tip rather than render a broken-looking
+            // subtitle.
         }
 
         // 5. Seasonal tip — the existing system-gated logic.
@@ -875,18 +894,48 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func fetchAll() async {
-        // Fire each load in its own unstructured Task so SwiftUI task cancellation
-        // (from pull-to-refresh or view lifecycle) doesn't cascade-cancel all requests.
-        // Each task updates @Published properties on MainActor independently.
+        // Two-phase load to eliminate a race condition: Phase 1 runs
+        // every fetch that doesn't depend on primaryPropertyId /
+        // primaryHouseholdId, including loadEnrichmentData (which is
+        // what *sets* those IDs from the user's properties row).
+        // Phase 2 runs every fetch that early-returns when those IDs
+        // are nil — loadHomeAssessment, loadHandymanPunchCount,
+        // loadHandymanSeasonalReminder, loadChezActivity. Without the
+        // split, on initial app launch those four loads frequently
+        // raced against loadEnrichmentData and lost, silently
+        // suppressing their cards until the next manual refresh.
+        //
+        // Each load runs inside an unstructured Task so SwiftUI's
+        // view-lifecycle cancellation doesn't cascade-cancel the
+        // whole batch.
         await withTaskGroup(of: Void.self) { group in
-            let methods: [() async -> Void] = [
-                loadExpirations, loadOverdueMaintenance,
-                loadRecentDocuments, loadUserName, loadGettingStartedState,
-                loadRecommendationData, loadEnrichmentData, loadInboxItems, loadVehicleAlerts,
-                loadVendorVisits, loadHouseholdEmail,
+            let phase1: [() async -> Void] = [
+                loadEnrichmentData,        // sets primaryPropertyId + primaryHouseholdId
+                loadExpirations,
+                loadOverdueMaintenance,
+                loadRecentDocuments,
+                loadUserName,
+                loadGettingStartedState,
+                loadRecommendationData,
+                loadInboxItems,
+                loadVehicleAlerts,
+                loadVendorVisits,
+                loadHouseholdEmail,
+                loadChezOwnershipCounts,
+            ]
+            for method in phase1 {
+                group.addTask { @MainActor in
+                    await Task { await method() }.value
+                }
+            }
+        }
+
+        // Phase 2: primary IDs are now populated; loads that depend
+        // on them can safely run.
+        await withTaskGroup(of: Void.self) { group in
+            let phase2: [() async -> Void] = [
                 loadHandymanPunchCount,
                 loadHandymanSeasonalReminder,
-                loadChezOwnershipCounts,
                 // Phase 85 — "This week with Chez" digest powering the
                 // Dashboard ChezActivityCard. Empty for DIY-default
                 // users; populated as ingestion + chez_owned task
@@ -897,9 +946,8 @@ final class DashboardViewModel: ObservableObject {
                 // HomeAssessmentPendingCard + HomeAssessmentPrepCard.
                 loadHomeAssessment,
             ]
-            for method in methods {
+            for method in phase2 {
                 group.addTask { @MainActor in
-                    // Ignore cancellation — we want these to complete
                     await Task { await method() }.value
                 }
             }
