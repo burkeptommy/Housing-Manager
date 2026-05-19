@@ -153,14 +153,18 @@ final class DashboardViewModel: ObservableObject {
         }
 
         // Seasonal tips, gated on the household's actual systems so we
-        // never reference a category the homeowner doesn't have.
-        let hasHVAC = hasAnySystem(matching: ["hvac"])
-        let hasLandscaping = hasAnySystem(matching: ["landscaping", "lawn"])
-        let hasPool = hasAnySystem(matching: ["pool", "spa", "hot tub"])
-        let hasIrrigation = hasAnySystem(matching: ["irrigation", "sprinkler"])
-        let hasGutters = hasAnySystem(matching: ["gutter", "roof"])
-        let hasSnow = hasAnySystem(matching: ["snow"])
-        let hasGenerator = hasAnySystem(matching: ["generator"])
+        // never reference a category the homeowner doesn't have. Match
+        // against exact canonical category keys (from
+        // SystemCategoryRegistry) — substring matching had a "Crawl
+        // Space".contains("spa") false positive that fired the May
+        // pool-opening prompt for every household with a crawl space.
+        let hasHVAC = hasAnySystem(inCategories: ["HVAC"])
+        let hasLandscaping = hasAnySystem(inCategories: ["Landscaping"])
+        let hasPool = hasAnySystem(inCategories: ["Pool/Spa", "Hot Tub"])
+        let hasIrrigation = hasAnySystem(inCategories: ["Irrigation"])
+        let hasGutters = hasAnySystem(inCategories: ["Gutter Cleaning", "Roofing"])
+        let hasSnow = hasAnySystem(inCategories: ["Snow Removal"])
+        let hasGenerator = hasAnySystem(inCategories: ["Generator"])
 
         switch calendar.component(.month, from: now) {
         case 3, 4:
@@ -205,18 +209,17 @@ final class DashboardViewModel: ObservableObject {
     }
 
     /// True when any of the household's home systems has a category
-    /// containing one of the given lowercased substrings. Substring
-    /// match (rather than equality) so legacy variants like
-    /// `"Pool/Spa"` and `"Hot Tub"` both pick up `"pool"` / `"spa"`.
-    private func hasAnySystem(matching loweredKeywords: [String]) -> Bool {
+    /// EXACTLY matching one of the given canonical category keys
+    /// (case-insensitive). Substring matching was tried earlier and
+    /// produced false positives — most notably `"Crawl Space"
+    /// .contains("spa")` triggering the pool-opening tip for every
+    /// crawl-space household. Categories in `home_systems.category`
+    /// are deterministic canonical keys from `SystemCategoryRegistry`,
+    /// so exact match is the right semantics.
+    private func hasAnySystem(inCategories canonicalCategories: [String]) -> Bool {
         guard !homeSystems.isEmpty else { return false }
-        for system in homeSystems {
-            let lowered = system.category.lowercased()
-            for keyword in loweredKeywords where lowered.contains(keyword) {
-                return true
-            }
-        }
-        return false
+        let targetSet = Set(canonicalCategories.map { $0.lowercased() })
+        return homeSystems.contains { targetSet.contains($0.category.lowercased()) }
     }
 
     /// Oxford-comma joiner. 1 → "a", 2 → "a and b", 3+ → "a, b, and c".
