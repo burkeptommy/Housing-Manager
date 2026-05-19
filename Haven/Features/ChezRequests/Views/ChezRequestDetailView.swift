@@ -155,7 +155,7 @@ struct ChezRequestDetailView: View {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: "arrow.triangle.merge")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(HavenColors.indigo)
+                    .foregroundStyle(HavenColors.navy800)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("This conversation was merged")
                         .font(HavenTypography.uiLabel)
@@ -174,11 +174,11 @@ struct ChezRequestDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(HavenColors.indigo.opacity(0.08))
+                    .fill(HavenColors.navy800.opacity(0.08))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(HavenColors.indigo.opacity(0.18), lineWidth: 1)
+                    .strokeBorder(HavenColors.navy800.opacity(0.18), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
