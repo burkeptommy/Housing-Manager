@@ -61,8 +61,39 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 //   tools      — sandboxes + reference docs (Simulate, Architecture, Claude file)
 const VIEWS = [
   {
+    // Phase 86A — Today command center. Cross-home triage: SLA-due cases,
+    // today's vendor visits, urgent items across every home. This is the
+    // operator's start-of-day surface. Replaces "Concierge" as the default
+    // landing since case-by-case work is one step deeper than triage.
+    id: "today",
+    label: "Today",
+    type: "today",
+    group: "action",
+    title: "Today",
+    eyebrow: "Start of day · what's urgent across every home",
+    subtitle: "SLA-due cases, today's vendor visits, and unread customer replies — every home Chez manages, sorted by what needs you next.",
+  },
+  {
+    // Phase 84 — Per-household ongoing oversight. Lists every home; clicking
+    // opens the Home overview (address as masthead, contacts, standing
+    // instructions, coverage) → then the 8 entity tabs (routines, systems,
+    // vendors, tasks, projects, documents, bills, vehicles, cases).
+    // Phase 86A — Renamed user-facing label to "Homes". Internal id stays
+    // "households" to avoid breaking the dozens of state references.
+    id: "households",
+    label: "Homes",
+    type: "household",
+    group: "action",
+    title: "Homes",
+    eyebrow: "Every home Chez manages",
+    subtitle: "Drill into any home to see its address, family, standing instructions, coverage, and every entity Chez owns — routines, systems, vendors, tasks, projects, documents, bills, vehicles. Cases open as a slide-over from within a home.",
+  },
+  {
     // Phase 83 — Customer service cockpit. Internal route id stays "chez"
     // (referenced in dozens of places); user-facing label is "Concierge".
+    // Phase 86A — Demoted below Today + Homes. Still reachable as a
+    // top-level tab for case-centric triage; cases also deep-link here
+    // from within a Home Overview.
     id: "chez",
     label: "Concierge",
     type: "chez_request",
@@ -84,16 +115,19 @@ const VIEWS = [
     subtitle: "Routine visits, bills due, warranties expiring, insurance renewals, follow-ups, and stale cases — sorted by urgency across every household Chez manages.",
   },
   {
-    // Phase 84 — Per-household ongoing oversight. Lists every
-    // household; clicking opens a workbench showing every owned
-    // entity grouped by type with action buttons.
+    // Phase 84 — Per-household ongoing oversight. Lists every home; clicking
+    // opens the Home overview (address as masthead, contacts, standing
+    // instructions, coverage) → then the 8 entity tabs (routines, systems,
+    // vendors, tasks, projects, documents, bills, vehicles, cases).
+    // Phase 86A — Renamed user-facing label to "Homes". Internal id stays
+    // "households" to avoid breaking the dozens of state references.
     id: "households",
-    label: "Households",
+    label: "Homes",
     type: "household",
     group: "action",
-    title: "Households workbench",
-    eyebrow: "Ongoing oversight of every owned entity",
-    subtitle: "Every household, every entity Chez owns for them. Routines, systems, vendors, projects, documents, bills, insurance, vehicles. Cases also surface inline on the Open cases tab and on the Concierge cockpit.",
+    title: "Homes",
+    eyebrow: "Every home Chez manages",
+    subtitle: "Drill into any home to see its address, family, standing instructions, coverage, and every entity Chez owns — routines, systems, vendors, tasks, projects, documents, bills, vehicles. Cases open as a slide-over from within a home.",
   },
   {
     id: "audit",
@@ -562,7 +596,11 @@ const DEFAULT_SYSTEMS = [
 const state = {
   session: null,
   storageMode: "cloud",
-  view: "quiz",
+  // Phase 86A — Default landing flipped to "today" (cross-home triage).
+  // Was "quiz" (Quiz Builder catalog editor) which read as a dev tool, not
+  // a customer-service surface. Today shows SLA-due cases + today's vendor
+  // visits + urgent items across every home Chez manages.
+  view: "today",
   auditQuestions: [],
   auditTasks: [],
   adminItems: [],
@@ -674,7 +712,6 @@ const state = {
     selectedId: null,
     workbench: null,           // full per-household payload for the selected one
     workbenchLoadedAt: 0,
-    workbenchTab: "routines",  // routines | systems | vendors | tasks | projects | documents | utilities | vehicles | cases
     // Phase 86A — default tab is now "overview" (Home overview page). Was
     // "routines" which dropped operators straight into the entity list
     // without the home context that makes the rest of the workbench
@@ -1953,8 +1990,17 @@ function render() {
     document.querySelector("[data-storage-warning]")?.classList.toggle("is-hidden-by-concierge", isConcierge);
   }
 
+  // Phase 86A — Today view runs in single-column mode so the cards have
+  // room to breathe. The default 2-column admin layout is right for entity
+  // list + detail surfaces (Tasks, Quiz, Routines, etc.) but cramped for
+  // a command center that wants to span the viewport.
+  el.adminLayout?.classList.toggle("admin-layout--single", state.view === "today");
+
   if (state.view === "chez") {
     renderConciergeCockpit();
+  } else if (state.view === "today") {
+    // Phase 86A — Today command center. Cross-home triage surface.
+    renderTodayView();
   } else if (state.view === "upcoming") {
     renderUpcomingView();
   } else if (state.view === "households") {
@@ -18748,6 +18794,383 @@ function prettifyEnum(value) {
 // Both reuse the existing admin layout (el.list + el.auditFocused for
 // the focused detail rail), so no new HTML container is needed.
 
+// ============================================================================
+// Phase 86A — Today command center
+// ============================================================================
+// Cross-home triage. Default landing when the admin opens the panel.
+// Three sections stacked vertically:
+//   1. Needs you now    — SLA-overdue cases + unread homeowner replies +
+//                         SLA-due-soon cases. Severity color-coded.
+//   2. Today's visits   — chez_visits scheduled today (vendor, time, home).
+//   3. Coming up        — chez_visits scheduled tomorrow → +7d.
+//
+// Every row is clickable. Case rows deep-link into the Concierge cockpit
+// with that case pre-selected. Visit rows open the home workbench at the
+// visit's home (the operator can drill into the case from there).
+//
+// Data source: chez-concierge `fetch_today_brief` action. Stale window:
+// 60 seconds (matches Households + Upcoming pattern).
+// ============================================================================
+
+async function renderTodayView() {
+  el.search.value = state.search || "";
+  el.stats.innerHTML = `<div class="admin-stat"><strong>—</strong><span>Loading…</span></div>`;
+  el.list.innerHTML = `<p class="admin-audit__intro">Loading today's brief…</p>`;
+  // Hide the focused-detail rail (only relevant on entity views).
+  el.auditFocused?.classList.add("is-hidden");
+  el.emptyDetail?.classList.add("is-hidden");
+  el.detail?.classList.add("is-hidden");
+  el.noteFocused?.classList.add("is-hidden");
+  el.decisionFocused?.classList.add("is-hidden");
+
+  const stale = Date.now() - state.today.loadedAt > 60_000;
+  if (stale || state.today.loadedAt === 0) {
+    state.today.loading = true;
+    try {
+      const result = await callChezConcierge({ action: "fetch_today_brief" });
+      state.today.urgentCases = result.urgent_cases ?? [];
+      state.today.todaysVisits = result.todays_visits ?? [];
+      state.today.upcomingVisits = result.upcoming_visits ?? [];
+      state.today.recentUnread = result.recent_unread ?? [];
+      state.today.stats = result.stats ?? state.today.stats;
+      state.today.loadedAt = Date.now();
+      state.today.error = null;
+    } catch (e) {
+      state.today.error = String(e.message || e);
+      el.list.innerHTML = `<p class="admin-muted">Couldn't load today's brief: ${escapeHtml(state.today.error)}</p>`;
+      state.today.loading = false;
+      return;
+    }
+    state.today.loading = false;
+  }
+
+  const stats = state.today.stats;
+  // Stat tiles use the same `.admin-stat` chrome as every other surface so
+  // visual rhythm stays consistent.
+  el.stats.innerHTML = `
+    <div class="admin-stat admin-stat--clickable" data-today-jump="urgent">
+      <strong>${stats.sla_overdue || 0}</strong><span>Overdue</span>
+    </div>
+    <div class="admin-stat admin-stat--clickable" data-today-jump="urgent">
+      <strong>${stats.sla_due_soon || 0}</strong><span>Due soon</span>
+    </div>
+    <div class="admin-stat admin-stat--clickable" data-today-jump="visits-today">
+      <strong>${stats.visits_today || 0}</strong><span>Visits today</span>
+    </div>
+    <div class="admin-stat"><strong>${stats.open_cases || 0}</strong><span>Open cases</span></div>
+    <div class="admin-stat"><strong>${stats.homes_under_management || 0}</strong><span>Homes</span></div>
+  `;
+
+  const greetingHtml = renderTodayGreetingHtml(stats);
+  const urgentHtml = renderTodayUrgentSectionHtml(state.today.urgentCases);
+  const visitsHtml = renderTodayVisitsTodaySectionHtml(state.today.todaysVisits);
+  const upcomingHtml = renderTodayUpcomingSectionHtml(state.today.upcomingVisits);
+  const unreadHtml = renderTodayUnreadSectionHtml(state.today.recentUnread);
+
+  el.list.innerHTML = `
+    <div class="admin-audit admin-today">
+      ${greetingHtml}
+      <section class="admin-today__section" id="today-section-urgent" data-section="urgent">
+        <header class="admin-today__sec-head">
+          <h3>Needs you now</h3>
+          <span class="admin-today__sec-count">${state.today.urgentCases.length}</span>
+        </header>
+        ${urgentHtml}
+      </section>
+      <section class="admin-today__section" id="today-section-visits-today" data-section="visits-today">
+        <header class="admin-today__sec-head">
+          <h3>Today's visits</h3>
+          <span class="admin-today__sec-count">${state.today.todaysVisits.length}</span>
+        </header>
+        ${visitsHtml}
+      </section>
+      <section class="admin-today__section" id="today-section-unread" data-section="unread">
+        <header class="admin-today__sec-head">
+          <h3>Recent customer messages</h3>
+          <span class="admin-today__sec-count">${state.today.recentUnread.length}</span>
+        </header>
+        ${unreadHtml}
+      </section>
+      <section class="admin-today__section" id="today-section-upcoming" data-section="upcoming">
+        <header class="admin-today__sec-head">
+          <h3>Coming up · next 7 days</h3>
+          <span class="admin-today__sec-count">${state.today.upcomingVisits.length}</span>
+        </header>
+        ${upcomingHtml}
+      </section>
+    </div>
+  `;
+
+  // Stat-tile scroll jumps: clicking a tile scrolls the matching section
+  // into view. Mirrors the iOS Dashboard "Up Next" stat-pill filter pattern.
+  el.list.querySelectorAll("[data-today-jump]").forEach((tile) => {
+    tile.addEventListener("click", () => {
+      const target = el.list.querySelector(`#today-section-${tile.dataset.todayJump}`);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  // Case rows → open the Concierge cockpit with that case pre-selected.
+  el.list.querySelectorAll("[data-today-open-case]").forEach((row) => {
+    row.addEventListener("click", async () => {
+      const requestId = row.dataset.todayOpenCase;
+      await openCaseInCockpit(requestId);
+    });
+  });
+
+  // Visit rows + home rows → open the home workbench at that household.
+  el.list.querySelectorAll("[data-today-open-home]").forEach((row) => {
+    row.addEventListener("click", async () => {
+      const householdId = row.dataset.todayOpenHome;
+      await openHomeFromToday(householdId);
+    });
+  });
+
+  // "View all cases" / "View all homes" footer links.
+  el.list.querySelector("[data-today-view-all-cases]")?.addEventListener("click", () => {
+    state.view = "chez";
+    render();
+  });
+  el.list.querySelector("[data-today-view-all-homes]")?.addEventListener("click", () => {
+    state.view = "households";
+    render();
+  });
+  el.list.querySelector("[data-today-refresh]")?.addEventListener("click", () => {
+    state.today.loadedAt = 0;
+    renderTodayView();
+  });
+}
+
+// Greeting card — operator + date + headline that adapts to what's hot.
+function renderTodayGreetingHtml(stats) {
+  const now = new Date();
+  const hour = now.getHours();
+  let greeting;
+  if (hour < 5) greeting = "Late shift";
+  else if (hour < 12) greeting = "Good morning";
+  else if (hour < 17) greeting = "Good afternoon";
+  else greeting = "Good evening";
+
+  const dateStr = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  let headline;
+  if ((stats.sla_overdue || 0) > 0) {
+    headline = `${stats.sla_overdue} ${stats.sla_overdue === 1 ? "case is" : "cases are"} past SLA.`;
+  } else if ((stats.sla_due_soon || 0) > 0) {
+    headline = `${stats.sla_due_soon} ${stats.sla_due_soon === 1 ? "case is" : "cases are"} due within 6 hours.`;
+  } else if ((stats.visits_today || 0) > 0) {
+    headline = `${stats.visits_today} vendor ${stats.visits_today === 1 ? "visit is" : "visits are"} scheduled today.`;
+  } else if ((stats.open_cases || 0) > 0) {
+    headline = `All caught up on SLAs. ${stats.open_cases} ${stats.open_cases === 1 ? "case" : "cases"} open.`;
+  } else {
+    headline = "All clear. No open cases.";
+  }
+
+  return `
+    <header class="admin-today__greeting">
+      <div class="admin-today__greeting-text">
+        <span class="admin-today__greeting-eyebrow">${escapeHtml(dateStr)}</span>
+        <h2>${escapeHtml(greeting)}, Tom.</h2>
+        <p>${escapeHtml(headline)}</p>
+      </div>
+      <button type="button" class="admin-today__refresh" data-today-refresh title="Refresh">
+        ↻ Refresh
+      </button>
+    </header>
+  `;
+}
+
+function renderTodayUrgentSectionHtml(items) {
+  if (items.length === 0) {
+    return `<p class="admin-today__empty">No SLA pressure and no unread homeowner messages. Beautiful.</p>`;
+  }
+  const rows = items.map((c) => {
+    const tone = c.severity === "overdue" ? "red" : c.severity === "unread" ? "amber" : "yellow";
+    const label = c.severity === "overdue"
+      ? `Overdue · SLA ${relativeTimeString(c.sla_due_at)}`
+      : c.severity === "unread"
+      ? `Unread reply · ${relativeTimeString(c.last_message_at || c.sla_due_at)}`
+      : `Due ${relativeTimeString(c.sla_due_at)}`;
+    const proposalChip = (c.pending_proposal_count ?? 0) > 0
+      ? `<span class="admin-pill" data-tone="indigo">${c.pending_proposal_count} pending proposal${c.pending_proposal_count === 1 ? "" : "s"}</span>`
+      : "";
+    return `
+      <button type="button" class="admin-today__row" data-today-open-case="${escapeHtml(c.id)}">
+        <div class="admin-today__row-left">
+          <span class="admin-pill" data-tone="${tone}">${escapeHtml(label)}</span>
+          <strong class="admin-today__row-title">${escapeHtml(c.summary || "Untitled case")}</strong>
+          <span class="admin-today__row-sub">${escapeHtml(c.household_address)} · ${escapeHtml(prettyCategoryLabel(c.category))}</span>
+        </div>
+        <div class="admin-today__row-right">
+          ${proposalChip}
+          <span class="admin-today__chevron">→</span>
+        </div>
+      </button>
+    `;
+  }).join("");
+  return `
+    <div class="admin-today__rows">${rows}</div>
+    <button type="button" class="admin-today__view-all" data-today-view-all-cases>
+      View all cases in Concierge →
+    </button>
+  `;
+}
+
+function renderTodayVisitsTodaySectionHtml(items) {
+  if (items.length === 0) {
+    return `<p class="admin-today__empty">No vendor visits scheduled today.</p>`;
+  }
+  const rows = items.map((v) => {
+    const timeStr = v.scheduled_for
+      ? new Date(v.scheduled_for).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+      : "Time TBD";
+    const window = v.scheduled_window ? ` · ${escapeHtml(v.scheduled_window)}` : "";
+    const phoneChip = v.vendor_phone
+      ? `<span class="admin-today__chip">📞 ${escapeHtml(v.vendor_phone)}</span>`
+      : "";
+    return `
+      <button type="button" class="admin-today__row" data-today-open-home="${escapeHtml(v.household_id)}">
+        <div class="admin-today__row-left">
+          <strong class="admin-today__row-time">${escapeHtml(timeStr)}${window}</strong>
+          <span class="admin-today__row-title">${escapeHtml(v.vendor_name || "Vendor")}</span>
+          <span class="admin-today__row-sub">${escapeHtml(v.household_address)}</span>
+        </div>
+        <div class="admin-today__row-right">
+          ${phoneChip}
+          <span class="admin-today__chevron">→</span>
+        </div>
+      </button>
+    `;
+  }).join("");
+  return `<div class="admin-today__rows">${rows}</div>`;
+}
+
+function renderTodayUnreadSectionHtml(items) {
+  if (items.length === 0) {
+    return `<p class="admin-today__empty">Inbox is clear. No unread homeowner messages in the last 48 hours.</p>`;
+  }
+  const rows = items.map((m) => {
+    return `
+      <button type="button" class="admin-today__row" data-today-open-case="${escapeHtml(m.request_id)}">
+        <div class="admin-today__row-left">
+          <span class="admin-pill" data-tone="amber">${escapeHtml(relativeTimeString(m.sent_at))}</span>
+          <strong class="admin-today__row-title">${escapeHtml(m.summary || "Untitled case")}</strong>
+          <span class="admin-today__row-sub">${escapeHtml(m.household_address)} · ${escapeHtml(prettyCategoryLabel(m.category))}</span>
+          <span class="admin-today__row-excerpt">"${escapeHtml(m.excerpt || "")}"</span>
+        </div>
+        <div class="admin-today__row-right">
+          <span class="admin-today__chevron">→</span>
+        </div>
+      </button>
+    `;
+  }).join("");
+  return `<div class="admin-today__rows">${rows}</div>`;
+}
+
+function renderTodayUpcomingSectionHtml(items) {
+  if (items.length === 0) {
+    return `<p class="admin-today__empty">Quiet week. No scheduled vendor visits in the next 7 days.</p>`;
+  }
+  // Group by day for readability.
+  const byDay = new Map();
+  for (const v of items) {
+    const day = v.scheduled_for ? new Date(v.scheduled_for).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "TBD";
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(v);
+  }
+  const blocks = [...byDay.entries()].map(([day, visits]) => {
+    const rows = visits.map((v) => {
+      const timeStr = v.scheduled_for
+        ? new Date(v.scheduled_for).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+        : "Time TBD";
+      return `
+        <button type="button" class="admin-today__row admin-today__row--compact" data-today-open-home="${escapeHtml(v.household_id)}">
+          <div class="admin-today__row-left">
+            <span class="admin-today__row-time admin-today__row-time--compact">${escapeHtml(timeStr)}</span>
+            <span class="admin-today__row-title">${escapeHtml(v.vendor_name || "Vendor")} · ${escapeHtml(v.household_address)}</span>
+          </div>
+          <span class="admin-today__chevron">→</span>
+        </button>
+      `;
+    }).join("");
+    return `
+      <div class="admin-today__day-block">
+        <h4 class="admin-today__day-label">${escapeHtml(day)}</h4>
+        ${rows}
+      </div>
+    `;
+  }).join("");
+  return `<div class="admin-today__rows">${blocks}</div>`;
+}
+
+// Map chez_request.category enum → human label. Single source of truth so
+// the same copy appears in Today, Concierge, and the iOS thread.
+function prettyCategoryLabel(category) {
+  switch (category) {
+    case "find_vendor": return "Find a vendor";
+    case "get_quote": return "Get a quote";
+    case "schedule_visit": return "Schedule a visit";
+    case "coordinate_task": return "Coordinate a task";
+    case "find_handyman": return "Find a handyman";
+    case "general": return "General request";
+    default: return category || "Request";
+  }
+}
+
+// Deep-link: open the Concierge cockpit with a specific case selected.
+// Mirrors what the Concierge tab does on first render when a case id is
+// supplied. The cockpit's own state (briefTab, composer scratchpad, alfred
+// chat) is keyed by request id so we get the right context for free.
+async function openCaseInCockpit(requestId) {
+  if (!requestId) return;
+  // Find or fetch the case so the cockpit can render without a flash of
+  // "loading…". state.chezRequests is the cache populated by the initial
+  // app-load query (top 200 by last_message_at).
+  let req = state.chezRequests.find((r) => r.id === requestId);
+  if (!req) {
+    try {
+      const { data, error } = await supabase
+        .from("chez_requests")
+        .select("*")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (error) throw error;
+      req = data;
+      if (req) state.chezRequests = [req, ...state.chezRequests];
+    } catch (e) {
+      console.warn("[today] could not fetch case", requestId, e);
+    }
+  }
+  state.selectedChezRequest = req;
+  state.view = "chez";
+  // Phase 86A — when arriving via Today, default the cockpit to master-detail
+  // chat mode so the operator lands on the case thread, not the queue list.
+  state.concierge.queueMode = "case";
+  // Warm the thread before render so the workspace doesn't flash empty.
+  if (req) {
+    try { await loadChezMessages(req.id); } catch (e) { /* non-fatal */ }
+  }
+  render();
+}
+
+// Deep-link: open the household workbench at a given home id, on the
+// Overview tab. Operator can then drill into the case from there if they
+// arrived via a visit row.
+async function openHomeFromToday(householdId) {
+  if (!householdId) return;
+  state.households.selectedId = householdId;
+  state.households.workbenchTab = "overview";
+  state.view = "households";
+  render();
+  // Trigger the workbench fetch right away so the panel doesn't sit empty.
+  try {
+    await loadHouseholdWorkbench(householdId);
+    renderHouseholdWorkbenchDetail();
+  } catch (e) {
+    console.warn("[today] workbench load failed", e);
+  }
+}
+
 // ----- Households list view --------------------------------------------------
 
 async function renderHouseholdsView() {
@@ -19062,6 +19485,35 @@ function renderHouseholdWorkbenchDetail() {
       try { await loadChezMessages(id); } catch (e) { console.warn("[workbench→case] message load failed", e); }
       render();
     });
+  });
+
+  // Phase 86A — Overview tab interactions.
+  // 1. Coverage tile → switch to that entity tab.
+  el.auditFocused.querySelectorAll("[data-overview-jump-tab]").forEach((tile) => {
+    tile.addEventListener("click", () => {
+      state.households.workbenchTab = tile.dataset.overviewJumpTab;
+      state.households.workbenchQuery = "";
+      renderHouseholdWorkbenchDetail();
+    });
+  });
+  // 2. Case row → open the cockpit slide-over with that case selected.
+  el.auditFocused.querySelectorAll("[data-overview-open-case]").forEach((row) => {
+    row.addEventListener("click", async () => {
+      const id = row.dataset.overviewOpenCase;
+      await openCaseInCockpit(id);
+    });
+  });
+  // 3. Standing-instructions edit → opens the existing profile drawer (a
+  // Phase 80.1 surface). For now we route the click through whichever
+  // open-profile handler the cockpit already exposes; if absent, fall
+  // back to switching to the cockpit which knows how to render it.
+  el.auditFocused.querySelector("[data-overview-edit-profile]")?.addEventListener("click", () => {
+    // Future: open a household-scoped profile editor inline. For v1, route
+    // to the cockpit so the operator can edit via the existing profile
+    // drawer surface there. The selected case stays unchanged so the
+    // operator can come back to this Home with one tab click.
+    state.view = "chez";
+    render();
   });
 }
 
@@ -21202,7 +21654,23 @@ function renderHouseholdWorkbenchHtml(wb, tab) {
     return fields.some((f) => typeof f === "string" && f.toLowerCase().includes(query));
   };
 
+  // Phase 86A — Overview is the new default tab. Address as masthead,
+  // family card, standing instructions, coverage summary, today feed
+  // (open cases + today's visits for this specific home). The eight
+  // entity tabs stay as drill-in destinations for power-use; Overview
+  // is where the operator orients before doing work.
+  const totalOwned =
+    allRoutines.filter((r) => r.chez_owned).length +
+    allSystems.filter((s) => s.chez_owned).length +
+    allVendors.filter((c) => c.chez_owned).length +
+    allTasks.filter((t) => t.chez_owned).length +
+    allProjects.filter((p) => p.chez_owned).length +
+    allDocuments.filter((d) => d.chez_owned).length +
+    allUtilities.filter((u) => u.chez_owned).length +
+    allVehicles.filter((v) => v.chez_owned).length;
+
   const tabs = [
+    { id: "overview", label: "Overview", count: openCases.length, owned: totalOwned, isOverview: true },
     { id: "routines", label: "Routines", count: allRoutines.length, owned: allRoutines.filter((r) => r.chez_owned).length },
     { id: "systems", label: "Systems", count: allSystems.length, owned: allSystems.filter((s) => s.chez_owned).length },
     { id: "vendors", label: "Vendors", count: allVendors.length, owned: allVendors.filter((c) => c.chez_owned).length },
@@ -21216,6 +21684,11 @@ function renderHouseholdWorkbenchHtml(wb, tab) {
 
   const tabBody = (() => {
     switch (tab) {
+      case "overview":
+        return renderHouseholdOverviewHtml(wb, {
+          allRoutines, allSystems, allVendors, allTasks, allProjects,
+          allDocuments, allUtilities, allVehicles, openCases, totalOwned,
+        });
       case "routines": {
         const rows = allRoutines.filter(matchOwned).filter((r) => matchQuery(r.label, r.routine_kind));
         return renderWorkbenchListHtml(rows, "No routines match.", (r) => {
@@ -21381,7 +21854,7 @@ function renderHouseholdWorkbenchHtml(wb, tab) {
         `).join("")}
       </div>
 
-      ${tab !== "cases" ? `
+      ${tab !== "cases" && tab !== "overview" ? `
         <div class="admin-households__toolbar">
           <input
             type="search"
@@ -21438,6 +21911,252 @@ function renderHouseholdWorkbenchHtml(wb, tab) {
       ` : ""}
     </section>
   `;
+}
+
+// ============================================================================
+// Phase 86A — Home Overview (workbench's default tab)
+// ============================================================================
+// Address as masthead → key contacts (homeowner + family + home managers) →
+// standing instructions (chez_profile summary) → coverage card (count of
+// chez_owned entities across types) → today feed for this specific home
+// (open cases + today's visits) → recent workbench activity.
+//
+// Tap any case row → opens the cockpit slide-over with that case selected.
+// Tap "Manage standing instructions" → opens the profile drawer (existing).
+// Tap any coverage tile → switches the workbench to that entity tab.
+// ============================================================================
+
+function renderHouseholdOverviewHtml(wb, lists) {
+  const household = wb.household ?? {};
+  const property = (wb.properties || [])[0] || null;
+  const users = wb.users || [];
+  const familyMembers = wb.family_members || [];
+  const profile = (household.chez_profile && typeof household.chez_profile === "object") ? household.chez_profile : {};
+  const recentActions = wb.workbench_actions || [];
+  const reminders = wb.reminders || [];
+
+  // Today bucketing for this home only.
+  const now = new Date();
+  const endOfDayUtc = new Date(now); endOfDayUtc.setUTCHours(23, 59, 59, 999);
+  const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  // chez_visits aren't part of the workbench payload yet — we infer
+  // upcoming-visit hints from open cases' pending_proposal_count + from
+  // workbench_actions where action_type = "schedule_visit". Real per-home
+  // visit feed will land in Phase 86B alongside the iOS activity feed.
+  const openCases = (lists.openCases || []).slice().sort((a, b) => {
+    const aT = a.sla_due_at ? new Date(a.sla_due_at).getTime() : Number.MAX_SAFE_INTEGER;
+    const bT = b.sla_due_at ? new Date(b.sla_due_at).getTime() : Number.MAX_SAFE_INTEGER;
+    return aT - bT;
+  });
+
+  // Address masthead. Prefer street + city/state; fall back to household
+  // name; finally to "Unnamed home" so we always render something.
+  const addressLine = property
+    ? formatAddress(property) || (household.name || "Unnamed home")
+    : (household.name || "Unnamed home");
+
+  // Spending tiers — render as a compact pill so the operator sees the
+  // authority bands without opening the full profile sheet.
+  const tiers = profile.spending_tiers || {};
+  const tierPill = (tiers.auto_approve_under || tiers.ping_under || tiers.explicit_above)
+    ? `<span class="admin-pill" data-tone="indigo">Auto-approve ≤ $${escapeHtml(String(tiers.auto_approve_under || 0))} · Ping ≤ $${escapeHtml(String(tiers.ping_under || 0))} · Explicit > $${escapeHtml(String(tiers.explicit_above || 0))}</span>`
+    : `<span class="admin-pill" data-tone="amber">Spending tiers not set</span>`;
+
+  // Communication preferences mini-card.
+  const comm = profile.communication || {};
+  const commChannel = comm.preferred_channel || "either";
+  const vacationActive = comm.vacation_mode === true;
+
+  // Vendor + logistics mini-cards.
+  const vendorPrefs = profile.vendor_preferences || {};
+  const logistics = profile.logistics || {};
+
+  // Contacts: combine signed-in users + family members.
+  const primaryUser = users[0];
+  const otherUsers = users.slice(1);
+  const contactsHtml = renderHomeContactsHtml(primaryUser, otherUsers, familyMembers);
+
+  // Coverage summary — tiles map to entity tabs.
+  const coverageTiles = [
+    { tab: "routines",  label: "Routines",  total: lists.allRoutines.length,  owned: lists.allRoutines.filter((r) => r.chez_owned).length },
+    { tab: "systems",   label: "Systems",   total: lists.allSystems.length,   owned: lists.allSystems.filter((s) => s.chez_owned).length },
+    { tab: "vendors",   label: "Vendors",   total: lists.allVendors.length,   owned: lists.allVendors.filter((c) => c.chez_owned).length },
+    { tab: "tasks",     label: "Tasks",     total: lists.allTasks.length,     owned: lists.allTasks.filter((t) => t.chez_owned).length },
+    { tab: "projects",  label: "Projects",  total: lists.allProjects.length,  owned: lists.allProjects.filter((p) => p.chez_owned).length },
+    { tab: "documents", label: "Documents", total: lists.allDocuments.length, owned: lists.allDocuments.filter((d) => d.chez_owned).length },
+    { tab: "utilities", label: "Bills",     total: lists.allUtilities.length, owned: lists.allUtilities.filter((u) => u.chez_owned).length },
+    { tab: "vehicles",  label: "Vehicles",  total: lists.allVehicles.length,  owned: lists.allVehicles.filter((v) => v.chez_owned).length },
+  ];
+
+  // Open-cases section.
+  const openCasesHtml = openCases.length === 0
+    ? `<p class="admin-overview__empty">No open cases for this home.</p>`
+    : openCases.slice(0, 5).map((c) => {
+        const slaTime = c.sla_due_at ? new Date(c.sla_due_at).getTime() : null;
+        const isOverdue = slaTime !== null && slaTime < now.getTime() && c.status === "open";
+        const tone = isOverdue ? "red" : c.unread_for_admin ? "amber" : "muted";
+        const label = isOverdue
+          ? `Overdue · ${relativeTimeString(c.sla_due_at)}`
+          : c.unread_for_admin
+          ? "Unread reply"
+          : (c.status === "waiting_customer" ? "Waiting on customer" : "Open");
+        return `
+          <button type="button" class="admin-overview__case-row" data-overview-open-case="${escapeHtml(c.id)}">
+            <span class="admin-pill" data-tone="${tone}">${escapeHtml(label)}</span>
+            <strong>${escapeHtml(c.summary || "Untitled case")}</strong>
+            <span class="admin-muted">${escapeHtml(prettyCategoryLabel(c.category))}</span>
+            <span class="admin-overview__chevron">→</span>
+          </button>
+        `;
+      }).join("");
+
+  // Recent workbench activity (last 5).
+  const recentActivityHtml = recentActions.length === 0
+    ? `<p class="admin-overview__empty">No recent Chez activity on this home yet.</p>`
+    : recentActions.slice(0, 5).map((a) => `
+        <div class="admin-overview__activity-row">
+          <strong>${escapeHtml(workbenchActionLabel(a.action_type))}</strong>
+          <span class="admin-muted">${escapeHtml(a.entity_type)} · ${escapeHtml(relativeTimeString(a.created_at))}</span>
+        </div>
+      `).join("");
+
+  // Reminders panel (the operator's own follow-up list for this home).
+  const remindersHtml = reminders.length === 0
+    ? ""
+    : `
+      <section class="admin-overview__section">
+        <h4>Your reminders for this home</h4>
+        ${reminders.slice(0, 4).map((r) => `
+          <div class="admin-overview__reminder-row">
+            <strong>${escapeHtml(r.title || "Reminder")}</strong>
+            <span class="admin-muted">${escapeHtml(formatDateTimeShort(r.due_at))}</span>
+          </div>
+        `).join("")}
+      </section>
+    `;
+
+  return `
+    <div class="admin-overview">
+      <header class="admin-overview__masthead">
+        <div class="admin-overview__address">
+          <span class="admin-overview__eyebrow">Home</span>
+          <h2>${escapeHtml(addressLine)}</h2>
+        </div>
+        <div class="admin-overview__quick-actions">
+          <button type="button" class="admin-pill admin-pill--action" data-overview-edit-profile>
+            ✎ Standing instructions
+          </button>
+        </div>
+      </header>
+
+      <div class="admin-overview__grid">
+        <section class="admin-overview__section admin-overview__section--contacts">
+          <h4>Who lives here</h4>
+          ${contactsHtml}
+        </section>
+
+        <section class="admin-overview__section admin-overview__section--instructions">
+          <h4>Standing instructions</h4>
+          ${profile.about_us ? `<p class="admin-overview__about">${escapeHtml(profile.about_us)}</p>` : `<p class="admin-overview__empty">No about-us copy yet. Click ✎ to capture standing context.</p>`}
+          <div class="admin-overview__inst-grid">
+            <div class="admin-overview__inst-row">
+              <span class="admin-overview__inst-label">Spending</span>
+              ${tierPill}
+            </div>
+            <div class="admin-overview__inst-row">
+              <span class="admin-overview__inst-label">Comms</span>
+              <span class="admin-pill" data-tone="muted">${escapeHtml(commChannel)}</span>
+              ${vacationActive ? `<span class="admin-pill" data-tone="amber">Vacation mode on</span>` : ""}
+            </div>
+            ${vendorPrefs.budget_orientation || vendorPrefs.prefer_local_owned ? `
+              <div class="admin-overview__inst-row">
+                <span class="admin-overview__inst-label">Vendors</span>
+                ${vendorPrefs.budget_orientation ? `<span class="admin-pill" data-tone="muted">${escapeHtml(vendorPrefs.budget_orientation)}</span>` : ""}
+                ${vendorPrefs.prefer_local_owned ? `<span class="admin-pill" data-tone="muted">prefers local</span>` : ""}
+                ${vendorPrefs.avoid_chains ? `<span class="admin-pill" data-tone="muted">avoid chains</span>` : ""}
+              </div>
+            ` : ""}
+            ${logistics.has_pets || logistics.entry_instructions ? `
+              <div class="admin-overview__inst-row">
+                <span class="admin-overview__inst-label">Logistics</span>
+                ${logistics.has_pets ? `<span class="admin-pill" data-tone="muted">Pets on premises</span>` : ""}
+                ${logistics.entry_instructions ? `<span class="admin-muted admin-overview__inst-note">${escapeHtml(logistics.entry_instructions)}</span>` : ""}
+              </div>
+            ` : ""}
+          </div>
+        </section>
+      </div>
+
+      <section class="admin-overview__section">
+        <h4>Coverage · what Chez handles</h4>
+        <div class="admin-overview__coverage-grid">
+          ${coverageTiles.map((t) => `
+            <button type="button" class="admin-overview__coverage-tile" data-overview-jump-tab="${escapeHtml(t.tab)}">
+              <span class="admin-overview__cov-num">${t.owned} <span class="admin-overview__cov-of">/ ${t.total}</span></span>
+              <span class="admin-overview__cov-label">${escapeHtml(t.label)}</span>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+
+      <section class="admin-overview__section">
+        <h4>Open cases · ${openCases.length}</h4>
+        <div class="admin-overview__cases">${openCasesHtml}</div>
+      </section>
+
+      ${remindersHtml}
+
+      <section class="admin-overview__section">
+        <h4>Recent Chez activity on this home</h4>
+        <div class="admin-overview__activity">${recentActivityHtml}</div>
+      </section>
+    </div>
+  `;
+}
+
+function renderHomeContactsHtml(primaryUser, otherUsers, familyMembers) {
+  const rows = [];
+  if (primaryUser) {
+    const name = primaryUser.full_name || primaryUser.email || "Homeowner";
+    rows.push(`
+      <div class="admin-overview__contact-row">
+        <span class="admin-pill" data-tone="indigo">Homeowner</span>
+        <strong>${escapeHtml(name)}</strong>
+        ${primaryUser.email ? `<span class="admin-muted">${escapeHtml(primaryUser.email)}</span>` : ""}
+      </div>
+    `);
+  }
+  for (const u of otherUsers) {
+    const name = u.full_name || u.email || "Account holder";
+    rows.push(`
+      <div class="admin-overview__contact-row">
+        <span class="admin-pill" data-tone="muted">${escapeHtml(u.role || "User")}</span>
+        <strong>${escapeHtml(name)}</strong>
+        ${u.email ? `<span class="admin-muted">${escapeHtml(u.email)}</span>` : ""}
+      </div>
+    `);
+  }
+  // Family members (not necessarily linked to a user). Skip if same as primaryUser.
+  for (const f of familyMembers) {
+    const name = ((f.first_name || "") + " " + (f.last_name || "")).trim();
+    if (!name) continue;
+    if (primaryUser && (primaryUser.full_name === name)) continue;
+    const memberType = f.member_type || "family";
+    const tone = memberType === "home_manager" ? "indigo" : memberType === "staff" ? "amber" : "muted";
+    const tierLabel = memberType === "home_manager" ? "Home manager" : memberType === "staff" ? "Staff" : (f.relationship || "Family");
+    rows.push(`
+      <div class="admin-overview__contact-row">
+        <span class="admin-pill" data-tone="${tone}">${escapeHtml(tierLabel)}</span>
+        <strong>${escapeHtml(name)}</strong>
+        ${f.phone ? `<span class="admin-muted">${escapeHtml(f.phone)}</span>` : ""}
+      </div>
+    `);
+  }
+  if (rows.length === 0) {
+    return `<p class="admin-overview__empty">No contacts captured yet.</p>`;
+  }
+  return rows.join("");
 }
 
 function renderWorkbenchListHtml(items, emptyCopy, formatter) {
