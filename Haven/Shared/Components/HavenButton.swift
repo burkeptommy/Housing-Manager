@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Chez button — salmon CTA + indigo-tinted secondary + text-only tertiary.
+/// Chez button — purple CTA + neutral-outlined secondary + text-only tertiary.
 ///
-/// Primary buttons get a salmon glow shadow that intensifies-then-tightens
-/// on press (matches the JSX prototype: `0 6px 16px rgba(237,105,85,.32)`
-/// at rest, `0 2px 8px rgba(237,105,85,.32)` pressed). Secondary uses the
-/// neutral 300 outline. Tertiary is text-only with an indigo 500 link
-/// color, used inline in cards for "View all" / "Manage" affordances.
+/// Primary buttons get a purple glow shadow that intensifies-then-tightens
+/// on press (`0 6px 16px rgba(105,56,239,.32)` at rest, `0 2px 8px
+/// rgba(105,56,239,.32)` pressed). Secondary uses the neutral 300 outline.
+/// Tertiary is text-only with a neutral-gray link color, used inline in
+/// cards for "View all" / "Manage" affordances.
 struct HavenButton: View {
     let title: String
     let action: () -> Void

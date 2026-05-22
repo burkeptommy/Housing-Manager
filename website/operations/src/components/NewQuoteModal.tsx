@@ -373,7 +373,7 @@ export function NewQuoteModal() {
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 55,
-        background: "rgba(42,34,82,0.4)",
+        background: "rgba(15, 10, 40,0.4)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
@@ -384,7 +384,7 @@ export function NewQuoteModal() {
           background: "#fff", borderRadius: 16,
           width: "min(820px, 95vw)",
           maxHeight: "90vh", overflowY: "auto",
-          boxShadow: "0 24px 60px rgba(42,34,82,0.4)",
+          boxShadow: "0 24px 60px rgba(15, 10, 40,0.4)",
         }}
         onClick={(e) => e.stopPropagation()}
       >

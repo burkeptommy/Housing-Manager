@@ -356,6 +356,14 @@ struct UtilityProviderSearchPicker: View {
                 tappedProviderId = provider.id
             }
             onSelect(provider)
+            // Phase X feedback: lazy logo enrichment. Only fire Brandfetch
+            // when the user explicitly picks a row that's missing a logo
+            // and has a website to resolve. Fire-and-forget so the
+            // selection animation completes instantly; the patch lands
+            // on the catalog row for the next user to benefit.
+            if provider.logoUrl == nil, provider.website != nil {
+                Task.detached { await Self.enrichOne(provider) }
+            }
         } label: {
             HStack(spacing: HavenTheme.spacing12) {
                 logoView(for: provider)
@@ -757,16 +765,14 @@ struct UtilityProviderSearchPicker: View {
         do {
             let providers = try await DatabaseService.shared.fetchUtilityProviders(types: providerTypes)
             allProviders = providers
-            // Phase 18d: lazy logo enrichment. Any provider in this category
-            // that's still missing a logo gets a background Brandfetch lookup
-            // so the next picker render shows it. Capped at 6 concurrent
-            // lookups to be polite to Brandfetch's rate limit; one fire-and
-            // -forget pass per .task(id:) load is more than enough since the
-            // server-side enrich-provider-logos function handles bulk catch
-            // up via ops.
-            Task.detached { [providers] in
-                await Self.enrichMissingLogos(providers: providers)
-            }
+            // Phase X feedback: the prior eager Brandfetch batch (up to 60
+            // providers / 15 concurrent per picker mount × 5+ quiz questions)
+            // was burning quota during onboarding for catalog rows the user
+            // never even saw. Gone. Logos now fetch lazily — on tap — via
+            // `enrichOne` in the row-select handler, so we only pay
+            // Brandfetch for brands a real user is committing to. Rows
+            // without a logo render initials immediately, which the
+            // homeowner barely notices given the picker is search-driven.
         } catch {
             loadError = error.localizedDescription
         }
@@ -789,53 +795,14 @@ struct UtilityProviderSearchPicker: View {
         }
     }
 
-    /// Phase 18d: Background enrichment for any provider in the loaded list
-    /// that's missing a logo. Runs detached so it doesn't block the picker
-    /// from rendering. Patches the catalog row directly so subsequent users
-    /// (and the next render of this picker) see the brand identity. Failures
-    /// are silent — Brandfetch downtime should never break the quiz.
-    ///
-    /// Build 90: Prioritise national/statewide brands so recognisable
-    /// logos (Fidelity, Schwab, MetLife, etc.) resolve on the very first
-    /// picker visit instead of losing their slot to random local firms.
-    /// Sorting: US-tagged first, then state-tagged, then local. Within
-    /// each tier, providers WITH a website sort before those without
-    /// (defensive, since the filter already requires a website).
-    /// Batch bumped from 20 → 60 and concurrency from 12 → 15 so a
-    /// fresh 500-row advisor catalog makes real progress on the first
-    /// render. Each subsequent visit enriches another 60 until the
-    /// backlog is drained.
-    private static func enrichMissingLogos(providers: [UtilityProviderRow]) async {
-        let needsLogo = providers.filter { $0.logoUrl == nil && $0.website != nil }
-        guard !needsLogo.isEmpty else { return }
-
-        // Prioritise nationals (regions contains 'US') then state-level,
-        // then local so the most recognisable brands get logos first.
-        let sorted = needsLogo.sorted { a, b in
-            let aRegions = a.regions ?? []
-            let bRegions = b.regions ?? []
-            let aIsUS = aRegions.contains(where: { $0.caseInsensitiveCompare("US") == .orderedSame })
-            let bIsUS = bRegions.contains(where: { $0.caseInsensitiveCompare("US") == .orderedSame })
-            if aIsUS != bIsUS { return aIsUS }
-            // Fewer region tags → broader coverage → higher priority
-            return aRegions.count < bRegions.count
-        }
-        let batch = Array(sorted.prefix(60))
-        await withTaskGroup(of: Void.self) { group in
-            var inFlight = 0
-            for provider in batch {
-                if inFlight >= 15 {
-                    await group.next()
-                    inFlight -= 1
-                }
-                group.addTask {
-                    await enrichOne(provider)
-                }
-                inFlight += 1
-            }
-        }
-    }
-
+    /// Lazy one-shot logo enrichment. Called from the row-select handler
+    /// when the user actually commits to a provider missing a logo —
+    /// gradually backfills the catalog via real usage instead of the
+    /// prior eager batch that hit Brandfetch hundreds of times per
+    /// onboarding regardless of whether the user cared about those rows.
+    /// Patches the catalog row directly so the next user who picks the
+    /// same provider gets the brand identity instantly. Silent failure —
+    /// Brandfetch downtime should never break selection.
     private static func enrichOne(_ provider: UtilityProviderRow) async {
         guard let website = provider.website else { return }
         let domain = website

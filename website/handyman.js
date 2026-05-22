@@ -167,7 +167,7 @@ function escapeHtml(value) {
 function setFeedback(node, text, isError = false) {
   if (!node) return;
   node.textContent = text || "";
-  node.style.color = text ? (isError ? "#c65241" : "#2f8b65") : "";
+  node.style.color = text ? (isError ? "#c65241" : "#0A0A0A") : "";
 }
 
 function money(value) {

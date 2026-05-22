@@ -1,18 +1,18 @@
 import SwiftUI
 
-/// Chez v1 Property detail header — the unifying indigo gradient card
+/// Chez v1 Property detail header — the unifying purple gradient card
 /// that sits above every Property sub-tab (Overview / Systems / Projects /
 /// Vendors / Documents). Replaces the duplicate "address + value" rows
 /// the previous build rendered separately on each sub-tab.
 ///
 /// Layout (per the design handoff):
 ///   - 168 pt tall, 24 pt corner radius, 16 pt horizontal margin
-///   - Indigo `#453A70` base + two radial gradient meshes (salmon
-///     bottom-right, indigo-light top-left) baked into a fill stack
-///   - Top column: salmon-light eyebrow → serif title → muted subtitle
+///   - Purple `#6938EF` base + two radial gradient meshes (deep purple
+///     bottom-right, lavender top-left) baked into a fill stack
+///   - Top column: lavender eyebrow → serif title → muted subtitle
 ///   - Bottom row: 3 stats separated by 1 pt × 28 pt vertical dividers
-///     (value, systems count, priorities — last one in salmon-light)
-///   - Indigo-tinted shadow `0 12px 32px rgba(42,34,82,0.18)`
+///     (value, systems count, priorities — last one in lavender)
+///   - Deep-purple-tinted shadow `0 12px 32px rgba(15,10,40,0.18)`
 struct PropertyHeroHeader: View {
     let eyebrow: String
     let title: String

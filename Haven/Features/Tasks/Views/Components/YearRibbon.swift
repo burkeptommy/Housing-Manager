@@ -114,11 +114,11 @@ private struct SeasonTile: View {
             .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isActive ? HavenColors.surface : season.v5Tint)
+                    .fill(isActive ? TasksV5.activeSeasonTint : season.v5Tint)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isActive ? HavenColors.beige200 : Color.clear, lineWidth: 1)
+                    .stroke(isActive ? HavenColors.action.opacity(0.3) : Color.clear, lineWidth: 1)
             )
             .shadow(
                 color: isActive ? HavenColors.navy800.opacity(0.08) : .clear,
@@ -154,7 +154,8 @@ private struct SeasonTile: View {
     }
 
     private var actionColor: Color {
-        summary.actionItems > 0 ? HavenColors.actionPressed : HavenColors.success
+        // Brief Rule 17: action-needed counts go purple, all others use textPrimary.
+        summary.actionItems > 0 ? HavenColors.action : HavenColors.textPrimary
     }
 }
 

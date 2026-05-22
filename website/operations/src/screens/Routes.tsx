@@ -204,7 +204,7 @@ export default function RoutesScreen() {
                   style={{
                     height: 130,
                     borderRadius: 12,
-                    background: "linear-gradient(135deg, #E8E4F2, #F2EFF8 50%, #FFE8E2)",
+                    background: "linear-gradient(135deg, #DDD3FA, #F4F0FE 50%, #EFEAFE)",
                     position: "relative",
                     marginBottom: 14,
                     overflow: "hidden",

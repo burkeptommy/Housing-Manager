@@ -21,11 +21,11 @@ export interface CrewMemberDemo {
 }
 
 export const CREW_DEMO: CrewMemberDemo[] = [
-  { id: "TB", name: "Tom Burke",     title: "Owner",            role: "Owner",      avatar: "TB", color: "#453A70", desk: true },
-  { id: "MC", name: "Mara Chen",     title: "Lead technician",  role: "Field tech", avatar: "MC", color: "#C77E2E" },
-  { id: "DA", name: "Diego Alvarez", title: "Field technician", role: "Field tech", avatar: "DA", color: "#4A7C59" },
-  { id: "LW", name: "Lou Whitman",   title: "Apprentice",       role: "Field tech", avatar: "LW", color: "#5A8DB5" },
-  { id: "JP", name: "Jess Park",     title: "Dispatcher",       role: "Desk",       avatar: "JP", color: "#5D4C8F", desk: true },
+  { id: "TB", name: "Tom Burke",     title: "Owner",            role: "Owner",      avatar: "TB", color: "#6938EF", desk: true },
+  { id: "MC", name: "Mara Chen",     title: "Lead technician",  role: "Field tech", avatar: "MC", color: "#6938EF" },
+  { id: "DA", name: "Diego Alvarez", title: "Field technician", role: "Field tech", avatar: "DA", color: "#0A0A0A" },
+  { id: "LW", name: "Lou Whitman",   title: "Apprentice",       role: "Field tech", avatar: "LW", color: "#6B6B7B" },
+  { id: "JP", name: "Jess Park",     title: "Dispatcher",       role: "Desk",       avatar: "JP", color: "#7A55F0", desk: true },
 ];
 
 export const HOMES_DEMO = [

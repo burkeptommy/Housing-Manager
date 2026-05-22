@@ -1,13 +1,18 @@
-/* Haven Website — Pearl White + Cosmic Indigo + Deepened Salmon */
+/* Haven Website — Pearl off-white + Vibrant Purple + Black/White + Gray
+ *
+ * Token NAMES preserved from the previous indigo+salmon palette
+ * (--navy, --champagne, --indigo, --salmon, etc.); VALUES remapped to
+ * the new three-color system. Text tokens point at black/gray, not purple.
+ */
 
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&display=swap');
 
 :root {
-  /* Surface — Pearl White background, Pure White cards */
-  --cream: #F8F9FA;
+  /* Surface — Pearl off-white background, Pure White cards */
+  --cream: #FAFAFC;
   --cream-light: #FCFCFD;
   --cream-white: #FFFFFF;
-  --pearl: #F8F9FA;
+  --pearl: #FAFAFC;
   --pearl-light: #FCFCFD;
   --pearl-white: #FFFFFF;
 
@@ -19,41 +24,41 @@
   --neutral-300: #D8DADF;
   --neutral-400: #B8BBC2;
 
-  /* Ink — Cosmic Indigo scale (legacy --navy names remap to indigo) */
-  --navy-900: #2A2252;
-  --navy: #453A70;
-  --navy-700: #524580;
-  --navy-600: #5D4C8F;
-  --navy-500: #6B5AA0;
-  --indigo-900: #2A2252;
-  --indigo: #453A70;
-  --indigo-700: #524580;
-  --indigo-600: #5D4C8F;
-  --indigo-500: #6B5AA0;
+  /* Ink + Purple scale (legacy --navy and --indigo names remap to purple/black) */
+  --navy-900: #0A0A0A;
+  --navy: #6938EF;
+  --navy-700: #8B6FF5;
+  --navy-600: #7A55F0;
+  --navy-500: #6B6B7B;
+  --indigo-900: #0A0A0A;
+  --indigo: #6938EF;
+  --indigo-700: #8B6FF5;
+  --indigo-600: #7A55F0;
+  --indigo-500: #6B6B7B;
 
-  /* Salmon — actions & accents (legacy --champagne names remap to salmon) */
-  --champagne: #ED6955;
-  --champagne-light: #F4877B;
-  --champagne-dark: #D14E3E;
-  --salmon: #ED6955;
-  --salmon-dark: #D14E3E;
-  --salmon-light: #F4877B;
-  --salmon-pale: #FFE8E2;
+  /* Action / CTA (legacy --champagne and --salmon names remap to purple) */
+  --champagne: #6938EF;
+  --champagne-light: #B49BFA;
+  --champagne-dark: #5025D1;
+  --salmon: #6938EF;
+  --salmon-dark: #5025D1;
+  --salmon-light: #B49BFA;
+  --salmon-pale: #EFEAFE;
 
-  /* Text */
-  --text-primary: #453A70;
-  --text-secondary: #6F6A88;
-  --text-tertiary: #9C98AD;
+  /* Text — black/gray, never purple */
+  --text-primary: #0A0A0A;
+  --text-secondary: #6B6B7B;
+  --text-tertiary: #A1A1AC;
   --text-on-navy: #FFFFFF;
   --text-on-indigo: #FFFFFF;
   --text-on-salmon: #FFFFFF;
 
-  /* Semantic */
-  --success: #5DCAA5;
-  --warning: #EF9F27;
-  --critical: #E85D5D;
-  --sage: #4A7C59;
-  --sage-light: #5A9466;
+  /* Semantic — retired ramp, collapsed to three-tone system */
+  --success: #0A0A0A;
+  --warning: #6938EF;
+  --critical: #0A0A0A;
+  --sage: #0A0A0A;
+  --sage-light: #1A1A1A;
 
   --max-width: 1120px;
   --page-margin: 24px;
@@ -286,14 +291,14 @@ nav .nav-inner {
   border-radius: 10px;
   text-decoration: none;
   transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(237, 105, 85, 0.22);
+  box-shadow: 0 2px 8px rgba(105, 56, 239, 0.22);
 }
 
 .nav-cta:hover {
   background: var(--salmon-dark) !important;
   color: var(--text-on-salmon) !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(237, 105, 85, 0.32);
+  box-shadow: 0 4px 14px rgba(105, 56, 239, 0.32);
 }
 
 /* ============ LAYOUT ============ */
@@ -387,14 +392,14 @@ section {
   border-radius: 12px;
   text-decoration: none;
   transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-  box-shadow: 0 6px 22px rgba(237, 105, 85, 0.28);
+  box-shadow: 0 6px 22px rgba(105, 56, 239, 0.28);
   animation: fadeInUp 0.8s ease 0.2s both;
 }
 
 .hero-cta:hover {
   background: var(--salmon-dark);
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(237, 105, 85, 0.38);
+  box-shadow: 0 10px 30px rgba(105, 56, 239, 0.38);
 }
 
 .hero-note {
@@ -430,8 +435,8 @@ section {
   border-radius: 36px;
   padding: 10px;
   box-shadow:
-    0 24px 60px rgba(42, 34, 82, 0.18),
-    0 6px 20px rgba(42, 34, 82, 0.08),
+    0 24px 60px rgba(15, 10, 40, 0.18),
+    0 6px 20px rgba(15, 10, 40, 0.08),
     inset 0 1px 0 rgba(255,255,255,0.05);
   position: relative;
   transition: transform 0.4s ease;
@@ -1625,7 +1630,7 @@ section {
   left: -40px;
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(237, 105, 85, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(105, 56, 239, 0.06) 0%, transparent 70%);
   border-radius: 50%;
 }
 
@@ -1962,7 +1967,7 @@ section {
   right: -20%;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(237, 105, 85, 0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(105, 56, 239, 0.08) 0%, transparent 70%);
   border-radius: 50%;
 }
 
@@ -2214,7 +2219,7 @@ footer {
   transform: translateX(-50%);
   width: 600px;
   height: 300px;
-  background: radial-gradient(ellipse, rgba(237, 105, 85, 0.1) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(105, 56, 239, 0.1) 0%, transparent 70%);
 }
 
 .security-promise h2 {
@@ -2855,7 +2860,7 @@ footer {
   font-weight: 600;
   letter-spacing: 1px;
   color: var(--champagne-dark);
-  background: rgba(237, 105, 85, 0.12);
+  background: rgba(105, 56, 239, 0.12);
   padding: 4px 10px;
   border-radius: 4px;
 }

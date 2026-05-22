@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chez · Service Desk</title>
+    <meta
+      name="description"
+      content="Chez operator workspace — every homeowner request, every household Chez is managing, in one focused surface."
+    />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#6938EF" />
+    <!-- Same favicon set as admin.html / handyman.html — keeps brand identity
+         consistent across the three back-of-house surfaces. -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=5" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=5" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=5" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png?v=5" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png?v=5" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5" />
+    <link rel="stylesheet" href="/chez.css" />
+    <link rel="stylesheet" href="/admin.css" />
+    <link rel="stylesheet" href="/service.css" />
+  </head>
+  <!--
+    Phase X (May 2026) — `data-portal-mode="service"` is the single switch
+    that splits this surface from admin.html. admin.js reads the attribute
+    at module load and filters VIEWS to the action group only (Today /
+    Homes / Concierge / Upcoming / Audit / Vendor Apps). admin.html (no
+    attribute) keeps the full catalog/reference/archive/tools nav.
+
+    Both surfaces share one JS codebase to avoid duplicating the 22k+ line
+    cockpit + simulator + architecture map. The cosmetic split lives in
+    this HTML shell + service.css.
+  -->
+  <body data-portal-mode="service">
+    <main id="admin-root" class="admin-root">
+      <section class="admin-login" data-login>
+        <div class="admin-login__card">
+          <div class="admin-mark">chez</div>
+          <p class="admin-eyebrow">Operator workspace</p>
+          <h1>Service Desk</h1>
+          <p class="admin-muted">
+            Sign in to see every homeowner request, every household Chez is
+            managing, and what needs a human next. Cross-home triage,
+            household oversight, and the case cockpit — nothing else.
+          </p>
+          <form class="admin-login__form" data-login-form>
+            <label>
+              <span>Email</span>
+              <input
+                data-login-email
+                type="email"
+                value="tom@getchez.com"
+                autocomplete="username"
+                spellcheck="false"
+              />
+            </label>
+            <label>
+              <span>Password</span>
+              <input
+                data-login-password
+                type="password"
+                autocomplete="current-password"
+                placeholder="Enter operator password"
+              />
+            </label>
+            <button type="submit" class="admin-button admin-button--primary">
+              Open service desk
+            </button>
+            <p class="admin-login__feedback" data-login-feedback></p>
+          </form>
+          <p class="admin-login__footnote">
+            Same Supabase Auth + email allowlist as admin.getchez.com.
+            Content templates, quiz authoring, and system catalog management
+            live there — this surface is request-handling only.
+          </p>
+        </div>
+      </section>
+
+      <section class="admin-app is-hidden" data-app>
+        <aside class="admin-sidebar">
+          <a class="admin-sidebar__brand" href="/" aria-label="Chez home">
+            <img src="/chez-logo.png?v=5" alt="" />
+            <div>
+              <strong>chez</strong>
+              <span>service</span>
+            </div>
+          </a>
+          <nav class="admin-nav" data-nav></nav>
+          <div class="admin-sidebar__footer">
+            <span data-session-email>tom@getchez.com</span>
+            <button type="button" data-sign-out>Sign out</button>
+          </div>
+        </aside>
+
+        <section class="admin-main">
+          <header class="admin-topbar">
+            <div>
+              <p class="admin-eyebrow" data-view-eyebrow>Service desk</p>
+              <h2 data-view-title>Today</h2>
+              <p class="admin-muted" data-view-subtitle>
+                Start of day — what needs attention across every home Chez manages.
+              </p>
+              <div class="admin-readiness is-hidden" data-readiness-pill>
+                <span class="admin-readiness__count" data-readiness-count></span>
+                <div class="admin-readiness__bar"><div data-readiness-bar></div></div>
+                <span class="admin-readiness__hint" data-readiness-hint></span>
+              </div>
+            </div>
+            <div class="admin-topbar__actions">
+              <!-- Preview quiz button is hidden on the service desk
+                   (catalog work belongs on admin.getchez.com). The data-*
+                   attributes are still present so admin.js's wiring code
+                   doesn't crash trying to bind a missing element. -->
+              <button type="button" class="admin-button is-hidden" data-preview-quiz hidden>
+                Preview entire quiz
+              </button>
+              <button type="button" class="admin-button admin-button--ghost admin-refresh" data-refresh-data title="Refresh — pull the latest requests, dossier data, and SLA timers.">
+                <span class="admin-refresh__icon" aria-hidden="true">↻</span>
+                <span class="admin-refresh__label">Refresh</span>
+                <span class="admin-refresh__indicator" data-refresh-indicator></span>
+                <span class="admin-refresh__time admin-muted" data-refresh-time>—</span>
+              </button>
+              <!-- Export config is catalog-side admin work; hide on
+                   service desk but keep the data-* anchor so admin.js
+                   can wire its (no-op) event handler without erroring. -->
+              <button type="button" class="admin-button is-hidden" data-export-config hidden>
+                Export config
+              </button>
+              <!-- "Add item" creates catalog entries; not used on service
+                   desk. Hidden but anchored so admin.js wiring survives. -->
+              <button type="button" class="admin-button admin-button--primary is-hidden" data-new-item hidden>
+                Add item
+              </button>
+            </div>
+          </header>
+
+          <section class="admin-warning" data-storage-warning hidden>
+            <strong>Local draft mode.</strong>
+            Supabase admin tables are not available yet.
+          </section>
+
+          <!-- Concierge cockpit host. Today / Homes / Upcoming render
+               via the legacy .admin-layout below; Concierge swaps to
+               this 4-pane cockpit when state.view === "chez". -->
+          <section class="admin-concierge-host is-hidden" data-concierge-host></section>
+
+          <section class="admin-layout">
+            <div class="admin-list-panel">
+              <div class="admin-list-tools">
+                <label class="admin-search">
+                  <span class="admin-search__icon" aria-hidden="true">⌕</span>
+                  <input data-search placeholder="Search homes, cases, addresses..." />
+                  <button type="button" class="admin-search__clear" data-search-clear aria-label="Clear search" hidden>×</button>
+                </label>
+                <select data-status-filter>
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="draft">Draft</option>
+                  <option value="cut">Cut</option>
+                  <option value="defer">Defer</option>
+                  <option value="reshape">Reshape</option>
+                </select>
+              </div>
+              <div class="admin-stats" data-stats></div>
+              <div class="admin-list" data-list></div>
+            </div>
+
+            <div class="admin-detail-panel">
+              <div class="admin-empty-detail" data-empty-detail>
+                <h3>Pick a home or a case.</h3>
+                <p>
+                  Today shows what's urgent across every home. Homes lets you
+                  drill into one household's full picture. Concierge opens
+                  the case cockpit. Upcoming surfaces everything time-bound.
+                </p>
+              </div>
+
+              <article class="admin-detail is-hidden" data-detail>
+                <div class="admin-detail__header">
+                  <div>
+                    <p class="admin-eyebrow" data-detail-kind></p>
+                    <h3 data-detail-title></h3>
+                    <p class="admin-muted" data-detail-subtitle></p>
+                  </div>
+                  <span class="admin-pill" data-detail-status></span>
+                </div>
+
+                <div class="admin-detail__quick-actions" data-detail-quick-actions>
+                  <button type="button" class="admin-button admin-button--secondary is-hidden" data-preview-question>
+                    Preview this question
+                  </button>
+                  <button type="button" class="admin-button admin-button--lock" data-lock-toggle>
+                    Lock as approved
+                  </button>
+                  <span class="admin-pill admin-pill--launch is-hidden" data-launch-pill></span>
+                </div>
+
+                <div class="admin-tabs" role="tablist" data-detail-tabs>
+                  <button type="button" class="admin-tab is-active" data-detail-tab="edit" role="tab">Detail</button>
+                  <button type="button" class="admin-tab" data-detail-tab="impact" role="tab">Impact</button>
+                  <button type="button" class="admin-tab" data-detail-tab="usage" role="tab">Usage</button>
+                </div>
+
+                <div class="admin-tab-pane is-active" data-tab-pane="edit">
+
+                <div class="admin-form-host" data-form-host></div>
+                <div class="admin-diff-host" data-diff-host></div>
+
+                <div class="admin-curated-form is-hidden" data-curated-form>
+                  <div class="admin-form-grid">
+                    <label><span>Title</span><input data-field-title /></label>
+                    <label>
+                      <span>Status</span>
+                      <select data-field-status>
+                        <option value="active">Active</option>
+                        <option value="draft">Draft</option>
+                        <option value="cut">Cut</option>
+                        <option value="defer">Defer</option>
+                        <option value="reshape">Reshape</option>
+                      </select>
+                    </label>
+                    <label><span>Category</span><input data-field-category /></label>
+                    <label><span>Sort order</span><input data-field-sort type="number" /></label>
+                  </div>
+                  <label class="admin-block-label">
+                    <span>Notes</span>
+                    <textarea data-field-description rows="4"></textarea>
+                  </label>
+                </div>
+
+                <textarea data-field-payload class="is-hidden" hidden></textarea>
+
+                <div class="admin-detail__actions" data-detail-actions>
+                  <button type="button" class="admin-button admin-button--primary" data-save-item>
+                    Save
+                  </button>
+                  <button type="button" class="admin-button is-hidden" data-promote-item hidden>
+                    Promote audit row
+                  </button>
+                  <button type="button" class="admin-button is-hidden" data-duplicate-item hidden>
+                    Duplicate
+                  </button>
+                  <button type="button" class="admin-button admin-button--danger is-hidden" data-delete-item hidden>
+                    Delete draft
+                  </button>
+                </div>
+
+                <section class="admin-notes-box" data-notes-box>
+                  <div>
+                    <p class="admin-eyebrow">Note for Claude</p>
+                    <h4>Leave a note about this customer or case</h4>
+                    <p>
+                      Notes capture the operator's running thoughts about a
+                      household or case. They round-trip to Claude so the next
+                      session sees the operator's context.
+                    </p>
+                  </div>
+                  <div class="admin-note-controls">
+                    <label class="admin-note-controls__attachment">
+                      <span>Attach screenshot / PDF</span>
+                      <input type="file" data-field-attachment accept="image/*,application/pdf" multiple />
+                      <span class="admin-note-controls__attachment-status" data-attachment-status></span>
+                    </label>
+                    <label>
+                      <span>Intent</span>
+                      <select data-field-intent>
+                        <option value="feedback">Feedback (just remember)</option>
+                        <option value="change_request">Change request (apply next session)</option>
+                        <option value="bug">Bug</option>
+                        <option value="idea">Idea (explore later)</option>
+                        <option value="question_for_claude">Question for Claude (answer first)</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Target file</span>
+                      <select data-field-target>
+                        <option value="claude" selected>CLAUDE_ADMIN_NOTES.md</option>
+                        <option value="codex">CODEX_ADMIN_NOTES.md</option>
+                        <option value="both">Both</option>
+                      </select>
+                    </label>
+                  </div>
+                  <textarea data-context-note rows="5" placeholder="Capture context the next session should know."></textarea>
+                  <div class="admin-note-feed" data-context-notes></div>
+                  <button type="button" class="admin-button admin-button--primary" data-save-note>
+                    Save note
+                  </button>
+                </section>
+
+                </div>
+
+                <div class="admin-tab-pane" data-tab-pane="impact" hidden>
+                  <div class="admin-impact-host" data-impact-host>
+                    <p class="admin-muted">Select an entity to see what depends on it.</p>
+                  </div>
+                </div>
+
+                <div class="admin-tab-pane" data-tab-pane="usage" hidden>
+                  <div class="admin-usage-host" data-usage-host>
+                    <p class="admin-muted">Select an entity to see live usage stats.</p>
+                  </div>
+                </div>
+
+                <div class="admin-note-focused is-hidden" data-note-focused></div>
+                <div class="admin-decision-focused is-hidden" data-decision-focused></div>
+                <div class="admin-decision-focused is-hidden" data-audit-focused></div>
+
+              </article>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <datalist id="admin-system-options"></datalist>
+
+    <div class="admin-palette" data-palette hidden>
+      <div class="admin-palette__scrim" data-palette-dismiss></div>
+      <div class="admin-palette__panel" role="dialog" aria-modal="true" aria-label="Global search">
+        <input
+          type="text"
+          class="admin-palette__input"
+          data-palette-input
+          placeholder="Search any home, case, or note… (Esc to close, ↑↓ to navigate, Enter to open)"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="admin-palette__results" data-palette-results></div>
+        <p class="admin-palette__hint admin-muted" data-palette-hint>Start typing to search across every household and case.</p>
+      </div>
+    </div>
+
+    <script type="module" src="/admin.js"></script>
+  </body>
+</html>

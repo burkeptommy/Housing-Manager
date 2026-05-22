@@ -1545,7 +1545,7 @@ final class HouseQuizViewModel: ObservableObject {
                     intents: intents,
                     property: snapshotProperty
                 )
-                await MainActor.run {
+                await MainActor.run { [weak self] in
                     self?.chezQuizRequestsSubmittedCount = submitted
                     NotificationCenter.default.post(
                         name: .chezQuizRequestsSubmitted,

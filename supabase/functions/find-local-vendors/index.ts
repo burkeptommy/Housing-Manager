@@ -71,11 +71,80 @@ const CATEGORY_SEARCH_TERMS: Record<string, string> = {
   // Build 90: categories that were falling through to raw search
   generator: "generator repair service technician",
   "crawl space": "crawl space encapsulation service",
+  waterproofing: "basement waterproofing service",
   "water heater": "water heater repair plumber",
   "siding/exterior": "siding repair contractor",
   security: "home security system service",
   solar: "solar panel service repair",
+  // Phase X+4 (dedup + category-correctness): the utility-account
+  // queries below previously matched gas STATIONS (Exxon/Mobil/Shell/
+  // Sunoco) because "natural gas" / "oil" / "propane" are too generic.
+  // Specific phrases steer Google Places toward actual utility
+  // delivery companies. Even with tightening, the negative-indicator
+  // list in `isCategoryPolluter` catches anything that slips through.
+  trash: "trash and recycling pickup service",
+  electric: "electric utility company",
+  natural_gas: "natural gas utility delivery service",
+  oil: "home heating oil delivery service",
+  propane: "propane delivery service",
+  water: "municipal water utility service",
+  internet_cable: "internet service provider",
+  home_insurance: "homeowners insurance agency",
+  auto_insurance: "auto insurance agency",
 };
+
+// Phase X+4 (category-correctness): some Google Places results pollute
+// the category they were searched under because Places' relevance algo
+// matches the search verb (e.g. "natural gas" matches gas stations).
+// This list of substrings disqualifies a row from being SAVED under
+// a category that's prone to such pollution. The same row is still
+// returned to the user for the user-facing query (we want them to see
+// the gas station if they search "gas station near me" for some other
+// reason) — but we don't snapshot it into the long-term catalog under
+// the wrong category.
+const CATEGORY_POLLUTION_BLOCKLIST: Record<string, string[]> = {
+  // Gas stations + oil-change shops constantly leak into utility cats
+  natural_gas: [
+    "exxon", "mobil", "shell", "sunoco", "bp ", " bp", "citgo",
+    "gas station", "gulf", "cumberland farms", "valvoline",
+    "mavis", "midas", "jiffy lube", "jiffy-lube",
+    "7-eleven", "wawa", "speedway", "quik", "quick mart",
+    "marathon", "phillips 66", "lukoil",
+  ],
+  oil: [
+    "exxon", "mobil", "shell", "sunoco", "bp ", " bp", "citgo",
+    "gas station", "valvoline", "mavis", "midas", "jiffy lube",
+    "jiffy-lube", "express oil", "speedee", "express lube",
+    "7-eleven", "wawa", "marathon", "phillips 66",
+  ],
+  propane: [
+    "exxon", "mobil", "shell", "sunoco", "bp ", " bp", "citgo",
+    "gas station", "cumberland farms",
+    "7-eleven", "wawa", "speedway", "marathon",
+  ],
+  electric: [
+    // Generic retailers that sell electronics shouldn't surface as
+    // electric utility providers.
+    "best buy", "p.c. richard", "pc richard",
+  ],
+  internet_cable: [
+    // Phone/electronics stores under "internet" are mis-routed.
+    "staples", "office depot", "wirelesszone",
+  ],
+  water: [
+    // Parks/lakes/state forests show up because "water" matches water
+    // bodies. Disqualify obvious parks/recreation rows.
+    "state park", "state forest", "reservation", "preserve", "pond",
+    "park ", "recreation", "beach", "lake ", "river ", "spring water refill",
+  ],
+};
+
+function isCategoryPolluter(category: string, name: string): boolean {
+  const list = CATEGORY_POLLUTION_BLOCKLIST[category.toLowerCase()];
+  if (!list) return false;
+  const lower = name.toLowerCase();
+  return list.some((token) => lower.includes(token));
+}
 
 // Common chain indicators we filter out of "Top-Rated". Heuristic — the
 // goal is to surface local independents, not nationals. The next tier
@@ -182,7 +251,77 @@ interface VendorCandidate {
   // rows always carry isChezCertified=false.
   isChezCertified: boolean;
   rankPosition: number;
+  // Phase X feedback: rows sourced from the seeded `utility_providers`
+  // catalog (15k+ providers across HVAC / plumbing / trash / insurance /
+  // etc.) carry this flag so iOS can render them in a dedicated
+  // "FROM YOUR AREA" section above the Google-derived tiers. Logo and
+  // brand color flow through when the catalog row has them (currently
+  // ~9% coverage; the rest grow lazily via the picker's on-tap fetch).
+  isFromCatalog: boolean;
+  logoUrl: string | null;
+  brandColor: string | null;
 }
+
+// Phase X feedback: map iOS category strings → `utility_providers.provider_type`
+// values so the catalog merge knows what to query. Keys are lowercased
+// matches against the iOS `category` payload (which can be a chip id,
+// a `home_systems.category` string, or a free-text label like
+// "Trash & Recycling"). Unmapped categories simply skip the catalog
+// merge and fall back to Google-only — no error path needed.
+const CATEGORY_TO_PROVIDER_TYPE: Record<string, string> = {
+  // Service trades — heavily seeded (~700 rows each)
+  hvac: "hvac",
+  hvac_service: "hvac",
+  "heating and cooling": "hvac",
+  plumbing: "plumbing",
+  plumber: "plumbing",
+  electrical: "electrical",
+  electrician: "electrical",
+  roofing: "roofing",
+  roofer: "roofing",
+  "tree service": "tree_service",
+  tree_service: "tree_service",
+  "garage door": "garage_door",
+  garage_door: "garage_door",
+  "well system": "well_water_service",
+  "well water service": "well_water_service",
+  well_water_service: "well_water_service",
+  "septic system": "septic_pumper",
+  "septic pumper": "septic_pumper",
+  septic_pumper: "septic_pumper",
+  chimney: "chimney_sweep",
+  "chimney sweep": "chimney_sweep",
+  chimney_sweep: "chimney_sweep",
+  // Utility / account-style — also seeded (200+ each)
+  trash: "trash",
+  "trash & recycling": "trash",
+  "trash and recycling": "trash",
+  sanitation: "trash",
+  recycling: "trash",
+  water: "water",
+  oil: "oil",
+  "heating oil": "oil",
+  electric: "electric",
+  electricity: "electric",
+  propane: "propane",
+  internet: "internet_cable",
+  "internet & cable": "internet_cable",
+  "internet cable": "internet_cable",
+  internet_cable: "internet_cable",
+  cable: "internet_cable",
+  gas: "natural_gas",
+  "natural gas": "natural_gas",
+  natural_gas: "natural_gas",
+  // Insurance lines (estate-adjacent life_insurance removed alongside the
+  // rest of the estate categories — Chez v1 doesn't surface them)
+  "home insurance": "home_insurance",
+  homeowners: "home_insurance",
+  "homeowners insurance": "home_insurance",
+  home_insurance: "home_insurance",
+  "auto insurance": "auto_insurance",
+  auto: "auto_insurance",
+  auto_insurance: "auto_insurance",
+};
 
 // Phase 72: pull active vendor applications matching the (state, category)
 // query, dedup against Google results, and front-load them so chez_certified
@@ -236,6 +375,9 @@ async function mergeVendorApplications(
       isTopRated: false,
       isChezCertified: app.status === "chez_certified",
       rankPosition: 0,
+      isFromCatalog: false,
+      logoUrl: null,
+      brandColor: null,
     }));
 
     // Sort: chez_certified > live_unverified. The SQL ORDER BY already
@@ -258,6 +400,145 @@ async function mergeVendorApplications(
   }
 }
 
+// Phase X feedback: pull `utility_providers` rows whose `provider_type`
+// matches the iOS category (per `CATEGORY_TO_PROVIDER_TYPE`) and whose
+// `regions` array overlaps the user's town or state. These are the
+// 15k+ seeded providers Tom sourced for the iOS picker; surfacing them
+// in "Add a Pro" closes the gap where searches for catalog vendors
+// (e.g. local trash haulers, HVAC pros) found only Google Places hits.
+// Dedup'd against incoming Google results by website-domain match.
+// Returns up to 8 catalog rows ranked: town match first, then state-only.
+async function mergeUtilityProviders(
+  supabase: ReturnType<typeof createClient>,
+  existingVendors: VendorCandidate[],
+  town: string,
+  state: string,
+  normalizedCategory: string,
+  searchQuery: string | null,
+): Promise<VendorCandidate[]> {
+  try {
+    const providerType =
+      CATEGORY_TO_PROVIDER_TYPE[normalizedCategory] ??
+      CATEGORY_TO_PROVIDER_TYPE[normalizedCategory.toLowerCase()];
+    if (!providerType) {
+      // Category doesn't map to any seeded provider_type — nothing to
+      // merge. Common for super-niche categories (e.g. waterproofing
+      // wasn't seeded). Skip silently; Google results carry the user.
+      return existingVendors;
+    }
+
+    // Query: provider_type match AND regions array overlaps with
+    // [town, state]. Reads from `utility_providers_visible` so
+    // single-household user_pending rows stay private until promoted.
+    // When `searchQuery` is set (user typed a vendor name in find-a-pro),
+    // also filter by name ILIKE — surfaces the catalog row first before
+    // we ever hit Google Places for the same name.
+    const stateUpper = state.toUpperCase();
+    let query = supabase
+      .from("utility_providers_visible")
+      .select("id, name, slug, website, phone, logo_url, brand_color, regions")
+      .eq("provider_type", providerType)
+      .overlaps("regions", [town, state, stateUpper])
+      .limit(60);
+    if (searchQuery && searchQuery.trim().length > 0) {
+      // Escape % and _ characters so user input doesn't accidentally
+      // become a wildcard. PostgREST passes the value straight through
+      // to ILIKE.
+      const escaped = searchQuery.trim().replace(/[%_]/g, "\\$&");
+      query = query.ilike("name", `%${escaped}%`);
+    }
+    const { data: catalogRows, error } = await query;
+
+    if (error || !catalogRows || catalogRows.length === 0) {
+      if (error) console.warn("[find-local-vendors] catalog merge query failed:", error);
+      return existingVendors;
+    }
+
+    // Phase X feedback (data-quality safeguard): an audit of
+    // `utility_providers` found ~10,585 service-trade rows with NEITHER
+    // a website NOR phone — almost certainly templated synthetic seed
+    // data (pattern: "[Town] Climate Control", "[Town] Heating &
+    // Cooling", etc. across alphabetical MA towns). Until those rows
+    // are cleaned up, filter them out at the merge boundary so they
+    // never surface to homeowners as if they were real vendors.
+    // Utility-account categories (electric, trash, etc.) are nearly
+    // 100% real and unaffected by this filter.
+    const realCatalogRows = catalogRows.filter((row) => {
+      const hasWebsite = typeof row.website === "string" && row.website.trim().length > 0;
+      const hasPhone = typeof row.phone === "string" && row.phone.trim().length > 0;
+      return hasWebsite || hasPhone;
+    });
+    if (realCatalogRows.length === 0) {
+      return existingVendors;
+    }
+
+    // Dedup against incoming vendors by website-domain match. A catalog
+    // row whose domain already appears in Google results would otherwise
+    // double-render. Names are too noisy to dedup on (suffix variants,
+    // LLC vs Inc, etc.) — domain is the stable key.
+    const normalizeDomain = (url: string | null): string => {
+      if (!url) return "";
+      return url
+        .replace(/^https?:\/\//, "")
+        .replace(/^www\./, "")
+        .split("/")[0]
+        .toLowerCase();
+    };
+    const existingDomains = new Set(
+      existingVendors
+        .map((v) => normalizeDomain(v.website))
+        .filter((d) => d.length > 0),
+    );
+
+    // Rank: town-match first (more relevant), then state-only.
+    const townLower = town.toLowerCase();
+    const ranked = realCatalogRows
+      .filter((row) => {
+        const dom = normalizeDomain(row.website);
+        return dom.length === 0 || !existingDomains.has(dom);
+      })
+      .sort((a, b) => {
+        const aTown = (a.regions ?? []).some(
+          (r: string) => r.toLowerCase() === townLower,
+        );
+        const bTown = (b.regions ?? []).some(
+          (r: string) => r.toLowerCase() === townLower,
+        );
+        if (aTown !== bTown) return aTown ? -1 : 1;
+        // Tiebreak alphabetical so results are deterministic.
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 10);
+
+    const catalogVendors: VendorCandidate[] = ranked.map((row) => ({
+      name: row.name,
+      address: null,
+      phone: row.phone ?? null,
+      website: row.website ?? null,
+      rating: null,
+      reviewCount: null,
+      // Synthesize an id from the catalog uuid so iOS Identifiable
+      // conformance still works. `up:` prefix distinguishes catalog
+      // rows from Google place ids and `app:` vendor_application rows.
+      googlePlaceId: `up:${row.id}`,
+      isTopRated: false,
+      isChezCertified: false,
+      rankPosition: 0,
+      isFromCatalog: true,
+      logoUrl: row.logo_url ?? null,
+      brandColor: row.brand_color ?? null,
+    }));
+
+    // Catalog rows go FIRST in the response — they're our seeded data,
+    // higher trust than raw Google results, and iOS will render them in
+    // a dedicated "FROM YOUR AREA" section above the existing tiers.
+    return [...catalogVendors, ...existingVendors];
+  } catch (err) {
+    console.warn("[find-local-vendors] catalog merge threw:", err);
+    return existingVendors;
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -269,6 +550,14 @@ serve(async (req: Request) => {
     const town = (body.town ?? "").toString().trim();
     const state = (body.state ?? "").toString().trim();
     const rawCategory = (body.category ?? "").toString().trim();
+    // Phase X feedback: optional vendor-name filter. When set, the catalog
+    // merge filters by `name ILIKE %query%` before town/state ranking, so
+    // a user typing "Redding Sanitation" in find-a-pro hits the catalog
+    // row directly. Empty / missing → existing top-N-by-region behavior.
+    const searchQueryRaw = body.searchQuery ?? body.search_query ?? null;
+    const searchQuery = typeof searchQueryRaw === "string" && searchQueryRaw.trim().length > 0
+      ? searchQueryRaw.trim()
+      : null;
 
     if (!town || !state || !rawCategory) {
       return new Response(
@@ -340,10 +629,28 @@ serve(async (req: Request) => {
         // overlaid from vendor_applications below.
         isChezCertified: false,
         rankPosition: row.rank_position ?? 0,
+        // Catalog rows are merged fresh on every request, not cached, so
+        // these default false/null here.
+        isFromCatalog: false,
+        logoUrl: null,
+        brandColor: null,
       }));
       const merged = await mergeVendorApplications(supabase, vendors, state, rawCategory);
+      // Phase X feedback: also merge the seeded `utility_providers`
+      // catalog so the homeowner sees our sourced regional vendors
+      // (trash haulers, HVAC pros, etc.) alongside Google results.
+      // `searchQuery` filters the catalog by name when the user typed
+      // one in find-a-pro.
+      const withCatalog = await mergeUtilityProviders(
+        supabase,
+        merged,
+        town,
+        state,
+        cacheCategory,
+        searchQuery,
+      );
       return new Response(
-        JSON.stringify({ vendors: merged, cached: true }),
+        JSON.stringify({ vendors: withCatalog, cached: true }),
         { status: 200, headers }
       );
     }
@@ -357,13 +664,20 @@ serve(async (req: Request) => {
       );
     }
 
-    // --- GOOGLE PLACES TEXT SEARCH ---
-    // Places API (New) uses a single searchText endpoint with field masks.
-    // We ask for displayName, formattedAddress, rating, userRatingCount,
-    // internationalPhoneNumber, websiteUri, and id in one round trip — no
-    // separate Place Details call needed.
+    // --- GOOGLE PLACES TEXT SEARCH (paginated) ---
+    // Places API (New) supports up to 3 pages (20 results each = 60 total)
+    // via `pageToken`. The first call returns up to 20 results + an optional
+    // `nextPageToken`. Subsequent calls echo the same textQuery but include
+    // the pageToken to fetch the next 20. Pages 2 + 3 are fetched serially
+    // because the token's validity is enforced server-side and pages must
+    // be requested in order.
+    //
+    // Phase X+3 (UX coverage push): pagination triples our catalog yield
+    // per cell at no engineering cost — each (town, category) discovery
+    // bumps from ~12 unique to ~30-40 unique vendors. Bulk-seed run goes
+    // from $113 → ~$340 for full pagination across the launch footprint.
     const query = `${searchTerm} near ${town}, ${state}`;
-    console.log(`[find-local-vendors] Places search: ${query}`);
+    console.log(`[find-local-vendors] Places search (paginated): ${query}`);
 
     const fieldMask = [
       "places.id",
@@ -374,32 +688,10 @@ serve(async (req: Request) => {
       "places.internationalPhoneNumber",
       "places.nationalPhoneNumber",
       "places.websiteUri",
+      "nextPageToken",
     ].join(",");
 
-    const placesResponse = await fetch(PLACES_TEXT_SEARCH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": placesApiKey,
-        "X-Goog-FieldMask": fieldMask,
-      },
-      body: JSON.stringify({
-        textQuery: query,
-        maxResultCount: 20,
-      }),
-    });
-
-    if (!placesResponse.ok) {
-      const errText = await placesResponse.text();
-      console.error("[find-local-vendors] Places API error:", placesResponse.status, errText);
-      return new Response(
-        JSON.stringify({ error: "Places API call failed", status: placesResponse.status }),
-        { status: 502, headers }
-      );
-    }
-
-    const placesData = await placesResponse.json();
-    const rawPlaces: Array<{
+    type RawPlace = {
       id?: string;
       displayName?: { text?: string };
       formattedAddress?: string;
@@ -408,7 +700,74 @@ serve(async (req: Request) => {
       internationalPhoneNumber?: string;
       nationalPhoneNumber?: string;
       websiteUri?: string;
-    }> = placesData.places ?? [];
+    };
+
+    const fetchPage = async (pageToken: string | null): Promise<{
+      places: RawPlace[];
+      nextPageToken: string | null;
+      ok: boolean;
+      status: number;
+      errText?: string;
+    }> => {
+      const body: Record<string, unknown> = { textQuery: query, maxResultCount: 20 };
+      if (pageToken) body.pageToken = pageToken;
+      const res = await fetch(PLACES_TEXT_SEARCH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": placesApiKey,
+          "X-Goog-FieldMask": fieldMask,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        return { places: [], nextPageToken: null, ok: false, status: res.status, errText };
+      }
+      const data = await res.json();
+      return {
+        places: (data.places ?? []) as RawPlace[],
+        nextPageToken: data.nextPageToken ?? null,
+        ok: true,
+        status: 200,
+      };
+    };
+
+    const allPlaces: RawPlace[] = [];
+    let pageToken: string | null = null;
+    let pageCount = 0;
+    const MAX_PAGES = 3;
+    while (pageCount < MAX_PAGES) {
+      const page = await fetchPage(pageToken);
+      if (!page.ok) {
+        if (pageCount === 0) {
+          // First page failed — bail with an error to the client.
+          console.error(
+            `[find-local-vendors] Places API error on page ${pageCount + 1}: ${page.status} ${page.errText}`,
+          );
+          return new Response(
+            JSON.stringify({ error: "Places API call failed", status: page.status }),
+            { status: 502, headers },
+          );
+        }
+        // Page 2 or 3 failure — log + use what we have so far.
+        console.warn(
+          `[find-local-vendors] page ${pageCount + 1} failed (${page.status}), continuing with ${allPlaces.length} results`,
+        );
+        break;
+      }
+      allPlaces.push(...page.places);
+      pageCount++;
+      if (!page.nextPageToken) break;
+      pageToken = page.nextPageToken;
+      // The pageToken needs a brief beat to become valid server-side.
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    console.log(
+      `[find-local-vendors] Places pagination: ${pageCount} page(s) × ${allPlaces.length} total results`,
+    );
+
+    const rawPlaces: RawPlace[] = allPlaces;
 
     if (rawPlaces.length === 0) {
       console.log("[find-local-vendors] zero results from Google Places");
@@ -496,6 +855,9 @@ serve(async (req: Request) => {
         isTopRated: true,
         isChezCertified: false,
         rankPosition: rank++,
+        isFromCatalog: false,
+        logoUrl: null,
+        brandColor: null,
       });
     }
     for (const p of suggested) {
@@ -510,6 +872,9 @@ serve(async (req: Request) => {
         isTopRated: false,
         isChezCertified: false,
         rankPosition: rank++,
+        isFromCatalog: false,
+        logoUrl: null,
+        brandColor: null,
       });
     }
 
@@ -541,11 +906,279 @@ serve(async (req: Request) => {
           `[find-local-vendors] cached ${insertRows.length} rows for ${town}, ${state}, ${cacheCategory}`
         );
       }
+
+      // Phase X feedback: organic catalog growth. Every Google Places
+      // fetch persists results to `utility_providers` as
+      // `source = 'google_places'` so real user searches grow the
+      // catalog over time. The bulk-seed script (Phase 3) drives this
+      // same path at scale. Dedup is by `google_place_id` (UNIQUE
+      // partial index).
+      //
+      // Phase X+2: persist ALL chain/retailer-filtered service
+      // providers (not just the 4 user-facing finalVendors). Google
+      // Places typically returns 15-20 candidates per query; after
+      // filtering, we get 8-15 real businesses per cell. Catalog
+      // growth = same number of Google API calls × ~3x more
+      // discovered businesses. Per-cell upsert is capped at the top
+      // 15 by (rating, review_count) so we don't blow up the table.
+      const providerType =
+        CATEGORY_TO_PROVIDER_TYPE[cacheCategory] ??
+        CATEGORY_TO_PROVIDER_TYPE[cacheCategory.toLowerCase()];
+      if (providerType) {
+        const stateUpper = state.toUpperCase();
+
+        // Catalog candidates = all serviceProviders that passed the
+        // chain/retailer filter AND have at least a website or phone
+        // AND aren't in the category-pollution blocklist for this
+        // category. Sorted by rating + review count, capped at 15 per
+        // (town, category) to keep upserts tight.
+        const catalogCandidates = serviceProviders
+          .filter((p) =>
+            (p.website && p.website.trim().length > 0) ||
+            (p.phone && p.phone.trim().length > 0)
+          )
+          .filter((p) => !isCategoryPolluter(providerType, p.name))
+          .sort((a, b) => {
+            if (b.rating !== a.rating) return b.rating - a.rating;
+            return b.reviewCount - a.reviewCount;
+          })
+          .slice(0, 15);
+
+        if (catalogCandidates.length > 0) {
+          // Phase X+4: root-domain dedup. A single brand (ADT,
+          // Allstate, Eversource, Optimum, Xfinity) can have many
+          // Google Places listings — one per physical store / agent /
+          // service area. Each has a unique google_place_id but they
+          // all share a root website domain. Without dedup we end up
+          // with 55 "Allstate Insurance: Cara Benjamin" rows.
+          //
+          // Rule: for each new candidate, compute the root domain
+          // (strip subdomains, e.g. "agents.allstate.com" →
+          // "allstate.com"). Look up any existing utility_providers
+          // row with the same provider_type AND a website whose root
+          // domain matches. If found, expand THAT row's regions
+          // instead of inserting a new row. Result: one ADT, one
+          // Allstate, one Eversource — each with regions covering
+          // every place we've discovered them.
+          const rootDomain = (url: string | null): string => {
+            if (!url) return "";
+            const trimmed = url
+              .replace(/^https?:\/\//, "")
+              .replace(/^www\./, "")
+              .split("/")[0]
+              .toLowerCase();
+            if (!trimmed) return "";
+            // Strip subdomains: keep the last two segments. Doesn't
+            // handle compound TLDs (.co.uk) but US-focused launch
+            // doesn't need it.
+            const parts = trimmed.split(".");
+            if (parts.length < 2) return trimmed;
+            return parts.slice(-2).join(".");
+          };
+
+          // Build a lookup of existing rows matching by either
+          // root_domain OR google_place_id (covers both cases).
+          const candidateDomains = catalogCandidates
+            .map((v) => rootDomain(v.website))
+            .filter((d) => d.length > 0);
+          const candidatePlaceIds = catalogCandidates
+            .map((v) => v.googlePlaceId)
+            .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+          // Domain match: pull every row in this provider_type that
+          // might share a root domain. PostgREST doesn't support a
+          // server-side regexp_replace, so we fetch by website-LIKE
+          // pattern per candidate and dedup client-side. To keep the
+          // query bounded, we batch ILIKE clauses with `or`.
+          const domainFilters = candidateDomains.map(
+            (d) => `website.ilike.%${d}%`,
+          );
+          const { data: existingByDomain } = domainFilters.length > 0
+            ? await supabase
+                .from("utility_providers")
+                .select("id, website, regions, source, google_place_id")
+                .eq("provider_type", providerType)
+                .or(domainFilters.join(","))
+                .limit(200)
+            : { data: [] as Array<{
+                id: string;
+                website: string | null;
+                regions: string[] | null;
+                source: string | null;
+                google_place_id: string | null;
+              }> };
+
+          // Index existing rows by root domain so each candidate can
+          // probe in O(1). Prefer admin/vendor_application/user_verified
+          // rows when multiple exist for the same domain — those are
+          // the canonical home for the brand.
+          const existingByRootDomain = new Map<string, {
+            id: string;
+            regions: string[];
+            source: string | null;
+          }>();
+          const sourceRank = (s: string | null): number => {
+            switch (s) {
+              case "admin": return 0;
+              case "vendor_application": return 1;
+              case "user_verified": return 2;
+              case "google_places": return 3;
+              case "user_pending": return 4;
+              default: return 5;
+            }
+          };
+          for (const row of (existingByDomain ?? [])) {
+            const d = rootDomain(row.website);
+            if (!d) continue;
+            const current = existingByRootDomain.get(d);
+            if (!current || sourceRank(row.source) < sourceRank(current.source)) {
+              existingByRootDomain.set(d, {
+                id: row.id,
+                regions: row.regions ?? [],
+                source: row.source,
+              });
+            }
+          }
+
+          // Also pull by google_place_id so re-discovery of the SAME
+          // Place ID merges cleanly (the existing UNIQUE constraint
+          // path).
+          const { data: existingByPlace } = candidatePlaceIds.length > 0
+            ? await supabase
+                .from("utility_providers")
+                .select("id, google_place_id, regions, source")
+                .in("google_place_id", candidatePlaceIds)
+            : { data: [] as Array<{
+                id: string;
+                google_place_id: string | null;
+                regions: string[] | null;
+                source: string | null;
+              }> };
+          const existingByPlaceId = new Map<string, {
+            id: string;
+            regions: string[];
+            source: string | null;
+          }>();
+          for (const row of (existingByPlace ?? [])) {
+            if (!row.google_place_id) continue;
+            existingByPlaceId.set(row.google_place_id, {
+              id: row.id,
+              regions: row.regions ?? [],
+              source: row.source,
+            });
+          }
+
+          // Walk candidates: each becomes either an UPDATE of an
+          // existing row's regions OR a fresh INSERT.
+          const newInserts: Array<{
+            name: string;
+            slug: string;
+            provider_type: string;
+            website: string | null;
+            phone: string | null;
+            regions: string[];
+            source: string;
+            google_place_id: string;
+            contribution_count: number;
+          }> = [];
+          const regionUpdates: Map<string, Set<string>> = new Map();
+          let dedupedCount = 0;
+          let insertedCount = 0;
+
+          for (const v of catalogCandidates) {
+            const placeId = v.googlePlaceId;
+            if (!placeId) continue;
+            const domain = rootDomain(v.website);
+
+            // Prefer domain match (collapses brand shards across
+            // physical locations). Fall back to place-id match.
+            const existing =
+              (domain ? existingByRootDomain.get(domain) : undefined) ??
+              existingByPlaceId.get(placeId);
+
+            if (existing) {
+              // Expand the existing row's regions with this town/state.
+              const set = regionUpdates.get(existing.id) ?? new Set(existing.regions);
+              set.add(town);
+              set.add(stateUpper);
+              regionUpdates.set(existing.id, set);
+              dedupedCount++;
+            } else {
+              newInserts.push({
+                name: v.name,
+                slug: `gp-${placeId.toLowerCase()}`,
+                provider_type: providerType,
+                website: v.website,
+                phone: v.phone,
+                regions: [town, stateUpper],
+                source: "google_places",
+                google_place_id: placeId,
+                contribution_count: 1,
+              });
+              insertedCount++;
+              // Add to existingByRootDomain so subsequent candidates
+              // in this same batch don't also create a new row for
+              // the same domain.
+              if (domain) {
+                existingByRootDomain.set(domain, {
+                  id: "pending-" + placeId,
+                  regions: [town, stateUpper],
+                  source: "google_places",
+                });
+              }
+            }
+          }
+
+          // Apply region updates (one UPDATE per existing row).
+          for (const [id, regions] of regionUpdates) {
+            if (id.startsWith("pending-")) continue; // it's a same-batch insert, not a real row yet
+            const { error: updateError } = await supabase
+              .from("utility_providers")
+              .update({ regions: Array.from(regions) })
+              .eq("id", id);
+            if (updateError) {
+              console.warn(
+                `[find-local-vendors] region update failed for ${id}:`,
+                updateError,
+              );
+            }
+          }
+
+          // Apply new inserts.
+          if (newInserts.length > 0) {
+            const { error: insertError } = await supabase
+              .from("utility_providers")
+              .insert(newInserts);
+            if (insertError) {
+              console.warn(
+                "[find-local-vendors] catalog insert failed:",
+                insertError,
+              );
+            }
+          }
+
+          console.log(
+            `[find-local-vendors] catalog: ${insertedCount} new, ${dedupedCount} folded into existing rows for ${town}, ${state}, ${cacheCategory}`,
+          );
+        }
+      }
     }
 
     const mergedFinal = await mergeVendorApplications(supabase, finalVendors, state, rawCategory);
+    // Phase X feedback: merge the seeded `utility_providers` catalog on
+    // top so iOS gets a unified list (catalog rows first, then Chez
+    // Certified applications, then Top-Rated Google, then Suggested).
+    // `searchQuery` filters the catalog by name when set.
+    const withCatalog = await mergeUtilityProviders(
+      supabase,
+      mergedFinal,
+      town,
+      state,
+      cacheCategory,
+      searchQuery,
+    );
     return new Response(
-      JSON.stringify({ vendors: mergedFinal, cached: false }),
+      JSON.stringify({ vendors: withCatalog, cached: false }),
       { status: 200, headers }
     );
   } catch (error) {

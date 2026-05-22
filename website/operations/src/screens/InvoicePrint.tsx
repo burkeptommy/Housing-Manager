@@ -116,7 +116,7 @@ export default function InvoicePrintScreen() {
         margin: "32px auto",
         padding: "48px 56px",
         background: "#fff",
-        boxShadow: "0 8px 32px rgba(42,34,82,0.08)",
+        boxShadow: "0 8px 32px rgba(15, 10, 40,0.08)",
         fontFamily: "var(--sans)",
         color: "var(--text)",
       }}>
@@ -305,8 +305,8 @@ export default function InvoicePrintScreen() {
                 fontWeight: 700,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
-                color: "#4A7C59",
-                border: "1px solid #4A7C59",
+                color: "#0A0A0A",
+                border: "1px solid #0A0A0A",
               }}>
                 Paid in full {invoice.paidAt ? `on ${new Date(invoice.paidAt).toLocaleDateString()}` : ""}
               </div>

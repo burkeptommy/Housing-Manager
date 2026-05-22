@@ -52,5 +52,12 @@ COPY admin-data /usr/share/nginx/html/admin-data
 COPY chez-logo.png /usr/share/nginx/html/
 COPY alfred-mark.svg /usr/share/nginx/html/
 
+# Service desk (operator workspace, served at service.getchez.com).
+# Shares admin.js / admin.css / admin-data / admin-* helpers above. The
+# split lives entirely in service.html's `data-portal-mode="service"`
+# attribute + the small cosmetic overrides in service.css.
+COPY service.html /usr/share/nginx/html/
+COPY service.css /usr/share/nginx/html/
+
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

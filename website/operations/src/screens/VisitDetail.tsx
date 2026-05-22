@@ -1524,14 +1524,14 @@ function RescheduleModal({
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 50,
-        background: "rgba(42,34,82,0.4)",
+        background: "rgba(15, 10, 40,0.4)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
       onClick={() => !submitting && onClose()}
     >
       <div
-        style={{ background: "#fff", borderRadius: 16, padding: 24, width: "min(440px, 90vw)", boxShadow: "0 24px 60px rgba(42,34,82,0.4)" }}
+        style={{ background: "#fff", borderRadius: 16, padding: 24, width: "min(440px, 90vw)", boxShadow: "0 24px 60px rgba(15, 10, 40,0.4)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -1684,7 +1684,7 @@ function SplitVisitModal({
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 60,
-        background: "rgba(42, 34, 82, 0.45)",
+        background: "rgba(15, 10, 40, 0.45)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
@@ -1694,7 +1694,7 @@ function SplitVisitModal({
         style={{
           background: "#fff", borderRadius: 18, width: "min(640px, 95vw)",
           maxHeight: "88vh", overflowY: "auto",
-          boxShadow: "0 24px 60px rgba(42, 34, 82, 0.4)",
+          boxShadow: "0 24px 60px rgba(15, 10, 40, 0.4)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1887,9 +1887,9 @@ function PendingHomeownerProposalCard({
           marginBottom: 16,
           padding: 20,
           borderRadius: 16,
-          background: "linear-gradient(155deg, #FFF5F2 0%, #FFE8E2 100%)",
-          border: "1px solid rgba(237, 105, 85, 0.35)",
-          boxShadow: "0 6px 20px rgba(237, 105, 85, 0.12)",
+          background: "linear-gradient(155deg, #F4F0FE 0%, #EFEAFE 100%)",
+          border: "1px solid rgba(105, 56, 239, 0.35)",
+          boxShadow: "0 6px 20px rgba(105, 56, 239, 0.12)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>

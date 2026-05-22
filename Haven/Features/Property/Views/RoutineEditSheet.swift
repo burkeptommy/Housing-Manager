@@ -292,14 +292,34 @@ struct RoutineEditSheet: View {
                 }
             }
 
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            // Error banner pinned below the toolbar so it stays visible
+            // with the keyboard up — the prior in-Form Section rendered
+            // at the bottom of the scroll view, hidden under the
+            // keyboard during Label-field entry.
             if let errorMessage {
-                Section {
-                    Text(errorMessage)
-                        .font(HavenTypography.caption)
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(HavenColors.critical)
+                    Text(errorMessage)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(HavenColors.critical.opacity(0.08))
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(HavenColors.critical.opacity(0.18))
+                        .frame(height: 0.5)
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.18), value: errorMessage)
         .confirmationDialog(
             "Delete this routine?",
             isPresented: $showDeleteConfirm,
@@ -326,7 +346,7 @@ struct RoutineEditSheet: View {
                     if isSaving { ProgressView() } else { Text("Save").fontWeight(.semibold) }
                 }
                 .foregroundStyle(HavenColors.textPrimary)
-                .disabled(isDisabled || isSaving)
+                .disabled(isSaving)
             }
         }
         .onAppear {
@@ -419,11 +439,22 @@ struct RoutineEditSheet: View {
         [(1, "S"), (2, "M"), (3, "T"), (4, "W"), (5, "T"), (6, "F"), (7, "S")]
     }
 
-    private var isDisabled: Bool {
-        if label.trimmingCharacters(in: .whitespaces).isEmpty { return true }
-        if [.weekly, .biweekly, .triweekly].contains(cadenceType) && selectedWeekdays.isEmpty { return true }
-        if activeMonths.isEmpty { return true }
-        return false
+    /// Returns nil when the form is valid, or a specific human-readable
+    /// message identifying the first missing field. Drives both the
+    /// inline error banner and the early-return inside `save()`. The
+    /// Save button itself stays enabled so users get explicit feedback
+    /// on tap instead of a silently-disabled control.
+    private var validationErrorMessage: String? {
+        if label.trimmingCharacters(in: .whitespaces).isEmpty {
+            return "Add a label so you'll recognize this routine later."
+        }
+        if [.weekly, .biweekly, .triweekly].contains(cadenceType) && selectedWeekdays.isEmpty {
+            return "Pick at least one day of the week."
+        }
+        if activeMonths.isEmpty {
+            return "Pick at least one active month."
+        }
+        return nil
     }
 
     /// Maps a routine kind to a ContractorPickerSheet category token
@@ -651,6 +682,28 @@ struct RoutineEditSheet: View {
     }
 
     private func save() async {
+        // Dismiss keyboard before anything else so any inline error
+        // banner is visible above the safe area. `sendAction` returns
+        // a discardable Bool — explicitly assigning to `_` silences the
+        // unused-result warning.
+        await MainActor.run {
+            _ = UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder),
+                to: nil,
+                from: nil,
+                for: nil
+            )
+        }
+
+        // Inline validation: surface specific missing-field messages
+        // instead of silently disabling Save. Keeps the user oriented
+        // when the form has scrolled past the empty field.
+        if let validationMessage = validationErrorMessage {
+            errorMessage = validationMessage
+            Haptics.error()
+            return
+        }
+
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -782,6 +835,7 @@ struct RoutineEditSheet: View {
             onSaved()
             dismiss()
         } catch {
+            print("[RoutineEditSheet] save failed: \(error)")
             errorMessage = "Couldn't save: \(error.localizedDescription)"
             Haptics.error()
         }

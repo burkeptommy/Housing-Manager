@@ -132,6 +132,13 @@ struct DashboardView: View {
         .navigationTitle("Chez")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { dashboardToolbar }
+        // Force an opaque pearl-white nav bar background regardless of
+        // scroll content. Without this, the translucent material picks
+        // up the navy tint from `HomeCoverageHero` / "Spring readiness"
+        // as those scroll under, and the dark-indigo "Chez" wordmark
+        // becomes near-invisible against the navy backdrop.
+        .toolbarBackground(HavenColors.background, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
     }
 
     /// Phase 95.3 — toolbar content moved out of the body's modifier
@@ -385,10 +392,14 @@ struct DashboardView: View {
                     )
                 } else {
                     // No property or household available — defensive
-                    // fallback so the sheet never dead-ends.
-                    AddVendorSheet(onComplete: {
-                        Task { await viewModel.refresh() }
-                    })
+                    // fallback so the sheet never dead-ends. Forward
+                    // the triggering system's canonical category when
+                    // possible so the manual add path still picks up
+                    // pre-selection.
+                    AddVendorSheet(
+                        onComplete: { Task { await viewModel.refresh() } },
+                        prefilledCategory: SystemCategoryRegistry.canonical(category: item.systemName)
+                    )
                 }
             }
             .sheet(item: $addVendorItem) { action in
@@ -412,9 +423,16 @@ struct DashboardView: View {
                     // Fallback when the coverage item isn't available
                     // (coverage data refreshed between tap and sheet
                     // presentation, or no household resolved yet).
-                    AddVendorSheet(onComplete: {
-                        Task { await viewModel.refresh() }
-                    })
+                    // Best-effort canonicalize the action's system
+                    // name — if it's already a registry key (which
+                    // is the common case since gap card taps stash
+                    // the canonical id) we forward it as prefill;
+                    // otherwise the prefill is nil and no auto-stamp
+                    // happens.
+                    AddVendorSheet(
+                        onComplete: { Task { await viewModel.refresh() } },
+                        prefilledCategory: SystemCategoryRegistry.canonical(category: action.systemName)
+                    )
                 }
             }
             // Phase 56.1: BrowseSpecialty / AddRecurringService /

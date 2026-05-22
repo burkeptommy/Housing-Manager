@@ -101,7 +101,7 @@ export default function InvoicesScreen() {
                     padding: "6px 12px",
                     border: "1px solid var(--neutral-200)",
                     borderRadius: 999,
-                    background: isActive ? "var(--indigo-900, #2A2252)" : "#fff",
+                    background: isActive ? "var(--indigo-900, #0A0A0A)" : "#fff",
                     color: isActive ? "#fff" : "var(--text)",
                     fontSize: 12.5,
                     fontWeight: 600,

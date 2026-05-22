@@ -27,7 +27,12 @@
 //   CHEZ_ADMIN_EMAILS       — comma-separated list (e.g. "tom@getchez.com")
 //   CHEZ_ADMIN_USER_IDS     — comma-separated UUIDs (recipients for iOS push)
 //   SENDGRID_API_KEY        — for emailing Tom on new requests / replies
-//   ADMIN_PORTAL_URL        — defaults to https://admin.getchez.com
+//   OPERATOR_PORTAL_URL     — defaults to https://service.getchez.com
+//                             (operator workspace for handling live homeowner
+//                             requests; admin.getchez.com is back-of-house
+//                             content/templates only.) `ADMIN_PORTAL_URL` is
+//                             still read as a fallback so existing deployments
+//                             keep working until the Vercel env var is renamed.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -224,10 +229,33 @@ async function sendAdminEmail(
   }
 }
 
+/// Returns the operator-portal deep-link for a chez_requests row.
+/// Phase X (May 2026) — every admin push payload + every SendGrid
+/// email backstop now lands on the operator workspace focused on
+/// serving home requests. admin.getchez.com stays for back-of-house
+/// content/templates (Quiz Builder, Task Templates, Routines,
+/// Systems). The legacy `adminPortalUrl` name is preserved here so
+/// the 19+ callers don't need to be touched in the same diff.
+///
+/// URL resolution precedence:
+///   1. OPERATOR_PORTAL_URL secret (set once DNS for
+///      service.getchez.com is configured; format
+///      "https://service.getchez.com" → produces "/?case={id}")
+///   2. Default → `https://getchez.com/service.html?case={id}` so
+///      links work today, on the existing getchez.com domain, the
+///      moment the website redeploys with service.html in place.
+///
+/// We intentionally DO NOT fall back to ADMIN_PORTAL_URL anymore.
+/// Old deployments may still have it set pointing at
+/// `https://admin.getchez.com`, which would produce a broken URL
+/// under the new `/?case={id}` path (admin's root serves admin.html,
+/// not a case query handler). Default-to-getchez-interim is safer.
 function adminPortalUrl(requestId: string): string {
-  const base = (Deno.env.get("ADMIN_PORTAL_URL") || "https://admin.getchez.com")
-    .replace(/\/+$/, "");
-  return `${base}/admin.html?view=chez&request=${requestId}`;
+  const explicit = Deno.env.get("OPERATOR_PORTAL_URL");
+  if (explicit) {
+    return `${explicit.replace(/\/+$/, "")}/?case=${requestId}`;
+  }
+  return `https://getchez.com/service.html?case=${requestId}`;
 }
 
 function emailBody(args: {
@@ -5391,10 +5419,43 @@ async function handleCancelHomeAssessment(
     await service.from("properties").update({ attributes: attrs }).eq("id", a.property_id);
   }
 
+  // Phase X (May 2026) — also send admin email + include the operator
+  // portal URL in the push payload so cancel notifications deep-link
+  // directly to the right case on service.getchez.com. Cases linked
+  // to this assessment carry `context.assessment_id` in their JSONB.
+  const { data: matchedRequests } = await service
+    .from("chez_requests")
+    .select("id")
+    .filter("context->>_kind", "eq", "home_assessment_request")
+    .filter("context->>assessment_id", "eq", assessmentId)
+    .limit(1);
+  const linkedRequestId =
+    (matchedRequests as Array<{ id: string }> | null)?.[0]?.id ?? null;
+  const portalUrl = linkedRequestId ? adminPortalUrl(linkedRequestId) : null;
+
   await sendPush(serviceUrl, serviceRoleKey, adminUserIds(),
     "Home assessment cancelled",
     `Customer cancelled their assessment (${payload.reason ?? "homeowner_self_serve"}).`,
-    { type: "chez_admin_request", assessment_id: assessmentId });
+    {
+      type: "chez_admin_request",
+      assessment_id: assessmentId,
+      ...(linkedRequestId ? { request_id: linkedRequestId } : {}),
+    });
+  if (portalUrl) {
+    await sendAdminEmail(
+      adminEmails(),
+      "[Chez] Home assessment cancelled",
+      `Customer cancelled their assessment.\nReason: ${payload.reason ?? "homeowner_self_serve"}\n\n${portalUrl}`,
+      emailBody({
+        preview: "Home assessment cancelled",
+        heading: "Home assessment cancelled",
+        intro: "The homeowner cancelled their scheduled assessment.",
+        bodyText: `Reason: ${payload.reason ?? "homeowner_self_serve"}`,
+        ctaLabel: "Open case",
+        ctaUrl: portalUrl,
+      })
+    );
+  }
   return json({ ok: true, status: "cancelled" });
 }
 
@@ -5470,10 +5531,39 @@ async function handleRequestAssessmentReschedule(
   }
 
   const preferredText = cleanedPreferredDates.join(", ");
+
+  // Phase X (May 2026) — fold the linked chez_request_id into the
+  // push payload + send a SendGrid email backstop so the operator
+  // can land directly on the right case on service.getchez.com.
+  // The matchedRequests query above already loaded those rows; reuse
+  // the first id for the deep-link URL.
+  const firstRequestId =
+    (matchedRequests as Array<{ id: string; context: Record<string, unknown> | null }> | null)?.[0]?.id ?? null;
+  const portalUrl = firstRequestId ? adminPortalUrl(firstRequestId) : null;
+
   await sendPush(serviceUrl, serviceRoleKey, adminUserIds(),
     "Reschedule requested",
     `Customer asked to reschedule their assessment.${preferredText ? ` Preferred: ${preferredText}` : ""}`,
-    { type: "chez_admin_request", assessment_id: assessmentId });
+    {
+      type: "chez_admin_request",
+      assessment_id: assessmentId,
+      ...(firstRequestId ? { request_id: firstRequestId } : {}),
+    });
+  if (portalUrl) {
+    await sendAdminEmail(
+      adminEmails(),
+      "[Chez] Reschedule requested",
+      `Customer asked to reschedule their assessment.\n${preferredText ? `Preferred: ${preferredText}\n` : ""}${payload.notes ? `Notes: ${payload.notes}\n` : ""}\n${portalUrl}`,
+      emailBody({
+        preview: "Reschedule requested",
+        heading: "Reschedule requested",
+        intro: "The homeowner wants to reschedule their assessment.",
+        bodyText: `${preferredText ? `Preferred: ${preferredText}\n` : ""}${payload.notes ? `Notes: ${payload.notes}` : ""}`.trim() || "No additional notes.",
+        ctaLabel: "Open case",
+        ctaUrl: portalUrl,
+      })
+    );
+  }
   return json({ ok: true });
 }
 

@@ -1,60 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
-  <!-- Open Graph / Twitter card image. Matches the iOS app icon
-       (indigo background, uppercase serif C, salmon roof chevron).
-       1200x630 = Facebook standard, also works for Twitter/Linked In. -->
-
-  <!-- Background -->
-  <rect width="1200" height="630" fill="#453A70"/>
-
-  <!-- Left side: app icon (C + chevron) inside a rounded square card -->
-  <g transform="translate(100, 145)">
-    <rect width="340" height="340" rx="68" fill="#3B3162"/>
-    <!-- Salmon chevron over the C -->
-    <path d="M205 60 L255 95 L305 60"
-          stroke="#ED6955" stroke-width="22" stroke-linecap="round"
-          stroke-linejoin="round" fill="none"/>
-    <!-- Uppercase serif C -->
-    <text x="170" y="290"
-          font-family="ui-serif, 'New York', Georgia, 'Times New Roman', serif"
-          font-size="320"
-          font-weight="500"
-          fill="#FFFFFF"
-          text-anchor="middle">C</text>
+  <rect width="1200" height="630" fill="#6938EF"></rect>
+  <g fill="white" transform="translate(375, 90) scale(0.879)">
+    <path d="M 256.00 15.69 L 270.34 256.00 L 241.66 256.00 Z"></path>
+    <path d="M 329.70 128.34 L 268.42 263.17 L 243.58 248.83 Z"></path>
+    <path d="M 445.48 146.60 L 263.17 268.42 L 248.83 243.58 Z"></path>
+    <path d="M 411.44 256.00 L 256.00 270.34 L 256.00 241.66 Z"></path>
+    <path d="M 484.99 388.21 L 248.83 268.42 L 263.17 243.58 Z"></path>
+    <path d="M 335.73 394.10 L 243.58 263.17 L 268.42 248.83 Z"></path>
+    <path d="M 256.00 488.83 L 241.66 256.00 L 270.34 256.00 Z"></path>
+    <path d="M 180.45 386.85 L 243.58 248.83 L 268.42 263.17 Z"></path>
+    <path d="M 44.49 378.12 L 248.83 243.58 L 263.17 268.42 Z"></path>
+    <path d="M 80.86 256.00 L 256.00 241.66 L 256.00 270.34 Z"></path>
+    <path d="M 48.45 136.17 L 263.17 243.58 L 248.83 268.42 Z"></path>
+    <path d="M 168.54 104.52 L 268.42 248.83 L 243.58 263.17 Z"></path>
+    <circle cx="256" cy="256" r="18.43"></circle>
   </g>
-
-  <!-- Right side: Chez wordmark + tagline -->
-  <g transform="translate(540, 0)">
-    <text x="0" y="290"
-          font-family="ui-serif, 'New York', Georgia, 'Times New Roman', serif"
-          font-size="120"
-          font-weight="600"
-          fill="#FFFFFF">Chez</text>
-    <text x="0" y="365"
-          font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
-          font-size="34"
-          font-weight="500"
-          fill="#FFFFFF"
-          opacity="0.85">Your home, organized.</text>
-    <text x="0" y="430"
-          font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
-          font-size="22"
-          font-weight="400"
-          fill="#FFFFFF"
-          opacity="0.7">Estate intelligence + home management,</text>
-    <text x="0" y="460"
-          font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
-          font-size="22"
-          font-weight="400"
-          fill="#FFFFFF"
-          opacity="0.7">designed for the families who run their own.</text>
-  </g>
-
-  <!-- Footer URL -->
-  <text x="600" y="585"
-        font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif"
-        font-size="20"
-        font-weight="500"
-        fill="#FFFFFF"
-        opacity="0.6"
-        text-anchor="middle">getchez.com</text>
 </svg>

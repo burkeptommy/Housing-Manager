@@ -41,7 +41,8 @@ const VALID_CATEGORIES = new Set<string>([
     "Pool/Spa", "Hot Tub", "Deck/Outdoor", "Driveway Sealcoating",
     "Pressure Washing", "Solar", "EV Charger", "Smart Home",
     "Water Treatment", "Boiler", "Radiant Floor", "Painting",
-    "Siding/Exterior", "Elevator", "Wine Cellar", "Attic & Foundation",
+    "Siding/Exterior", "Waterproofing", "Elevator", "Wine Cellar",
+    "Attic & Foundation",
     // Sub-system
     "Appliance", "Crawl Space", "Garage Door", "Sump Pump",
     "Irrigation", "Fire Protection",

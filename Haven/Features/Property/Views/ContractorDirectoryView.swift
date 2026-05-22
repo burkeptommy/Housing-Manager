@@ -23,6 +23,13 @@ struct DelegationContext {
 struct ContractorDirectoryView: View {
     var onSelect: ((ContractorRow) -> Void)?
     var delegationContext: DelegationContext? = nil
+    /// Phase X feedback: when the picker is opened from a category-aware
+    /// flow (e.g. FindLocalVendorSheet's "Add my own" with a Crawl Space
+    /// context), pass the canonical picker key here so the inner
+    /// AddVendorSheet pre-selects the specialty and never has to fall
+    /// back to the Phase-95 "Pick a category" picker. Nil for
+    /// context-free entry points (Settings → Vendors, generic "+").
+    var prefilledCategoryOnAdd: String? = nil
     @StateObject private var viewModel = ContractorViewModel()
     @State private var showAddContractor = false
     @State private var contractorIdsBeforeAdd: Set<UUID> = []
@@ -103,9 +110,22 @@ struct ContractorDirectoryView: View {
             }
         }
         .sheet(isPresented: $showAddContractor) {
-            AddVendorSheet(onComplete: {
-                Task { await autoSelectNewlyAddedContractor() }
-            })
+            // Precedence: explicit `prefilledCategoryOnAdd` from the
+            // caller wins; otherwise inherit the delegation context's
+            // systemCategory (mapped through `pickerCategoryFor` so
+            // sub-systems like Crawl Space land on "Waterproofing");
+            // otherwise nil (context-free entry points).
+            let derivedCategory: String? = {
+                if let explicit = prefilledCategoryOnAdd { return explicit }
+                if let delegationCat = delegationContext?.systemCategory {
+                    return SystemCategoryRegistry.pickerCategoryFor(systemCategory: delegationCat) ?? delegationCat
+                }
+                return nil
+            }()
+            AddVendorSheet(
+                onComplete: { Task { await autoSelectNewlyAddedContractor() } },
+                prefilledCategory: derivedCategory
+            )
         }
     }
 

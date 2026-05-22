@@ -379,7 +379,7 @@ export function CrewChatPanel({ workspaceId, members, selfMemberId }: CrewChatPa
                 fontSize: 13,
                 borderRadius: 12,
                 border: "1px solid var(--border, #E6E5EE)",
-                background: "var(--pearl, #F8F9FA)",
+                background: "var(--pearl, #FAFAFC)",
                 outline: "none",
               }}
             />
@@ -754,7 +754,7 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   border: "1px solid var(--border, #E6E5EE)",
-  background: "var(--pearl, #F8F9FA)",
+  background: "var(--pearl, #FAFAFC)",
   borderRadius: 12,
   fontSize: 13,
 };

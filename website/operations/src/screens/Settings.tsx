@@ -420,7 +420,7 @@ export default function SettingsScreen() {
         padding: "16px 20px", borderRadius: 16,
         background: "#fff", border: "1px solid var(--neutral-200)",
         position: "sticky", bottom: 16, zIndex: 5,
-        boxShadow: "0 6px 22px rgba(42, 34, 82, 0.08)",
+        boxShadow: "0 6px 22px rgba(15, 10, 40, 0.08)",
       }}>
         <div style={{ flex: 1, fontSize: 12.5, color: "var(--text-muted)" }}>
           {error ? (

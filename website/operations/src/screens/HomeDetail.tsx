@@ -653,7 +653,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 50,
-        background: "rgba(42,34,82,0.4)",
+        background: "rgba(15, 10, 40,0.4)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
@@ -666,7 +666,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
           padding: 24,
           maxWidth: 520,
           width: "100%",
-          boxShadow: "0 24px 60px rgba(42,34,82,0.4)",
+          boxShadow: "0 24px 60px rgba(15, 10, 40,0.4)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -894,7 +894,7 @@ function SystemEditSheet({
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 50,
-        background: "rgba(42,34,82,0.4)",
+        background: "rgba(15, 10, 40,0.4)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
@@ -904,7 +904,7 @@ function SystemEditSheet({
         style={{
           background: "#fff", borderRadius: 16, padding: 24,
           width: "min(520px, 95vw)", maxHeight: "90vh", overflowY: "auto",
-          boxShadow: "0 24px 60px rgba(42,34,82,0.4)",
+          boxShadow: "0 24px 60px rgba(15, 10, 40,0.4)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1033,7 +1033,7 @@ function SystemEditSheet({
                     aria-label="Remove photo"
                     style={{
                       position: "absolute", top: 4, right: 4,
-                      background: "rgba(42, 34, 82, 0.78)", color: "#fff",
+                      background: "rgba(15, 10, 40, 0.78)", color: "#fff",
                       border: "none", borderRadius: "50%",
                       width: 22, height: 22, fontSize: 13, lineHeight: 1,
                       cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -1161,8 +1161,8 @@ function ChezSpendingTierBanner({ tiers }: ChezSpendingTierBannerProps) {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, rgba(237,105,85,0.08), rgba(237,105,85,0.04))",
-        border: "1px solid rgba(237,105,85,0.30)",
+        background: "linear-gradient(135deg, rgba(105, 56, 239,0.08), rgba(105, 56, 239,0.04))",
+        border: "1px solid rgba(105, 56, 239,0.30)",
         borderRadius: 14,
         padding: "14px 18px",
         marginBottom: 16,

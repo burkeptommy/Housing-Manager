@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 @MainActor
 final class AppState: ObservableObject {
@@ -57,6 +58,30 @@ final class AppState: ObservableObject {
 
     let authService = AuthService()
     let sessionManager = SessionManager()
+
+    /// Combine subscriptions for nested ObservableObjects (sessionManager,
+    /// etc.). SwiftUI's `@EnvironmentObject` dependency tracking does not
+    /// transitively follow nested ObservableObjects — ContentView reads
+    /// `appState.sessionManager.isLocked` but only observes `appState`,
+    /// so when `isLocked` flipped to false after a successful Face ID
+    /// unlock, ContentView wasn't re-rendering and `BiometricAuthView`
+    /// stayed mounted. Forwarding sessionManager's `objectWillChange`
+    /// into AppState's own publisher fixes the silent-lock bug.
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // Forward sessionManager's @Published changes to AppState's
+        // objectWillChange so views observing AppState re-render when
+        // isLocked toggles. Critical for the Face ID unlock path —
+        // without this, evaluatePolicy can succeed and isLocked flips
+        // to false on SessionManager, but ContentView never re-renders
+        // because it only watches AppState.
+        sessionManager.objectWillChange
+            .sink { [weak self] in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+    }
 
     #if DEBUG && targetEnvironment(simulator)
     private var didAttemptE2ELoginBootstrap = false
@@ -260,6 +285,12 @@ final class AppState: ObservableObject {
                         // legacy rows (e.g. "Plumbing & Heating", "Fire
                         // Protection" from the old chimney_sweep chip).
                         await Self.canonicalizeContractorCategoriesOnceIfNeeded()
+                        // Phase X feedback: migrate contractor rows that
+                        // were stamped `category = "Crawl Space"` under
+                        // the old "waterproofing → Crawl Space" alias to
+                        // the new top-level "Waterproofing" specialty.
+                        // No-op on installs that never had this state.
+                        await Self.migrateCrawlSpaceContractorsToWaterproofingOnceIfNeeded()
                         // Phase 55.2: repair air-filter tasks that
                         // drifted to vendor under the 54A assignment
                         // leak. Runs AFTER the other backfills so any
@@ -355,6 +386,17 @@ final class AppState: ObservableObject {
                         // `installDateAttomPrefilled` flag on the row +
                         // a UserDefaults gate inside the helper.
                         await Self.runInstallDatePrefillOnceIfNeeded()
+
+                        // Quiz dismissal snooze backfill (May 2026):
+                        // convert existing permanent dismissals to
+                        // 12-month snoozes so core homeowner categories
+                        // (HVAC, Roofing, Septic, etc.) auto-resurface
+                        // instead of vanishing forever after a single
+                        // post-quiz "Not applicable" tap. Users who
+                        // truly mean permanent can re-dismiss from the
+                        // in-app Coverage view. Gated on UserDefaults
+                        // hasConvertedQuizDismissalsToSnoozes_v1.
+                        await Self.convertQuizDismissalsToSnoozesOnceIfNeeded()
                     }
                     Task { await Self.archivePreQuizChoreTasksOnce() }
                     Task { await Self.backfillUniversalSystemsOnce() }
@@ -1335,6 +1377,57 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(true, forKey: key)
     }
 
+    /// Quiz dismissal snooze backfill (May 2026): convert every
+    /// existing `dismissed_categories` row with `snoozed_until = NULL`
+    /// (permanent dismissal) into a 12-month snooze anchored on the
+    /// row's `createdAt`. The Burke account screenshot showed 7 core
+    /// homeowner categories (HVAC, Roofing, Septic, etc.) permanently
+    /// dismissed; without resurfacing they vanish from coverage
+    /// forever. Users who truly mean permanent can re-dismiss from
+    /// the in-app Coverage view ("Not applicable" there still calls
+    /// `dismissCategory` and stays permanent — this backfill only
+    /// touches rows that were created before the quiz default flip).
+    /// Idempotent via UserDefaults gate.
+    @MainActor
+    static func convertQuizDismissalsToSnoozesOnceIfNeeded() async {
+        let key = "hasConvertedQuizDismissalsToSnoozes_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let rows: [DismissedCategoryRow]
+        do {
+            rows = try await db.fetchDismissedCategories()
+        } catch {
+            print("[AppState] QuizDismissalSnooze backfill: fetch failed: \(error)")
+            return
+        }
+
+        var converted = 0
+        for row in rows where row.snoozedUntil == nil {
+            // Anchor the snooze on the row's createdAt when available
+            // so rows dismissed a long time ago still resurface ~now
+            // (createdAt + 12mo could already be in the past).
+            // Rows with nil createdAt fall back to now + 12 months.
+            let anchor = row.createdAt ?? Date()
+            let until = Calendar.current.date(byAdding: .month, value: 12, to: anchor) ?? Date()
+            do {
+                try await db.snoozeCategory(
+                    householdId: row.householdId,
+                    category: row.category,
+                    until: until
+                )
+                converted += 1
+            } catch {
+                print("[AppState] QuizDismissalSnooze backfill: failed to convert \(row.category): \(error)")
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+        if converted > 0 {
+            print("[AppState] QuizDismissalSnooze backfill: converted \(converted) permanent dismissals to 12-month snoozes")
+        }
+    }
+
     /// Phase 54E.3: One-time backfill that walks every existing
     /// utility_account with a service-type provider (landscaping, pool,
     /// pest control, trash, recycling, compost, yard waste, etc.) and
@@ -1413,6 +1506,47 @@ final class AppState: ObservableObject {
     /// similarly canonicalized if any entry wasn't already canonical.
     /// Gated on a UserDefaults key so it only runs once per install.
     @MainActor
+    /// One-time backfill (Phase X feedback): contractor rows that were
+    /// canonicalized to `category = "Crawl Space"` under the pre-fix
+    /// variant map (where `"waterproofing"` aliased to `"Crawl Space"`)
+    /// belong on the new top-level `"Waterproofing"` specialty. Renames
+    /// `category` AND any matching entry in `specialties`. Skipped on
+    /// installs that never had this state — the loop short-circuits on
+    /// the first pass if no contractors match.
+    ///
+    /// Gate key suffix `_v1`. Bump to `_v2` if future variant remappings
+    /// need a re-sweep.
+    static func migrateCrawlSpaceContractorsToWaterproofingOnceIfNeeded() async {
+        let key = "hasMigratedCrawlSpaceContractorsToWaterproofing_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let contractors: [ContractorRow]
+        do {
+            contractors = try await db.fetchContractors()
+        } catch {
+            return
+        }
+        guard !contractors.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        for contractor in contractors {
+            let categoryNeedsMigration = contractor.category == "Crawl Space"
+            let oldSpecialties = contractor.specialties ?? []
+            let newSpecialties = oldSpecialties.map { $0 == "Crawl Space" ? "Waterproofing" : $0 }
+            let specialtiesChanged = oldSpecialties != newSpecialties
+            guard categoryNeedsMigration || specialtiesChanged else { continue }
+
+            var update = ContractorUpdate()
+            if categoryNeedsMigration { update.category = "Waterproofing" }
+            if specialtiesChanged { update.specialties = newSpecialties }
+            _ = try? await db.updateContractor(id: contractor.id, update)
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
     static func canonicalizeContractorCategoriesOnceIfNeeded() async {
         let key = "hasRunContractorCategoryCanonicalizationP60_6_v1"
         guard !UserDefaults.standard.bool(forKey: key) else { return }

@@ -1,15 +1,19 @@
 import SwiftUI
 
-/// Haven Design System — Pearl White + Cosmic Indigo + Salmon Action
+/// Haven Design System — Pearl White + Vibrant Purple + Black/White + Gray
 ///
-/// Pearl White (#F8F9FA) is the canvas. Cosmic Indigo (#453A70) is the ink.
-/// Deepened Salmon (#ED6955) is the action color for CTAs.
+/// Pearl off-white (#FAFAFC) is the canvas. Black (#0A0A0A) is the ink.
+/// Vibrant Purple (#6938EF) is the action color for CTAs.
 /// Cards are pure white (#FFFFFF) to pop off the pearl background.
+///
+/// Token NAMES are preserved from the previous indigo+salmon palette
+/// (`navy800`, `action`, `salmonPale`, etc.) so existing call sites pick
+/// up the recolor without renames. Only VALUES changed.
 struct HavenColors {
 
     // MARK: - Pearl White — The Canvas
 
-    /// #F8F9FA — THE main background for every screen
+    /// #FAFAFC — THE main background for every screen
     static let cream = Color.havenCream
 
     /// #FFFFFF — Cards, elevated surfaces, tab bar, AI chat bubbles
@@ -33,87 +37,116 @@ struct HavenColors {
     /// #BFC2C8 — Progress bar fills (neutral), placeholder-weight
     static let beige400 = Color.havenBeige400
 
-    /// #9C98AD — text-soft tier; also drives section-header eyebrows.
+    /// #A1A1AC — text-soft tier; also drives section-header eyebrows.
     static let neutral500 = Color.havenNeutral500
 
-    // MARK: - Cosmic Indigo — The Ink
+    // MARK: - Ink + Purple (token names preserved; values remapped)
 
-    /// #2A2252 — Body text, footer, deepest pressed states.
-    /// Chez design refresh: was #332860 in the previous palette.
+    /// #0A0A0A — Body text, footer, deepest pressed states (black).
+    /// Replaces the previous deep indigo #2A2252.
     static let navy900 = Color.havenNavy900
 
-    /// #332860 — Slightly lighter than 900; pressed states where 900
-    /// would feel too heavy. The previous `navy900` value.
+    /// #2A0F75 — Purple-deep. Replaces the previous indigo #332860.
     static let indigo800 = Color.havenIndigo800
 
-    /// #453A70 — PRIMARY: text, icons, inactive borders, hero card
+    /// #6938EF — PRIMARY: CTAs, active tab, progress fill, hero card,
+    /// active cost-tier dollars. Replaces the previous indigo #453A70.
     static let navy800 = Color.havenNavy
 
-    /// Alias: primary indigo
+    /// Alias: primary purple
     static let navy = Color.havenNavy
 
-    /// #524580 — Pressed states, active tab icons
+    /// #8B6FF5 — Pressed states, active tab icons (lighter purple).
+    /// Replaces the previous indigo #524580.
     static let navy700 = Color.havenNavy700
 
-    /// #5D4C8F — Secondary interactive elements (refreshed hex)
+    /// #7A55F0 — Secondary interactive (mid purple)
     static let navy600 = Color.havenNavy600
 
-    /// #6B5AA0 — Links, tertiary interactive (refreshed hex)
+    /// #6B6B7B — Links, tertiary interactive (neutral gray).
+    /// Replaces the previous muted-indigo #6B5AA0.
     static let navy500 = Color.havenNavy500
 
-    /// #8B7DBA — Tertiary accents on dark surfaces
+    /// #B49BFA — Tertiary accents on dark purple surfaces (lavender)
     static let indigo400 = Color.havenIndigo400
 
-    /// #E8E4F2 — Faint indigo wash; subtle backgrounds for indigo-tinted cards
+    /// #DDD3FA — Subtle background tint for purple-tinted cards
     static let indigo100 = Color.havenIndigo100
 
-    /// #F2EFF8 — Pill / icon-bg tint behind indigo glyphs
+    /// #F4F0FE — Pill / icon-bg tint behind small purple glyphs
     static let indigo50 = Color.havenIndigo50
 
-    // MARK: - Deepened Salmon — Action / CTA
+    // MARK: - Action / CTA (salmon names retained; values remapped to purple)
 
-    /// #ED6955 — Primary CTA: buttons, FAB, progress bars, active nav
+    /// #6938EF — Primary CTA: buttons, FAB, progress bars, active nav
     static let action = Color.havenSalmon
 
-    /// #D14E3E — Pressed state for salmon action elements
+    /// #5025D1 — Pressed state for primary CTA elements
     static let actionPressed = Color.havenSalmonPressed
 
-    /// #F4877B — Eyebrows on indigo backgrounds; hover-tint variant
+    /// #B49BFA — Lavender. Eyebrows on the purple hero card, hover-tint
+    /// variant for purple glyphs on a purple CTA.
     static let actionLight = Color.havenSalmonLight
 
-    /// #FFE8E2 — Salmon-tinted pill / chip background
+    /// #EFEAFE — Purple-pale pill / chip background
     static let actionPale = Color.havenSalmonPale
 
-    /// #FFF5F2 — "Decision needed" wash for cards prompting action
+    /// #F4F0FE — "Decision needed" wash for cards prompting action
     static let action50 = Color.havenSalmon50
 
-    /// White text on salmon action surfaces
+    /// White text on purple action surfaces
     static let textOnAction = Color.white
 
     // MARK: - Text Colors
 
-    /// Indigo in light, white in dark
+    /// Black in light, white in dark
     static let textPrimary = Color.havenTextPrimary
 
-    /// Muted indigo in light, neutral300 in dark
+    /// Neutral gray in light, neutral300 in dark
     static let textSecondary = Color.havenTextSecondary
 
     /// Placeholders, metadata labels
     static let textTertiary = Color.havenTextTertiary
 
-    /// Text on indigo surfaces (hero card, user chat bubbles)
+    /// Text on purple surfaces (hero card, user chat bubbles)
+    /// Token name preserved; surface beneath is now purple, not indigo.
     static let textOnNavy = Color.havenTextOnNavy
 
     // MARK: - Semantic Status Colors
+    // The semantic ramp is retired. These four tokens now collapse to the
+    // three-tone system: complete → black, needs-attention → purple,
+    // critical → black, info → gray. Tokens preserved so existing call
+    // sites continue to resolve, but they no longer differentiate by hue.
 
+    /// Black — complete/good/active states
     static let success = Color.havenSuccess
+    /// Purple — needs-attention/warning states
     static let warning = Color.havenWarning
+    /// Black — critical/overdue states
     static let critical = Color.havenCritical
+    /// Gray — pending/review states
     static let info = Color.havenInfo
+
+    // MARK: - Pill Triad (new explicit tokens)
+    // Three pill tones. Components picking a pill tone should map to one
+    // of these three.
+
+    /// #EFEAFE — Purple pill background (needs attention / overdue)
+    static let pillPurpleBg = Color.havenPillPurpleBg
+    /// #6938EF — Purple pill foreground
+    static let pillPurpleFg = Color.havenPillPurpleFg
+    /// #0A0A0A — Dark pill background (complete / good / active)
+    static let pillDarkBg = Color.havenPillDarkBg
+    /// #FFFFFF — Dark pill foreground
+    static let pillDarkFg = Color.havenPillDarkFg
+    /// #F2F2F4 — Neutral pill background (pending / review / info)
+    static let pillNeutralBg = Color.havenPillNeutralBg
+    /// #6B6B7B — Neutral pill foreground
+    static let pillNeutralFg = Color.havenPillNeutralFg
 
     // MARK: - Adaptive Surfaces (light/dark)
 
-    /// Screen background — pearl white in light, darkBg in dark
+    /// Screen background — pearl off-white in light, darkBg in dark
     static let background = Color.havenBackground
 
     /// Card / elevated surface — white in light, darkElevated in dark
@@ -155,32 +188,34 @@ struct HavenColors {
 
     // MARK: - Utility
 
-    /// Semantic status color for document/system status strings.
+    /// Status color resolver. The semantic ramp is retired (no more
+    /// green/amber/red/blue); every status now collapses to the three-tone
+    /// system: complete → black, needs-attention → purple, neutral → gray.
     static func statusColor(_ status: String) -> Color {
         switch status.lowercased() {
         case "active", "good", "complete", "completed":
-            return success
-        case "expired", "overdue", "critical":
-            return critical
+            return success  // black
+        case "expired", "overdue", "critical", "missing":
+            return critical // black
         case "expiring_soon", "expiringsoon", "warning", "needs_attention", "needs maintenance":
-            return warning
+            return warning  // purple
         case "needs_review", "needsreview", "pending":
-            return info
-        case "missing":
-            return critical
+            return info     // gray
         default:
             return textSecondary
         }
     }
 
-    /// Priority color.
+    /// Priority color resolver. Same three-tone collapse: urgent/high
+    /// surface as black ink (severity); medium needs-attention is purple;
+    /// low is gray.
     static func priorityColor(_ priority: String) -> Color {
         switch priority.lowercased() {
-        case "urgent": return navy900
-        case "high": return critical
-        case "medium": return warning
-        case "low": return info
-        default: return textSecondary
+        case "urgent": return navy900  // black
+        case "high":   return critical // black
+        case "medium": return warning  // purple
+        case "low":    return info     // gray
+        default:       return textSecondary
         }
     }
 }

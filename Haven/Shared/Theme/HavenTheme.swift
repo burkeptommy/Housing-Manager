@@ -48,30 +48,30 @@ enum HavenTheme {
     static let cornerRadius = radiusMedium
     static let cardCornerRadius = radiusLarge
 
-    // MARK: - Shadows (indigo-tinted, light mode only)
-    // NEVER pure black. Color: indigo at low opacity. No shadows in dark mode.
+    // MARK: - Shadows (deep-purple-tinted, light mode only)
+    // NEVER pure black. Color: deep purple at low opacity. No shadows in dark mode.
 
-    /// Subtle card shadow — indigo at 0.04, 8pt blur, 2pt y
+    /// Subtle card shadow — deep purple at 0.04, 8pt blur, 2pt y
     static let shadowCard = HavenShadow(
-        color: Color(red: 0.271, green: 0.227, blue: 0.439).opacity(0.04),
+        color: Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.04),
         radius: 8,
         y: 2
     )
-    /// Button shadow — indigo at 0.06, 4pt blur, 2pt y
+    /// Button shadow — deep purple at 0.06, 4pt blur, 2pt y
     static let shadowButton = HavenShadow(
-        color: Color(red: 0.271, green: 0.227, blue: 0.439).opacity(0.06),
+        color: Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.06),
         radius: 4,
         y: 2
     )
-    /// Elevated element shadow — indigo at 0.08, 12pt blur, 4pt y
+    /// Elevated element shadow — deep purple at 0.08, 12pt blur, 4pt y
     static let shadowElevated = HavenShadow(
-        color: Color(red: 0.271, green: 0.227, blue: 0.439).opacity(0.08),
+        color: Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.08),
         radius: 12,
         y: 4
     )
-    /// FAB / floating shadow — indigo at 0.2, 8pt blur, 4pt y
+    /// FAB / floating shadow — deep purple at 0.2, 8pt blur, 4pt y
     static let shadowFloat = HavenShadow(
-        color: Color(red: 0.271, green: 0.227, blue: 0.439).opacity(0.20),
+        color: Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.20),
         radius: 8,
         y: 4
     )

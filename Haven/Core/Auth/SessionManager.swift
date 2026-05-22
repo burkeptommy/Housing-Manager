@@ -48,11 +48,11 @@ final class SessionManager: ObservableObject {
         self.backgroundDate = nil
     }
 
-    func unlock() async -> Bool {
-        let success = await AuthService.authenticateWithBiometrics()
-        if success {
+    func unlock() async -> AuthService.BiometricAuthResult {
+        let result = await AuthService.authenticateWithBiometrics()
+        if result.success {
             isLocked = false
         }
-        return success
+        return result
     }
 }

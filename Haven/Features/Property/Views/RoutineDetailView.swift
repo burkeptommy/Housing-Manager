@@ -455,34 +455,37 @@ struct RoutineDetailView: View {
                     context: chezRoutineContext
                 )
 
-                Button {
-                    isEditing = true
-                } label: {
-                    Label("Edit routine", systemImage: "pencil")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.bordered)
-                .tint(HavenColors.navy)
+                // Use HavenButton so Edit + Archive match the rest of
+                // the app's secondary / destructive button treatment
+                // (cream-light fill with navy ink + bordered outline,
+                // red-tinted fill with critical ink). The previous
+                // `.buttonStyle(.bordered)` rendered as pale lavender
+                // pills with SF Pro labels, breaking the design system.
+                HavenButton(
+                    title: "Edit routine",
+                    action: { isEditing = true },
+                    style: .secondary,
+                    icon: "pencil"
+                )
 
-                Button(role: .destructive) {
-                    showArchiveConfirm = true
-                } label: {
-                    Label("Archive routine", systemImage: "archivebox")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                HavenButton(
+                    title: "Archive routine",
+                    action: { showArchiveConfirm = true },
+                    style: .destructive,
+                    icon: "archivebox"
+                )
+            }
+            .confirmationDialog(
+                "Archive this routine?",
+                isPresented: $showArchiveConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Archive routine", role: .destructive) {
+                    Task { await archive() }
                 }
-                .buttonStyle(.bordered)
-                .confirmationDialog(
-                    "Archive this routine?",
-                    isPresented: $showArchiveConfirm,
-                    titleVisibility: .visible
-                ) {
-                    Button("Archive routine", role: .destructive) {
-                        Task { await archive() }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Archiving \(routine.presentationLabel) hides its schedule and unlinks any vendor tasks. You can restore it later from the archived routines list.")
-                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Archiving \(routine.presentationLabel) hides its schedule and unlinks any vendor tasks. You can restore it later from the archived routines list.")
             }
         }
     }

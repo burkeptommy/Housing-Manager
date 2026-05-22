@@ -50,6 +50,7 @@
         { "key": "Deck/Outdoor", "label": "Deck / Outdoor" },
         { "key": "Fire Protection", "label": "Fire Protection" },
         { "key": "Crawl Space", "label": "Crawl Space" },
+        { "key": "Waterproofing", "label": "Waterproofing" },
         { "key": "Attic & Foundation", "label": "Attic & Foundation" },
         { "key": "Elevator", "label": "Residential Elevator" },
         { "key": "Wine Cellar", "label": "Wine Cellar" },

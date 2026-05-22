@@ -54,6 +54,11 @@ struct MaintenanceTaskDetailSheet: View {
     @State private var showHandymanPunchList = false
     @State private var showFindLocalVendor = false
     @State private var showManualAddFromFindVendor = false
+    /// Phase X feedback: carries the canonical picker category from
+    /// FindLocalVendorSheet's "Add my own" notification, forwarded to
+    /// ContractorDirectoryView's inner AddVendorSheet so it pre-selects
+    /// the specialty.
+    @State private var manualAddFromFindVendorCategory: String? = nil
     @State private var showEditDueDate = false
     @State private var editedDueDate = Date()
     @State private var showLastServicedPicker = false
@@ -529,15 +534,23 @@ struct MaintenanceTaskDetailSheet: View {
             await loadUpcomingVisits()
             await loadPropertyContext()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openManualContractorAdd)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .openManualContractorAdd)) { notification in
+            // Phase X feedback: propagate FindLocalVendorSheet's category
+            // through to the inner AddVendorSheet so the user doesn't hit
+            // the "Pick a category" picker when they hit "+" inside the
+            // contractor directory.
+            manualAddFromFindVendorCategory = notification.userInfo?["system_category"] as? String
             showManualAddFromFindVendor = true
         }
         .sheet(isPresented: $showManualAddFromFindVendor) {
             NavigationStack {
-                ContractorDirectoryView(onSelect: { contractor in
-                    showManualAddFromFindVendor = false
-                    Task { await assignContractorToTask(contractor) }
-                })
+                ContractorDirectoryView(
+                    onSelect: { contractor in
+                        showManualAddFromFindVendor = false
+                        Task { await assignContractorToTask(contractor) }
+                    },
+                    prefilledCategoryOnAdd: manualAddFromFindVendorCategory
+                )
             }
         }
         .sheet(isPresented: $showPauseFromDetail) {
@@ -2598,11 +2611,12 @@ struct MaintenanceTaskDetailSheet: View {
     }
 
     private func loadHouseholdUsers() async {
-        householdUsers = (try? await db.fetchHouseholdUsers()) ?? []
-        // Build 87 (Home Manager expansion): also pull the family + staff
-        // rows so the assignee picker can label home managers. Both queries
-        // run sequentially to avoid burning a parallel connection on a
-        // small list.
+        // Augmented load: includes linked family members whose users
+        // row has a stale household_id, so the wife sees Tom even if
+        // his auth-side household linkage is mismatched. The role-suffix
+        // arrays (family + staff) still load separately because we
+        // need them for the home-manager label rendering.
+        householdUsers = (try? await db.fetchHouseholdUsersAugmented()) ?? []
         let family = (try? await db.fetchFamilyMembers()) ?? []
         let staff = (try? await db.fetchHouseholdStaff()) ?? []
         householdFamilyMembersForRoles = family + staff

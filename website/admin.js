@@ -49,6 +49,37 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
+// Phase X (May 2026) — Portal-mode split. service.html sets
+// `data-portal-mode="service"` on <body>; admin.html doesn't. The two
+// HTML shells share this single admin.js codebase so we don't have to
+// duplicate the 22k+ lines of cockpit + simulator + architecture map.
+// The split is view-filter cosmetic only:
+//   - service mode → only the "action" group nav (Today / Homes /
+//     Concierge / Upcoming / Audit / Vendor Apps)
+//   - admin mode   → full nav (action + catalog + reference + archive
+//     + tools)
+// Deep-links via `?case={request_id}` (set by the chez-concierge edge
+// function's adminPortalUrl helper) are translated into the cockpit
+// view + selectedChezRequest at init time below.
+const PORTAL_MODE =
+  (typeof document !== "undefined" && document.body?.dataset?.portalMode) ||
+  "admin";
+
+function isViewVisibleForPortal(view) {
+  if (!view) return false;
+  if (PORTAL_MODE === "service") {
+    return (view.group || "catalog") === "action";
+  }
+  return true;
+}
+
+function visibleViewGroups() {
+  if (PORTAL_MODE === "service") {
+    return VIEW_GROUPS.filter((g) => g.id === "action");
+  }
+  return VIEW_GROUPS;
+}
+
 // Phase 5z+18 — VIEWS now carries a `group` field so the left nav can
 // render section headers. Tom: "we should also categorize our left
 // hand panel to make it easier to navigate like a real site."
@@ -897,18 +928,38 @@ async function init() {
   // Phase 85.5: restore the active view from the URL hash so a refresh
   // lands the operator back where they were instead of bouncing them to
   // Quiz Builder. Format: `#/<viewId>` (e.g. `#/chez`, `#/upcoming`).
+  //
+  // Phase X (May 2026) — Honor portal mode when resolving the hash. In
+  // service mode, hashes that point at catalog/reference/archive/tools
+  // views (e.g. `#/quiz`) fall back to the default service view so the
+  // operator never lands on a hidden tab.
   if (typeof window !== "undefined") {
     const hash = (window.location.hash || "").replace(/^#\/?/, "");
-    if (hash && VIEWS.some((v) => v.id === hash)) {
-      state.view = hash;
+    if (hash) {
+      const target = VIEWS.find((v) => v.id === hash);
+      if (target && isViewVisibleForPortal(target)) {
+        state.view = hash;
+      }
+    }
+    // Phase X (May 2026) — `?case={request_id}` deep-link from chez
+    // concierge push notifications + SendGrid admin emails. Lands the
+    // operator in the cockpit with the right case pre-selected.
+    const params = new URLSearchParams(window.location.search);
+    const caseId = params.get("case");
+    if (caseId && /^[0-9a-f-]{36}$/i.test(caseId)) {
+      state.view = "chez";
+      state.selectedChezRequest = caseId;
     }
     // Honor browser back/forward (also catches manual hash edits).
     window.addEventListener("hashchange", () => {
       const next = (window.location.hash || "").replace(/^#\/?/, "");
-      if (next && VIEWS.some((v) => v.id === next) && next !== state.view) {
-        state.view = next;
-        state.selected = null;
-        render();
+      if (next && next !== state.view) {
+        const target = VIEWS.find((v) => v.id === next);
+        if (target && isViewVisibleForPortal(target)) {
+          state.view = next;
+          state.selected = null;
+          render();
+        }
       }
     });
   }
@@ -2272,8 +2323,10 @@ function renderNav() {
     }
     return button;
   };
-  const groupHtml = VIEW_GROUPS.map((group) => {
-    const views = VIEWS.filter((v) => (v.group || "catalog") === group.id);
+  const groupHtml = visibleViewGroups().map((group) => {
+    const views = VIEWS.filter(
+      (v) => (v.group || "catalog") === group.id && isViewVisibleForPortal(v)
+    );
     if (views.length === 0) return "";
     // Phase 86A.1 — auto-expand any group that contains the currently
     // selected view, regardless of saved collapse state. Prevents the
@@ -6591,11 +6644,11 @@ function openVendorEmailComposer(activeReq, vendor) {
     const body = (fd.get("body") || "").toString().trim();
     if (!subject || !body) {
       feedback.textContent = "Subject and message are both required.";
-      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      feedback.style.color = "var(--salmon-dark, #5025D1)";
       return;
     }
     feedback.textContent = "Sending…";
-    feedback.style.color = "var(--text-muted, #6F6A88)";
+    feedback.style.color = "var(--text-muted, #6B6B7B)";
     try {
       // Call the new send-chez-vendor-email function. It records the
       // outreach + posts a system message + returns the reply_token.
@@ -6621,7 +6674,7 @@ function openVendorEmailComposer(activeReq, vendor) {
         throw new Error(result.error || `HTTP ${resp.status}`);
       }
       feedback.textContent = "Sent. The vendor's reply will appear in this thread automatically.";
-      feedback.style.color = "var(--success, #4A7C59)";
+      feedback.style.color = "var(--success, #0A0A0A)";
       // Refresh the case thread so the new system message appears.
       try {
         await loadChezMessages(activeReq.id);
@@ -6631,7 +6684,7 @@ function openVendorEmailComposer(activeReq, vendor) {
     } catch (err) {
       console.error("[vendor-email-composer]", err);
       feedback.textContent = `Failed to send: ${err.message || err}`;
-      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      feedback.style.color = "var(--salmon-dark, #5025D1)";
     }
   });
 }
@@ -6723,7 +6776,7 @@ function openVendorCounterComposer(activeReq, vendor) {
     const scope = (fd.get("scope") || "").toString().trim();
     const operatorNotes = (fd.get("operator_notes") || "").toString().trim();
     feedback.textContent = "Drafting counter-offer…";
-    feedback.style.color = "var(--text-muted, #6F6A88)";
+    feedback.style.color = "var(--text-muted, #6B6B7B)";
     draftBtn.disabled = true;
     try {
       const result = await callChezConcierge({
@@ -6746,7 +6799,7 @@ function openVendorCounterComposer(activeReq, vendor) {
       const side = result?.side_effect ?? {};
       if (!side.drafted || !side.draft) {
         feedback.textContent = `Could not draft: ${side.reason || side.error || "unknown"}`;
-        feedback.style.color = "var(--salmon-dark, #D14E3E)";
+        feedback.style.color = "var(--salmon-dark, #5025D1)";
         draftBtn.disabled = false;
         return;
       }
@@ -6757,12 +6810,12 @@ function openVendorCounterComposer(activeReq, vendor) {
       if (rationaleEl) rationaleEl.textContent = draft.rationale ? `Why this works: ${draft.rationale}` : "";
       draftOutput.classList.remove("is-hidden");
       feedback.textContent = "Draft ready — edit before sending if needed.";
-      feedback.style.color = "var(--success, #4A7C59)";
+      feedback.style.color = "var(--success, #0A0A0A)";
       draftBtn.disabled = false;
     } catch (err) {
       console.error("[counter-draft]", err);
       feedback.textContent = `Failed to draft: ${err.message || err}`;
-      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      feedback.style.color = "var(--salmon-dark, #5025D1)";
       draftBtn.disabled = false;
     }
   });
@@ -6776,11 +6829,11 @@ function openVendorCounterComposer(activeReq, vendor) {
     const targetCents = Number(fd.get("target_amount_cents")) || null;
     if (!subject || !body || !vendorEmail) {
       feedback.textContent = "Subject, body, and vendor email are all required.";
-      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      feedback.style.color = "var(--salmon-dark, #5025D1)";
       return;
     }
     feedback.textContent = "Sending counter-offer…";
-    feedback.style.color = "var(--text-muted, #6F6A88)";
+    feedback.style.color = "var(--text-muted, #6B6B7B)";
     try {
       const session = state.session;
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/send-chez-vendor-email`, {
@@ -6806,7 +6859,7 @@ function openVendorCounterComposer(activeReq, vendor) {
       const result = await resp.json();
       if (!resp.ok || result.error) throw new Error(result.error || `HTTP ${resp.status}`);
       feedback.textContent = "Counter-offer sent. The vendor's reply will appear in this thread.";
-      feedback.style.color = "var(--success, #4A7C59)";
+      feedback.style.color = "var(--success, #0A0A0A)";
       try {
         await loadChezMessages(activeReq.id);
         renderConciergeCockpit();
@@ -6815,7 +6868,7 @@ function openVendorCounterComposer(activeReq, vendor) {
     } catch (err) {
       console.error("[counter-send]", err);
       feedback.textContent = `Failed to send: ${err.message || err}`;
-      feedback.style.color = "var(--salmon-dark, #D14E3E)";
+      feedback.style.color = "var(--salmon-dark, #5025D1)";
     }
   });
 }

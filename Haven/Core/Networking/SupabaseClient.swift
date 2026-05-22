@@ -1567,6 +1567,19 @@ enum HavenSupabase {
         // to false for backward compat with cached server responses that
         // pre-date the field.
         let isChezCertified: Bool
+        // Phase X feedback: row sourced from the seeded `utility_providers`
+        // catalog (the 15k+ regional vendors Tom sourced). When true,
+        // FindLocalVendorSheet renders the row under a "FROM YOUR AREA"
+        // section above the Google-derived tiers. Defaults to false so
+        // cached responses that pre-date the field still decode cleanly.
+        let isFromCatalog: Bool
+        // Phase X feedback: logo + brand color carried through from the
+        // catalog row when present. Lets the row card render the brand
+        // identity without a fresh Brandfetch call — and lets the
+        // adoption flow stamp the new contractor with the same assets.
+        // Nil for Google-derived and vendor_application rows.
+        let logoUrl: String?
+        let brandColor: String?
 
         let rankPosition: Int
 
@@ -1585,11 +1598,28 @@ enum HavenSupabase {
             self.googlePlaceId = (try? c.decode(String.self, forKey: .googlePlaceId)) ?? ""
             self.isTopRated = (try? c.decode(Bool.self, forKey: .isTopRated)) ?? false
             self.isChezCertified = (try? c.decode(Bool.self, forKey: .isChezCertified)) ?? false
+            self.isFromCatalog = (try? c.decode(Bool.self, forKey: .isFromCatalog)) ?? false
+            self.logoUrl = try? c.decodeIfPresent(String.self, forKey: .logoUrl)
+            self.brandColor = try? c.decodeIfPresent(String.self, forKey: .brandColor)
             self.rankPosition = (try? c.decode(Int.self, forKey: .rankPosition)) ?? 0
         }
 
         // Designated init for inline construction (e.g. quiz hydrate path).
-        init(name: String, address: String?, phone: String?, website: String?, rating: Double?, reviewCount: Int?, googlePlaceId: String, isTopRated: Bool, isChezCertified: Bool = false, rankPosition: Int) {
+        init(
+            name: String,
+            address: String?,
+            phone: String?,
+            website: String?,
+            rating: Double?,
+            reviewCount: Int?,
+            googlePlaceId: String,
+            isTopRated: Bool,
+            isChezCertified: Bool = false,
+            isFromCatalog: Bool = false,
+            logoUrl: String? = nil,
+            brandColor: String? = nil,
+            rankPosition: Int
+        ) {
             self.name = name
             self.address = address
             self.phone = phone
@@ -1599,6 +1629,9 @@ enum HavenSupabase {
             self.googlePlaceId = googlePlaceId
             self.isTopRated = isTopRated
             self.isChezCertified = isChezCertified
+            self.isFromCatalog = isFromCatalog
+            self.logoUrl = logoUrl
+            self.brandColor = brandColor
             self.rankPosition = rankPosition
         }
     }
@@ -1612,21 +1645,39 @@ enum HavenSupabase {
         let town: String
         let state: String
         let category: String
+        /// Optional vendor-name filter. When set, the edge function
+        /// ILIKE-matches `utility_providers.name` before town/state
+        /// ranking — surfaces the catalog row first when a user types
+        /// a specific vendor name in find-a-pro. Empty / nil → existing
+        /// top-N-by-region behavior.
+        let searchQuery: String?
     }
 
     /// Calls the `find-local-vendors` edge function. The function checks the
     /// cache first; on a miss it calls Google Places Text Search, ranks
-    /// results, writes the cache, and returns up to 4 vendors total
-    /// (2 Top-Rated + 2 Suggested). Empty `vendors` is a valid result —
-    /// the iOS sheet renders an empty state in that case.
+    /// results, writes the cache, snapshots Google rows into the
+    /// `utility_providers` catalog for permanence, and returns up to
+    /// 10 catalog rows + up to 4 Google rows (2 Top-Rated + 2 Suggested).
+    /// Empty `vendors` is a valid result — the iOS sheet renders an
+    /// empty state in that case.
+    ///
+    /// `searchQuery` filters by vendor name (catalog ILIKE + Google
+    /// Places "<query> in <town>, <state>" search). Used by the
+    /// debounced search bar in FindLocalVendorSheet.
     static func findLocalVendors(
         town: String,
         state: String,
-        category: String
+        category: String,
+        searchQuery: String? = nil
     ) async throws -> LocalVendorResponse {
         let data = try await callEdgeFunction(
             name: "find-local-vendors",
-            body: LocalVendorRequest(town: town, state: state, category: category),
+            body: LocalVendorRequest(
+                town: town,
+                state: state,
+                category: category,
+                searchQuery: searchQuery
+            ),
             timeoutSeconds: 30
         )
         return try JSONDecoder().decode(LocalVendorResponse.self, from: data)
@@ -1642,7 +1693,12 @@ enum HavenSupabase {
     ) async throws -> LocalVendorResponse {
         let data = try await callEdgeFunction(
             name: "find-local-advisors",
-            body: LocalVendorRequest(town: town, state: state, category: advisorType),
+            body: LocalVendorRequest(
+                town: town,
+                state: state,
+                category: advisorType,
+                searchQuery: nil
+            ),
             timeoutSeconds: 30
         )
         return try JSONDecoder().decode(LocalVendorResponse.self, from: data)

@@ -48,6 +48,75 @@ struct FindLocalVendorSheet: View {
     @State private var chezFieldProviders: [HavenSupabase.ChezFieldProvider] = []
     @State private var isLoading: Bool = true
     @State private var loadError: String? = nil
+    /// Live client-side filter against the loaded Google Places vendor
+    /// list. Substring match on `name`; empty string passes through.
+    /// Phase X feedback: Tom asked to search the list by name (e.g.
+    /// "American Dry") to find a specific company among the top results.
+    /// Phase X+1: now a hybrid — instant client-side filter for the
+    /// already-loaded `vendors` array PLUS a 400ms-debounced network
+    /// call to `find-local-vendors` with `searchQuery:` so we can
+    /// surface catalog rows + Google Places hits that weren't in the
+    /// initial top-10 load.
+    @State private var vendorSearchQuery: String = ""
+    /// Debounced copy of `vendorSearchQuery`. The `.onChange` handler
+    /// schedules a Task that waits 400ms then mirrors the query here;
+    /// the second `.onChange(of:)` on this state triggers the network
+    /// search. Empty query short-circuits both paths.
+    @State private var vendorSearchDebounced: String = ""
+    /// Network-fetched results for the last debounced query. When this
+    /// is non-empty AND the query is still active, the rendered list
+    /// uses these instead of the client-side filter.
+    @State private var searchResults: [HavenSupabase.LocalVendorResult] = []
+    /// The query that produced `searchResults`. Lets us drop stale
+    /// results when the user keeps typing without firing a redundant
+    /// network call.
+    @State private var lastSearchedQuery: String = ""
+    /// True while a debounced search network call is in flight.
+    @State private var isSearchingByName: Bool = false
+    /// Monotonic counter to ignore in-flight results when the user
+    /// types past them. Each `runVendorSearch` increment claims a
+    /// sequence id; only the most recent claim writes results.
+    @State private var vendorSearchSequence: Int = 0
+    /// Phase X+3 (UX coverage push): filter chips above the vendor
+    /// list let users narrow a wider catalog to the rows they actually
+    /// want. Defaults to "all" so the empty state is unchanged.
+    @State private var ratingFilter: RatingFilter = .all
+    /// Filter chip: only show vendors with a phone number on file.
+    /// "Has website" isn't a chip because most catalog rows have a
+    /// website already; phone is the differentiator the homeowner
+    /// actually needs to make a call.
+    @State private var requirePhone: Bool = false
+
+    /// Minimum-rating filter chip. Catalog rows have nil rating
+    /// (no ratings yet from Google), so the `all` case lets them
+    /// through; the rating-gated cases exclude them since "no
+    /// rating" can't satisfy "≥ 4.5 stars".
+    enum RatingFilter: String, CaseIterable, Identifiable {
+        case all
+        case fourPlus = "4+"
+        case fourFivePlus = "4.5+"
+        case fourEightPlus = "4.8+"
+
+        var id: String { rawValue }
+
+        var minimumRating: Double? {
+            switch self {
+            case .all: return nil
+            case .fourPlus: return 4.0
+            case .fourFivePlus: return 4.5
+            case .fourEightPlus: return 4.8
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .all: return "All"
+            case .fourPlus: return "★ 4+"
+            case .fourFivePlus: return "★ 4.5+"
+            case .fourEightPlus: return "★ 4.8+"
+            }
+        }
+    }
     /// Inline directory-search query for the ON CHEZ section. Empty
     /// string falls back to the auto-match (near-me) results — that's
     /// the default discovery surface. Typing kicks the same search
@@ -95,6 +164,14 @@ struct FindLocalVendorSheet: View {
                         // visual treatment is a navy-tinted card so it reads
                         // as the premium option, not a fallback escape hatch.
                         chezConciergeEntry
+
+                        // Phase X+3: filter chips above the list let
+                        // users narrow a wider catalog. Only render
+                        // when there are vendors to filter — empty
+                        // state shouldn't show empty chips.
+                        if shouldRenderVendorList && !isLoading && loadError == nil {
+                            filterChipsRow
+                        }
 
                         if isLoading {
                             loadingState
@@ -148,6 +225,42 @@ struct FindLocalVendorSheet: View {
                             .foregroundStyle(HavenColors.textPrimary)
                     }
                 }
+            }
+            // Phase X feedback: name-search across the loaded vendor
+            // list. Gated on a non-empty `vendors` array so the bar
+            // doesn't appear during the loading/empty states. Driven
+            // by `vendorSearchQuery`; filtering happens in
+            // `filteredVendors`.
+            .searchable(
+                text: $vendorSearchQuery,
+                placement: .navigationBarDrawer(displayMode: .automatic),
+                prompt: "Search by name"
+            )
+            // Debounce + network search: 400ms after the user stops
+            // typing, mirror the query to `vendorSearchDebounced` and
+            // fire `findLocalVendors(searchQuery:)` so we can surface
+            // catalog rows + Google Places hits that weren't in the
+            // initial top-10. Empty query short-circuits both.
+            .onChange(of: vendorSearchQuery) { _, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    vendorSearchDebounced = ""
+                    searchResults = []
+                    lastSearchedQuery = ""
+                    isSearchingByName = false
+                    return
+                }
+                vendorSearchSequence += 1
+                let claim = vendorSearchSequence
+                Task {
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    guard claim == vendorSearchSequence else { return }
+                    vendorSearchDebounced = trimmed
+                }
+            }
+            .onChange(of: vendorSearchDebounced) { _, newValue in
+                guard !newValue.isEmpty else { return }
+                Task { await runVendorSearch(query: newValue) }
             }
             .alert(
                 "Add this vendor?",
@@ -359,18 +472,165 @@ struct FindLocalVendorSheet: View {
         return systemCategory.lowercased() == "handyman"
     }
 
+    /// Vendors after the hybrid name-search filter. Empty query falls
+    /// through to the full list. When a debounced network search has
+    /// returned results for the current query, those take precedence
+    /// over client-side filtering so the user sees catalog rows + new
+    /// Google Places hits beyond the initial top-10 load. Mid-typing
+    /// (before debounce fires), client-side substring filter on the
+    /// already-loaded vendors gives instant feedback.
+    ///
+    /// Phase X+3: post-search filter chips (rating + phone presence)
+    /// applied AFTER name search so the user can compose "search for X"
+    /// with "only 4.5+ stars". Sorted with smart rank: rating × review
+    /// count first, then alphabetical tiebreak. Catalog rows (no rating)
+    /// preserve their pre-applied town-match-first ranking from the
+    /// edge function — they sit at the top of their section.
+    private var filteredVendors: [HavenSupabase.LocalVendorResult] {
+        let base: [HavenSupabase.LocalVendorResult] = {
+            let trimmed = vendorSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return vendors }
+            if !searchResults.isEmpty,
+               lastSearchedQuery.caseInsensitiveCompare(trimmed) == .orderedSame {
+                return searchResults
+            }
+            let lower = trimmed.lowercased()
+            return vendors.filter { $0.name.lowercased().contains(lower) }
+        }()
+
+        return base.filter { vendor in
+            // Rating filter — catalog rows have nil rating, so the
+            // `all` case is the only one that passes them through.
+            if let minRating = ratingFilter.minimumRating {
+                guard let r = vendor.rating, r >= minRating else { return false }
+            }
+            // Phone filter — strict: must have a non-empty phone.
+            if requirePhone {
+                guard let p = vendor.phone, !p.isEmpty else { return false }
+            }
+            return true
+        }
+    }
+
+    /// Smart-sort comparator: ranks within a tier by rating × review
+    /// count (well-rated AND well-reviewed beats well-rated obscure).
+    /// Used inside each section (TOP-RATED, SUGGESTED) below.
+    /// Catalog rows sit on their existing edge-function rank (town match
+    /// first) since they don't carry Google ratings.
+    private func smartRank(_ a: HavenSupabase.LocalVendorResult, _ b: HavenSupabase.LocalVendorResult) -> Bool {
+        let aScore = (a.rating ?? 0) * Double(max(a.reviewCount ?? 0, 1))
+        let bScore = (b.rating ?? 0) * Double(max(b.reviewCount ?? 0, 1))
+        if aScore != bScore { return aScore > bScore }
+        return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+    }
+
+    private var isVendorSearchActive: Bool {
+        !vendorSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Filter chip row rendered above the vendor list. Tap to toggle a
+    /// chip on/off; multiple chips compose (e.g. "4.5+ stars" AND
+    /// "must have phone"). Tap the active rating chip to clear back
+    /// to all.
+    private var filterChipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: HavenTheme.spacing8) {
+                ForEach(RatingFilter.allCases) { filter in
+                    let active = ratingFilter == filter
+                    Button {
+                        Haptics.selection()
+                        ratingFilter = active && filter != .all ? .all : filter
+                    } label: {
+                        Text(filter.label)
+                            .font(HavenTypography.uiLabel.weight(.semibold))
+                            .foregroundStyle(active ? HavenColors.textOnNavy : HavenColors.textPrimary)
+                            .padding(.horizontal, HavenTheme.spacing12)
+                            .padding(.vertical, 6)
+                            .background(active ? HavenColors.navy800 : HavenColors.creamLight)
+                            .overlay(
+                                Capsule().strokeBorder(
+                                    active ? Color.clear : HavenColors.beige200,
+                                    lineWidth: 1
+                                )
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                Divider().frame(height: 16).padding(.horizontal, 2)
+                Button {
+                    Haptics.selection()
+                    requirePhone.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "phone.fill").font(.system(size: 10))
+                        Text("Has phone")
+                            .font(HavenTypography.uiLabel.weight(.semibold))
+                    }
+                    .foregroundStyle(requirePhone ? HavenColors.textOnNavy : HavenColors.textPrimary)
+                    .padding(.horizontal, HavenTheme.spacing12)
+                    .padding(.vertical, 6)
+                    .background(requirePhone ? HavenColors.navy800 : HavenColors.creamLight)
+                    .overlay(
+                        Capsule().strokeBorder(
+                            requirePhone ? Color.clear : HavenColors.beige200,
+                            lineWidth: 1
+                        )
+                    )
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+
     private var vendorList: some View {
         // Phase 72: filter precedence — Chez Certified first (real human
         // verification, navy badge), then Top-Rated (Google heuristic, green
         // badge), then everything else (live_unverified applications +
         // Google Suggested, no badge).
-        let chezCertified = vendors.filter { $0.isChezCertified }
-        let havenCertified = vendors.filter { !$0.isChezCertified && $0.isTopRated }
-        let suggested = vendors.filter { !$0.isChezCertified && !$0.isTopRated }
+        // Phase X feedback: vendor sections now read from `filteredVendors`
+        // so the inline name search filters across every tier at once.
+        // Catalog rows (sourced regional providers from `utility_providers`)
+        // get their own dedicated section above everything else — same
+        // search filter applies via `filteredVendors`.
+        // Phase X+3: smart-sort applied to each Google-derived tier
+        // (rating × review count, alphabetical tiebreak). Catalog rows
+        // keep their existing edge-function rank (town-match first)
+        // since they don't carry Google ratings.
+        let fromCatalog = filteredVendors.filter { $0.isFromCatalog }
+        let chezCertified = filteredVendors
+            .filter { !$0.isFromCatalog && $0.isChezCertified }
+            .sorted(by: smartRank)
+        let havenCertified = filteredVendors
+            .filter { !$0.isFromCatalog && !$0.isChezCertified && $0.isTopRated }
+            .sorted(by: smartRank)
+        let suggested = filteredVendors
+            .filter { !$0.isFromCatalog && !$0.isChezCertified && !$0.isTopRated }
+            .sorted(by: smartRank)
         let isHandyman = systemCategory.lowercased() == "handyman"
         let chezSectionVisible = isHandyman || !chezFieldProviders.isEmpty
 
         return VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+            // Phase X feedback: catalog rows ("FROM YOUR AREA") render
+            // above every other tier because they're seeded, sourced,
+            // and region-matched — the highest-relevance signal we have
+            // before a human verifies. No badge color claim ("Top-Rated"
+            // is Google's heuristic and "Chez Certified" is operator
+            // verification); this section is just "from our catalog."
+            if !fromCatalog.isEmpty {
+                Text("FROM YOUR AREA")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.2)
+                    .foregroundStyle(HavenColors.navy700)
+                VStack(spacing: HavenTheme.spacing12) {
+                    ForEach(fromCatalog) { vendor in
+                        vendorCard(vendor)
+                    }
+                }
+            }
+
             // Chez Field providers — registered via the desktop command
             // center, opted into the homeowner directory. Render at the
             // top because they're already in the network and have
@@ -420,7 +680,7 @@ struct FindLocalVendorSheet: View {
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.navy800)
-                    .padding(.top, chezSectionVisible ? HavenTheme.spacing8 : 0)
+                    .padding(.top, (chezSectionVisible || !fromCatalog.isEmpty) ? HavenTheme.spacing8 : 0)
                 VStack(spacing: HavenTheme.spacing12) {
                     ForEach(chezCertified) { vendor in
                         vendorCard(vendor)
@@ -436,7 +696,7 @@ struct FindLocalVendorSheet: View {
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.success)
-                    .padding(.top, (chezSectionVisible || !chezCertified.isEmpty) ? HavenTheme.spacing8 : 0)
+                    .padding(.top, (chezSectionVisible || !chezCertified.isEmpty || !fromCatalog.isEmpty) ? HavenTheme.spacing8 : 0)
                 VStack(spacing: HavenTheme.spacing12) {
                     ForEach(havenCertified) { vendor in
                         vendorCard(vendor)
@@ -449,12 +709,82 @@ struct FindLocalVendorSheet: View {
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.textTertiary)
-                    .padding(.top, (havenCertified.isEmpty && chezCertified.isEmpty && !chezSectionVisible) ? 0 : HavenTheme.spacing8)
+                    .padding(.top, (havenCertified.isEmpty && chezCertified.isEmpty && !chezSectionVisible && fromCatalog.isEmpty) ? 0 : HavenTheme.spacing8)
                 VStack(spacing: HavenTheme.spacing12) {
                     ForEach(suggested) { vendor in
                         vendorCard(vendor)
                     }
                 }
+            }
+
+            // Phase X feedback: when the user typed a name that doesn't
+            // match any loaded vendor, route them straight to the
+            // "Add my own" path. The bottom button does the same thing
+            // but is easy to miss; surfacing the affordance inline
+            // closes the loop on "I searched for them, they weren't in
+            // your list, now what?".
+            // Phase X+1: a "Searching for X..." row surfaces while the
+            // debounced network call is in flight so the user knows
+            // the empty list is provisional, not final.
+            if isVendorSearchActive && isSearchingByName {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Searching for \"\(vendorSearchQuery)\"…")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .padding(.vertical, HavenTheme.spacing8)
+            }
+            // Only render "No matches" once the network call has
+            // settled on the active query — avoids flashing the card
+            // before the network search returns.
+            if isVendorSearchActive
+                && !isSearchingByName
+                && lastSearchedQuery.caseInsensitiveCompare(
+                    vendorSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                ) == .orderedSame
+                && chezCertified.isEmpty && havenCertified.isEmpty && suggested.isEmpty && fromCatalog.isEmpty {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    Text("No matches for \"\(vendorSearchQuery)\"")
+                        .font(HavenTypography.bodySmall.weight(.semibold))
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Add them as your own vendor — Chez will track every visit and invoice.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Button {
+                        Haptics.light()
+                        NotificationCenter.default.post(
+                            name: .openManualContractorAdd,
+                            object: nil,
+                            userInfo: [
+                                "system_category": SystemCategoryRegistry.pickerCategoryFor(systemCategory: systemCategory) ?? systemCategory
+                            ]
+                        )
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Add \"\(vendorSearchQuery)\"")
+                                .font(HavenTypography.uiLabel.weight(.semibold))
+                        }
+                        .foregroundStyle(HavenColors.textOnNavy)
+                        .padding(.horizontal, HavenTheme.spacing16)
+                        .padding(.vertical, HavenTheme.spacing8)
+                        .background(HavenColors.navy800)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, HavenTheme.spacing4)
+                }
+                .padding(HavenTheme.spacing16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .strokeBorder(HavenColors.beige200, lineWidth: 1)
+                )
             }
         }
     }
@@ -796,7 +1126,18 @@ struct FindLocalVendorSheet: View {
             // Phase 19n: opening the manual contractor add path stays as a
             // separate sheet on top of this one. We dismiss first so the
             // navigation stack is clean.
-            NotificationCenter.default.post(name: .openManualContractorAdd, object: nil)
+            // Phase X feedback: propagate the active system category as
+            // a vendor-picker registry key (sub-systems like Crawl Space
+            // route to "Waterproofing" via `pickerCategoryFor`) so the
+            // downstream AddVendorSheet pre-selects the specialty and
+            // doesn't dump the user into the unexplained category picker.
+            NotificationCenter.default.post(
+                name: .openManualContractorAdd,
+                object: nil,
+                userInfo: [
+                    "system_category": SystemCategoryRegistry.pickerCategoryFor(systemCategory: systemCategory) ?? systemCategory
+                ]
+            )
             dismiss()
         } label: {
             HStack(spacing: 6) {
@@ -857,6 +1198,39 @@ struct FindLocalVendorSheet: View {
             c["task_id"] = task.id.uuidString
         }
         return c
+    }
+
+    // MARK: - Name search
+
+    /// Fires `find-local-vendors` with `searchQuery` to discover catalog
+    /// rows + Google Places hits beyond the initial top-10 load.
+    /// `vendorSearchSequence` claims protect against stale writes when
+    /// the user keeps typing past an in-flight request.
+    private func runVendorSearch(query: String) async {
+        let claim = vendorSearchSequence
+        await MainActor.run { isSearchingByName = true }
+        do {
+            let response = try await HavenSupabase.findLocalVendors(
+                town: town,
+                state: state,
+                category: systemCategory,
+                searchQuery: query
+            )
+            await MainActor.run {
+                guard claim == vendorSearchSequence else { return }
+                searchResults = response.vendors
+                lastSearchedQuery = query
+                isSearchingByName = false
+            }
+        } catch {
+            await MainActor.run {
+                guard claim == vendorSearchSequence else { return }
+                isSearchingByName = false
+                // On error, keep client-side filter behavior intact;
+                // the user still sees client-filtered results from the
+                // initial `vendors` array.
+            }
+        }
     }
 
     // MARK: - Loading
@@ -967,6 +1341,18 @@ struct FindLocalVendorSheet: View {
         insert.website = vendor.website
         insert.category = systemCategory
         insert.specialties = [systemCategory]
+        // Phase X feedback: catalog rows carry their logo + brand color
+        // through from the seeded `utility_providers` table — stamp them
+        // on the contractor at creation time so we don't pay Brandfetch
+        // for a brand we already have. `source` stays "find_vendor" for
+        // both Google and catalog adoptions (the contractors.source
+        // CHECK constraint enumerates manual/quiz/find_vendor/chez_field
+        // only); the catalog provenance is captured implicitly by the
+        // presence of `logoUrl` + `brandColor` at create time.
+        if vendor.isFromCatalog {
+            insert.logoUrl = vendor.logoUrl
+            insert.brandColor = vendor.brandColor
+        }
         insert.source = "find_vendor"
 
         let createdContractor: ContractorRow

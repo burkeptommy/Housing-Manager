@@ -389,21 +389,75 @@ final class AuthService: ObservableObject {
         }
     }
 
-    static func authenticateWithBiometrics() async -> Bool {
+    /// Result of a biometric authentication attempt. When `success` is
+    /// false, `reason` holds a user-facing message derived from the
+    /// underlying `LAError`. Surfaces in BiometricAuthView so users
+    /// can distinguish "Face ID is locked out" from "cancelled" from
+    /// "biometry not enrolled" instead of seeing a single generic
+    /// "Authentication failed. Try again." for every failure mode.
+    struct BiometricAuthResult {
+        let success: Bool
+        let reason: String?
+    }
+
+    static func authenticateWithBiometrics() async -> BiometricAuthResult {
         let context = LAContext()
         context.localizedCancelTitle = "Cancel"
         // Use .deviceOwnerAuthentication which falls back to device passcode
-        // if biometrics fail or aren't enrolled
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
-            return false
+        // if biometrics fail or aren't enrolled.
+        var canEvalError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &canEvalError) else {
+            let reason: String
+            if let laError = canEvalError as? LAError {
+                SecureLogger.error("Biometric canEvaluatePolicy failed: \(laError.code.rawValue) \(laError.localizedDescription)")
+                reason = humanReadableReason(for: laError) ?? "Biometrics not available on this device."
+            } else {
+                SecureLogger.error("Biometric canEvaluatePolicy failed with non-LAError: \(canEvalError?.localizedDescription ?? "unknown")")
+                reason = "Biometrics not available on this device."
+            }
+            return BiometricAuthResult(success: false, reason: reason)
         }
         do {
-            return try await context.evaluatePolicy(
+            let success = try await context.evaluatePolicy(
                 .deviceOwnerAuthentication,
                 localizedReason: "Unlock Chez"
             )
+            return BiometricAuthResult(success: success, reason: success ? nil : "Authentication failed. Try again.")
+        } catch let laError as LAError {
+            SecureLogger.error("Biometric evaluatePolicy threw LAError.code=\(laError.code.rawValue): \(laError.localizedDescription)")
+            return BiometricAuthResult(success: false, reason: humanReadableReason(for: laError) ?? "Authentication failed. Try again.")
         } catch {
-            return false
+            SecureLogger.error("Biometric evaluatePolicy threw non-LAError: \(error.localizedDescription)")
+            return BiometricAuthResult(success: false, reason: "Authentication failed. Try again.")
+        }
+    }
+
+    /// Map LAError codes to user-facing strings. Returns nil for codes
+    /// where the generic "Authentication failed. Try again." is the
+    /// best message (e.g. `.userCancel` — the user knows they tapped
+    /// Cancel, no further explanation needed).
+    private static func humanReadableReason(for error: LAError) -> String? {
+        switch error.code {
+        case .biometryLockout:
+            return "Face ID is locked. Sign in with your passcode to re-enable."
+        case .biometryNotAvailable:
+            return "Face ID isn't available on this device."
+        case .biometryNotEnrolled:
+            return "Face ID isn't set up. Add it in Settings."
+        case .passcodeNotSet:
+            return "Set a device passcode in Settings to unlock with Face ID."
+        case .userCancel, .systemCancel, .appCancel:
+            return nil // silent — the user cancelled deliberately
+        case .userFallback:
+            return "Use your device passcode to unlock."
+        case .authenticationFailed:
+            return "Face ID didn't recognize you. Try again."
+        default:
+            // Catches legacy touchID* codes plus any future LAError
+            // codes introduced by a newer iOS SDK. Falls through to
+            // the generic "Authentication failed. Try again." in the
+            // caller.
+            return nil
         }
     }
 

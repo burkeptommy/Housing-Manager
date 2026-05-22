@@ -64,9 +64,17 @@ struct VendorCoveragePickerSheet: View {
             }
             .task { await loadContractors() }
             .sheet(isPresented: $showAddVendor) {
-                AddVendorSheet(onComplete: {
-                    Task { await autoSelectNewlyAdded() }
-                })
+                // Feed the gap's canonical category (which IS the
+                // SystemCategoryRegistry key per `vendorCoverageItems`)
+                // through so AddVendorSheet's downstream import paths
+                // (website + contacts) can auto-stamp the specialty
+                // picker and pre-select category-matching home systems
+                // on the assignment sheet. Skips ~2 manual taps for
+                // the common gap-resolution flow.
+                AddVendorSheet(
+                    onComplete: { Task { await autoSelectNewlyAdded() } },
+                    prefilledCategory: coverageItem.id
+                )
             }
             .trackScreen("VendorCoveragePickerSheet", properties: [
                 "system_category": coverageItem.id

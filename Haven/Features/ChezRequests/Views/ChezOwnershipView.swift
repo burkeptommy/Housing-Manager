@@ -8,11 +8,14 @@ import SwiftUI
 ///   1. **Three modes** at the top — DIY · Blend · Full — as quick-set
 ///      shortcuts for the entire household.
 ///   2. **Hero count** — "X handed to Chez · You manage the rest."
-///   3. **Group-level toggles** — eight toggles ("Chez handles all my
-///      routines", "...all my systems", "...all my vendors", "...all my
-///      projects", "...all my bills", "...all my documents", "...all
-///      my insurance", "...all my vehicles"). Each, when flipped on,
-///      backfills every existing entity in that category.
+///   3. **Group-level toggles** — eight toggles ("Chez handles my
+///      routines", "...my systems", "...my vendors", "...my projects",
+///      "...my bills", "...my documents", "...my insurance",
+///      "...my vehicles"). Each, when flipped on, backfills every
+///      existing entity in that category. Copy intentionally avoids
+///      "all" — Chez doesn't actually handle every single bill (e.g.
+///      a phone bill that lives outside the household stack), so the
+///      group titles describe a class of work, not universal scope.
 ///   4. **What's currently handled** — the inventory of individual
 ///      entities Chez owns. Reuses the Phase 80.2 delegations list as
 ///      the foundation; each row has a quick-revoke pill.
@@ -416,14 +419,14 @@ enum ChezOwnershipGroup: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .allRoutines: return "Chez handles all my routines"
-        case .allSystems: return "Chez handles all my systems"
-        case .allVendors: return "Chez handles all my vendor relationships"
-        case .allProjects: return "Chez handles all my projects"
-        case .allBills: return "Chez handles all my bills"
-        case .allDocuments: return "Chez handles all my documents"
-        case .allInsurance: return "Chez handles all my insurance"
-        case .allVehicles: return "Chez handles all my vehicles"
+        case .allRoutines: return "Chez handles my routines"
+        case .allSystems: return "Chez handles my systems"
+        case .allVendors: return "Chez handles my vendor relationships"
+        case .allProjects: return "Chez handles my projects"
+        case .allBills: return "Chez handles my bills"
+        case .allDocuments: return "Chez handles my documents"
+        case .allInsurance: return "Chez handles my insurance"
+        case .allVehicles: return "Chez handles my vehicles"
         }
     }
 

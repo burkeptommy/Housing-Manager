@@ -91,7 +91,7 @@ export default function HomesScreen() {
             padding="default"
             hoverable
             onClick={() => navigate(`/homes/${home.propertyId}`)}
-            style={selectedHome?.propertyId === home.propertyId ? { borderColor: "var(--indigo-400)", boxShadow: "0 6px 20px rgba(42,34,82,0.12)" } : {}}
+            style={selectedHome?.propertyId === home.propertyId ? { borderColor: "var(--indigo-400)", boxShadow: "0 6px 20px rgba(15, 10, 40,0.12)" } : {}}
           >
             <HomeArtwork isNew={!home.lastCompletedVisit} />
             <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, color: "var(--text)" }}>{home.name}</div>
@@ -171,7 +171,7 @@ function HomeArtwork({ isNew }: { isNew: boolean }) {
       style={{
         height: 96,
         borderRadius: 12,
-        background: "linear-gradient(135deg, #E8E4F2, #FFE8E2)",
+        background: "linear-gradient(135deg, #DDD3FA, #EFEAFE)",
         position: "relative",
         marginBottom: 14,
         overflow: "hidden",

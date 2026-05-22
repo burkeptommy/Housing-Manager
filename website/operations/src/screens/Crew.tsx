@@ -66,7 +66,7 @@ export default function CrewScreen() {
       {/* Wave M7 — sub-tab switcher. Roster (existing surface) vs
           Chat (intra-workspace messaging). Lives above the workload
           strip so it's the first thing the operator sees. */}
-      <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--pearl, #F8F9FA)", borderRadius: 12, alignSelf: "flex-start", border: "1px solid var(--border, #E6E5EE)" }}>
+      <div style={{ display: "flex", gap: 4, padding: 4, background: "var(--pearl, #FAFAFC)", borderRadius: 12, alignSelf: "flex-start", border: "1px solid var(--border, #E6E5EE)" }}>
         <button
           onClick={() => setSubTab("roster")}
           style={crewSubTabStyle(subTab === "roster")}
@@ -282,7 +282,7 @@ export default function CrewScreen() {
                   <div style={{ display: "flex", flexDirection: "column" }}>
                     {myWork.map((v) => (
                       <div key={v.requestId} className="ops-row" style={{ padding: "10px 0" }}>
-                        <span className="ops-pill__dot" style={{ background: "#4A7C59", width: 8, height: 8, borderRadius: "50%" }} />
+                        <span className="ops-pill__dot" style={{ background: "#0A0A0A", width: 8, height: 8, borderRadius: "50%" }} />
                         <div style={{ flex: 1, fontSize: 13, color: "var(--text)" }}>{v.title}</div>
                         <div style={{ fontSize: 11.5, color: "var(--text-soft)" }}>
                           {v.fieldWorkspace?.completedAt ? formatRelativeTime(v.fieldWorkspace.completedAt) : formatRelativeTime(v.updatedAt)}

@@ -21,6 +21,17 @@ struct VendorReviewForm: View {
     // System assignment after save
     @State private var systems: [HomeSystemRow] = []
     @State private var selectedSystemIds: Set<UUID> = []
+    /// Subset of `systems` whose canonical category matches the
+    /// contractor's category (plus `SystemCategoryRegistry.categoryRelations`
+    /// — e.g. a Plumbing vendor → Water Heater). Computed in `save()`
+    /// after the contractor row lands so the sheet can pre-select these
+    /// AND surface a master "Covers all my {Category} systems" toggle.
+    @State private var relevantSystemIds: Set<UUID> = []
+    /// Canonical category label used by the master toggle copy
+    /// ("Covers all my **Plumbing** systems"). Nil when the contractor
+    /// has no canonical category (rare — user skipped the picker), in
+    /// which case the master toggle is hidden.
+    @State private var relevantCategoryLabel: String?
 
     private let contactTypes = [
         "Contractor / Service Provider",
@@ -43,7 +54,7 @@ struct VendorReviewForm: View {
         let vendorSpecialty = SystemCategoryRegistry.specialty
             .filter { ["Pool/Spa", "Hot Tub", "Solar", "Water Treatment",
                        "Painting", "Siding/Exterior", "Driveway Sealcoating",
-                       "Pressure Washing", "EV Charger"].contains($0.categoryKey) }
+                       "Pressure Washing", "EV Charger", "Waterproofing"].contains($0.categoryKey) }
             .map(\.categoryKey)
         return tier1 + tier2 + vendorSpecialty
     }
@@ -173,6 +184,8 @@ struct VendorReviewForm: View {
                 SystemAssignmentSheet(
                     systems: systems,
                     selectedIds: $selectedSystemIds,
+                    categoryLabel: relevantCategoryLabel,
+                    relevantSystemIds: relevantSystemIds,
                     vendorName: vendor.companyName,
                     onDone: {
                         Task { await assignSystems() }
@@ -314,10 +327,52 @@ struct VendorReviewForm: View {
             Analytics.track(.contractorCreated, ["contractor_id": contractor.id.uuidString, "source": vendor.source == .manual ? "manual" : vendor.source == .contacts ? "contacts" : "website"])
             Haptics.success()
 
+            // Phase X+1: best-effort upsert into the global
+            // `utility_providers` catalog. Network-effect gate keeps
+            // the row hidden from other households until 2+ have added
+            // it (matched by phone or website domain). Skips silently
+            // for categories not in the contribution allow-list or
+            // when the contractor has no phone/website to match on.
+            if let properties = try? await DatabaseService.shared.fetchProperties(),
+               let primaryProperty = properties.first,
+               let town = primaryProperty.city, !town.isEmpty,
+               let propState = primaryProperty.state, !propState.isEmpty {
+                await DatabaseService.shared.contributeToUtilityProvidersCatalog(
+                    contractor: contractor,
+                    propertyTown: town,
+                    propertyState: propState
+                )
+            }
+
             // Load systems for assignment
             let allSystems = (try? await DatabaseService.shared.fetchHomeSystems()) ?? []
             if !allSystems.isEmpty {
                 systems = allSystems
+
+                // Pre-select systems whose canonical category matches
+                // the contractor's canonical category OR a related
+                // category from `SystemCategoryRegistry.categoryRelations`
+                // (e.g. a Plumbing vendor pre-selects Water Heater
+                // systems). The same set powers the master "Covers all
+                // my {Category} systems" toggle on the sheet so users
+                // coming from a gap card with a known specialty can
+                // tap Done without hunting through irrelevant rows.
+                if let canonicalCat = SystemCategoryRegistry.canonical(category: resolvedCategory) {
+                    relevantCategoryLabel = canonicalCat
+                    let coverageSet = SystemCategoryRegistry.canonicalCoverageSet(for: canonicalCat)
+                    let matchingIds = allSystems.compactMap { system -> UUID? in
+                        guard let canonicalSystemCat = SystemCategoryRegistry.canonical(category: system.category),
+                              coverageSet.contains(canonicalSystemCat) else { return nil }
+                        return system.id
+                    }
+                    relevantSystemIds = Set(matchingIds)
+                    selectedSystemIds = relevantSystemIds
+                } else {
+                    relevantCategoryLabel = nil
+                    relevantSystemIds = []
+                    selectedSystemIds = []
+                }
+
                 showSystemAssignment = true
             } else {
                 // No systems — just complete. Phase 95 audit fix:
@@ -411,12 +466,78 @@ struct VendorReviewForm: View {
 
 // MARK: - System Assignment Sheet
 
+/// Post-save vendor → home_systems assignment surface. Renders a sheet
+/// listing the household's home systems with checkboxes; the parent
+/// view fans the selection out into `home_systems.preferred_contractor_id`
+/// links in `assignSystems()`.
+///
+/// Category awareness (May 2026 feedback fix): when the contractor has
+/// a canonical category, the sheet:
+///   1. **Pre-selects** systems in the matching category + its related
+///      categories (via `SystemCategoryRegistry.canonicalCoverageSet`)
+///      so a plumber starts with Water Heater / Well System / Sump Pump
+///      already ticked instead of asking the user to hunt.
+///   2. **Surfaces a master toggle** at the top — "Covers all my
+///      {Category} systems" — that flips the whole relevant set on or
+///      off in one tap. This is the "general plumber" affordance Tom
+///      flagged was missing.
+///   3. **Splits the list** into a primary "{Category} systems" section
+///      and an "Other systems" section below, so the plumber doesn't
+///      have to scan past Wall Oven and Wine Fridge to find Water
+///      Heater.
+///
+/// The Skip button still clears the selection — coverage matching via
+/// `contractors.category` already works on the category-level path in
+/// `vendorCoverageItems`, so the assignment step is genuinely optional.
 struct SystemAssignmentSheet: View {
     let systems: [HomeSystemRow]
     @Binding var selectedIds: Set<UUID>
+    /// Canonical category for the contractor (e.g. "Plumbing"). When
+    /// nil — rare; user skipped the specialty picker — the sheet falls
+    /// back to the legacy flat list with no pre-selection and no master
+    /// toggle.
+    let categoryLabel: String?
+    /// Set of `systems` ids that should pre-select on appear and drive
+    /// the master toggle. Computed by the parent so the sheet stays
+    /// presentation-only.
+    let relevantSystemIds: Set<UUID>
     let vendorName: String
     var onDone: () -> Void
     @Environment(\.dismiss) private var dismiss
+
+    private var relevantSystems: [HomeSystemRow] {
+        systems.filter { relevantSystemIds.contains($0.id) }
+    }
+
+    private var otherSystems: [HomeSystemRow] {
+        systems.filter { !relevantSystemIds.contains($0.id) }
+    }
+
+    /// Master toggle state: ON when every relevant system is checked,
+    /// OFF otherwise. Reading is cheap (set arithmetic); the binding's
+    /// setter unions / subtracts the relevant set as a bulk operation.
+    private var allRelevantSelected: Binding<Bool> {
+        Binding(
+            get: {
+                guard !relevantSystemIds.isEmpty else { return false }
+                return relevantSystemIds.isSubset(of: selectedIds)
+            },
+            set: { newValue in
+                if newValue {
+                    selectedIds.formUnion(relevantSystemIds)
+                } else {
+                    selectedIds.subtract(relevantSystemIds)
+                }
+            }
+        )
+    }
+
+    private var subtitleText: String {
+        if let label = categoryLabel, !relevantSystemIds.isEmpty {
+            return "We've checked your \(label) systems below. Adjust if needed."
+        }
+        return "Which systems does \(vendorName) service?"
+    }
 
     var body: some View {
         NavigationStack {
@@ -424,35 +545,50 @@ struct SystemAssignmentSheet: View {
                 VStack(spacing: 6) {
                     Text("Assign to Home Systems")
                         .font(HavenTypography.title2)
-                    Text("Which systems does \(vendorName) service?")
+                    Text(subtitleText)
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
                 }
                 .padding(.top, 16)
 
-                List(systems) { system in
-                    Button {
-                        if selectedIds.contains(system.id) {
-                            selectedIds.remove(system.id)
-                        } else {
-                            selectedIds.insert(system.id)
-                        }
-                    } label: {
-                        HStack {
-                            Text(system.name)
-                                .foregroundStyle(HavenColors.textPrimary)
-                            Spacer()
-                            if selectedIds.contains(system.id) {
-                                Image(systemName: "checkmark.circle.fill")
+                List {
+                    if let label = categoryLabel, !relevantSystemIds.isEmpty {
+                        Section {
+                            Toggle(isOn: allRelevantSelected) {
+                                Text("Covers all my \(label) systems")
                                     .foregroundStyle(HavenColors.textPrimary)
+                            }
+                            .tint(HavenColors.action)
+                        }
+                    }
+
+                    if !relevantSystems.isEmpty {
+                        Section {
+                            ForEach(relevantSystems) { system in
+                                systemRow(system)
+                            }
+                        } header: {
+                            if let label = categoryLabel {
+                                Text("\(label) systems")
                             } else {
-                                Image(systemName: "circle")
-                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text("Suggested")
                             }
                         }
                     }
+
+                    if !otherSystems.isEmpty {
+                        Section {
+                            ForEach(otherSystems) { system in
+                                systemRow(system)
+                            }
+                        } header: {
+                            Text(relevantSystems.isEmpty ? "Your systems" : "Other systems")
+                        }
+                    }
                 }
-                .listStyle(.plain)
+                .listStyle(.insetGrouped)
             }
             .navigationTitle("Assign Systems")
             .navigationBarTitleDisplayMode(.inline)
@@ -469,6 +605,31 @@ struct SystemAssignmentSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    private func systemRow(_ system: HomeSystemRow) -> some View {
+        Button {
+            if selectedIds.contains(system.id) {
+                selectedIds.remove(system.id)
+            } else {
+                selectedIds.insert(system.id)
+            }
+        } label: {
+            HStack {
+                Text(system.name)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                if selectedIds.contains(system.id) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(HavenColors.textPrimary)
+                } else {
+                    Image(systemName: "circle")
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

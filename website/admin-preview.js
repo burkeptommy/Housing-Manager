@@ -18,11 +18,11 @@
 //                                                  detail for that Q)
 
 const COLORS = {
-  cream: "#F8F9FA",
+  cream: "#FAFAFC",
   creamLight: "#FFFFFF",
-  navy800: "#453A70",
-  navy700: "#524580",
-  action: "#ED6955",
+  navy800: "#6938EF",
+  navy700: "#8B6FF5",
+  action: "#6938EF",
   textOnAction: "#FFFFFF",
   beige200: "#EDEEF0",
   beige300: "#D8DADF",

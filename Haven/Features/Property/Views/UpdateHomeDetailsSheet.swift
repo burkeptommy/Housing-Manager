@@ -49,7 +49,6 @@ struct UpdateHomeDetailsSheet: View {
     @State private var error: String?
     @State private var pendingDiff: SubtypeReviewDiff?
     @State private var showDiffSheet = false
-    @State private var confirmationToast: String?
 
     /// Regional pack for the property. Drives whether the Northeast
     /// recommendations block renders.
@@ -98,21 +97,6 @@ struct UpdateHomeDetailsSheet: View {
                         .disabled(isLoading || isSaving)
                 }
             }
-            .overlay(alignment: .top) {
-                if let toast = confirmationToast {
-                    Text(toast)
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .padding(.horizontal, HavenTheme.spacing16)
-                        .padding(.vertical, HavenTheme.spacing8)
-                        .background(HavenColors.creamLight)
-                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-                        .havenShadow()
-                        .padding(.top, HavenTheme.spacing8)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut, value: confirmationToast)
             .task { await load() }
             .sheet(isPresented: $showDiffSheet) {
                 if let diff = pendingDiff {
@@ -441,24 +425,14 @@ struct UpdateHomeDetailsSheet: View {
 
         Haptics.success()
 
-        // Brief confirmation toast so the user sees what happened before
-        // the sheet dismisses. Uses reconciler result counts so the
-        // message is specific.
-        let changes = result.added.count + result.removed.count
-        let message: String
-        if changes == 0 {
-            message = "Saved. No new tasks."
-        } else if result.removed.isEmpty {
-            message = "Added \(result.added.count) task\(result.added.count == 1 ? "" : "s")"
-        } else if result.added.isEmpty {
-            message = "Archived \(result.removed.count) task\(result.removed.count == 1 ? "" : "s")"
-        } else {
-            message = "Added \(result.added.count), archived \(result.removed.count)"
-        }
-
+        // The reconciler's notifications above already refresh Tasks
+        // and any other surface that cares about the change. Dismiss
+        // immediately — no inline toast, no artificial delay. Users
+        // confirmed the save via the diff-sheet step; the haptic on
+        // success is the only feedback the parent surface needs to
+        // emit before closing.
+        _ = result // result counts logged via reconciler; not surfaced inline
         _ = decisions // V1: decisions recorded for analytics; archive driven by reconciler
-        confirmationToast = message
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
         onSaved?()
         dismiss()
     }

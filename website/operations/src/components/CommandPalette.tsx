@@ -155,7 +155,7 @@ export function CommandPalette() {
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 60,
-        background: "rgba(42,34,82,0.45)",
+        background: "rgba(15, 10, 40,0.45)",
         display: "flex", alignItems: "flex-start", justifyContent: "center",
         paddingTop: 100,
       }}
@@ -166,7 +166,7 @@ export function CommandPalette() {
           background: "#fff",
           borderRadius: 16,
           width: "min(640px, 92vw)",
-          boxShadow: "0 24px 60px rgba(42,34,82,0.4)",
+          boxShadow: "0 24px 60px rgba(15, 10, 40,0.4)",
           overflow: "hidden",
         }}
         onClick={(e) => e.stopPropagation()}

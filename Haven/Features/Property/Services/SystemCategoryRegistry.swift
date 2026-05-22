@@ -203,6 +203,17 @@ enum SystemCategoryRegistry {
         .init(categoryKey: "Siding/Exterior", displayName: "Siding / Exterior", tier: .specialty,
               displayPriority: 85, icon: "building.2.fill", defaultCadence: "Annually",
               specialtyGroup: "Exterior Services"),
+        // Waterproofing covers basement, crawl space, and foundation
+        // waterproofing work — vendors like American Dry market
+        // themselves under this single trade. `showInVendorCoverage:
+        // false` for v1 (Tom adds manually); surfacing as a coverage
+        // gap gated on Crawl Space / Basement presence is a follow-up
+        // phase. The companion `categoryRelations` entry
+        // ("Waterproofing": ["Crawl Space"]) is what lets the
+        // assignment sheet pre-select Crawl Space sub-system rows.
+        .init(categoryKey: "Waterproofing", displayName: "Waterproofing", tier: .specialty,
+              displayPriority: 100, icon: "drop.fill", defaultCadence: nil,
+              showInVendorCoverage: false, specialtyGroup: "Exterior Services"),
 
         // Lifestyle Amenities
         .init(categoryKey: "Elevator", displayName: "Residential Elevator", tier: .specialty,
@@ -287,6 +298,67 @@ enum SystemCategoryRegistry {
     ///    comma and retry — "Plumbing & Heating" → "Plumbing".
     /// 5. Return the trimmed original so custom user categories pass through.
     ///
+    // MARK: - Related Categories
+
+    /// Cross-category coverage: a contractor whose canonical category is the
+    /// key implicitly covers home_systems whose category is in the value set.
+    /// Used by both `vendorCoverageItems` (so a "Plumbing" contractor marks
+    /// "Water Heater" systems covered) AND by `SystemAssignmentSheet`'s
+    /// pre-selection (so adding a Plumbing vendor pre-checks the household's
+    /// Water Heater rows).
+    ///
+    /// Keys + values are canonical registry keys, with two intentional
+    /// aliases ("Heating"/"Air Conditioning") that catch legacy system rows
+    /// whose category never canonicalized to "HVAC". Extending this map
+    /// reshapes both vendor coverage and assignment pre-selection in one
+    /// place — keep it tight.
+    static let categoryRelations: [String: Set<String>] = [
+        "Landscaping": ["Irrigation"],
+        "HVAC": ["Water Heater", "Heating", "Air Conditioning"],
+        "Plumbing": ["Water Heater"],
+        "Electrical": ["Generator", "EV Charger"],
+        "Roofing": ["Gutters", "Gutter Cleaning"],
+        // Waterproofing contractors (American Dry et al.) service the
+        // Crawl Space sub-system rows directly. Basement / Foundation
+        // don't have dedicated home_systems categories yet — if they
+        // do later, append here.
+        "Waterproofing": ["Crawl Space"],
+    ]
+
+    /// The set of canonical category keys a contractor with the given
+    /// canonical category implicitly covers — i.e. `{category} ∪
+    /// categoryRelations[category]`. Returns `[category]` when the input
+    /// isn't canonical or has no related entries.
+    static func canonicalCoverageSet(for category: String?) -> Set<String> {
+        guard let canonical = canonical(category: category) else { return [] }
+        var set: Set<String> = [canonical]
+        if let related = categoryRelations[canonical] {
+            set.formUnion(related)
+        }
+        return set
+    }
+
+    /// Returns the specialty-picker registry key that fits the given
+    /// (sub-)system category. Sub-systems like "Crawl Space" map to
+    /// their parent vendor trade ("Waterproofing"); everything else
+    /// passes through `canonical(category:)` unchanged. Used by
+    /// propagation sites (FindLocalVendorSheet "Add my own", Vendor
+    /// Coverage gap cards) so the downstream `VendorReviewForm`
+    /// picker pre-selects a value the user can actually see.
+    ///
+    /// Distinct from `vendorCategoryFor(systemCategory:)`, which
+    /// returns a descriptive vendor-TYPE label (e.g. "Plumber") for
+    /// Google Places searches.
+    static func pickerCategoryFor(systemCategory: String?) -> String? {
+        guard let canonicalKey = canonical(category: systemCategory) else { return nil }
+        let subSystemToPicker: [String: String] = [
+            "Crawl Space": "Waterproofing",
+            // Future mappings as new sub-systems get vendor trades:
+            // "Gutters": "Roofing", "Sump Pump": "Plumbing", etc.
+        ]
+        return subSystemToPicker[canonicalKey] ?? canonicalKey
+    }
+
     /// Returns nil only when the input is nil/empty after trimming.
     static func canonical(category raw: String?) -> String? {
         guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -393,17 +465,23 @@ enum SystemCategoryRegistry {
             "alarm":                  "Security System",
             "alarm company":          "Security System",
             "alarm monitoring":       "Security System",
-            // Phase 67I: waterproofing aliases. Crawl Space templates
-            // (foundation cracks, mold, vapor barrier) are what these
-            // contractors actually service. Registry key is
-            // "Crawl Space" so the alias collapses every variant.
-            "waterproofing":          "Crawl Space",
-            "basement waterproofing": "Crawl Space",
-            "waterproofing & basement": "Crawl Space",
-            "waterproofing and basement": "Crawl Space",
-            "basement systems":       "Crawl Space",
-            "foundation":             "Crawl Space",
-            "foundation repair":      "Crawl Space",
+            // Waterproofing — service trade for vendors like American Dry,
+            // Alpha Basement Waterproofing, Home Spark Construction.
+            // Lands on the top-level "Waterproofing" registry key so
+            // these contractors show up in the specialty picker and
+            // the assignment sheet pre-selects their Crawl Space
+            // sub-system rows via `categoryRelations`. "Basement" alone
+            // maps here too — homeowners think "basement guy" but the
+            // industry calls it waterproofing.
+            "waterproofing":              "Waterproofing",
+            "basement waterproofing":     "Waterproofing",
+            "waterproofing & basement":   "Waterproofing",
+            "waterproofing and basement": "Waterproofing",
+            "basement systems":           "Waterproofing",
+            "basement":                   "Waterproofing",
+            "foundation waterproofing":   "Waterproofing",
+            "foundation":                 "Waterproofing",
+            "foundation repair":          "Waterproofing",
         ]
         if let mapped = variantMap[lower] {
             return mapped
@@ -523,36 +601,47 @@ enum SystemCategoryRegistry {
         // Step 1: Build a map of category -> coverage info from existing systems
         var categoryCoverage: [String: VendorCoverageItem] = [:]
 
-        // Related categories (contractor for one covers related systems).
-        // Phase 60.6: keys and values here are canonical registry keys
-        // (or intentional aliases like "Heating"/"Air Conditioning" for
-        // legacy system rows whose category didn't canonicalize to "HVAC").
-        let relatedCategories: [String: Set<String>] = [
-            "Landscaping": ["Irrigation"],
-            "HVAC": ["Water Heater", "Heating", "Air Conditioning"],
-            "Plumbing": ["Water Heater"],
-            "Electrical": ["Generator", "EV Charger"],
-            "Roofing": ["Gutters", "Gutter Cleaning"],
-        ]
-        // Phase 60.6: canonicalize every contractor category before
-        // matching so "Plumbing & Heating" / "plumbing" / nil-vs-set
-        // variants all collapse to a single registry key. Contractors
-        // with a nil category (never stamped at save time) are excluded
-        // from category-based matching here; they can still cover a
-        // system via `preferredContractorId` (path 1) or an explicit
-        // task assignment (path 2) above.
-        let canonicalContractorCategories: [UUID: String] = Dictionary(
+        // Shared with `SystemAssignmentSheet` pre-selection so both
+        // surfaces agree on which categories a contractor implicitly
+        // covers (e.g. a Plumbing vendor → Water Heater).
+        let relatedCategories = SystemCategoryRegistry.categoryRelations
+        // Phase X feedback: build a per-contractor SET of canonical
+        // categories rather than a single value. The set unions:
+        //   1. the contractor's primary `category` (canonicalized)
+        //   2. every entry in `specialties[]` (canonicalized)
+        //   3. every `relatedCategories` expansion of (1) + (2)
+        // This is what makes a multi-trade vendor — an HVAC vendor who
+        // also does Boiler + Plumbing — surface across all their trades
+        // in Vendor Coverage instead of only their primary. Contractors
+        // whose category AND specialties both canonicalize to nothing
+        // are excluded (they can still cover via path 1 or 2 above).
+        let canonicalContractorCategorySets: [UUID: Set<String>] = Dictionary(
             uniqueKeysWithValues: contractors.compactMap { c in
-                guard let canonical = SystemCategoryRegistry.canonical(category: c.category) else { return nil }
-                return (c.id, canonical)
+                var set: Set<String> = []
+                if let canon = SystemCategoryRegistry.canonical(category: c.category) {
+                    set.insert(canon)
+                }
+                for specialty in c.specialties ?? [] {
+                    if let canon = SystemCategoryRegistry.canonical(category: specialty) {
+                        set.insert(canon)
+                    }
+                }
+                guard !set.isEmpty else { return nil }
+                return (c.id, set)
             }
         )
-        let directCategories = Set(canonicalContractorCategories.values)
-        var expandedContractorCategories = directCategories
-        for cat in directCategories {
-            if let related = relatedCategories[cat] {
-                expandedContractorCategories.formUnion(related)
+        // Expand each contractor's set with `relatedCategories` so the
+        // implicit cross-coverage (HVAC → Water Heater, Plumbing →
+        // Water Heater, Waterproofing → Crawl Space, etc.) still
+        // applies on top of the explicit category + specialties.
+        let expandedContractorSets: [UUID: Set<String>] = canonicalContractorCategorySets.mapValues { directSet in
+            var expanded = directSet
+            for cat in directSet {
+                if let related = relatedCategories[cat] {
+                    expanded.formUnion(related)
+                }
             }
+            return expanded
         }
 
         for system in existingSystems {
@@ -588,21 +677,21 @@ enum SystemCategoryRegistry {
                 vendorLogoURL = contractor.logoUrl
                 vendorBrandColor = contractor.brandColor
             }
-            // Check if household has a contractor whose category matches.
-            // Phase 60.6: both the system category and the contractor
-            // category are canonicalized before comparison. The system
-            // side uses `canonical(category:)` so legacy verbose system
-            // names ("Security" on an old row) collapse to the registry
-            // key ("Security System"). The contractor side uses the
-            // pre-canonicalized map built above. Expansion runs on the
-            // canonical system key so Water Heater systems match a
-            // Plumbing-category contractor via `relatedCategories`.
+            // Check if household has a contractor whose category OR any
+            // specialty matches. Phase 60.6: both the system category and
+            // the contractor categories are canonicalized before
+            // comparison. The system side uses `canonical(category:)` so
+            // legacy verbose system names ("Security" on an old row)
+            // collapse to the registry key ("Security System"). The
+            // contractor side uses the per-contractor set built above
+            // (category + specialties + relatedCategories expansions).
+            // Phase X feedback: this now picks up multi-trade vendors
+            // who service multiple system categories — an HVAC company
+            // that also does Boiler will surface as covering both.
             else if
                 let canonicalSystemCategory = SystemCategoryRegistry.canonical(category: system.category),
-                expandedContractorCategories.contains(canonicalSystemCategory),
-                let match = canonicalContractorCategories.first(where: { entry in
-                    entry.value == canonicalSystemCategory
-                        || (relatedCategories[entry.value]?.contains(canonicalSystemCategory) ?? false)
+                let match = expandedContractorSets.first(where: { _, set in
+                    set.contains(canonicalSystemCategory)
                 }),
                 let contractor = contractorById[match.key]
             {
@@ -664,17 +753,16 @@ enum SystemCategoryRegistry {
         // synthesized row. That caused the Groton-Plumbing bug — contractor
         // had `category = "Plumbing"` but no Plumbing home_system existed,
         // so the synthesized Plumbing gap always rendered uncovered. Fix:
-        // reuse `expandedContractorCategories` + `canonicalContractorCategories`
-        // (already built above) to detect a matching contractor and stamp
-        // the row covered with their name/logo/brand color.
+        // reuse `expandedContractorSets` (already built above, includes
+        // category + specialties + relatedCategories expansions) to
+        // detect a matching contractor and stamp the row covered with
+        // their name/logo/brand color.
         let existingCategories = Set(existingSystems.map(\.category))
         for meta in universal {
             if !existingCategories.contains(meta.categoryKey) && categoryCoverage[meta.categoryKey] == nil {
                 let (isCovered, vendorName, vendorLogoURL, vendorBrandColor) = Self.resolveSynthesizedCoverage(
                     categoryKey: meta.categoryKey,
-                    canonicalContractorCategories: canonicalContractorCategories,
-                    expandedContractorCategories: expandedContractorCategories,
-                    relatedCategories: relatedCategories,
+                    expandedContractorSets: expandedContractorSets,
                     contractorById: contractorById
                 )
                 categoryCoverage[meta.categoryKey] = VendorCoverageItem(
@@ -739,16 +827,18 @@ enum SystemCategoryRegistry {
 
     private static func resolveSynthesizedCoverage(
         categoryKey: String,
-        canonicalContractorCategories: [UUID: String],
-        expandedContractorCategories: Set<String>,
-        relatedCategories: [String: Set<String>],
+        expandedContractorSets: [UUID: Set<String>],
         contractorById: [UUID: ContractorRow]
     ) -> (Bool, String?, String?, String?) {
+        // Phase X feedback: a contractor covers the synthesized gap if
+        // the canonical category appears anywhere in their expanded
+        // coverage set — the union of `category`, every `specialty`,
+        // and any `relatedCategories` expansion. That's what makes
+        // multi-trade vendors (HVAC + Boiler + Plumbing) cover all
+        // their trades' synthesized gaps simultaneously.
         guard let canonicalCategory = SystemCategoryRegistry.canonical(category: categoryKey),
-              expandedContractorCategories.contains(canonicalCategory),
-              let match = canonicalContractorCategories.first(where: { entry in
-                  entry.value == canonicalCategory
-                      || (relatedCategories[entry.value]?.contains(canonicalCategory) ?? false)
+              let match = expandedContractorSets.first(where: { _, set in
+                  set.contains(canonicalCategory)
               }),
               let contractor = contractorById[match.key] else {
             return (false, nil, nil, nil)

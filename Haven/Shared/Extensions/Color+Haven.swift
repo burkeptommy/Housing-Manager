@@ -2,10 +2,10 @@ import SwiftUI
 
 extension Color {
     // MARK: - Pearl White — The Canvas
-    // Pearl white is the dominant color. Every background is pearl white.
+    // The dominant background color. Every screen sits on the pearl canvas.
 
-    /// #F8F9FA — THE main background for every screen
-    static let havenCream = Color(red: 0.973, green: 0.976, blue: 0.980)
+    /// #FAFAFC — THE main background for every screen
+    static let havenCream = Color(red: 0.980, green: 0.980, blue: 0.988)
 
     /// #FFFFFF — Cards, elevated surfaces, tab bar, AI chat bubbles
     static let havenCreamLight = Color.white
@@ -30,105 +30,133 @@ extension Color {
     /// #BFC2C8 — Progress bar fills (neutral), placeholder-weight elements
     static let havenBeige400 = Color(red: 0.749, green: 0.761, blue: 0.784)
 
-    /// #9C98AD — text-soft / placeholder weight; also drives the section
+    /// #A1A1AC — text-soft / placeholder weight; also drives the section
     /// header all-caps eyebrow.
-    static let havenNeutral500 = Color(red: 0.612, green: 0.596, blue: 0.678)
+    static let havenNeutral500 = Color(red: 0.631, green: 0.631, blue: 0.675)
 
-    // MARK: - Cosmic Indigo — The Ink
-    // All text. Structure. Inactive borders. The primary dark color.
+    // MARK: - Cosmic Indigo (now Vibrant Purple) — The Action
+    // Vibrant purple drives CTAs, active states, hero surfaces, and any
+    // surface that previously read as "primary brand color".
+    // Token NAMES preserved for backwards compatibility; VALUES remapped.
 
-    /// #2A2252 — Body text. Footer. Deepest pressed states. The
-    /// primary "ink" color — darker than `havenNavy` for stronger
-    /// contrast on body copy.
-    static let havenNavy900 = Color(red: 0.165, green: 0.133, blue: 0.322)
+    /// #0A0A0A — Body text. Footer. Deepest pressed states. The
+    /// primary "ink" color. Replaced the previous deep-indigo #2A2252.
+    static let havenNavy900 = Color(red: 0.039, green: 0.039, blue: 0.039)
 
-    /// #332860 — Slightly lighter than 900; used for pressed states
-    /// where pure 900 would feel too heavy. Was the previous
-    /// `havenNavy900` value before the Chez design refresh.
-    static let havenIndigo800 = Color(red: 0.200, green: 0.157, blue: 0.376)
+    /// #2A0F75 — Purple-deep. Used where black would feel too cold,
+    /// e.g. eyebrows on light surfaces, deep accents.
+    static let havenIndigo800 = Color(red: 0.165, green: 0.059, blue: 0.459)
 
-    /// #453A70 — PRIMARY brand color. Headings, icons, hero surfaces.
-    /// Use for entity names, screen titles, hero card backgrounds.
-    static let havenNavy = Color(red: 0.271, green: 0.227, blue: 0.439)
+    /// #6938EF — PRIMARY brand color. Headings on dark hero, icons on hero,
+    /// CTA button fills, active tab, progress bar fill.
+    static let havenNavy = Color(red: 0.412, green: 0.220, blue: 0.937)
 
-    /// #524580 — Pressed button states, active tab icons
-    static let havenNavy700 = Color(red: 0.322, green: 0.271, blue: 0.502)
+    /// #8B6FF5 — Pressed button states, lighter purple for hover/active
+    static let havenNavy700 = Color(red: 0.545, green: 0.435, blue: 0.961)
 
-    /// #5D4C8F — Secondary interactive elements
-    static let havenNavy600 = Color(red: 0.365, green: 0.298, blue: 0.561)
+    /// #7A55F0 — Mid-purple between primary and pressed-light. Secondary
+    /// interactive elements.
+    static let havenNavy600 = Color(red: 0.478, green: 0.333, blue: 0.941)
 
-    /// #6B5AA0 — Links, "View all" text, tertiary interactive
-    static let havenNavy500 = Color(red: 0.420, green: 0.353, blue: 0.627)
+    /// #6B6B7B — Neutral gray. Links, "View all" text, tertiary interactive,
+    /// and text-secondary on light surfaces.
+    static let havenNavy500 = Color(red: 0.420, green: 0.420, blue: 0.482)
 
-    /// #8B7DBA — Tertiary accents on dark surfaces
-    static let havenIndigo400 = Color(red: 0.545, green: 0.490, blue: 0.729)
+    /// #B49BFA — Lavender. Eyebrows on the purple hero card, tertiary
+    /// accents on dark purple surfaces.
+    static let havenIndigo400 = Color(red: 0.706, green: 0.608, blue: 0.980)
 
-    /// #E8E4F2 — Faint indigo wash; subtle background tint for
-    /// indigo-tinted cards.
-    static let havenIndigo100 = Color(red: 0.910, green: 0.894, blue: 0.949)
+    /// #DDD3FA — Light lavender. Subtle background tint for purple-tinted
+    /// cards, slightly stronger than indigo50.
+    static let havenIndigo100 = Color(red: 0.867, green: 0.827, blue: 0.980)
 
-    /// #F2EFF8 — Pill / icon-bg tint. Use behind small indigo glyphs
-    /// where `Color.white` would lose them.
-    static let havenIndigo50 = Color(red: 0.949, green: 0.937, blue: 0.973)
+    /// #F4F0FE — Purple-pale tint background. Use behind small purple
+    /// glyphs where `Color.white` would lose them.
+    static let havenIndigo50 = Color(red: 0.957, green: 0.941, blue: 0.996)
 
-    // MARK: - Deepened Salmon — Action / CTA
-    // Primary calls-to-action, buttons, progress bars, active nav states.
+    // MARK: - Deepened Salmon (now Vibrant Purple) — Action / CTA
+    // Salmon retired. Salmon-named tokens now resolve to purple/lavender
+    // so existing call sites pick up the recolor without renames.
 
-    /// #ED6955 — Primary CTA: buttons, FAB, progress bars, active nav
-    static let havenSalmon = Color(red: 0.929, green: 0.412, blue: 0.333)
+    /// #6938EF — Primary CTA: buttons, FAB, progress bars, active nav
+    static let havenSalmon = Color(red: 0.412, green: 0.220, blue: 0.937)
 
-    /// #D14E3E — Pressed state for salmon action elements
-    static let havenSalmonPressed = Color(red: 0.820, green: 0.306, blue: 0.243)
+    /// #5025D1 — Pressed state for primary CTA elements
+    static let havenSalmonPressed = Color(red: 0.314, green: 0.145, blue: 0.820)
 
-    /// #F4877B — Eyebrows on indigo backgrounds; hover-tint variant
-    /// for salmon glyphs sitting on a salmon CTA.
-    static let havenSalmonLight = Color(red: 0.957, green: 0.529, blue: 0.482)
+    /// #B49BFA — Lavender. Eyebrows on the purple hero card, hover-tint
+    /// variant for purple glyphs on a purple CTA.
+    static let havenSalmonLight = Color(red: 0.706, green: 0.608, blue: 0.980)
 
-    /// #FFE8E2 — Pill / chip background when a tag should read as
-    /// salmon-tinted but not a CTA.
-    static let havenSalmonPale = Color(red: 1.000, green: 0.910, blue: 0.886)
+    /// #EFEAFE — Purple-pale pill/chip background; the new tint for any
+    /// chip that should read as "action-adjacent" but is not itself a CTA.
+    static let havenSalmonPale = Color(red: 0.937, green: 0.918, blue: 0.996)
 
-    /// #FFF5F2 — "Decision needed" wash; the lightest salmon tint,
-    /// used as a card background when the user has an action to take.
-    static let havenSalmon50 = Color(red: 1.000, green: 0.961, blue: 0.949)
+    /// #F4F0FE — "Decision needed" wash; the lightest purple tint, used
+    /// as a card background when the user has an action to take.
+    static let havenSalmon50 = Color(red: 0.957, green: 0.941, blue: 0.996)
 
-    // MARK: - Semantic Status Colors (softened, warm)
+    // MARK: - Semantic Status Colors (retired ramp)
+    // No more green / amber / red / blue. Three roles: black = complete,
+    // purple = needs-attention, gray = neutral info.
 
-    static let havenSuccess = Color(red: 0.290, green: 0.486, blue: 0.349)
-    static let havenWarning = Color(red: 0.780, green: 0.494, blue: 0.180)
-    static let havenCritical = Color(red: 0.761, green: 0.353, blue: 0.369)
-    static let havenInfo = Color(red: 0.353, green: 0.553, blue: 0.710)
+    /// #0A0A0A — Complete / good / active states (black)
+    static let havenSuccess = Color(red: 0.039, green: 0.039, blue: 0.039)
+    /// #6938EF — Needs attention / warning (purple)
+    static let havenWarning = Color(red: 0.412, green: 0.220, blue: 0.937)
+    /// #0A0A0A — Critical / overdue (black)
+    static let havenCritical = Color(red: 0.039, green: 0.039, blue: 0.039)
+    /// #6B6B7B — Neutral info / pending review (gray)
+    static let havenInfo = Color(red: 0.420, green: 0.420, blue: 0.482)
+
+    // MARK: - Pill Triad (new explicit tokens)
+    // Three pill tones replace the old semantic ramp. Components that
+    // need to pick a pill tone should map to one of these three.
+
+    /// #EFEAFE — Purple pill background (needs attention / overdue)
+    static let havenPillPurpleBg = Color(red: 0.937, green: 0.918, blue: 0.996)
+    /// #6938EF — Purple pill foreground
+    static let havenPillPurpleFg = Color(red: 0.412, green: 0.220, blue: 0.937)
+    /// #0A0A0A — Dark pill background (complete / good / active)
+    static let havenPillDarkBg = Color(red: 0.039, green: 0.039, blue: 0.039)
+    /// #FFFFFF — Dark pill foreground
+    static let havenPillDarkFg = Color.white
+    /// #F2F2F4 — Neutral pill background (pending / review / info)
+    static let havenPillNeutralBg = Color(red: 0.949, green: 0.949, blue: 0.957)
+    /// #6B6B7B — Neutral pill foreground
+    static let havenPillNeutralFg = Color(red: 0.420, green: 0.420, blue: 0.482)
 
     // MARK: - Text Colors
 
-    /// Primary text — deepest indigo in light (#2A2252), white in dark.
-    /// Chez design refresh darkened body copy from #453A70 → #2A2252
-    /// for stronger contrast on long-form text.
+    /// Primary text — black (#0A0A0A) in light, white in dark.
     static let havenTextPrimary = Color(
-        light: Color(red: 0.165, green: 0.133, blue: 0.322),
+        light: Color(red: 0.039, green: 0.039, blue: 0.039),
         dark: Color.white
     )
 
-    /// Secondary text — muted indigo (#6F6A88) in light, neutral300 in dark.
-    /// Slightly cooler tone than primary; used for descriptions and
-    /// subtitle metadata.
+    /// Secondary text — neutral gray (#6B6B7B) in light, neutral300 in dark.
+    /// Used for descriptions and subtitle metadata.
     static let havenTextSecondary = Color(
-        light: Color(red: 0.435, green: 0.416, blue: 0.533),
+        light: Color(red: 0.420, green: 0.420, blue: 0.482),
         dark: Color(red: 0.847, green: 0.855, blue: 0.875)
     )
 
-    /// Tertiary text — soft neutral (#9C98AD) in light, beige400 in dark.
+    /// Tertiary text — softest gray (#A1A1AC) in light, beige400 in dark.
     /// Placeholders, timestamps, metadata that should be readable but
     /// recede from primary content.
     static let havenTextTertiary = Color(
-        light: Color(red: 0.612, green: 0.596, blue: 0.678),
+        light: Color(red: 0.631, green: 0.631, blue: 0.675),
         dark: Color(red: 0.749, green: 0.761, blue: 0.784)
     )
 
-    /// Text on indigo surfaces — buttons, hero card, user chat bubbles
+    /// Text on purple surfaces — buttons, hero card, user chat bubbles.
+    /// (Token name preserved; surface beneath is now purple, not indigo.)
     static let havenTextOnNavy = Color.white
 
     // MARK: - Dark Mode Surfaces
+    // Light-mode-only ships in v1 (Info.plist locks UIUserInterfaceStyle to
+    // Light). Dark surfaces remain indigo-tinted until a separate pass
+    // re-tones them on top of the purple palette.
 
     /// #0E0B1A
     static let havenDarkBg = Color(red: 0.055, green: 0.043, blue: 0.102)
@@ -141,9 +169,9 @@ extension Color {
 
     // MARK: - Adaptive Surface Colors
 
-    /// Screen background — pearl white (#F8F9FA) in light, dark navy in dark
+    /// Screen background — pearl off-white (#FAFAFC) in light, dark in dark
     static let havenBackground = Color(
-        light: Color(red: 0.973, green: 0.976, blue: 0.980),
+        light: Color(red: 0.980, green: 0.980, blue: 0.988),
         dark: Color(red: 0.055, green: 0.043, blue: 0.102)
     )
 

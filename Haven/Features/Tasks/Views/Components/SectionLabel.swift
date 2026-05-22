@@ -2,7 +2,9 @@ import SwiftUI
 
 /// V5 ArrowLink — text + trailing "→" glyph. Two tones:
 ///   - `.salmon` (primary action: "Choose vendor →", "Set up →")
+///     Token name preserved for backwards compat; resolves to purple.
 ///   - `.indigo` (navigation: "See all →", "View all →")
+///     Token name preserved for backwards compat; resolves to neutral gray.
 struct ArrowLink: View {
     enum Tone {
         case salmon
@@ -10,8 +12,8 @@ struct ArrowLink: View {
 
         var color: Color {
             switch self {
-            case .salmon: return HavenColors.actionPressed   // #D14E3E
-            case .indigo: return HavenColors.navy500          // #6B5AA0
+            case .salmon: return HavenColors.actionPressed   // #5025D1 purple-pressed
+            case .indigo: return HavenColors.navy500          // #6B6B7B neutral gray
             }
         }
     }

@@ -221,9 +221,9 @@ struct LoginView: View {
 
     private func biometricSignIn() async {
         Analytics.track(.authLoginBiometric)
-        let success = await AuthService.authenticateWithBiometrics()
-        if !success {
-            viewModel.errorMessage = "Biometric authentication failed."
+        let result = await AuthService.authenticateWithBiometrics()
+        if !result.success {
+            viewModel.errorMessage = result.reason ?? "Biometric authentication failed."
         }
     }
 }

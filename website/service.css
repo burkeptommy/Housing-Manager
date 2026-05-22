@@ -1,0 +1,46 @@
+/*
+ * Chez Service Desk — cosmetic deltas on top of admin.css.
+ *
+ * The service desk shares admin.html's layout (sidebar + topbar + main),
+ * the Phase 83 4-pane concierge cockpit, and every JS surface in
+ * admin.js. The only visual deltas live here:
+ *   1. The sidebar brand says "chez service" instead of "chez admin"
+ *      (handled in service.html markup).
+ *   2. A slight accent on the topbar so operators know which surface
+ *      they're on at a glance.
+ *   3. Subdued "back of house" affordances (catalog buttons hidden via
+ *      .is-hidden + hidden attributes in service.html).
+ *
+ * Keep this file small. Anything reusable across both portals belongs
+ * in admin.css.
+ */
+
+/* Service-mode topbar accent: a thin salmon underline below the eyebrow
+   so the operator's eye lands on the title bar slightly faster than on
+   the admin lab. Same accent the iOS app uses for primary CTAs. */
+body[data-portal-mode="service"] .admin-topbar > div > .admin-eyebrow {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 2px;
+}
+body[data-portal-mode="service"] .admin-topbar > div > .admin-eyebrow::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 24px;
+  height: 2px;
+  background: var(--chez-action, #ed6955);
+  border-radius: 1px;
+}
+
+/* Brand subtitle: "service" reads in salmon to distinguish from admin's
+   indigo "admin" label. Same approach the iOS app uses for action vs ink. */
+body[data-portal-mode="service"] .admin-sidebar__brand span {
+  color: var(--chez-action, #ed6955);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Login card copy already differs (markup in service.html). No extra
+   styling needed — the admin-login__card already centers nicely. */

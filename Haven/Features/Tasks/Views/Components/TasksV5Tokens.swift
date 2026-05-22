@@ -2,95 +2,120 @@ import SwiftUI
 
 /// V5 design tokens specific to the Tasks tab redesign.
 ///
-/// Most tokens (pearl, indigo, salmon, neutrals, success) come from
-/// `HavenColors`. This file holds the season-tint palette + the indigo
-/// hero/band gradient recipes that are V5-specific.
+/// Most tokens (pearl, purple, neutrals) come from `HavenColors`. This file
+/// holds the season-tile palette + the purple hero/band gradient recipes
+/// that are V5-specific.
 enum TasksV5 {
 
     // MARK: - Season tints (background of inactive YearRibbon tiles)
+    //
+    // The three-color discipline retires the warm/cool seasonal hues. All
+    // four inactive season tiles share the same neutral gray bg + black
+    // ink. The active tile picks up a purple wash + larger size + NOW chip
+    // (rendered in `YearRibbon.swift`).
 
-    static let springTint  = Color(red: 1.000, green: 0.910, blue: 0.886) // #FFE8E2
-    static let summerTint  = Color(red: 1.000, green: 0.965, blue: 0.839) // #FFF6D6
-    static let fallTint    = Color(red: 0.949, green: 0.937, blue: 0.973) // #F2EFF8
-    static let winterTint  = Color(red: 0.902, green: 0.933, blue: 0.969) // #E6EEF7
+    /// #F2F2F4 — Inactive tile background (neutral gray)
+    static let springTint  = Color(red: 0.949, green: 0.949, blue: 0.957)
+    /// #F2F2F4 — Inactive tile background (neutral gray)
+    static let summerTint  = Color(red: 0.949, green: 0.949, blue: 0.957)
+    /// #F2F2F4 — Inactive tile background (neutral gray)
+    static let fallTint    = Color(red: 0.949, green: 0.949, blue: 0.957)
+    /// #F2F2F4 — Inactive tile background (neutral gray)
+    static let winterTint  = Color(red: 0.949, green: 0.949, blue: 0.957)
 
     // MARK: - Season inks (text color on inactive YearRibbon tiles)
 
-    static let springInk   = Color(red: 0.608, green: 0.227, blue: 0.165) // #9B3A2A
-    static let summerInk   = Color(red: 0.541, green: 0.431, blue: 0.122) // #8A6E1F
-    static let fallInk     = Color(red: 0.271, green: 0.227, blue: 0.439) // #453A70 (= navy800)
-    static let winterInk   = Color(red: 0.184, green: 0.337, blue: 0.494) // #2F567E
+    /// #0A0A0A — Inactive tile ink (black)
+    static let springInk   = Color(red: 0.039, green: 0.039, blue: 0.039)
+    /// #0A0A0A — Inactive tile ink (black)
+    static let summerInk   = Color(red: 0.039, green: 0.039, blue: 0.039)
+    /// #0A0A0A — Inactive tile ink (black)
+    static let fallInk     = Color(red: 0.039, green: 0.039, blue: 0.039)
+    /// #0A0A0A — Inactive tile ink (black)
+    static let winterInk   = Color(red: 0.039, green: 0.039, blue: 0.039)
 
-    // MARK: - Decision row salmon wash
+    // MARK: - Active-tile wash (Year Ribbon)
 
-    static let decisionRowBackground = Color(red: 1.000, green: 0.961, blue: 0.949) // #FFF5F2 (= action50)
-    static let decisionRowBorder     = Color(red: 1.000, green: 0.878, blue: 0.839) // #FFE0D6
+    /// #EFEAFE — Purple-pale wash for the active season tile
+    static let activeSeasonTint = Color(red: 0.937, green: 0.918, blue: 0.996)
+
+    // MARK: - Decision row purple wash
+
+    /// #EFEAFE — Decision row background (purple-pale)
+    static let decisionRowBackground = Color(red: 0.937, green: 0.918, blue: 0.996)
+    /// #D9C9FB — Decision row border (slightly darker purple-pale)
+    static let decisionRowBorder     = Color(red: 0.851, green: 0.788, blue: 0.984)
 
     // MARK: - "ON" pill (active program badge)
 
-    static let onPillBackground = Color(red: 0.918, green: 0.953, blue: 0.925) // #EAF3EC
-    static let onPillForeground = HavenColors.success
+    /// #EFEAFE — ON pill background (purple-pale)
+    static let onPillBackground = Color(red: 0.937, green: 0.918, blue: 0.996)
+    /// #6938EF — ON pill foreground (purple)
+    static let onPillForeground = HavenColors.action
 
     // MARK: - Punch-list inner row divider
 
-    static let punchListDivider = Color(red: 0.957, green: 0.961, blue: 0.969) // #F4F5F7
+    /// #F4F5F7 — Neutral divider inside punch-list rows
+    static let punchListDivider = Color(red: 0.957, green: 0.961, blue: 0.969)
 
     // MARK: - Gradients
 
-    /// Hero gradient: 3-stop, used by MiniHero and VisitHero.
-    /// `linear-gradient(135deg, #524080 0%, #453A70 55%, #3D2F66 100%)`
+    /// Hero gradient: 3-stop purple, used by MiniHero and VisitHero.
+    /// `linear-gradient(135deg, #8B6FF5 0%, #6938EF 55%, #5025D1 100%)`
     static let heroGradient = LinearGradient(
         colors: [
-            Color(red: 0.322, green: 0.251, blue: 0.502),   // #524080
-            Color(red: 0.271, green: 0.227, blue: 0.439),   // #453A70
-            Color(red: 0.239, green: 0.184, blue: 0.400),   // #3D2F66
+            Color(red: 0.545, green: 0.435, blue: 0.961),   // #8B6FF5
+            Color(red: 0.412, green: 0.220, blue: 0.937),   // #6938EF
+            Color(red: 0.314, green: 0.145, blue: 0.820),   // #5025D1
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    /// Band gradient: 2-stop, used by BrowseBand and WhatWeHandleBand.
-    /// `linear-gradient(135deg, #524080 0%, #453A70 100%)`
+    /// Band gradient: 2-stop purple, used by BrowseBand and WhatWeHandleBand.
+    /// `linear-gradient(135deg, #8B6FF5 0%, #6938EF 100%)`
     static let bandGradient = LinearGradient(
         colors: [
-            Color(red: 0.322, green: 0.251, blue: 0.502),   // #524080
-            Color(red: 0.271, green: 0.227, blue: 0.439),   // #453A70
+            Color(red: 0.545, green: 0.435, blue: 0.961),   // #8B6FF5
+            Color(red: 0.412, green: 0.220, blue: 0.937),   // #6938EF
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    // MARK: - Shadows (custom for V5 — indigo-tinted, never black)
+    // MARK: - Shadows (custom for V5 — deep-purple-tinted, never black)
 
-    /// Resting card shadow: `0 1px 3px rgba(42,34,82,0.05), 0 4px 12px rgba(42,34,82,0.06)`
-    /// Compose into a `.shadow` modifier; SwiftUI's single-shadow API drops the inner-shadow trick,
-    /// so we use the larger of the two for the visual effect.
-    static let cardShadowColor = Color(red: 0.165, green: 0.133, blue: 0.322).opacity(0.06) // navy900 @ 6%
+    /// Resting card shadow: deep purple #0F0A28 at 6%
+    /// SwiftUI's single-shadow API drops the inner-shadow trick, so we use
+    /// the larger of the two for the visual effect.
+    static let cardShadowColor = Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.06)
     static let cardShadowRadius: CGFloat = 12
     static let cardShadowY: CGFloat = 4
 
-    /// Hero shadow: `0 12px 32px rgba(42,34,82,0.18)`
-    static let heroShadowColor = Color(red: 0.165, green: 0.133, blue: 0.322).opacity(0.18)
+    /// Hero shadow: deep purple #0F0A28 at 18%
+    static let heroShadowColor = Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.18)
     static let heroShadowRadius: CGFloat = 32
     static let heroShadowY: CGFloat = 12
 
-    /// Band shadow: `0 8px 24px rgba(42,34,82,0.16)`
-    static let bandShadowColor = Color(red: 0.165, green: 0.133, blue: 0.322).opacity(0.16)
+    /// Band shadow: deep purple #0F0A28 at 16%
+    static let bandShadowColor = Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.16)
     static let bandShadowRadius: CGFloat = 24
     static let bandShadowY: CGFloat = 8
 
-    /// Salmon CTA glow: `0 6px 16px rgba(237,105,85,0.32)`
-    static let salmonGlowColor = Color(red: 0.929, green: 0.412, blue: 0.333).opacity(0.32)
+    /// Purple CTA glow: `0 6px 16px rgba(105,56,239,0.32)`
+    /// Token name preserved from the salmon palette for backwards compat.
+    static let salmonGlowColor = Color(red: 0.412, green: 0.220, blue: 0.937).opacity(0.32)
     static let salmonGlowRadius: CGFloat = 16
     static let salmonGlowY: CGFloat = 6
 
-    /// Recommended-row salmon "+" button glow: `0 4px 10px rgba(237,105,85,0.32)`
-    static let salmonPlusGlowColor = Color(red: 0.929, green: 0.412, blue: 0.333).opacity(0.32)
+    /// Recommended-row "+" button glow: `0 4px 10px rgba(105,56,239,0.32)`
+    /// Token name preserved from the salmon palette for backwards compat.
+    static let salmonPlusGlowColor = Color(red: 0.412, green: 0.220, blue: 0.937).opacity(0.32)
     static let salmonPlusGlowRadius: CGFloat = 10
     static let salmonPlusGlowY: CGFloat = 4
 
-    /// Header "+" button shadow: `0 1px 3px rgba(42,34,82,0.04)`
-    static let headerPlusShadowColor = Color(red: 0.165, green: 0.133, blue: 0.322).opacity(0.04)
+    /// Header "+" button shadow: deep purple #0F0A28 at 4%
+    static let headerPlusShadowColor = Color(red: 0.059, green: 0.039, blue: 0.157).opacity(0.04)
     static let headerPlusShadowRadius: CGFloat = 3
     static let headerPlusShadowY: CGFloat = 1
 

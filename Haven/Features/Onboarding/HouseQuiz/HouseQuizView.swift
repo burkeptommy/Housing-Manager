@@ -5691,14 +5691,20 @@ struct HouseQuizView: View {
                     sweepSheetTarget = .addVendor(category: category)
                 },
                 onDismissItem: { item in
-                    // Optimistic local dismissal handled inside
-                    // VendorCoverageSheet; we also need to remove it
-                    // from our state so re-renders don't bring it back.
+                    // Phase X — quiz-time "Not applicable" defaults to a
+                    // 12-month snooze so core homeowner categories
+                    // (HVAC, Roofing, Septic, etc.) auto-resurface
+                    // instead of getting permanently dropped during the
+                    // initial sweep. The in-app Coverage view's own
+                    // "Not applicable" stays permanent as the explicit
+                    // power-user action.
                     coverageUncovered.removeAll { $0.id == item.id }
+                    let until = Calendar.current.date(byAdding: .month, value: 12, to: Date()) ?? Date()
                     Task {
-                        try? await DatabaseService.shared.dismissCategory(
+                        try? await DatabaseService.shared.snoozeCategory(
                             householdId: viewModel.property.householdId,
-                            category: item.id
+                            category: item.id,
+                            until: until
                         )
                     }
                 },

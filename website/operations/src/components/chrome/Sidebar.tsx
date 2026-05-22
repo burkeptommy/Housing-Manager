@@ -151,7 +151,7 @@ export function Sidebar() {
             initials={initialsFor(workspaceName)}
             size={28}
             fontSize={11}
-            color="#5D4C8F"
+            color="#7A55F0"
           />
           <div className="ops-sidebar__workspace-info">
             <span className="ops-sidebar__workspace-name">{workspaceName}</span>
@@ -183,14 +183,14 @@ export function Sidebar() {
                   initials={initialsFor(ws.companyName)}
                   size={26}
                   fontSize={10}
-                  color="#5D4C8F"
+                  color="#7A55F0"
                 />
                 <div className="ops-sidebar__workspace-option-info">
                   <span className="ops-sidebar__workspace-option-name">{ws.companyName}</span>
                   <span className="ops-sidebar__workspace-option-role">{roleDisplay(ws.role)}</span>
                 </div>
                 <span className="ops-sidebar__workspace-option-check">
-                  {ws.isCurrent ? <Icon name="check" size={14} stroke={2.4} color="#ED6955" /> : null}
+                  {ws.isCurrent ? <Icon name="check" size={14} stroke={2.4} color="#6938EF" /> : null}
                 </span>
               </button>
             ))}
@@ -217,7 +217,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="ops-sidebar__footer">
-        <Avatar initials={memberInitials} size={32} color="#453A70" />
+        <Avatar initials={memberInitials} size={32} color="#6938EF" />
         <div className="ops-sidebar__footer-info">
           <div className="ops-sidebar__footer-name">{memberFullName}</div>
           <div className="ops-sidebar__footer-email">{memberEmail}</div>

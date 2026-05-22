@@ -105,7 +105,7 @@ export function InviteTeammateSheet() {
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 60,
-        background: "rgba(42, 34, 82, 0.45)",
+        background: "rgba(15, 10, 40, 0.45)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
       }}
@@ -118,7 +118,7 @@ export function InviteTeammateSheet() {
         style={{
           background: "#fff", borderRadius: 18, width: "min(540px, 95vw)",
           maxHeight: "90vh", overflowY: "auto",
-          boxShadow: "0 24px 60px rgba(42, 34, 82, 0.4)",
+          boxShadow: "0 24px 60px rgba(15, 10, 40, 0.4)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -218,7 +218,7 @@ export function InviteTeammateSheet() {
           {success && (
             <div role="status" style={{
               padding: "10px 12px", borderRadius: 10,
-              background: "rgba(74, 124, 89, 0.12)", color: "var(--success)",
+              background: "rgba(10, 10, 15, 0.12)", color: "var(--success)",
               fontSize: 12.5, lineHeight: 1.5,
             }}>
               {success}

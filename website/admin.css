@@ -1,7 +1,7 @@
 .admin-root {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 14% 10%, rgba(237, 105, 85, 0.18), transparent 30%),
+    radial-gradient(circle at 14% 10%, rgba(105, 56, 239, 0.18), transparent 30%),
     radial-gradient(circle at 86% 18%, rgba(69, 58, 112, 0.16), transparent 34%),
     var(--pearl);
   color: var(--text);
@@ -54,7 +54,7 @@
 .admin-button--primary {
   background: var(--salmon);
   border-color: var(--salmon);
-  box-shadow: 0 8px 18px rgba(237, 105, 85, 0.28);
+  box-shadow: 0 8px 18px rgba(105, 56, 239, 0.28);
   color: #fff;
 }
 
@@ -147,7 +147,7 @@
 .admin-block-label textarea:focus,
 .admin-notes-box textarea:focus {
   border-color: var(--indigo-400);
-  box-shadow: 0 0 0 3px rgba(139, 125, 186, 0.16);
+  box-shadow: 0 0 0 3px rgba(180, 155, 250, 0.16);
   outline: none;
 }
 
@@ -173,7 +173,7 @@
 
 .admin-sidebar {
   background:
-    radial-gradient(circle at 0 0, rgba(237, 105, 85, 0.22), transparent 32%),
+    radial-gradient(circle at 0 0, rgba(105, 56, 239, 0.22), transparent 32%),
     var(--indigo-900);
   color: rgba(255, 255, 255, 0.9);
   display: flex;
@@ -239,8 +239,8 @@
 }
 
 .admin-nav button.is-active {
-  background: rgba(237, 105, 85, 0.18);
-  border-color: rgba(237, 105, 85, 0.32);
+  background: rgba(105, 56, 239, 0.18);
+  border-color: rgba(105, 56, 239, 0.32);
   color: #fff;
 }
 
@@ -454,8 +454,8 @@
 
 .admin-list-item:hover,
 .admin-list-item.is-active {
-  border-color: rgba(237, 105, 85, 0.55);
-  box-shadow: 0 8px 20px rgba(42, 34, 82, 0.08);
+  border-color: rgba(105, 56, 239, 0.55);
+  box-shadow: 0 8px 20px rgba(15, 10, 40, 0.08);
   transform: translateY(-1px);
 }
 
@@ -520,8 +520,8 @@
 }
 
 .admin-pill[data-tone="active"] {
-  background: rgba(74, 124, 89, 0.12);
-  color: #4a7c59;
+  background: rgba(10, 10, 15, 0.12);
+  color: #0A0A0A;
 }
 
 .admin-pill[data-tone="cut"] {
@@ -542,13 +542,13 @@
 }
 
 .admin-pill--lint {
-  background: rgba(237, 105, 85, 0.14);
+  background: rgba(105, 56, 239, 0.14);
   color: var(--salmon-dark);
 }
 
 /* Phase 5p — handyman bundle / library tier pills */
 .admin-pill--bundle-spring {
-  background: rgba(74, 124, 89, 0.16);
+  background: rgba(10, 10, 15, 0.16);
   color: #2f5e3f;
 }
 .admin-pill--bundle-fall {
@@ -581,12 +581,12 @@
    them feel "this happens automatically, you don't have to do
    anything" vs. the indigo/yellow tones used for opt-in. */
 .admin-pill--autoseed {
-  background: rgba(74, 124, 89, 0.16);
+  background: rgba(10, 10, 15, 0.16);
   color: rgba(46, 88, 60, 1);
 }
 .admin-pill--autoseed-conditional {
-  background: rgba(74, 124, 89, 0.08);
-  border: 1px dashed rgba(74, 124, 89, 0.5);
+  background: rgba(10, 10, 15, 0.08);
+  border: 1px dashed rgba(10, 10, 15, 0.5);
   color: rgba(46, 88, 60, 1);
 }
 .admin-pill--season {
@@ -604,7 +604,7 @@
   color: #4a5365;
 }
 .admin-pill--routing-handyman {
-  background: rgba(237, 105, 85, 0.14);
+  background: rgba(105, 56, 239, 0.14);
   color: var(--salmon-dark);
 }
 .admin-pill--routing-bundled {
@@ -668,8 +668,8 @@
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .admin-facet-pill:hover {
-  background: rgba(237, 105, 85, 0.06);
-  border-color: rgba(237, 105, 85, 0.4);
+  background: rgba(105, 56, 239, 0.06);
+  border-color: rgba(105, 56, 239, 0.4);
 }
 .admin-facet-pill.is-active {
   background: var(--indigo-700);
@@ -735,7 +735,7 @@
 }
 
 .admin-form__field.is-changed {
-  background: rgba(237, 105, 85, 0.06);
+  background: rgba(105, 56, 239, 0.06);
   border-radius: 10px;
   margin: 0 -8px;
   padding: 6px 8px;
@@ -998,7 +998,7 @@
   width: 28px;
 }
 .admin-form__answer-remove:hover {
-  background: rgba(237, 105, 85, 0.1);
+  background: rgba(105, 56, 239, 0.1);
   border-color: var(--salmon-dark);
   color: var(--salmon-dark);
 }
@@ -1066,8 +1066,8 @@
   padding-left: 10px;
 }
 .admin-jump-link {
-  background: rgba(237, 105, 85, 0.08);
-  border: 1px solid rgba(237, 105, 85, 0.3);
+  background: rgba(105, 56, 239, 0.08);
+  border: 1px solid rgba(105, 56, 239, 0.3);
   border-radius: 999px;
   color: var(--salmon-dark);
   cursor: pointer;
@@ -1087,11 +1087,11 @@
    list. Three sections (voice / duplicates / bundle candidates), each
    row has Open + Draft note buttons. */
 .admin-recs {
-  background: linear-gradient(135deg, rgba(237, 105, 85, 0.1), rgba(237, 105, 85, 0.04));
-  border: 1px solid rgba(237, 105, 85, 0.45);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.1), rgba(105, 56, 239, 0.04));
+  border: 1px solid rgba(105, 56, 239, 0.45);
   border-left: 4px solid var(--salmon-dark);
   border-radius: 14px;
-  box-shadow: 0 4px 14px rgba(237, 105, 85, 0.1);
+  box-shadow: 0 4px 14px rgba(105, 56, 239, 0.1);
   margin-bottom: 14px;
   padding: 0;
 }
@@ -1158,13 +1158,13 @@
   padding: 1px 5px;
 }
 .admin-recs--empty {
-  background: rgba(74, 124, 89, 0.06);
-  border-color: rgba(74, 124, 89, 0.3);
-  border-left-color: rgba(74, 124, 89, 0.7);
+  background: rgba(10, 10, 15, 0.06);
+  border-color: rgba(10, 10, 15, 0.3);
+  border-left-color: rgba(10, 10, 15, 0.7);
   box-shadow: none;
 }
 .admin-recs--empty > summary::before {
-  color: rgba(74, 124, 89, 0.7);
+  color: rgba(10, 10, 15, 0.7);
 }
 .admin-recs > summary {
   align-items: center;
@@ -1282,7 +1282,7 @@
    per-card "Delete" on entity detail thread. Both visually subdued
    so the destructive intent stands out only on hover. */
 .admin-button--danger:hover {
-  background: rgba(237, 105, 85, 0.12) !important;
+  background: rgba(105, 56, 239, 0.12) !important;
   border-color: var(--salmon-dark) !important;
   color: var(--salmon-dark) !important;
 }
@@ -1316,7 +1316,7 @@
   opacity: 1;
 }
 .admin-list-item__delete:hover {
-  background: rgba(237, 105, 85, 0.12);
+  background: rgba(105, 56, 239, 0.12);
   border-color: var(--salmon-dark);
   color: var(--salmon-dark);
 }
@@ -1379,7 +1379,7 @@
   cursor: help;
 }
 .admin-eyebrow__flavor--live {
-  background: rgba(74, 124, 89, 0.14);
+  background: rgba(10, 10, 15, 0.14);
   color: #2f5e3f;
 }
 .admin-eyebrow__flavor--overlay {
@@ -1486,8 +1486,8 @@
 }
 
 .admin-summary__section--proactive {
-  background: linear-gradient(135deg, rgba(74, 124, 89, 0.06), rgba(74, 124, 89, 0.02));
-  border: 1px solid rgba(74, 124, 89, 0.2);
+  background: linear-gradient(135deg, rgba(10, 10, 15, 0.06), rgba(10, 10, 15, 0.02));
+  border: 1px solid rgba(10, 10, 15, 0.2);
   border-radius: 10px;
   padding: 12px 14px;
 }
@@ -1573,8 +1573,8 @@
 /* -- Diff strip ----------------------------------------------------------- */
 
 .admin-diff-strip {
-  background: linear-gradient(135deg, rgba(237, 105, 85, 0.08), rgba(237, 105, 85, 0.02));
-  border: 1px solid rgba(237, 105, 85, 0.3);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.08), rgba(105, 56, 239, 0.02));
+  border: 1px solid rgba(105, 56, 239, 0.3);
   border-radius: 14px;
   display: grid;
   gap: 10px;
@@ -1606,7 +1606,7 @@
 .admin-diff__item {
   align-items: center;
   background: #fff;
-  border: 1px solid rgba(237, 105, 85, 0.2);
+  border: 1px solid rgba(105, 56, 239, 0.2);
   border-radius: 10px;
   display: grid;
   font: 500 12px var(--sans);
@@ -1643,8 +1643,8 @@
 }
 
 @keyframes admin-pulse {
-  0%, 100% { box-shadow: 0 8px 18px rgba(237, 105, 85, 0.28); }
-  50% { box-shadow: 0 8px 24px rgba(237, 105, 85, 0.55); }
+  0%, 100% { box-shadow: 0 8px 18px rgba(105, 56, 239, 0.28); }
+  50% { box-shadow: 0 8px 24px rgba(105, 56, 239, 0.55); }
 }
 
 .admin-button--secondary {
@@ -1680,7 +1680,7 @@
 }
 
 .qp-modal__panel {
-  background: var(--pearl, #f8f9fa);
+  background: var(--pearl, #FAFAFC);
   border-radius: 24px;
   box-shadow: 0 32px 80px rgba(20, 12, 40, 0.4);
   display: grid;
@@ -1709,7 +1709,7 @@
 }
 
 .qp-modal--salmon .qp-modal__header {
-  background: var(--salmon, #ed6955);
+  background: var(--salmon, #6938EF);
 }
 
 .qp-modal__eyebrow {
@@ -1748,7 +1748,7 @@
 }
 
 .qp-modal__body {
-  background: var(--pearl, #f8f9fa);
+  background: var(--pearl, #FAFAFC);
   overflow: auto;
   padding: 24px;
 }
@@ -1779,7 +1779,7 @@
 }
 
 .qp__statusbar {
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 13px var(--sans);
   padding: 12px 24px 4px;
 }
@@ -1793,14 +1793,14 @@
 }
 
 .qp__nav-back {
-  color: var(--salmon, #ed6955);
+  color: var(--salmon, #6938EF);
   font: 600 13px var(--sans);
 }
 
 .qp__chapter-pill {
   background: rgba(69, 58, 112, 0.1);
   border-radius: 999px;
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 10px var(--sans);
   letter-spacing: 0.12em;
   padding: 4px 10px;
@@ -1814,7 +1814,7 @@
 }
 
 .qp__progress-bar {
-  background: var(--salmon, #ed6955);
+  background: var(--salmon, #6938EF);
   height: 100%;
 }
 
@@ -1825,7 +1825,7 @@
 }
 
 .qp__title {
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 22px Fraunces, Georgia, serif;
   line-height: 1.25;
   margin: 0;
@@ -1864,7 +1864,7 @@
   background: #fff;
   border: 1.5px solid var(--neutral-200, #edeef0);
   border-radius: 12px;
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   cursor: default;
   display: flex;
   font: 600 13px var(--sans);
@@ -1880,8 +1880,8 @@
 }
 
 .qp__answer-btn--primary {
-  background: var(--salmon, #ed6955);
-  border-color: var(--salmon, #ed6955);
+  background: var(--salmon, #6938EF);
+  border-color: var(--salmon, #6938EF);
   color: #fff;
 }
 
@@ -1896,12 +1896,12 @@
 }
 
 .qp__option-icon {
-  color: var(--salmon, #ed6955);
+  color: var(--salmon, #6938EF);
   font: 700 14px var(--sans);
 }
 
 .qp__option-custom {
-  background: rgba(237, 105, 85, 0.12);
+  background: rgba(105, 56, 239, 0.12);
   border-radius: 999px;
   color: var(--salmon-dark, #c25a4a);
   font: 700 9px var(--sans);
@@ -1940,7 +1940,7 @@
 .qp__currency-input {
   background: transparent;
   border: 0;
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   flex: 1;
   font: 700 28px var(--sans);
   outline: none;
@@ -1988,7 +1988,7 @@
 }
 
 .qp__cta-btn {
-  background: var(--salmon, #ed6955);
+  background: var(--salmon, #6938EF);
   border: 0;
   border-radius: 16px;
   color: #fff;
@@ -2047,8 +2047,8 @@
 }
 
 .qp__lint {
-  background: rgba(237, 105, 85, 0.08);
-  border-color: rgba(237, 105, 85, 0.32);
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.32);
   color: var(--salmon-dark, #c25a4a);
 }
 
@@ -2112,7 +2112,7 @@
 
 .qf__legend-dot--ok { background: var(--indigo-700); }
 .qf__legend-dot--skip { background: rgba(199, 126, 46, 0.7); }
-.qf__legend-dot--lint { background: var(--salmon, #ed6955); }
+.qf__legend-dot--lint { background: var(--salmon, #6938EF); }
 .qf__legend-dot--token { background: rgba(69, 58, 112, 0.5); }
 
 .qf__chapter {
@@ -2127,7 +2127,7 @@
 }
 
 .qf__chapter-header h2 {
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 24px Fraunces, Georgia, serif;
   margin: 0;
 }
@@ -2234,7 +2234,7 @@
 }
 
 .qf__flag--skip { background: rgba(199, 126, 46, 0.16); color: #9c6322; }
-.qf__flag--lint { background: rgba(237, 105, 85, 0.18); color: var(--salmon-dark, #c25a4a); }
+.qf__flag--lint { background: rgba(105, 56, 239, 0.18); color: var(--salmon-dark, #c25a4a); }
 .qf__flag--token { background: rgba(69, 58, 112, 0.16); }
 
 .qf__notes {
@@ -2258,15 +2258,15 @@
 
 .admin-form__field[data-field-key="_tier"] select,
 [data-control="assignment-tier"] {
-  background: rgba(237, 105, 85, 0.06);
-  border-color: rgba(237, 105, 85, 0.32);
-  color: var(--indigo-800, #453a70);
+  background: rgba(105, 56, 239, 0.06);
+  border-color: rgba(105, 56, 239, 0.32);
+  color: var(--indigo-800, #6938EF);
   font: 700 14px var(--sans);
   padding: 11px 12px;
 }
 
 [data-control="assignment-tier"]:focus {
-  border-color: var(--salmon, #ed6955);
+  border-color: var(--salmon, #6938EF);
 }
 
 /* Phase 5d — System picker: render as full-width select */
@@ -2418,7 +2418,7 @@
 }
 
 .admin-arch__edge-bucket header h5 {
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 14px var(--sans);
   margin: 0;
 }
@@ -2453,7 +2453,7 @@
 
 .admin-arch__edge-fn code {
   background: transparent;
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 600 12px ui-monospace, monospace;
 }
 
@@ -2539,7 +2539,7 @@
 .admin-arch__chip:hover {
   background: rgba(69, 58, 112, 0.06);
   border-color: var(--indigo-700);
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
 }
 
 .admin-arch__chip--small {
@@ -2701,8 +2701,8 @@
   padding: 14px 16px;
 }
 
-.admin-arch__rel-panel--belongs-to { border-left-color: var(--salmon, #ed6955); }
-.admin-arch__rel-panel--owns       { border-left-color: #4a7c59; }
+.admin-arch__rel-panel--belongs-to { border-left-color: var(--salmon, #6938EF); }
+.admin-arch__rel-panel--owns       { border-left-color: #0A0A0A; }
 .admin-arch__rel-panel--references { border-left-color: rgba(199, 126, 46, 0.85); }
 .admin-arch__rel-panel--incoming   { border-left-color: var(--indigo-700); }
 
@@ -2742,7 +2742,7 @@
   background: rgba(69, 58, 112, 0.08);
   border: 0;
   border-radius: 8px;
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   cursor: pointer;
   font: 700 13px var(--sans);
   padding: 6px 10px;
@@ -2845,7 +2845,7 @@
 
 .admin-arch__nav-cluster button:hover {
   background: rgba(69, 58, 112, 0.06);
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
 }
 
 .admin-arch__nav-cluster button.is-active {
@@ -2854,13 +2854,13 @@
 }
 
 .admin-arch__nav-cluster button.is-active:hover {
-  background: var(--indigo-800, #453a70);
+  background: var(--indigo-800, #6938EF);
   color: #fff;
 }
 
 /* Notes view — "Open X →" jump hint */
 .admin-list-item__jump {
-  background: rgba(237, 105, 85, 0.1);
+  background: rgba(105, 56, 239, 0.1);
   border-radius: 999px;
   color: var(--salmon-dark, #c25a4a);
   font: 700 10px var(--sans);
@@ -2871,7 +2871,7 @@
 }
 
 .admin-list-item:hover .admin-list-item__jump {
-  background: var(--salmon, #ed6955);
+  background: var(--salmon, #6938EF);
   color: #fff;
 }
 
@@ -2927,8 +2927,8 @@
 }
 
 .admin-claude-file__section--pending {
-  background: rgba(237, 105, 85, 0.05);
-  border-color: rgba(237, 105, 85, 0.3);
+  background: rgba(105, 56, 239, 0.05);
+  border-color: rgba(105, 56, 239, 0.3);
 }
 
 .admin-claude-file__section--pending h3 {
@@ -2936,8 +2936,8 @@
 }
 
 .admin-claude-file__section--applied {
-  background: rgba(74, 124, 89, 0.04);
-  border-color: rgba(74, 124, 89, 0.28);
+  background: rgba(10, 10, 15, 0.04);
+  border-color: rgba(10, 10, 15, 0.28);
 }
 
 .admin-claude-file__section--applied h3 {
@@ -3097,7 +3097,7 @@
 }
 
 .admin-info-popover header strong {
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 13px var(--sans);
 }
 
@@ -3146,8 +3146,8 @@
 }
 
 .qp-nav__btn--primary {
-  background: var(--salmon, #ed6955);
-  border-color: var(--salmon, #ed6955);
+  background: var(--salmon, #6938EF);
+  border-color: var(--salmon, #6938EF);
   color: #fff;
 }
 
@@ -3179,7 +3179,7 @@
 }
 
 .qp-nav__progress-bar > div {
-  background: var(--salmon, #ed6955);
+  background: var(--salmon, #6938EF);
   border-radius: 999px;
   height: 100%;
   transition: width 240ms ease;
@@ -3222,8 +3222,8 @@
 }
 
 .qp__exp-section--lint {
-  background: rgba(237, 105, 85, 0.06);
-  border-color: rgba(237, 105, 85, 0.32);
+  background: rgba(105, 56, 239, 0.06);
+  border-color: rgba(105, 56, 239, 0.32);
 }
 
 .qp__exp-section--lint h3 {
@@ -3311,8 +3311,8 @@
 /* -- Live notes panel inside preview ----------------------------------- */
 
 .qp__notes {
-  background: linear-gradient(135deg, rgba(237, 105, 85, 0.06), rgba(237, 105, 85, 0.02));
-  border: 1px solid rgba(237, 105, 85, 0.25);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.06), rgba(105, 56, 239, 0.02));
+  border: 1px solid rgba(105, 56, 239, 0.25);
   border-radius: 14px;
   display: grid;
   gap: 8px;
@@ -3371,7 +3371,7 @@
 }
 
 .qp__notes textarea:focus {
-  border-color: var(--salmon, #ed6955);
+  border-color: var(--salmon, #6938EF);
   outline: none;
 }
 
@@ -3387,7 +3387,7 @@
 }
 
 .qp__notes-feedback[data-tone="ok"] {
-  color: #4a7c59;
+  color: #0A0A0A;
 }
 
 .qp__notes-feedback[data-tone="warn"] {
@@ -3395,7 +3395,7 @@
 }
 
 .qp__notes-recent {
-  border-top: 1px dashed rgba(237, 105, 85, 0.32);
+  border-top: 1px dashed rgba(105, 56, 239, 0.32);
   margin-top: 6px;
   padding-top: 8px;
 }
@@ -3489,7 +3489,7 @@
 }
 
 .admin-sim__punch-check {
-  color: #4a7c59;
+  color: #0A0A0A;
   font: 700 13px var(--sans);
 }
 
@@ -3566,8 +3566,8 @@
    ============================================================================= */
 
 .admin-sim__lane--routine {
-  background: linear-gradient(135deg, rgba(74, 124, 89, 0.06), rgba(74, 124, 89, 0.01));
-  border-color: rgba(74, 124, 89, 0.3);
+  background: linear-gradient(135deg, rgba(10, 10, 15, 0.06), rgba(10, 10, 15, 0.01));
+  border-color: rgba(10, 10, 15, 0.3);
 }
 
 .admin-sim__routines {
@@ -3584,8 +3584,8 @@
 }
 
 .admin-sim__routine.is-active {
-  border-left-color: #4a7c59;
-  background: linear-gradient(135deg, rgba(74, 124, 89, 0.06), #fff);
+  border-left-color: #0A0A0A;
+  background: linear-gradient(135deg, rgba(10, 10, 15, 0.06), #fff);
 }
 
 .admin-sim__routine.is-pending {
@@ -3615,7 +3615,7 @@
 }
 
 .admin-sim__routine.is-active .admin-sim__routine-status {
-  background: rgba(74, 124, 89, 0.18);
+  background: rgba(10, 10, 15, 0.18);
   color: #3a6048;
 }
 
@@ -3664,7 +3664,7 @@
 /* Phase 5q — Funnel breakdown card in the simulator. Visualizes why
    only X% of templates fire as tasks: each step shows a real cut. */
 .admin-sim__funnel {
-  background: linear-gradient(135deg, rgba(69, 58, 112, 0.04), rgba(237, 105, 85, 0.04));
+  background: linear-gradient(135deg, rgba(69, 58, 112, 0.04), rgba(105, 56, 239, 0.04));
   border: 1px solid var(--neutral-200);
   border-radius: 14px;
   display: grid;
@@ -3711,13 +3711,13 @@
   line-height: 1.4;
 }
 .admin-sim__funnel-step--cut {
-  background: rgba(237, 105, 85, 0.06);
+  background: rgba(105, 56, 239, 0.06);
 }
 .admin-sim__funnel-step--cut strong {
   color: var(--salmon-dark);
 }
 .admin-sim__funnel-step--final {
-  background: rgba(74, 124, 89, 0.10);
+  background: rgba(10, 10, 15, 0.10);
 }
 .admin-sim__funnel-step--final strong {
   color: #2f5e3f;
@@ -3740,10 +3740,10 @@
 .admin-sim__task.is-clickable:hover,
 .admin-sim__punch-col li.is-clickable:hover,
 .admin-sim__children li.is-clickable:hover {
-  background: rgba(237, 105, 85, 0.08);
+  background: rgba(105, 56, 239, 0.08);
 }
 .admin-sim__routine.is-clickable:hover {
-  border-color: rgba(237, 105, 85, 0.55);
+  border-color: rgba(105, 56, 239, 0.55);
   transform: translateY(-1px);
 }
 
@@ -3774,7 +3774,7 @@
 .admin-sim__mode.is-active {
   background: #fff;
   box-shadow: 0 2px 6px rgba(20, 12, 40, 0.12);
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
 }
 
 .admin-sim__lane-blurb {
@@ -3788,8 +3788,8 @@
 }
 
 .admin-quizsim__presets {
-  background: linear-gradient(135deg, rgba(237, 105, 85, 0.06), rgba(237, 105, 85, 0.01));
-  border: 1px solid rgba(237, 105, 85, 0.25);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.06), rgba(105, 56, 239, 0.01));
+  border: 1px solid rgba(105, 56, 239, 0.25);
   border-radius: 12px;
   padding: 12px 14px;
 }
@@ -3822,8 +3822,8 @@
 }
 
 .admin-quizsim__preset:hover {
-  background: rgba(237, 105, 85, 0.04);
-  border-color: var(--salmon, #ed6955);
+  background: rgba(105, 56, 239, 0.04);
+  border-color: var(--salmon, #6938EF);
 }
 
 .admin-quizsim__preset strong {
@@ -3881,7 +3881,7 @@
 }
 
 .admin-quizsim__q-label {
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 12px var(--sans);
 }
 
@@ -4052,11 +4052,11 @@
 }
 
 .admin-sim__task[data-lane="findContractor"] {
-  border-left: 3px solid var(--salmon, #ed6955);
+  border-left: 3px solid var(--salmon, #6938EF);
 }
 
 .admin-sim__task[data-lane="personal"] {
-  border-left: 3px solid #4a7c59;
+  border-left: 3px solid #0A0A0A;
 }
 
 .admin-sim__task-meta {
@@ -4133,8 +4133,8 @@
 }
 
 .admin-tab.is-active {
-  border-bottom-color: var(--salmon, #ed6955);
-  color: var(--indigo-800, #453a70);
+  border-bottom-color: var(--salmon, #6938EF);
+  color: var(--indigo-800, #6938EF);
 }
 
 .admin-tab-pane {
@@ -4163,8 +4163,8 @@
 }
 
 .admin-impact__section--lint {
-  background: rgba(237, 105, 85, 0.05);
-  border-color: rgba(237, 105, 85, 0.32);
+  background: rgba(105, 56, 239, 0.05);
+  border-color: rgba(105, 56, 239, 0.32);
 }
 
 .admin-impact__section--lint h4 {
@@ -4172,7 +4172,7 @@
 }
 
 .admin-impact__section--lint code {
-  background: rgba(237, 105, 85, 0.14);
+  background: rgba(105, 56, 239, 0.14);
   border-radius: 6px;
   padding: 1px 6px;
 }
@@ -4239,7 +4239,7 @@
 }
 
 .admin-stat-tile strong {
-  color: var(--indigo-800, #453a70);
+  color: var(--indigo-800, #6938EF);
   font: 700 22px Fraunces, Georgia, serif;
 }
 
@@ -4298,8 +4298,8 @@
 }
 
 .admin-usage__recommendation[data-tone="active"] {
-  background: rgba(74, 124, 89, 0.08);
-  border-color: rgba(74, 124, 89, 0.32);
+  background: rgba(10, 10, 15, 0.08);
+  border-color: rgba(10, 10, 15, 0.32);
   color: #3a6048;
 }
 
@@ -4343,12 +4343,12 @@
 }
 
 .admin-pill--launch[data-tone="approved"] {
-  background: rgba(74, 124, 89, 0.18);
+  background: rgba(10, 10, 15, 0.18);
   color: #3a6048;
 }
 
 .admin-pill--launch[data-tone="shipped"] {
-  background: rgba(74, 124, 89, 0.32);
+  background: rgba(10, 10, 15, 0.32);
   color: #2a4a35;
 }
 
@@ -4359,19 +4359,19 @@
 
 /* Lock button — when locked, render as solid green */
 .admin-button--lock {
-  background: rgba(74, 124, 89, 0.1);
-  border-color: rgba(74, 124, 89, 0.3);
+  background: rgba(10, 10, 15, 0.1);
+  border-color: rgba(10, 10, 15, 0.3);
   color: #3a6048;
 }
 
 .admin-button--lock:hover {
-  background: rgba(74, 124, 89, 0.18);
+  background: rgba(10, 10, 15, 0.18);
 }
 
 .admin-button--lock.admin-button--locked {
-  background: #4a7c59;
-  border-color: #4a7c59;
-  box-shadow: 0 8px 18px rgba(74, 124, 89, 0.28);
+  background: #0A0A0A;
+  border-color: #0A0A0A;
+  box-shadow: 0 8px 18px rgba(10, 10, 15, 0.28);
   color: #fff;
 }
 
@@ -4406,7 +4406,7 @@
 }
 
 .admin-readiness__bar > div {
-  background: linear-gradient(90deg, var(--salmon, #ed6955), #4a7c59);
+  background: linear-gradient(90deg, var(--salmon, #6938EF), #0A0A0A);
   border-radius: 999px;
   height: 100%;
   transition: width 240ms ease;
@@ -4423,7 +4423,7 @@
 .admin-decision {
   background: #fff;
   border: 1px solid var(--neutral-200);
-  border-left: 3px solid var(--salmon, #ed6955);
+  border-left: 3px solid var(--salmon, #6938EF);
   border-radius: 14px;
   cursor: pointer;
   display: grid;
@@ -4433,15 +4433,15 @@
 }
 
 .admin-decision:hover {
-  background: rgba(237, 105, 85, 0.04);
+  background: rgba(105, 56, 239, 0.04);
 }
 
 /* Phase 5z+14 — Active row when its focused panel is open. Same
    pattern as Apple Mail / Linear: a stronger left strip + a fill so
    the user sees which decision the right pane belongs to. */
 .admin-decision.is-active {
-  background: rgba(237, 105, 85, 0.08);
-  border-color: rgba(237, 105, 85, 0.5);
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.5);
   border-left-width: 4px;
 }
 
@@ -4519,7 +4519,7 @@
   white-space: pre-wrap;
 }
 
-.admin-activity--applied { border-left: 3px solid #4a7c59; }
+.admin-activity--applied { border-left: 3px solid #0A0A0A; }
 .admin-activity--reverted { border-left: 3px solid #c25a4a; }
 .admin-activity--locked { border-left: 3px solid var(--indigo-700); }
 
@@ -4694,7 +4694,7 @@
 
 .admin-notes-box {
   background:
-    radial-gradient(circle at 100% 0, rgba(237, 105, 85, 0.12), transparent 36%),
+    radial-gradient(circle at 100% 0, rgba(105, 56, 239, 0.12), transparent 36%),
     var(--indigo-50);
   border: 1px solid var(--indigo-100);
   border-radius: 18px;
@@ -4877,8 +4877,8 @@
 
 /* Inline edit form */
 .admin-note-focused__edit {
-  background: rgba(237, 105, 85, 0.04);
-  border: 1px solid rgba(237, 105, 85, 0.18);
+  background: rgba(105, 56, 239, 0.04);
+  border: 1px solid rgba(105, 56, 239, 0.18);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -5072,8 +5072,8 @@
 }
 
 .admin-note-focused__alternative {
-  background: rgba(74, 124, 89, 0.06);
-  border: 1px solid rgba(74, 124, 89, 0.18);
+  background: rgba(10, 10, 15, 0.06);
+  border: 1px solid rgba(10, 10, 15, 0.18);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -5229,8 +5229,8 @@
 }
 
 .admin-note-focused__section--history {
-  background: rgba(74, 124, 89, 0.06);
-  border: 1px solid rgba(74, 124, 89, 0.18);
+  background: rgba(10, 10, 15, 0.06);
+  border: 1px solid rgba(10, 10, 15, 0.18);
   border-radius: 12px;
   padding: 14px 16px;
 }
@@ -5269,7 +5269,7 @@
 
 .admin-search:focus-within {
   border-color: var(--indigo-400);
-  box-shadow: 0 0 0 3px rgba(139, 125, 186, 0.16);
+  box-shadow: 0 0 0 3px rgba(180, 155, 250, 0.16);
 }
 
 .admin-search__icon {
@@ -5360,7 +5360,7 @@
 
 .admin-facet-dd.is-open .admin-facet-dd__trigger {
   border-color: var(--indigo-700);
-  box-shadow: 0 0 0 3px rgba(139, 125, 186, 0.16);
+  box-shadow: 0 0 0 3px rgba(180, 155, 250, 0.16);
 }
 
 .admin-facet-dd__label {
@@ -5478,8 +5478,8 @@
 
 /* Recommendation section — salmon-tinted card. The action card. */
 .admin-decision-focused__section--rec {
-  background: linear-gradient(135deg, rgba(237, 105, 85, 0.1), rgba(237, 105, 85, 0.04));
-  border: 1px solid rgba(237, 105, 85, 0.45);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.1), rgba(105, 56, 239, 0.04));
+  border: 1px solid rgba(105, 56, 239, 0.45);
   border-left: 4px solid var(--salmon-dark);
   border-radius: 12px;
   padding: 14px 16px;
@@ -5579,12 +5579,12 @@
 }
 
 .admin-decision-focused__lint-block--suggested {
-  background: rgba(74, 124, 89, 0.06);
-  border-color: rgba(74, 124, 89, 0.3);
+  background: rgba(10, 10, 15, 0.06);
+  border-color: rgba(10, 10, 15, 0.3);
 }
 
 .admin-decision-focused__lint-block--suggested strong {
-  color: rgba(74, 124, 89, 0.9);
+  color: rgba(10, 10, 15, 0.9);
 }
 
 /* Phase 5z+15 — "What Claude will do" block for lint hits without a
@@ -5852,11 +5852,11 @@
   color: rgba(255, 255, 255, 0.85);
 }
 .admin-nav__sub.is-active {
-  background: rgba(237, 105, 85, 0.15);
+  background: rgba(105, 56, 239, 0.15);
   color: #fff;
 }
 .admin-nav__sub.is-active .admin-nav-badge {
-  background: var(--salmon, #ED6955);
+  background: var(--salmon, #6938EF);
   color: #fff;
 }
 
@@ -5922,7 +5922,7 @@
   margin: 0;
 }
 .admin-audit__count {
-  background: rgba(237, 105, 85, 0.18);
+  background: rgba(105, 56, 239, 0.18);
   border-radius: 999px;
   color: var(--salmon-dark);
   font: 700 11px var(--sans);
@@ -5934,8 +5934,8 @@
   padding: 4px 2px;
 }
 .admin-audit__row {
-  background: rgba(237, 105, 85, 0.04);
-  border: 1px solid rgba(237, 105, 85, 0.2);
+  background: rgba(105, 56, 239, 0.04);
+  border: 1px solid rgba(105, 56, 239, 0.2);
   border-radius: 10px;
   cursor: pointer;
   display: flex;
@@ -5948,12 +5948,12 @@
   width: 100%;
 }
 .admin-audit__row:hover {
-  background: rgba(237, 105, 85, 0.08);
-  border-color: rgba(237, 105, 85, 0.4);
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.4);
 }
 .admin-audit__row.is-active {
-  background: rgba(237, 105, 85, 0.14);
-  border-color: rgba(237, 105, 85, 0.6);
+  background: rgba(105, 56, 239, 0.14);
+  border-color: rgba(105, 56, 239, 0.6);
   border-left-width: 4px;
 }
 .admin-audit__row--gap {
@@ -6014,8 +6014,8 @@
    Phase 5z+18 — Summary lead block (quiz "What this question does")
    ============================================================================= */
 .admin-summary__lead {
-  background: linear-gradient(135deg, rgba(237, 105, 85, 0.08), rgba(237, 105, 85, 0.02));
-  border: 1px solid rgba(237, 105, 85, 0.35);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.08), rgba(105, 56, 239, 0.02));
+  border: 1px solid rgba(105, 56, 239, 0.35);
   border-left: 4px solid var(--salmon-dark);
   border-radius: 12px;
   margin: 14px 0 0;
@@ -6068,7 +6068,7 @@
 
 .admin-focused-note-form textarea:focus {
   border-color: var(--indigo-400);
-  box-shadow: 0 0 0 3px rgba(139, 125, 186, 0.16);
+  box-shadow: 0 0 0 3px rgba(180, 155, 250, 0.16);
   outline: none;
 }
 
@@ -6277,7 +6277,7 @@
 }
 .admin-chez__msg--admin {
   background: rgba(245, 224, 217, 0.5);
-  border-color: rgba(237, 105, 85, 0.25);
+  border-color: rgba(105, 56, 239, 0.25);
 }
 .admin-chez__msg-head {
   align-items: baseline;
@@ -6329,7 +6329,7 @@
   text-transform: uppercase;
 }
 .admin-chez__composer textarea {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border: 1px solid var(--border, #d8dadf);
   border-radius: 10px;
   color: var(--text);
@@ -6355,7 +6355,7 @@
   justify-content: space-between;
 }
 .admin-chez__composer-row select {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border: 1px solid var(--border, #d8dadf);
   border-radius: 8px;
   color: var(--text);
@@ -6415,8 +6415,8 @@
 }
 
 .admin-chez__proposal {
-  background: rgba(237, 105, 85, 0.06);
-  border: 1px solid rgba(237, 105, 85, 0.3);
+  background: rgba(105, 56, 239, 0.06);
+  border: 1px solid rgba(105, 56, 239, 0.3);
   border-radius: 10px;
   margin-top: 8px;
   padding: 10px 12px;
@@ -6520,7 +6520,7 @@
 }
 .admin-chez__dossier-chip {
   align-items: center;
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border: 1px solid var(--border, #edeef0);
   border-radius: 999px;
   cursor: pointer;
@@ -6531,7 +6531,7 @@
   transition: background-color 100ms ease;
 }
 .admin-chez__dossier-chip:hover {
-  background: rgba(237, 105, 85, 0.08);
+  background: rgba(105, 56, 239, 0.08);
 }
 .admin-chez__dossier-chip-title {
   font-weight: 600;
@@ -6540,7 +6540,7 @@
   color: var(--text-soft);
 }
 .admin-chez__dossier-chip-badge {
-  background: rgba(237, 105, 85, 0.18);
+  background: rgba(105, 56, 239, 0.18);
   border-radius: 999px;
   color: rgb(196, 60, 40);
   font: 700 9px var(--sans);
@@ -6548,7 +6548,7 @@
   text-transform: uppercase;
 }
 .admin-chez__chez-badge {
-  background: rgba(237, 105, 85, 0.18);
+  background: rgba(105, 56, 239, 0.18);
   border-radius: 999px;
   color: rgb(196, 60, 40);
   font: 700 9px var(--sans);
@@ -6718,7 +6718,7 @@
 /* Proposal builder modal */
 
 .admin-chez__proposal-tabs {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border-radius: 10px;
   display: flex;
   gap: 2px;
@@ -6753,7 +6753,7 @@
 }
 .admin-chez__proposal-tab-pane input,
 .admin-chez__proposal-tab-pane textarea {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border: 1px solid var(--border, #d8dadf);
   border-radius: 8px;
   font: 400 14px var(--sans);
@@ -6783,7 +6783,7 @@
   margin: 0;
 }
 .admin-chez__proposal-existing {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border-radius: 10px;
   margin-bottom: 14px;
   padding: 10px 12px;
@@ -6811,7 +6811,7 @@
   padding: 4px 10px;
 }
 .admin-chez__proposal-existing-chip:hover {
-  background: rgba(237, 105, 85, 0.08);
+  background: rgba(105, 56, 239, 0.08);
 }
 .admin-chez__proposal-vendor-row {
   background: var(--surface, #fff);
@@ -6843,7 +6843,7 @@
   font-size: 11px;
 }
 .admin-chez__proposal-ai-suggest {
-  background: rgba(237, 105, 85, 0.12);
+  background: rgba(105, 56, 239, 0.12);
   border: 0;
   border-radius: 999px;
   color: rgb(196, 60, 40);
@@ -6852,7 +6852,7 @@
   padding: 3px 10px;
 }
 .admin-chez__proposal-ai-suggest:hover {
-  background: rgba(237, 105, 85, 0.22);
+  background: rgba(105, 56, 239, 0.22);
 }
 .admin-chez__proposal-ai-suggest:disabled {
   opacity: 0.6;
@@ -6918,7 +6918,7 @@
 }
 .admin-chez__vendor-picker-row {
   align-items: center;
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border: 1px solid var(--border, #edeef0);
   border-radius: 10px;
   cursor: pointer;
@@ -6932,7 +6932,7 @@
   width: 100%;
 }
 .admin-chez__vendor-picker-row:hover {
-  background: rgba(237, 105, 85, 0.08);
+  background: rgba(105, 56, 239, 0.08);
 }
 .admin-chez__vendor-picker-row.is-picked {
   background: rgba(34, 197, 94, 0.14);
@@ -7027,8 +7027,8 @@
 /* AI analysis panel */
 
 .admin-chez__analysis {
-  background: linear-gradient(135deg, rgba(237, 105, 85, 0.06) 0%, rgba(245, 224, 217, 0.4) 100%);
-  border: 1px solid rgba(237, 105, 85, 0.18);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.06) 0%, rgba(245, 224, 217, 0.4) 100%);
+  border: 1px solid rgba(105, 56, 239, 0.18);
   border-radius: 14px;
   padding: 14px 16px;
 }
@@ -7176,7 +7176,7 @@ details.admin-chez__analysis-section pre {
 .admin-chez__vendor-call-form input,
 .admin-chez__vendor-call-form select,
 .admin-chez__vendor-call-form textarea {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border: 1px solid var(--border, #d8dadf);
   border-radius: 8px;
   font: 400 13px var(--sans);
@@ -7228,7 +7228,7 @@ details.admin-chez__analysis-section pre {
 /* Phase 81.2 — Multi-slot availability picker + cost combobox */
 
 .admin-chez__slot-section {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border-radius: 8px;
   margin-bottom: 12px;
   padding: 10px 12px;
@@ -7265,7 +7265,7 @@ details.admin-chez__analysis-section pre {
 
 .admin-chez__vendor-call-form select {
   appearance: none;
-  background: var(--bg, #f8f9fa) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23677' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 10px center;
+  background: var(--bg, #FAFAFC) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23677' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") no-repeat right 10px center;
   padding-right: 28px;
 }
 
@@ -7312,10 +7312,10 @@ details.admin-chez__analysis-section pre {
 }
 .admin-chez__stage:hover { transform: translateY(-1px); }
 .admin-chez__stage:hover .admin-chez__stage-label {
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
 }
 .admin-chez__stage:focus-visible {
-  outline: 2px solid var(--indigo-500, #6B5AA0);
+  outline: 2px solid var(--indigo-500, #6B6B7B);
   outline-offset: 4px;
   border-radius: 6px;
 }
@@ -7368,7 +7368,7 @@ details.admin-chez__analysis-section pre {
   background: rgb(237, 105, 85);
   border-color: rgb(237, 105, 85);
   color: #fff;
-  box-shadow: 0 0 0 4px rgba(237, 105, 85, 0.18);
+  box-shadow: 0 0 0 4px rgba(105, 56, 239, 0.18);
 }
 .admin-chez__stage.is-current .admin-chez__stage-label {
   color: rgb(196, 60, 40);
@@ -7433,7 +7433,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-chez__visit-slots {
   align-items: center;
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border-radius: 8px;
   display: flex;
   flex-wrap: wrap;
@@ -7455,8 +7455,8 @@ details.admin-chez__analysis-section pre {
   transition: background-color 100ms ease;
 }
 .admin-chez__visit-slot-chip:hover {
-  background: rgba(237, 105, 85, 0.08);
-  border-color: rgba(237, 105, 85, 0.3);
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.3);
 }
 .admin-chez__visit-grid {
   display: grid;
@@ -7471,7 +7471,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-chez__visit-card input,
 .admin-chez__visit-card textarea {
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border: 1px solid var(--border, #d8dadf);
   border-radius: 8px;
   font: 400 13px var(--sans);
@@ -7519,7 +7519,7 @@ details.admin-chez__analysis-section pre {
 .admin-chez__analysis--collapsed-line {
   align-items: center;
   background: rgba(245, 224, 217, 0.3);
-  border: 1px solid rgba(237, 105, 85, 0.15);
+  border: 1px solid rgba(105, 56, 239, 0.15);
   border-radius: 10px;
   display: flex;
   flex-wrap: wrap;
@@ -7541,7 +7541,7 @@ details.admin-chez__analysis-section pre {
  * admin view with a desktop 4-pane layout per the design handoff.
  *
  * Tokens used:
- *   --indigo (#453A70), --salmon (#ED6955), --pearl (#F8F9FA), --white,
+ *   --indigo (#6938EF), --salmon (#6938EF), --pearl (#FAFAFC), --white,
  *   --indigo-50/100/500/600/700/800/900, --salmon-pale/light/50/dark,
  *   --neutral-200/300/400/500, --text/-muted/-soft.
  *
@@ -7591,9 +7591,9 @@ details.admin-chez__analysis-section pre {
   min-height: 720px;
   width: 100%;
   max-width: 100%;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   font-family: var(--sans, system-ui);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   overflow: hidden;
 }
 .cockpit-body {
@@ -7631,7 +7631,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-topbar__mark {
   width: 28px; height: 28px;
   border-radius: 7px;
-  background: var(--indigo, #453A70);
+  background: var(--indigo, #6938EF);
   color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--serif, Georgia);
@@ -7642,14 +7642,14 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-weight: 600;
   font-size: 16px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: -0.01em;
   margin-right: 4px;
 }
 .cockpit-topbar__eyebrow {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -7666,7 +7666,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-topbar__agent {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 
 .cockpit-search {
@@ -7682,11 +7682,11 @@ details.admin-chez__analysis-section pre {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .cockpit-search:focus-within {
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
   box-shadow: 0 0 0 3px rgba(69, 58, 112, 0.08);
 }
 .cockpit-search__icon {
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-size: 13px;
 }
 .cockpit-search input {
@@ -7695,13 +7695,13 @@ details.admin-chez__analysis-section pre {
   outline: none;
   background: transparent;
   font-size: 12px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   font-family: inherit;
 }
-.cockpit-search input::placeholder { color: var(--text-muted, #6F6A88); }
+.cockpit-search input::placeholder { color: var(--text-muted, #6B6B7B); }
 .cockpit-search__hint {
   font-size: 10px;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-weight: 600;
   letter-spacing: 0.06em;
 }
@@ -7729,50 +7729,50 @@ details.admin-chez__analysis-section pre {
 .cockpit-btn--full { width: 100%; }
 
 .cockpit-btn--primary {
-  background: var(--salmon, #ED6955);
+  background: var(--salmon, #6938EF);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(237, 105, 85, 0.28);
+  box-shadow: 0 4px 12px rgba(105, 56, 239, 0.28);
 }
 .cockpit-btn--primary:hover {
-  background: var(--salmon-dark, #D14E3E);
+  background: var(--salmon-dark, #5025D1);
 }
 .cockpit-btn--indigo {
-  background: var(--indigo, #453A70);
+  background: var(--indigo, #6938EF);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(42, 34, 82, 0.18);
+  box-shadow: 0 4px 12px rgba(15, 10, 40, 0.18);
 }
-.cockpit-btn--indigo:hover { background: var(--indigo-700, #524580); }
+.cockpit-btn--indigo:hover { background: var(--indigo-700, #8B6FF5); }
 .cockpit-btn--secondary {
   background: #fff;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   border: 1px solid var(--neutral-300, #D8DADF);
 }
 .cockpit-btn--secondary:hover {
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
 }
 .cockpit-btn--ghost {
   background: transparent;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
 }
 .cockpit-btn--ghost:hover { background: rgba(69, 58, 112, 0.06); }
 .cockpit-btn--ai {
-  background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F2 100%);
-  color: var(--indigo, #453A70);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: linear-gradient(135deg, #FFFFFF 0%, #F4F0FE 100%);
+  color: var(--indigo, #6938EF);
+  border: 1px solid var(--indigo-100, #DDD3FA);
 }
 .cockpit-btn--ai:hover {
-  border-color: var(--indigo-500, #6B5AA0);
+  border-color: var(--indigo-500, #6B6B7B);
 }
 .cockpit-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 .cockpit-spark {
   display: inline-block;
   font-size: 12px;
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
   line-height: 1;
 }
 .cockpit-spark--sm  { font-size: 10px; }
-.cockpit-spark--light { color: var(--salmon-light, #F4877B); }
+.cockpit-spark--light { color: var(--salmon-light, #B49BFA); }
 
 /* ===== Pills (cockpit) ===================================================== */
 
@@ -7783,27 +7783,27 @@ details.admin-chez__analysis-section pre {
   padding: 3px 9px;
   border-radius: 999px;
   background: #F1F2F4;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.005em;
   white-space: nowrap;
 }
 .cockpit-pill--xs { padding: 1px 7px; font-size: 9.5px; }
-.cockpit-pill--success  { background: rgba(74, 124, 89, 0.12); color: #3F6A4D; }
+.cockpit-pill--success  { background: rgba(10, 10, 15, 0.12); color: #3F6A4D; }
 .cockpit-pill--warning  { background: rgba(199, 126, 46, 0.14); color: #A76420; }
 .cockpit-pill--critical { background: rgba(194, 90, 94, 0.14); color: #9F4448; }
 .cockpit-pill--info     { background: rgba(90, 141, 181, 0.14); color: #406F94; }
-.cockpit-pill--salmon   { background: var(--salmon-pale, #FFE8E2); color: #9B3A2A; }
-.cockpit-pill--indigo   { background: var(--indigo-50, #F2EFF8); color: var(--indigo, #453A70); }
-.cockpit-pill--neutral  { background: #F1F2F4; color: var(--text-muted, #6F6A88); }
-.cockpit-pill--solid-salmon { background: var(--salmon, #ED6955); color: #fff; }
+.cockpit-pill--salmon   { background: var(--salmon-pale, #EFEAFE); color: #2A0F75; }
+.cockpit-pill--indigo   { background: var(--indigo-50, #F4F0FE); color: var(--indigo, #6938EF); }
+.cockpit-pill--neutral  { background: #F1F2F4; color: var(--text-muted, #6B6B7B); }
+.cockpit-pill--solid-salmon { background: var(--salmon, #6938EF); color: #fff; }
 /* Phase 2.5: salmon-tinted "Quiz" badge on requests sourced from the
  * homeowner's House Quiz. Distinct from `salmon` so operators can tell
  * the wave apart at a glance without crowding the other tones. */
 .cockpit-pill--quiz {
-  background: rgba(237, 105, 85, 0.12);
-  color: var(--salmon-dark, #D14E3E);
+  background: rgba(105, 56, 239, 0.12);
+  color: var(--salmon-dark, #5025D1);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -7815,8 +7815,8 @@ details.admin-chez__analysis-section pre {
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(237, 105, 85, 0.08);
-  color: var(--salmon-dark, #D14E3E);
+  background: rgba(105, 56, 239, 0.08);
+  color: var(--salmon-dark, #5025D1);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -7829,7 +7829,7 @@ details.admin-chez__analysis-section pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--indigo, #453A70);
+  background: var(--indigo, #6938EF);
   color: #fff;
   font-family: var(--serif, Georgia);
   font-weight: 700;
@@ -7837,18 +7837,18 @@ details.admin-chez__analysis-section pre {
   flex: none;
   border-radius: 50%;
 }
-.cockpit-avatar--sm { width: 28px; height: 28px; font-size: 11px; background: var(--indigo-600, #5D4C8F); }
+.cockpit-avatar--sm { width: 28px; height: 28px; font-size: 11px; background: var(--indigo-600, #7A55F0); }
 .cockpit-avatar--md { width: 30px; height: 30px; font-size: 12px; border-radius: 8px; }
 .cockpit-avatar--lg { width: 44px; height: 44px; font-size: 16px; border-radius: 50%; }
-.cockpit-avatar--soft   { background: var(--indigo-100, #E8E4F2); color: var(--indigo, #453A70); }
-.cockpit-avatar--vendor { background: var(--indigo-500, #6B5AA0); border-radius: 8px; }
-.cockpit-avatar--indigo { background: var(--indigo, #453A70); }
+.cockpit-avatar--soft   { background: var(--indigo-100, #DDD3FA); color: var(--indigo, #6938EF); }
+.cockpit-avatar--vendor { background: var(--indigo-500, #6B6B7B); border-radius: 8px; }
+.cockpit-avatar--indigo { background: var(--indigo, #6938EF); }
 
 .cockpit-icon-tile {
   width: 30px; height: 30px;
   border-radius: 8px;
-  background: var(--indigo-50, #F2EFF8);
-  color: var(--indigo, #453A70);
+  background: var(--indigo-50, #F4F0FE);
+  color: var(--indigo, #6938EF);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -7873,7 +7873,7 @@ details.admin-chez__analysis-section pre {
   height: 26px;
   border: 0;
   background: transparent;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-family: inherit;
   font-weight: 600;
   font-size: 12px;
@@ -7886,11 +7886,11 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-tab.is-active {
   background: #fff;
-  color: var(--text, #2A2252);
-  box-shadow: 0 1px 2px rgba(42, 34, 82, 0.08);
+  color: var(--text, #0A0A0A);
+  box-shadow: 0 1px 2px rgba(15, 10, 40, 0.08);
 }
 .cockpit-tab__count {
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-weight: 500;
   font-size: 11px;
 }
@@ -7901,7 +7901,7 @@ details.admin-chez__analysis-section pre {
   background: #fff;
   border-radius: 14px;
   border: 1px solid var(--neutral-200, #EDEEF0);
-  box-shadow: 0 1px 3px rgba(42, 34, 82, 0.04);
+  box-shadow: 0 1px 3px rgba(15, 10, 40, 0.04);
   overflow: hidden;
   margin-bottom: 16px;
 }
@@ -7915,12 +7915,12 @@ details.admin-chez__analysis-section pre {
   font-size: 10px;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
 }
 .cockpit-eyebrow--inline { margin: 0; display: inline; }
 .cockpit-eyebrow--space { margin-top: 22px; }
 .cockpit-eyebrow__count {
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
@@ -7943,7 +7943,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-row--clickable { cursor: pointer; transition: background 0.15s; }
 .cockpit-row--clickable:hover { background: rgba(69, 58, 112, 0.03); }
 .cockpit-row.is-highlight {
-  background: var(--salmon-50, #FFF5F2);
+  background: var(--salmon-50, #F4F0FE);
 }
 .cockpit-row__accent {
   position: absolute;
@@ -7952,7 +7952,7 @@ details.admin-chez__analysis-section pre {
   bottom: 6px;
   width: 3px;
   border-radius: 2px;
-  background: var(--salmon, #ED6955);
+  background: var(--salmon, #6938EF);
 }
 .cockpit-row__main {
   flex: 1;
@@ -7961,49 +7961,49 @@ details.admin-chez__analysis-section pre {
 .cockpit-row__title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .cockpit-row__sub {
   font-size: 11px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .cockpit-row__meta {
   font-size: 11px;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-weight: 600;
   flex: none;
 }
 .cockpit-row--note { padding-top: 10px; padding-bottom: 10px; }
 .cockpit-row__note-author { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.cockpit-row__note-author > span:first-child { font-weight: 600; font-size: 11px; color: var(--text, #2A2252); }
-.cockpit-row__note-time { font-size: 11px; color: var(--text-soft, #9C98AD); }
-.cockpit-row__note-text { font-size: 12px; color: var(--text-muted, #6F6A88); line-height: 1.5; }
+.cockpit-row__note-author > span:first-child { font-weight: 600; font-size: 11px; color: var(--text, #0A0A0A); }
+.cockpit-row__note-time { font-size: 11px; color: var(--text-soft, #A1A1AC); }
+.cockpit-row__note-text { font-size: 12px; color: var(--text-muted, #6B6B7B); line-height: 1.5; }
 
 .cockpit-coverage { display: flex; gap: 2px; flex: none; }
 .cockpit-coverage__seg {
   width: 4px; height: 12px; border-radius: 2px;
   background: var(--neutral-200, #EDEEF0);
 }
-.cockpit-coverage__seg.is-on { background: var(--salmon, #ED6955); }
+.cockpit-coverage__seg.is-on { background: var(--salmon, #6938EF); }
 
 .cockpit-stars {
-  font-size: 11px; color: var(--warning, #C77E2E); font-weight: 600;
+  font-size: 11px; color: var(--warning, #6938EF); font-weight: 600;
 }
 
-.cockpit-muted { color: var(--text-muted, #6F6A88); font-size: 12px; }
+.cockpit-muted { color: var(--text-muted, #6B6B7B); font-size: 12px; }
 
 /* ===== Queue rail (304px) ================================================== */
 
 .cockpit-queue {
   width: 304px;
   flex: none;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   border-right: 1px solid var(--neutral-200, #EDEEF0);
   display: flex;
   flex-direction: column;
@@ -8028,19 +8028,19 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-size: 17px;
   font-weight: 600;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: -0.01em;
 }
 .cockpit-queue__refresh {
   background: transparent;
   border: 0;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
 }
-.cockpit-queue__refresh:hover { color: var(--indigo, #453A70); }
+.cockpit-queue__refresh:hover { color: var(--indigo, #6938EF); }
 
 .cockpit-queue__stats {
   padding: 4px 14px 12px;
@@ -8060,15 +8060,15 @@ details.admin-chez__analysis-section pre {
   font-size: 18px;
   line-height: 1;
   letter-spacing: -0.02em;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
 }
-.cockpit-stat[data-tone="critical"] .cockpit-stat__num { color: var(--critical, #C25A5E); }
-.cockpit-stat[data-tone="salmon"] .cockpit-stat__num   { color: var(--salmon-dark, #D14E3E); }
+.cockpit-stat[data-tone="critical"] .cockpit-stat__num { color: var(--critical, #0A0A0A); }
+.cockpit-stat[data-tone="salmon"] .cockpit-stat__num   { color: var(--salmon-dark, #5025D1); }
 .cockpit-stat__label {
   margin-top: 4px;
   font-size: 9.5px;
   font-weight: 600;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -8084,7 +8084,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-queue__empty {
   padding: 20px 12px;
   font-size: 12px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   text-align: center;
 }
 
@@ -8104,7 +8104,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-queue__case.is-active {
   background: #fff;
   border-color: var(--neutral-200, #EDEEF0);
-  box-shadow: 0 1px 3px rgba(42, 34, 82, 0.06);
+  box-shadow: 0 1px 3px rgba(15, 10, 40, 0.06);
 }
 .cockpit-queue__case-accent {
   position: absolute;
@@ -8113,7 +8113,7 @@ details.admin-chez__analysis-section pre {
   bottom: 12px;
   width: 3px;
   border-radius: 2px;
-  background: var(--salmon, #ED6955);
+  background: var(--salmon, #6938EF);
 }
 .cockpit-queue__case-top {
   display: flex;
@@ -8126,19 +8126,19 @@ details.admin-chez__analysis-section pre {
 .cockpit-queue__case-type {
   flex: 1;
   font-weight: 700;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .cockpit-queue__case-id {
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-weight: 600;
   font-family: ui-monospace, "SF Mono", monospace;
 }
 .cockpit-queue__case-title {
   font-weight: 600;
   font-size: 13px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.35;
   margin-bottom: 6px;
   display: -webkit-box;
@@ -8153,20 +8153,20 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-queue__case-awaiting {
   font-size: 10px;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-weight: 500;
 }
 
 .cockpit-tip {
   margin: 8px 6px 0;
   padding: 12px;
-  background: linear-gradient(135deg, #FFF5F2 0%, #F2EFF8 100%);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: linear-gradient(135deg, #F4F0FE 0%, #F4F0FE 100%);
+  border: 1px solid var(--indigo-100, #DDD3FA);
   border-radius: 10px;
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
 }
-.cockpit-tip:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(42, 34, 82, 0.08); }
+.cockpit-tip:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15, 10, 40, 0.08); }
 .cockpit-tip__head {
   display: flex;
   align-items: center;
@@ -8178,11 +8178,11 @@ details.admin-chez__analysis-section pre {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
 }
 .cockpit-tip__body {
   font-size: 12px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.5;
 }
 
@@ -8194,11 +8194,11 @@ details.admin-chez__analysis-section pre {
   border-right: 1px solid var(--neutral-200, #EDEEF0);
   overflow-y: auto;
   padding: 20px 18px;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
 }
 .cockpit-homeowner__loading {
   padding: 20px 4px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-size: 13px;
 }
 .cockpit-homeowner__profile {
@@ -8219,13 +8219,13 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-weight: 600;
   font-size: 17px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: -0.012em;
   line-height: 1.2;
 }
 .cockpit-homeowner__sub {
   font-size: 11px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   margin-top: 2px;
 }
 .cockpit-homeowner__kv {
@@ -8239,26 +8239,26 @@ details.admin-chez__analysis-section pre {
 .cockpit-homeowner__kv > div {
   display: contents;
 }
-.cockpit-homeowner__kv span { color: var(--text-soft, #9C98AD); font-weight: 500; }
-.cockpit-homeowner__kv strong { color: var(--text, #2A2252); font-weight: 500; }
+.cockpit-homeowner__kv span { color: var(--text-soft, #A1A1AC); font-weight: 500; }
+.cockpit-homeowner__kv strong { color: var(--text, #0A0A0A); font-weight: 500; }
 .cockpit-homeowner__strip {
   display: flex;
   justify-content: space-between;
   padding: 12px 16px;
-  background: var(--indigo-50, #F2EFF8);
+  background: var(--indigo-50, #F4F0FE);
 }
 .cockpit-homeowner__strip-label {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
 }
 .cockpit-homeowner__strip-num {
   font-family: var(--serif, Georgia);
   font-weight: 700;
   font-size: 22px;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
@@ -8266,7 +8266,7 @@ details.admin-chez__analysis-section pre {
   padding: 10px 16px;
   border-top: 1px solid var(--neutral-200, #EDEEF0);
   font-size: 11px;
-  color: var(--warning, #C77E2E);
+  color: var(--warning, #6938EF);
   font-weight: 600;
   background: rgba(199, 126, 46, 0.06);
 }
@@ -8282,7 +8282,7 @@ details.admin-chez__analysis-section pre {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   overflow: hidden;
 }
 .cockpit-workspace--empty { align-items: center; justify-content: center; }
@@ -8295,12 +8295,12 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-size: 22px;
   font-weight: 600;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   margin: 0 0 12px;
 }
 .cockpit-empty p {
   font-size: 14px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   line-height: 1.5;
   margin: 0;
 }
@@ -8336,7 +8336,7 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-case-header__opened {
   font-size: 11px;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-weight: 500;
 }
 .cockpit-case-header__title {
@@ -8345,7 +8345,7 @@ details.admin-chez__analysis-section pre {
   font-weight: 600;
   font-size: 26px;
   letter-spacing: -0.018em;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.15;
   grid-row: 2;
   grid-column: 1;
@@ -8368,15 +8368,15 @@ details.admin-chez__analysis-section pre {
   border-radius: 16px;
   overflow: hidden;
   /* Phase 83.2 — deeper indigo background so the body text reads at full
-     contrast. The previous --indigo (#453A70) plus low-opacity white text
+     contrast. The previous --indigo (#6938EF) plus low-opacity white text
      looked grey-on-purple; bumping to indigo-900 fixes that. */
-  background: var(--indigo-900, #2A2252);
+  background: var(--indigo-900, #0A0A0A);
   color: #fff;
-  box-shadow: 0 8px 24px rgba(42, 34, 82, 0.18);
+  box-shadow: 0 8px 24px rgba(15, 10, 40, 0.18);
 }
 .cockpit-brief--loading,
 .cockpit-brief--empty {
-  background: var(--indigo-800, #332860);
+  background: var(--indigo-800, #2A0F75);
 }
 .cockpit-brief__overlay {
   position: absolute;
@@ -8384,8 +8384,8 @@ details.admin-chez__analysis-section pre {
   pointer-events: none;
   /* Phase 83.2 — softer mesh so it doesn't fight the body text. */
   background:
-    radial-gradient(60% 80% at 100% 0%, rgba(237, 105, 85, 0.20), transparent 60%),
-    radial-gradient(70% 90% at 0% 100%, rgba(139, 125, 186, 0.22), transparent 60%);
+    radial-gradient(60% 80% at 100% 0%, rgba(105, 56, 239, 0.20), transparent 60%),
+    radial-gradient(70% 90% at 0% 100%, rgba(180, 155, 250, 0.22), transparent 60%);
 }
 .cockpit-brief__inner {
   position: relative;
@@ -8402,7 +8402,7 @@ details.admin-chez__analysis-section pre {
   font-size: 10px;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--salmon-light, #F4877B);
+  color: var(--salmon-light, #B49BFA);
 }
 .cockpit-brief__refreshed {
   font-size: 11px;
@@ -8447,8 +8447,8 @@ details.admin-chez__analysis-section pre {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--indigo-50, #F2EFF8);
-  color: var(--indigo, #453A70);
+  background: var(--indigo-50, #F4F0FE);
+  color: var(--indigo, #6938EF);
   font-size: 9px;
   font-weight: 700;
   margin-left: 3px;
@@ -8477,7 +8477,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-brief__tab:hover { color: rgba(255, 255, 255, 0.92); }
 .cockpit-brief__tab.is-active {
   color: #fff;
-  border-bottom-color: var(--salmon, #ED6955);
+  border-bottom-color: var(--salmon, #6938EF);
 }
 .cockpit-brief__body {
   /* Phase 83.2 — bumped from .86 to .96 so the body text reads at full
@@ -8517,7 +8517,7 @@ details.admin-chez__analysis-section pre {
   background: #fff;
   border-radius: 14px;
   border: 1px solid var(--neutral-200, #EDEEF0);
-  border-left: 3px solid var(--salmon, #ED6955);
+  border-left: 3px solid var(--salmon, #6938EF);
 }
 .cockpit-nonvendor__head {
   display: flex;
@@ -8527,14 +8527,14 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-nonvendor__head .cockpit-eyebrow {
   margin: 0;
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
 }
 .cockpit-nonvendor__headline {
   margin: 0 0 12px;
   font-family: var(--serif, Georgia);
   font-size: 20px;
   font-weight: 500;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: -0.012em;
   line-height: 1.3;
   text-wrap: pretty;
@@ -8543,7 +8543,7 @@ details.admin-chez__analysis-section pre {
   margin: 0 0 14px;
   padding-left: 18px;
   font-size: 13px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   line-height: 1.7;
 }
 .cockpit-nonvendor__actions {
@@ -8566,7 +8566,7 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-weight: 600;
   font-size: 18px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: -0.012em;
 }
 .cockpit-vendors__head p {
@@ -8575,7 +8575,7 @@ details.admin-chez__analysis-section pre {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 .cockpit-vendors__head-actions {
   display: flex;
@@ -8595,9 +8595,9 @@ details.admin-chez__analysis-section pre {
   overflow: hidden;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.cockpit-vendor:hover { box-shadow: 0 4px 12px rgba(42, 34, 82, 0.06); }
-.cockpit-vendor.is-recommended { border-color: var(--success, #4A7C59); }
-.cockpit-vendor.is-noanswer { border-color: var(--warning, #C77E2E); }
+.cockpit-vendor:hover { box-shadow: 0 4px 12px rgba(15, 10, 40, 0.06); }
+.cockpit-vendor.is-recommended { border-color: var(--success, #0A0A0A); }
+.cockpit-vendor.is-noanswer { border-color: var(--warning, #6938EF); }
 
 .cockpit-vendor__head {
   display: grid;
@@ -8614,7 +8614,7 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-size: 18px;
   font-weight: 700;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   letter-spacing: -0.02em;
 }
 .cockpit-vendor__title { min-width: 0; }
@@ -8626,11 +8626,11 @@ details.admin-chez__analysis-section pre {
   font-size: 14px;
   margin-bottom: 2px;
 }
-.cockpit-vendor__name strong { font-weight: 600; color: var(--text, #2A2252); }
+.cockpit-vendor__name strong { font-weight: 600; color: var(--text, #0A0A0A); }
 .cockpit-vendor__reviews { font-size: 11px; }
 .cockpit-vendor__meta {
   font-size: 12px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -8649,9 +8649,9 @@ details.admin-chez__analysis-section pre {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.cockpit-vendor__fit-label[data-tone="success"] { color: var(--success, #4A7C59); }
-.cockpit-vendor__fit-label[data-tone="warning"] { color: var(--warning, #C77E2E); }
-.cockpit-vendor__fit-label[data-tone="muted"]   { color: var(--text-muted, #6F6A88); }
+.cockpit-vendor__fit-label[data-tone="success"] { color: var(--success, #0A0A0A); }
+.cockpit-vendor__fit-label[data-tone="warning"] { color: var(--warning, #6938EF); }
+.cockpit-vendor__fit-label[data-tone="muted"]   { color: var(--text-muted, #6B6B7B); }
 .cockpit-fit-meter {
   width: 56px;
   height: 4px;
@@ -8662,10 +8662,10 @@ details.admin-chez__analysis-section pre {
 .cockpit-fit-meter__fill {
   height: 100%;
   border-radius: 2px;
-  background: var(--success, #4A7C59);
+  background: var(--success, #0A0A0A);
 }
-.cockpit-fit-meter__fill[data-tone="warning"] { background: var(--warning, #C77E2E); }
-.cockpit-fit-meter__fill[data-tone="muted"]   { background: var(--text-muted, #6F6A88); }
+.cockpit-fit-meter__fill[data-tone="warning"] { background: var(--warning, #6938EF); }
+.cockpit-fit-meter__fill[data-tone="muted"]   { background: var(--text-muted, #6B6B7B); }
 
 .cockpit-vendor__cta {
   display: flex;
@@ -8679,19 +8679,19 @@ details.admin-chez__analysis-section pre {
   gap: 8px;
   padding: 0 14px 12px 58px;
   font-size: 12px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   line-height: 1.5;
   align-items: flex-start;
 }
 .cockpit-vendor__reasoning b {
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   font-weight: 600;
 }
 
 .cockpit-vendor__form {
   border-top: 1px solid var(--neutral-200, #EDEEF0);
   padding: 16px;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
 }
 .cockpit-vendor__grid-3 {
   display: grid;
@@ -8705,7 +8705,7 @@ details.admin-chez__analysis-section pre {
   gap: 5px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   letter-spacing: 0.02em;
 }
 .cockpit-vendor__form label.is-hidden { display: none; }
@@ -8716,7 +8716,7 @@ details.admin-chez__analysis-section pre {
   border: 1px solid var(--neutral-300, #D8DADF);
   border-radius: 10px;
   background: #fff;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   font-family: inherit;
   font-size: 13px;
   font-weight: 400;
@@ -8726,7 +8726,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-vendor__form input:focus,
 .cockpit-vendor__form select:focus,
 .cockpit-vendor__form textarea:focus {
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
   box-shadow: 0 0 0 3px rgba(69, 58, 112, 0.08);
 }
 .cockpit-vendor__form textarea {
@@ -8742,29 +8742,29 @@ details.admin-chez__analysis-section pre {
   padding: 10px 12px;
   border-radius: 10px;
   margin-bottom: 12px;
-  background: var(--indigo-50, #F2EFF8);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  border: 1px solid var(--indigo-100, #DDD3FA);
 }
 .cockpit-voice-banner.is-listening {
-  background: var(--salmon-50, #FFF5F2);
-  border-color: var(--salmon-pale, #FFE8E2);
+  background: var(--salmon-50, #F4F0FE);
+  border-color: var(--salmon-pale, #EFEAFE);
 }
 .cockpit-voice-btn {
   width: 32px; height: 32px;
   border-radius: 50%;
   border: 0;
   cursor: pointer;
-  background: var(--indigo, #453A70);
+  background: var(--indigo, #6938EF);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .cockpit-voice-btn:disabled { cursor: not-allowed; opacity: 0.6; }
-.cockpit-voice-banner.is-listening .cockpit-voice-btn { background: var(--salmon, #ED6955); }
+.cockpit-voice-banner.is-listening .cockpit-voice-btn { background: var(--salmon, #6938EF); }
 .cockpit-voice-text { flex: 1; min-width: 0; }
-.cockpit-voice-text strong { display: block; font-size: 12px; font-weight: 600; color: var(--text, #2A2252); }
-.cockpit-voice-text span { display: block; font-size: 11px; color: var(--text-muted, #6F6A88); margin-top: 1px; }
+.cockpit-voice-text strong { display: block; font-size: 12px; font-weight: 600; color: var(--text, #0A0A0A); }
+.cockpit-voice-text span { display: block; font-size: 11px; color: var(--text-muted, #6B6B7B); margin-top: 1px; }
 
 .cockpit-vendor__slots { margin-bottom: 12px; }
 .cockpit-vendor__slots-head {
@@ -8773,7 +8773,7 @@ details.admin-chez__analysis-section pre {
   justify-content: space-between;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   margin-bottom: 6px;
 }
 .cockpit-slot-row {
@@ -8789,7 +8789,7 @@ details.admin-chez__analysis-section pre {
   background: #fff;
   font-size: 12px;
   font-family: inherit;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .cockpit-slot-remove {
   width: 28px; height: 28px;
@@ -8797,7 +8797,7 @@ details.admin-chez__analysis-section pre {
   background: #fff;
   border-radius: 8px;
   cursor: pointer;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-size: 14px;
   font-family: inherit;
 }
@@ -8813,12 +8813,12 @@ details.admin-chez__analysis-section pre {
   justify-content: space-between;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 .cockpit-suggest-btn {
-  border: 1px solid var(--indigo-100, #E8E4F2);
-  background: linear-gradient(135deg, #fff, #FFF5F2);
-  color: var(--indigo, #453A70);
+  border: 1px solid var(--indigo-100, #DDD3FA);
+  background: linear-gradient(135deg, #fff, #F4F0FE);
+  color: var(--indigo, #6938EF);
   font-size: 11px;
   font-weight: 600;
   padding: 4px 10px;
@@ -8829,7 +8829,7 @@ details.admin-chez__analysis-section pre {
   align-items: center;
   gap: 4px;
 }
-.cockpit-suggest-btn:hover { border-color: var(--indigo, #453A70); }
+.cockpit-suggest-btn:hover { border-color: var(--indigo, #6938EF); }
 .cockpit-vendor__form-actions {
   display: flex;
   align-items: center;
@@ -8841,7 +8841,7 @@ details.admin-chez__analysis-section pre {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   font-weight: 500;
 }
 
@@ -8851,7 +8851,7 @@ details.admin-chez__analysis-section pre {
   margin-top: 16px;
   padding: 16px;
   background: linear-gradient(180deg, #fff, #FAF7F1);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  border: 1px solid var(--indigo-100, #DDD3FA);
   border-radius: 14px;
 }
 .cockpit-preview__head {
@@ -8871,7 +8871,7 @@ details.admin-chez__analysis-section pre {
   margin: 0 0 10px;
   font-family: var(--serif, Georgia);
   font-size: 16px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.4;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -8887,7 +8887,7 @@ details.admin-chez__analysis-section pre {
   border: 1px solid var(--neutral-200, #EDEEF0);
   border-radius: 10px;
 }
-.cockpit-preview__card strong { display: block; font-size: 13px; font-weight: 600; color: var(--text, #2A2252); }
+.cockpit-preview__card strong { display: block; font-size: 13px; font-weight: 600; color: var(--text, #0A0A0A); }
 .cockpit-preview__card .cockpit-muted { font-size: 11px; margin-top: 2px; }
 
 /* ----- Conversation pane --------------------------------------------------- */
@@ -8904,7 +8904,7 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-weight: 600;
   font-size: 18px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: -0.012em;
 }
 
@@ -8920,14 +8920,14 @@ details.admin-chez__analysis-section pre {
   gap: 8px;
   margin-bottom: 4px;
 }
-.cockpit-msg__head strong { font-size: 13px; font-weight: 600; color: var(--text, #2A2252); }
+.cockpit-msg__head strong { font-size: 13px; font-weight: 600; color: var(--text, #0A0A0A); }
 .cockpit-msg__bubble {
   padding: 14px;
   background: #fff;
   border: 1px solid var(--neutral-200, #EDEEF0);
   border-radius: 12px;
   font-size: 13.5px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.55;
   text-wrap: pretty;
   white-space: pre-wrap;
@@ -8936,10 +8936,10 @@ details.admin-chez__analysis-section pre {
   text-align: center;
   margin: 12px 0;
   padding: 6px 12px;
-  background: var(--indigo-50, #F2EFF8);
+  background: var(--indigo-50, #F4F0FE);
   border-radius: 999px;
   font-size: 11px;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -8951,7 +8951,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-msg__attach {
   margin-top: 8px;
   padding: 8px 10px;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   border: 1px solid var(--neutral-200, #EDEEF0);
   border-radius: 8px;
   display: flex;
@@ -8964,15 +8964,15 @@ details.admin-chez__analysis-section pre {
 .cockpit-resolved-bar {
   margin-top: 16px;
   padding: 14px;
-  background: var(--indigo-50, #F2EFF8);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  border: 1px solid var(--indigo-100, #DDD3FA);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   font-size: 13px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 
 .cockpit-composer {
@@ -8989,7 +8989,7 @@ details.admin-chez__analysis-section pre {
   margin-bottom: 10px;
   gap: 12px;
 }
-.cockpit-composer__head .cockpit-eyebrow { color: var(--text-soft, #9C98AD); }
+.cockpit-composer__head .cockpit-eyebrow { color: var(--text-soft, #A1A1AC); }
 .cockpit-composer__head-actions {
   display: flex;
   gap: 6px;
@@ -9012,14 +9012,14 @@ details.admin-chez__analysis-section pre {
   padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   text-transform: capitalize;
   transition: all 0.15s;
 }
 .cockpit-tone__opt.is-active {
   background: #fff;
-  color: var(--text, #2A2252);
-  box-shadow: 0 1px 2px rgba(42, 34, 82, 0.08);
+  color: var(--text, #0A0A0A);
+  box-shadow: 0 1px 2px rgba(15, 10, 40, 0.08);
 }
 .cockpit-composer textarea {
   width: 100%;
@@ -9030,30 +9030,30 @@ details.admin-chez__analysis-section pre {
   border-radius: 10px;
   font-family: inherit;
   font-size: 13.5px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.55;
   outline: none;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   box-sizing: border-box;
 }
 .cockpit-composer textarea:focus {
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
   box-shadow: 0 0 0 3px rgba(69, 58, 112, 0.08);
   background: #fff;
 }
 .cockpit-critique {
   margin-top: 8px;
   padding: 8px 10px;
-  background: var(--indigo-50, #F2EFF8);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  border: 1px solid var(--indigo-100, #DDD3FA);
   border-radius: 8px;
   font-size: 11px;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.cockpit-critique b { color: var(--indigo, #453A70); }
+.cockpit-critique b { color: var(--indigo, #6938EF); }
 .cockpit-critique__tone {
   margin-left: auto;
   font-weight: 600;
@@ -9073,7 +9073,7 @@ details.admin-chez__analysis-section pre {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-weight: 500;
 }
 .cockpit-composer__buttons { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -9087,8 +9087,8 @@ details.admin-chez__analysis-section pre {
   margin-top: 16px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(237, 105, 85, 0.06);
-  border: 1px solid rgba(237, 105, 85, 0.18);
+  background: rgba(105, 56, 239, 0.06);
+  border: 1px solid rgba(105, 56, 239, 0.18);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -9097,7 +9097,7 @@ details.admin-chez__analysis-section pre {
   font: 600 11px / 1 var(--sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
   margin-bottom: 4px;
 }
 .cockpit-prefs__row {
@@ -9112,11 +9112,11 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-prefs__label {
   font-weight: 600;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   min-width: 130px;
 }
 .cockpit-prefs__value {
-  color: var(--text-primary, #453A70);
+  color: var(--text-primary, #6938EF);
 }
 
 .cockpit-quickactions {
@@ -9140,7 +9140,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-alfred__head {
   position: relative;
   padding: 14px 16px 12px;
-  background: linear-gradient(135deg, #2A2252 0%, #453A70 60%, #5D4C8F 100%);
+  background: linear-gradient(135deg, #0A0A0A 0%, #6938EF 60%, #7A55F0 100%);
   color: #fff;
   overflow: hidden;
 }
@@ -9148,7 +9148,7 @@ details.admin-chez__analysis-section pre {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(60% 80% at 100% 0%, rgba(237, 105, 85, 0.28), transparent 60%);
+  background: radial-gradient(60% 80% at 100% 0%, rgba(105, 56, 239, 0.28), transparent 60%);
 }
 .cockpit-alfred__head-row {
   position: relative;
@@ -9166,7 +9166,7 @@ details.admin-chez__analysis-section pre {
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--salmon-light, #F4877B);
+  color: var(--salmon-light, #B49BFA);
 }
 .cockpit-alfred__model {
   font-size: 10px;
@@ -9199,13 +9199,13 @@ details.admin-chez__analysis-section pre {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
 }
 .cockpit-alfred__tab.is-active {
-  color: var(--text, #2A2252);
-  border-bottom-color: var(--salmon, #ED6955);
+  color: var(--text, #0A0A0A);
+  border-bottom-color: var(--salmon, #6938EF);
 }
 
 .cockpit-alfred__body {
@@ -9220,8 +9220,8 @@ details.admin-chez__analysis-section pre {
 }
 
 .cockpit-resolve {
-  background: linear-gradient(135deg, #FFF5F2, #FFFFFF);
-  border: 1px solid var(--salmon, #ED6955);
+  background: linear-gradient(135deg, #F4F0FE, #FFFFFF);
+  border: 1px solid var(--salmon, #6938EF);
   border-radius: 14px;
   padding: 14px;
   margin-bottom: 14px;
@@ -9237,13 +9237,13 @@ details.admin-chez__analysis-section pre {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
 }
 .cockpit-resolve__headline {
   font-family: var(--serif, Georgia);
   font-size: 15px;
   font-weight: 500;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.4;
   margin-bottom: 10px;
   letter-spacing: -0.008em;
@@ -9259,18 +9259,18 @@ details.admin-chez__analysis-section pre {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .cockpit-resolve__step-num {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1.5px solid var(--salmon, #ED6955);
+  border: 1.5px solid var(--salmon, #6938EF);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 9px;
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
   font-weight: 700;
   flex: none;
 }
@@ -9295,14 +9295,14 @@ details.admin-chez__analysis-section pre {
   width: 100%;
 }
 .cockpit-action:hover {
-  border-color: var(--indigo-100, #E8E4F2);
+  border-color: var(--indigo-100, #DDD3FA);
   transform: translateY(-1px);
 }
 .cockpit-action__icon {
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: var(--indigo-50, #F2EFF8);
+  background: var(--indigo-50, #F4F0FE);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -9312,18 +9312,18 @@ details.admin-chez__analysis-section pre {
 .cockpit-action__label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.35;
 }
 .cockpit-action__sub {
   font-size: 11.5px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   margin-top: 2px;
   line-height: 1.4;
 }
 .cockpit-action__arrow {
   font-size: 18px;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   line-height: 1;
   margin-top: 2px;
 }
@@ -9332,20 +9332,20 @@ details.admin-chez__analysis-section pre {
   margin-top: 18px;
   padding: 12px;
   border-radius: 10px;
-  background: var(--indigo-50, #F2EFF8);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  border: 1px solid var(--indigo-100, #DDD3FA);
 }
 .cockpit-context-box__eyebrow {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
   margin-bottom: 4px;
 }
 .cockpit-context-box__body {
   font-size: 11.5px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   line-height: 1.55;
 }
 
@@ -9362,7 +9362,7 @@ details.admin-chez__analysis-section pre {
   width: 24px; height: 24px;
   border-radius: 50%;
   flex: none;
-  background: linear-gradient(135deg, #453A70, #ED6955);
+  background: linear-gradient(135deg, #6938EF, #6938EF);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9370,22 +9370,22 @@ details.admin-chez__analysis-section pre {
 .cockpit-chat__bubble {
   flex: 1;
   padding: 10px;
-  background: var(--indigo-50, #F2EFF8);
+  background: var(--indigo-50, #F4F0FE);
   border-radius: 10px;
   font-size: 13px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.5;
   white-space: pre-wrap;
 }
 .cockpit-chat__bubble--user {
-  background: var(--indigo, #453A70);
+  background: var(--indigo, #6938EF);
   color: #fff;
   max-width: 85%;
   flex: none;
 }
 .cockpit-chat__typing {
   font-size: 12px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-style: italic;
   padding: 4px 8px;
 }
@@ -9399,15 +9399,15 @@ details.admin-chez__analysis-section pre {
   text-align: left;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   border: 1px solid var(--neutral-200, #EDEEF0);
   cursor: pointer;
   font-family: inherit;
   font-size: 12px;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   font-weight: 500;
 }
-.cockpit-chat__prompt:hover { border-color: var(--indigo-500, #6B5AA0); }
+.cockpit-chat__prompt:hover { border-color: var(--indigo-500, #6B6B7B); }
 
 /* Alfred similar cases */
 
@@ -9427,9 +9427,9 @@ details.admin-chez__analysis-section pre {
   transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 .cockpit-similar__card:hover {
-  border-color: var(--indigo-100, #E8E4F2);
+  border-color: var(--indigo-100, #DDD3FA);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(42, 34, 82, 0.06);
+  box-shadow: 0 4px 12px rgba(15, 10, 40, 0.06);
 }
 .cockpit-similar__head {
   display: flex;
@@ -9440,26 +9440,26 @@ details.admin-chez__analysis-section pre {
 .cockpit-similar__id {
   font-size: 11px;
   font-weight: 700;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
   font-family: ui-monospace, "SF Mono", monospace;
   letter-spacing: 0.06em;
 }
 .cockpit-similar__title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .cockpit-similar__sub {
   font-size: 12px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   margin-top: 2px;
 }
 .cockpit-similar__outcome {
   font-size: 12px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   margin-top: 8px;
   padding: 6px 8px;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   border-radius: 6px;
 }
 
@@ -9467,8 +9467,8 @@ details.admin-chez__analysis-section pre {
   margin-top: 14px;
   padding: 14px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #F2EFF8, #FFF5F2);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: linear-gradient(135deg, #F4F0FE, #F4F0FE);
+  border: 1px solid var(--indigo-100, #DDD3FA);
 }
 .cockpit-pattern__head {
   display: flex;
@@ -9481,11 +9481,11 @@ details.admin-chez__analysis-section pre {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
 }
 .cockpit-pattern__body {
   font-size: 12.5px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.5;
 }
 
@@ -9494,7 +9494,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-alfred__composer {
   border-top: 1px solid var(--neutral-200, #EDEEF0);
   padding: 12px;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   flex: none;
 }
 .cockpit-alfred__composer-pill {
@@ -9508,7 +9508,7 @@ details.admin-chez__analysis-section pre {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .cockpit-alfred__composer-pill:focus-within {
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
   box-shadow: 0 0 0 3px rgba(69, 58, 112, 0.08);
 }
 .cockpit-alfred__composer-pill input {
@@ -9518,22 +9518,22 @@ details.admin-chez__analysis-section pre {
   background: transparent;
   font-family: inherit;
   font-size: 13px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
-.cockpit-alfred__composer-pill input::placeholder { color: var(--text-muted, #6F6A88); }
+.cockpit-alfred__composer-pill input::placeholder { color: var(--text-muted, #6B6B7B); }
 .cockpit-alfred__send {
   width: 28px; height: 28px;
   border-radius: 50%;
   border: 0;
   cursor: pointer;
-  background: var(--salmon, #ED6955);
+  background: var(--salmon, #6938EF);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.15s;
 }
-.cockpit-alfred__send:hover { background: var(--salmon-dark, #D14E3E); }
+.cockpit-alfred__send:hover { background: var(--salmon-dark, #5025D1); }
 
 /* ===== Responsive sizing =================================================
  *
@@ -9559,7 +9559,7 @@ details.admin-chez__analysis-section pre {
   bottom: 0;
   width: 360px;
   z-index: 6;
-  box-shadow: -12px 0 32px rgba(42, 34, 82, 0.18);
+  box-shadow: -12px 0 32px rgba(15, 10, 40, 0.18);
 }
 .cockpit-shell--alfred-overlay { position: relative; }
 
@@ -9596,7 +9596,7 @@ details.admin-chez__analysis-section pre {
   background: transparent;
   border: 0;
   cursor: pointer;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -9604,8 +9604,8 @@ details.admin-chez__analysis-section pre {
   transition: background 0.15s, color 0.15s;
 }
 .cockpit-chatpanel__back:hover {
-  background: var(--indigo-50, #F2EFF8);
-  color: var(--indigo, #453A70);
+  background: var(--indigo-50, #F4F0FE);
+  color: var(--indigo, #6938EF);
 }
 .cockpit-chatpanel__head-meta {
   display: flex;
@@ -9617,14 +9617,14 @@ details.admin-chez__analysis-section pre {
   font-family: var(--serif, Georgia);
   font-weight: 600;
   font-size: 17px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: -0.012em;
   line-height: 1.25;
   margin-bottom: 2px;
 }
 .cockpit-chatpanel__sub {
   font-size: 11px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-weight: 500;
 }
 
@@ -9637,7 +9637,7 @@ details.admin-chez__analysis-section pre {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
 }
 .cockpit-chatpanel__empty {
   text-align: center;
@@ -9661,7 +9661,7 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-chatpanel__msg-head strong {
   font-size: 12px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   font-weight: 600;
 }
 .cockpit-chatpanel__msg-bubble {
@@ -9670,22 +9670,22 @@ details.admin-chez__analysis-section pre {
   border: 1px solid var(--neutral-200, #EDEEF0);
   border-radius: 10px;
   font-size: 13px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.55;
   text-wrap: pretty;
   white-space: pre-wrap;
 }
 .cockpit-chatpanel__msg--admin .cockpit-chatpanel__msg-bubble {
-  background: var(--indigo-50, #F2EFF8);
-  border-color: var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  border-color: var(--indigo-100, #DDD3FA);
 }
 .cockpit-chatpanel__system {
   align-self: center;
   padding: 4px 10px;
-  background: var(--indigo-50, #F2EFF8);
+  background: var(--indigo-50, #F4F0FE);
   border-radius: 999px;
   font-size: 10.5px;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
   display: inline-flex;
   gap: 8px;
   text-align: center;
@@ -9716,15 +9716,15 @@ details.admin-chez__analysis-section pre {
   border-radius: 10px;
   font-family: inherit;
   font-size: 13px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.5;
   outline: none;
-  background: var(--pearl, #F8F9FA);
+  background: var(--pearl, #FAFAFC);
   box-sizing: border-box;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .cockpit-chatpanel__composer textarea:focus {
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
   box-shadow: 0 0 0 3px rgba(69, 58, 112, 0.08);
   background: #fff;
 }
@@ -9745,9 +9745,9 @@ details.admin-chez__analysis-section pre {
 /* Phase 83.3 — pulse the visit card when the cockpit jumps to it via
    the "Confirm visit date" / "Mark completed" CTAs in the Resolve plan. */
 @keyframes cockpit-visit-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(237, 105, 85, 0); }
-  35%  { box-shadow: 0 0 0 6px rgba(237, 105, 85, 0.32); }
-  100% { box-shadow: 0 0 0 0 rgba(237, 105, 85, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(105, 56, 239, 0); }
+  35%  { box-shadow: 0 0 0 6px rgba(105, 56, 239, 0.32); }
+  100% { box-shadow: 0 0 0 0 rgba(105, 56, 239, 0); }
 }
 .admin-chez__visit-card.is-pulsing,
 .admin-chez__visits.is-pulsing {
@@ -9760,17 +9760,17 @@ details.admin-chez__analysis-section pre {
    tinted). */
 .cockpit-resolve.is-resolved {
   opacity: 0.9;
-  background: linear-gradient(135deg, #F2EFF8, #FFFFFF);
-  border-color: var(--indigo-100, #E8E4F2);
+  background: linear-gradient(135deg, #F4F0FE, #FFFFFF);
+  border-color: var(--indigo-100, #DDD3FA);
 }
 .cockpit-resolve.is-complete {
   background: linear-gradient(135deg, #EDF6EF, #FFFFFF);
-  border-color: rgba(74, 124, 89, 0.32);
+  border-color: rgba(10, 10, 15, 0.32);
 }
 .cockpit-resolve.is-complete .cockpit-resolve__eyebrow,
 .cockpit-resolve.is-complete .cockpit-resolve__step-num {
-  color: var(--success, #4A7C59);
-  border-color: var(--success, #4A7C59);
+  color: var(--success, #0A0A0A);
+  border-color: var(--success, #0A0A0A);
 }
 
 /* Phase 83.4 — coachmark on awaiting_date visit cards explaining the
@@ -9782,17 +9782,17 @@ details.admin-chez__analysis-section pre {
   gap: 2px;
   margin: 0 0 12px;
   padding: 10px 12px;
-  background: var(--salmon-50, #FFF5F2);
-  border: 1px solid var(--salmon-pale, #FFE8E2);
+  background: var(--salmon-50, #F4F0FE);
+  border: 1px solid var(--salmon-pale, #EFEAFE);
   border-radius: 10px;
 }
 .admin-chez__visit-coachmark strong {
   font: 600 12px var(--sans);
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
 }
 .admin-chez__visit-coachmark span {
   font: 400 12px/1.5 var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 
 /* Phase 83.5 — "About this case" overview card. Sits between the stage
@@ -9806,8 +9806,8 @@ details.admin-chez__analysis-section pre {
   border-radius: 14px;
 }
 .cockpit-overview.is-vague {
-  background: linear-gradient(135deg, #FFF5F2, #FFFFFF);
-  border-color: var(--salmon-pale, #FFE8E2);
+  background: linear-gradient(135deg, #F4F0FE, #FFFFFF);
+  border-color: var(--salmon-pale, #EFEAFE);
 }
 .cockpit-overview__head {
   display: flex;
@@ -9839,11 +9839,11 @@ details.admin-chez__analysis-section pre {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
 }
 .cockpit-overview__value {
   font-size: 13px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   font-weight: 500;
 }
 .cockpit-overview-link {
@@ -9851,25 +9851,25 @@ details.admin-chez__analysis-section pre {
   border: 0;
   padding: 0;
   cursor: pointer;
-  color: var(--indigo-500, #6B5AA0);
+  color: var(--indigo-500, #6B6B7B);
   font: inherit;
   text-decoration: underline;
 }
-.cockpit-overview-link:hover { color: var(--indigo, #453A70); }
+.cockpit-overview-link:hover { color: var(--indigo, #6938EF); }
 .cockpit-overview-warn {
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
   font-weight: 600;
 }
 
 /* Phase 83.5 — completed step in the Resolve plan: green check + struck
    through label. */
 .cockpit-resolve__step.is-done .cockpit-resolve__step-num {
-  border-color: var(--success, #4A7C59);
-  color: var(--success, #4A7C59);
-  background: rgba(74, 124, 89, 0.12);
+  border-color: var(--success, #0A0A0A);
+  color: var(--success, #0A0A0A);
+  background: rgba(10, 10, 15, 0.12);
 }
 .cockpit-resolve__step.is-done .cockpit-resolve__step-text {
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   text-decoration: line-through;
 }
 
@@ -9904,18 +9904,18 @@ details.admin-chez__analysis-section pre {
   border-radius: 999px;
   border: 1px solid var(--border, #d8dadf);
   background: var(--surface, #fff);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .admin-vendor-apps__chip:hover {
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
 }
 
 .admin-vendor-apps__chip.is-active {
-  background: var(--indigo, #453A70);
-  border-color: var(--indigo, #453A70);
+  background: var(--indigo, #6938EF);
+  border-color: var(--indigo, #6938EF);
   color: #fff;
 }
 
@@ -9923,15 +9923,15 @@ details.admin-chez__analysis-section pre {
   padding: 12px 16px;
   border-radius: 10px;
   font: 500 14px/1.5 var(--sans, system-ui, sans-serif);
-  background: rgba(74, 124, 89, 0.12);
-  color: var(--success, #4A7C59);
-  border: 1px solid rgba(74, 124, 89, 0.28);
+  background: rgba(10, 10, 15, 0.12);
+  color: var(--success, #0A0A0A);
+  border: 1px solid rgba(10, 10, 15, 0.28);
 }
 
 .admin-vendor-apps__feedback[data-kind="error"] {
-  background: rgba(237, 105, 85, 0.12);
-  color: var(--salmon-dark, #D14E3E);
-  border-color: rgba(237, 105, 85, 0.32);
+  background: rgba(105, 56, 239, 0.12);
+  color: var(--salmon-dark, #5025D1);
+  border-color: rgba(105, 56, 239, 0.32);
 }
 
 .admin-vendor-apps__rows {
@@ -9949,8 +9949,8 @@ details.admin-chez__analysis-section pre {
 }
 
 .admin-vendor-apps__empty--error {
-  color: var(--salmon-dark, #D14E3E);
-  border-color: rgba(237, 105, 85, 0.4);
+  color: var(--salmon-dark, #5025D1);
+  border-color: rgba(105, 56, 239, 0.4);
 }
 
 .admin-vendor-apps__row {
@@ -9961,7 +9961,7 @@ details.admin-chez__analysis-section pre {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 1px 2px rgba(42, 34, 82, 0.04);
+  box-shadow: 0 1px 2px rgba(15, 10, 40, 0.04);
 }
 
 .admin-vendor-apps__row-head {
@@ -9981,17 +9981,17 @@ details.admin-chez__analysis-section pre {
 
 .admin-vendor-apps__row-title strong {
   font: 600 17px/1.3 var(--sans, system-ui, sans-serif);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 
 .admin-vendor-apps__row-website {
   font: 500 12px/1.3 var(--sans, system-ui, sans-serif);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   text-decoration: none;
 }
 
 .admin-vendor-apps__row-website:hover {
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   text-decoration: underline;
 }
 
@@ -10007,16 +10007,16 @@ details.admin-chez__analysis-section pre {
   gap: 2px;
   min-width: 0;
   font: 500 13px/1.4 var(--sans, system-ui, sans-serif);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 
 .admin-vendor-apps__row-cell a {
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   text-decoration: none;
 }
 
 .admin-vendor-apps__row-cell a:hover {
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   text-decoration: underline;
 }
 
@@ -10024,7 +10024,7 @@ details.admin-chez__analysis-section pre {
   font: 600 11px/1.3 var(--sans, system-ui, sans-serif);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   margin-bottom: 2px;
 }
 
@@ -10034,26 +10034,26 @@ details.admin-chez__analysis-section pre {
 
 .admin-vendor-apps__row-note {
   font: 500 13px/1.5 var(--sans, system-ui, sans-serif);
-  color: var(--text-muted, #6F6A88);
-  background: var(--bg, #f8f9fa);
-  border-left: 3px solid var(--indigo-100, #E8E4F2);
+  color: var(--text-muted, #6B6B7B);
+  background: var(--bg, #FAFAFC);
+  border-left: 3px solid var(--indigo-100, #DDD3FA);
   padding: 8px 12px;
   border-radius: 6px;
   margin: 0;
 }
 
 .admin-vendor-apps__row-note strong {
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   margin-right: 4px;
 }
 
 .admin-vendor-apps__row-note--reject {
-  border-left-color: var(--salmon-pale, #FFE8E2);
-  color: var(--salmon-dark, #D14E3E);
+  border-left-color: var(--salmon-pale, #EFEAFE);
+  color: var(--salmon-dark, #5025D1);
 }
 
 .admin-vendor-apps__row-note--reject strong {
-  color: var(--salmon-dark, #D14E3E);
+  color: var(--salmon-dark, #5025D1);
 }
 
 .admin-vendor-apps__row-meta {
@@ -10080,26 +10080,26 @@ details.admin-chez__analysis-section pre {
 
 .admin-vendor-apps__status--pending_email_confirm {
   background: rgba(199, 126, 46, 0.14);
-  color: var(--warning, #C77E2E);
+  color: var(--warning, #6938EF);
   border: 1px solid rgba(199, 126, 46, 0.3);
 }
 
 .admin-vendor-apps__status--live_unverified {
-  background: var(--indigo-50, #F2EFF8);
-  color: var(--indigo, #453A70);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  color: var(--indigo, #6938EF);
+  border: 1px solid var(--indigo-100, #DDD3FA);
 }
 
 .admin-vendor-apps__status--chez_certified {
-  background: rgba(74, 124, 89, 0.14);
-  color: var(--success, #4A7C59);
-  border: 1px solid rgba(74, 124, 89, 0.3);
+  background: rgba(10, 10, 15, 0.14);
+  color: var(--success, #0A0A0A);
+  border: 1px solid rgba(10, 10, 15, 0.3);
 }
 
 .admin-vendor-apps__status--rejected {
-  background: var(--salmon-50, #FFF5F2);
-  color: var(--salmon-dark, #D14E3E);
-  border: 1px solid var(--salmon-pale, #FFE8E2);
+  background: var(--salmon-50, #F4F0FE);
+  color: var(--salmon-dark, #5025D1);
+  border: 1px solid var(--salmon-pale, #EFEAFE);
 }
 
 /* Right-side pill cluster on each row header — completion + status */
@@ -10120,20 +10120,20 @@ details.admin-chez__analysis-section pre {
 }
 
 .admin-vendor-apps__completion--success {
-  background: rgba(74, 124, 89, 0.14);
-  color: var(--success, #4A7C59);
-  border: 1px solid rgba(74, 124, 89, 0.3);
+  background: rgba(10, 10, 15, 0.14);
+  color: var(--success, #0A0A0A);
+  border: 1px solid rgba(10, 10, 15, 0.3);
 }
 
 .admin-vendor-apps__completion--indigo {
-  background: var(--indigo-50, #F2EFF8);
-  color: var(--indigo, #453A70);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  color: var(--indigo, #6938EF);
+  border: 1px solid var(--indigo-100, #DDD3FA);
 }
 
 .admin-vendor-apps__completion--warning {
   background: rgba(199, 126, 46, 0.14);
-  color: var(--warning, #C77E2E);
+  color: var(--warning, #6938EF);
   border: 1px solid rgba(199, 126, 46, 0.3);
 }
 
@@ -10149,7 +10149,7 @@ details.admin-chez__analysis-section pre {
 
 .admin-vendor-apps__modal-label > span {
   font: 600 13px/1.3 var(--sans, system-ui, sans-serif);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 
 .admin-vendor-apps__modal-label textarea {
@@ -10157,7 +10157,7 @@ details.admin-chez__analysis-section pre {
   min-height: 90px;
   padding: 10px 12px;
   font: 400 14px/1.5 var(--sans, system-ui, sans-serif);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   background: var(--surface, #fff);
   border: 1px solid var(--border, #d8dadf);
   border-radius: 8px;
@@ -10167,8 +10167,8 @@ details.admin-chez__analysis-section pre {
 
 .admin-vendor-apps__modal-label textarea:focus {
   outline: none;
-  border-color: var(--indigo, #453A70);
-  box-shadow: 0 0 0 3px var(--indigo-50, #F2EFF8);
+  border-color: var(--indigo, #6938EF);
+  box-shadow: 0 0 0 3px var(--indigo-50, #F4F0FE);
 }
 
 .admin-vendor-apps__modal-error {
@@ -10176,9 +10176,9 @@ details.admin-chez__analysis-section pre {
   padding: 10px 12px;
   border-radius: 8px;
   font: 500 13px/1.5 var(--sans, system-ui, sans-serif);
-  color: var(--salmon-dark, #D14E3E);
-  background: var(--salmon-50, #FFF5F2);
-  border: 1px solid var(--salmon-pale, #FFE8E2);
+  color: var(--salmon-dark, #5025D1);
+  background: var(--salmon-50, #F4F0FE);
+  border: 1px solid var(--salmon-pale, #EFEAFE);
 }
 
 /* =============================================================================
@@ -10207,7 +10207,7 @@ details.admin-chez__analysis-section pre {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font: 600 12px var(--sans);
   cursor: pointer;
   white-space: nowrap;
@@ -10215,12 +10215,12 @@ details.admin-chez__analysis-section pre {
 }
 .admin-households__tab.is-active {
   background: #fff;
-  color: var(--text, #2A2252);
-  box-shadow: 0 1px 2px rgba(42, 34, 82, 0.08);
+  color: var(--text, #0A0A0A);
+  box-shadow: 0 1px 2px rgba(15, 10, 40, 0.08);
 }
 .admin-households__tab-count {
   font-size: 11px;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   font-weight: 500;
 }
 
@@ -10256,7 +10256,7 @@ details.admin-chez__analysis-section pre {
   background: var(--surface-hover, #FAFAFC);
 }
 .admin-households__entity-row.is-active {
-  background: rgba(237, 105, 85, 0.06);
+  background: rgba(105, 56, 239, 0.06);
 }
 .admin-households__entity-main {
   grid-column: 1;
@@ -10267,7 +10267,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-households__entity-main strong {
   font: 600 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -10275,7 +10275,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-households__entity-main span {
   font: 400 11px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -10284,7 +10284,7 @@ details.admin-chez__analysis-section pre {
 .admin-households__entity-meta {
   grid-column: 2;
   font: 500 11px var(--sans);
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   white-space: nowrap;
 }
 .admin-households__entity-chevron {
@@ -10294,13 +10294,13 @@ details.admin-chez__analysis-section pre {
   line-height: 1;
 }
 .admin-households__entity-row.is-clickable:hover .admin-households__entity-chevron {
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 /* Owned badge — tiny salmon dot before the title on owned rows. */
 .admin-households__owned-badge {
   display: inline-block;
   margin-right: 6px;
-  color: var(--brand-strong, #ED6955);
+  color: var(--brand-strong, #6938EF);
   font: 700 13px var(--sans);
   line-height: 1;
 }
@@ -10308,7 +10308,7 @@ details.admin-chez__analysis-section pre {
 .admin-households__section {
   margin: 16px;
   padding: 12px;
-  background: var(--bg, #f8f9fa);
+  background: var(--bg, #FAFAFC);
   border-radius: 10px;
 }
 .admin-households__section h4 {
@@ -10316,7 +10316,7 @@ details.admin-chez__analysis-section pre {
   font: 600 11px var(--sans);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
 }
 .admin-households__reminder,
 .admin-households__action-row {
@@ -10325,7 +10325,7 @@ details.admin-chez__analysis-section pre {
   gap: 8px;
   padding: 6px 0;
   font: 400 12px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .admin-households__reminder strong,
 .admin-households__action-row strong {
@@ -10350,18 +10350,18 @@ details.admin-chez__analysis-section pre {
   border-radius: 999px;
   cursor: pointer;
   font: 500 11px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   transition: all 0.15s;
 }
 .admin-upcoming__filter.is-active {
-  background: var(--indigo, #453A70);
+  background: var(--indigo, #6938EF);
   color: #fff;
-  border-color: var(--indigo, #453A70);
+  border-color: var(--indigo, #6938EF);
 }
-.admin-upcoming__filter:hover { border-color: var(--indigo-500, #6B5AA0); }
+.admin-upcoming__filter:hover { border-color: var(--indigo-500, #6B6B7B); }
 .admin-upcoming__add {
   padding: 6px 14px;
-  background: var(--salmon, #ED6955);
+  background: var(--salmon, #6938EF);
   color: #fff;
   border: 0;
   border-radius: 999px;
@@ -10369,7 +10369,7 @@ details.admin-chez__analysis-section pre {
   font: 600 11px var(--sans);
   margin-left: auto;
 }
-.admin-upcoming__add:hover { background: var(--salmon-dark, #D14E3E); }
+.admin-upcoming__add:hover { background: var(--salmon-dark, #5025D1); }
 
 .admin-upcoming__band {
   margin-bottom: 16px;
@@ -10379,7 +10379,7 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
 }
 
 .admin-upcoming__row {
@@ -10399,11 +10399,11 @@ details.admin-chez__analysis-section pre {
 }
 .admin-upcoming__row-title {
   font: 600 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .admin-upcoming__row-sub {
   font: 400 12px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -10416,7 +10416,7 @@ details.admin-chez__analysis-section pre {
   font-size: 11px;
 }
 .admin-upcoming__row-due strong {
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   font-weight: 600;
 }
 
@@ -10429,28 +10429,28 @@ details.admin-chez__analysis-section pre {
   padding: 2px 7px;
   font: 600 10px/1.4 var(--sans);
   letter-spacing: 0.04em;
-  background: var(--salmon-50, #FFF5F2);
-  color: var(--salmon-dark, #D14E3E);
-  border: 1px solid var(--salmon-pale, #FFE8E2);
+  background: var(--salmon-50, #F4F0FE);
+  color: var(--salmon-dark, #5025D1);
+  border: 1px solid var(--salmon-pale, #EFEAFE);
   border-radius: 999px;
   vertical-align: middle;
 }
 .admin-upcoming__row--chez {
-  border-left: 3px solid var(--salmon, #ED6955);
-  background: linear-gradient(90deg, rgba(237, 105, 85, 0.04) 0%, transparent 50%);
+  border-left: 3px solid var(--salmon, #6938EF);
+  background: linear-gradient(90deg, rgba(105, 56, 239, 0.04) 0%, transparent 50%);
 }
 .admin-upcoming__filter--chez {
-  background: var(--salmon-50, #FFF5F2);
-  color: var(--salmon-dark, #D14E3E);
-  border-color: var(--salmon-pale, #FFE8E2) !important;
+  background: var(--salmon-50, #F4F0FE);
+  color: var(--salmon-dark, #5025D1);
+  border-color: var(--salmon-pale, #EFEAFE) !important;
 }
 .admin-upcoming__filter--chez:hover {
-  border-color: var(--salmon, #ED6955) !important;
+  border-color: var(--salmon, #6938EF) !important;
 }
 .admin-upcoming__filter--chez.is-active {
-  background: var(--salmon, #ED6955) !important;
+  background: var(--salmon, #6938EF) !important;
   color: #fff !important;
-  border-color: var(--salmon, #ED6955) !important;
+  border-color: var(--salmon, #6938EF) !important;
 }
 
 
@@ -10507,14 +10507,14 @@ details.admin-chez__analysis-section pre {
 }
 .admin-modal__head h2 {
   font: 600 16px var(--serif);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   margin: 0;
 }
 .admin-modal__close {
   background: transparent;
   border: 0;
   font-size: 24px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   cursor: pointer;
 }
 .admin-modal__body {
@@ -10548,25 +10548,25 @@ details.admin-chez__analysis-section pre {
   border-left: 3px solid var(--brand-soft, #C9C2E6);
 }
 .admin-negotiation__turn--chez {
-  border-left-color: var(--brand-strong, #ED6955);
-  background: rgba(237, 105, 85, 0.06);
+  border-left-color: var(--brand-strong, #6938EF);
+  background: rgba(105, 56, 239, 0.06);
 }
 .admin-negotiation__turn-from {
   display: inline-block;
   font: 600 10px var(--sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .admin-negotiation__turn-meta {
   font: 400 11px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   margin-left: 8px;
 }
 .admin-negotiation__turn p {
   margin: 4px 0 0;
   font: 400 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .admin-negotiation__composer {
   display: grid;
@@ -10599,12 +10599,12 @@ details.admin-chez__analysis-section pre {
   border-radius: 8px;
   font: 400 13px var(--sans);
   background: var(--surface, #FFF);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .admin-households__search:focus {
   outline: none;
-  border-color: var(--brand-strong, #ED6955);
-  box-shadow: 0 0 0 3px rgba(237, 105, 85, 0.12);
+  border-color: var(--brand-strong, #6938EF);
+  box-shadow: 0 0 0 3px rgba(105, 56, 239, 0.12);
 }
 .admin-pill--toggle {
   cursor: pointer;
@@ -10614,19 +10614,19 @@ details.admin-chez__analysis-section pre {
   border: 1px solid var(--border, #EDEEF0);
   background: var(--surface, #FFF);
   font: 500 11px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 .admin-pill--toggle.is-active {
-  background: rgba(237, 105, 85, 0.1);
-  border-color: var(--brand-strong, #ED6955);
-  color: var(--brand-strong, #ED6955);
+  background: rgba(105, 56, 239, 0.1);
+  border-color: var(--brand-strong, #6938EF);
+  color: var(--brand-strong, #6938EF);
 }
 
 /* Owned count appears in faint salmon next to the total tab count. */
 .admin-households__tab-owned {
   margin-left: 4px;
   font-size: 9px;
-  color: var(--brand-strong, #ED6955);
+  color: var(--brand-strong, #6938EF);
   font-weight: 600;
 }
 
@@ -10646,15 +10646,15 @@ details.admin-chez__analysis-section pre {
   border-radius: 999px;
   border: 1px solid var(--border, #EDEEF0);
   background: transparent;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 .cockpit-pill--filter.is-active {
-  background: var(--text, #2A2252);
-  border-color: var(--text, #2A2252);
+  background: var(--text, #0A0A0A);
+  border-color: var(--text, #0A0A0A);
   color: #FFF;
 }
 .cockpit-pill--filter .cockpit-pill__count {
@@ -10676,9 +10676,9 @@ details.admin-chez__analysis-section pre {
   border: 1px solid var(--border, #EDEEF0);
 }
 .cockpit-pill--warning {
-  background: rgba(237, 105, 85, 0.10);
-  border-color: rgba(237, 105, 85, 0.30);
-  color: var(--brand-strong, #ED6955);
+  background: rgba(105, 56, 239, 0.10);
+  border-color: rgba(105, 56, 239, 0.30);
+  color: var(--brand-strong, #6938EF);
 }
 .cockpit-pill--info {
   background: rgba(90, 110, 200, 0.10);
@@ -10688,7 +10688,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-pill--muted {
   background: rgba(111, 106, 136, 0.06);
   border-color: rgba(111, 106, 136, 0.20);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 
 /* ========================================================================
@@ -10708,7 +10708,7 @@ details.admin-chez__analysis-section pre {
   flex-direction: column;
   gap: 4px;
   font: 500 12px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .admin-modal__field span {
   font-weight: 600;
@@ -10720,18 +10720,18 @@ details.admin-chez__analysis-section pre {
   border: 1px solid var(--border, #EDEEF0);
   border-radius: 8px;
   font: 400 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   background: var(--surface, #FFF);
 }
 .admin-modal__field input:focus,
 .admin-modal__field textarea:focus,
 .admin-modal__field select:focus {
   outline: none;
-  border-color: var(--brand-strong, #ED6955);
-  box-shadow: 0 0 0 3px rgba(237, 105, 85, 0.12);
+  border-color: var(--brand-strong, #6938EF);
+  box-shadow: 0 0 0 3px rgba(105, 56, 239, 0.12);
 }
 .admin-required {
-  color: var(--brand-strong, #ED6955);
+  color: var(--brand-strong, #6938EF);
 }
 .admin-modal__buttons {
   display: flex;
@@ -10762,7 +10762,7 @@ details.admin-chez__analysis-section pre {
   padding: 6px 12px;
   background: var(--surface, #FFF);
   border: 1px solid var(--border, #EDEEF0);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 .admin-households__back-pill:hover {
   background: var(--surface-hover, #F1F0F7);
@@ -10776,7 +10776,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-focused__entity-head h2 {
   font: 600 22px var(--serif);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   margin: 0 0 8px;
   line-height: 1.2;
 }
@@ -10787,9 +10787,9 @@ details.admin-chez__analysis-section pre {
   align-items: center;
 }
 .admin-pill--owned {
-  background: rgba(237, 105, 85, 0.12);
-  border-color: rgba(237, 105, 85, 0.30);
-  color: var(--brand-strong, #ED6955);
+  background: rgba(105, 56, 239, 0.12);
+  border-color: rgba(105, 56, 239, 0.30);
+  color: var(--brand-strong, #6938EF);
 }
 
 .admin-focused__field-grid {
@@ -10812,11 +10812,11 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
 }
 .admin-focused__field-grid strong {
   font: 600 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   word-break: break-word;
 }
 
@@ -10831,13 +10831,13 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   margin: 0 0 6px;
 }
 .admin-focused__notes-block p {
   margin: 0;
   font: 400 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.45;
   white-space: pre-wrap;
 }
@@ -10849,7 +10849,7 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   margin: 0 0 10px;
 }
 .admin-focused__action-row {
@@ -10871,7 +10871,7 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   margin: 0 0 10px;
 }
 
@@ -10895,7 +10895,7 @@ details.admin-chez__analysis-section pre {
   border-left: 3px solid rgba(67, 75, 145, 0.4);
   border-radius: 6px;
   font: 400 12px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   line-height: 1.5;
 }
 
@@ -10911,18 +10911,18 @@ details.admin-chez__analysis-section pre {
   border-radius: 999px;
   border: 1px solid var(--border, #EDEEF0);
   background: var(--surface, #FFF);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   cursor: pointer;
   transition: background-color 80ms ease, color 80ms ease, border-color 80ms ease;
 }
 .admin-quickpill:hover {
   background: var(--surface-hover, #FAFAFC);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   border-color: var(--border-strong, #DCDDE3);
 }
 .admin-quickpill.is-active {
-  background: var(--text, #2A2252);
-  border-color: var(--text, #2A2252);
+  background: var(--text, #0A0A0A);
+  border-color: var(--text, #0A0A0A);
   color: #FFF;
 }
 
@@ -10930,21 +10930,21 @@ details.admin-chez__analysis-section pre {
    detail panel's actions read like the cockpit (small, even, salmon
    only on the primary). The list rows no longer use these. */
 .admin-pill--action {
-  background: var(--text, #2A2252);
-  border-color: var(--text, #2A2252);
+  background: var(--text, #0A0A0A);
+  border-color: var(--text, #0A0A0A);
   color: #FFF;
   font: 500 11px var(--sans);
   padding: 5px 12px;
 }
 .admin-pill--action:hover {
-  background: rgba(42, 34, 82, 0.86);
+  background: rgba(15, 10, 40, 0.86);
 }
 
 /* Phase 85 PR 5.1 — Upcoming row active state when its focused detail
    is open in the right pane. */
 .admin-upcoming__row.is-active {
-  background: rgba(237, 105, 85, 0.08) !important;
-  box-shadow: inset 3px 0 0 var(--brand-strong, #ED6955);
+  background: rgba(105, 56, 239, 0.08) !important;
+  box-shadow: inset 3px 0 0 var(--brand-strong, #6938EF);
 }
 
 /* ========================================================================
@@ -10962,13 +10962,13 @@ details.admin-chez__analysis-section pre {
   font: 600 9px var(--sans);
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: var(--text-soft, #9C98AD);
+  color: var(--text-soft, #A1A1AC);
   white-space: nowrap;
   padding-top: 2px;
 }
 .cockpit-vendor__notes-text {
   font: 400 12px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   line-height: 1.45;
 }
 
@@ -11014,7 +11014,7 @@ details.admin-chez__analysis-section pre {
   align-items: center;
   padding: 0 10px;
   background: rgba(67, 75, 145, 0.05);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font: 500 13px var(--sans);
   border-right: 1px solid var(--border, #EDEEF0);
 }
@@ -11025,7 +11025,7 @@ details.admin-chez__analysis-section pre {
   background: transparent;
 }
 .admin-input-prefix > .admin-input:focus {
-  outline: 2px solid var(--brand-strong, #ED6955);
+  outline: 2px solid var(--brand-strong, #6938EF);
   outline-offset: -2px;
 }
 
@@ -11048,22 +11048,22 @@ details.admin-chez__analysis-section pre {
   transition: border-color 0.15s, background 0.15s;
 }
 .admin-modal__radio:hover {
-  border-color: var(--brand-strong, #ED6955);
-  background: rgba(237, 105, 85, 0.03);
+  border-color: var(--brand-strong, #6938EF);
+  background: rgba(105, 56, 239, 0.03);
 }
 .admin-modal__radio input[type="radio"] {
   margin-top: 2px;
-  accent-color: var(--brand-strong, #ED6955);
+  accent-color: var(--brand-strong, #6938EF);
 }
 .admin-modal__radio strong {
   display: block;
   font: 600 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   margin-bottom: 2px;
 }
 .admin-modal__radio .admin-muted {
   font: 400 12px var(--sans);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   line-height: 1.4;
 }
 
@@ -11080,18 +11080,18 @@ details.admin-chez__analysis-section pre {
   border-radius: 99px;
   border: 1px solid var(--border, #D8DADF);
   background: #FFF;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 .admin-quickpill:hover {
   background: rgba(67, 75, 145, 0.05);
-  border-color: var(--text, #2A2252);
+  border-color: var(--text, #0A0A0A);
 }
 .admin-quickpill.is-active {
-  background: var(--text, #2A2252);
+  background: var(--text, #0A0A0A);
   color: #FFF;
-  border-color: var(--text, #2A2252);
+  border-color: var(--text, #0A0A0A);
 }
 
 /* Toast host + toasts. Fixed bottom-right of the viewport so they don't
@@ -11113,7 +11113,7 @@ details.admin-chez__analysis-section pre {
   font: 500 12px var(--sans);
   line-height: 1.4;
   max-width: 360px;
-  box-shadow: 0 8px 24px rgba(42, 34, 82, 0.16);
+  box-shadow: 0 8px 24px rgba(15, 10, 40, 0.16);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.18s ease, transform 0.18s ease;
@@ -11124,7 +11124,7 @@ details.admin-chez__analysis-section pre {
   transform: translateY(0);
 }
 .admin-toast--info {
-  background: #2A2252;
+  background: #0A0A0A;
   color: #FFF;
 }
 .admin-toast--error {
@@ -11160,13 +11160,13 @@ details.admin-chez__analysis-section pre {
   border: 0;
   padding: 0;
   font: inherit;
-  color: var(--brand-strong, #ED6955);
+  color: var(--brand-strong, #6938EF);
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
 }
 .admin-link-inline:hover {
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 
 /* Bundle checklist — bulleted list on Task focused panel. */
@@ -11179,14 +11179,14 @@ details.admin-chez__analysis-section pre {
   position: relative;
   padding: 4px 0 4px 16px;
   font: 400 13px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.4;
 }
 .admin-focused__checklist li::before {
   content: "—";
   position: absolute;
   left: 0;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 
 /* ========================================================================
@@ -11202,7 +11202,7 @@ details.admin-chez__analysis-section pre {
   background: #FFF;
   border: 1px solid var(--neutral-300, #D8DADF);
   border-radius: 12px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   font: 600 13px var(--sans);
   letter-spacing: 0;
   text-transform: none;
@@ -11214,7 +11214,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-focused__action-row .admin-pill:hover {
   background: var(--indigo-50, rgba(67, 75, 145, 0.05));
-  border-color: var(--text, #2A2252);
+  border-color: var(--text, #0A0A0A);
 }
 .admin-focused__action-row .admin-pill:active {
   transform: scale(0.98);
@@ -11225,10 +11225,10 @@ details.admin-chez__analysis-section pre {
 }
 /* Primary action — salmon fill (matches admin-button--primary). */
 .admin-focused__action-row .admin-pill.admin-pill--action {
-  background: var(--brand-strong, #ED6955);
-  border-color: var(--brand-strong, #ED6955);
+  background: var(--brand-strong, #6938EF);
+  border-color: var(--brand-strong, #6938EF);
   color: #FFF;
-  box-shadow: 0 6px 16px rgba(237, 105, 85, 0.25);
+  box-shadow: 0 6px 16px rgba(105, 56, 239, 0.25);
 }
 .admin-focused__action-row .admin-pill.admin-pill--action:hover {
   background: #D85440;
@@ -11237,7 +11237,7 @@ details.admin-chez__analysis-section pre {
 /* Secondary / ghost — muted text on white. */
 .admin-focused__action-row .admin-pill.admin-pill--secondary,
 .admin-focused__action-row .admin-pill.admin-pill--ghost {
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 /* Danger — red outline (used by Revoke Chez ownership). */
 .admin-focused__action-row .admin-pill.admin-pill--danger {
@@ -11270,7 +11270,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-focused__entity-head h2 {
   font: 700 22px var(--serif);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   margin: 0;
 }
 .admin-focused__entity-meta {
@@ -11301,11 +11301,11 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 .admin-focused__field-grid strong {
   font: 500 14px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
 }
 
 /* List block (Service history, Custom additions, etc.). */
@@ -11318,7 +11318,7 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   margin: 0 0 4px 0;
 }
 
@@ -11339,8 +11339,8 @@ details.admin-chez__analysis-section pre {
    .admin-pill[data-tone="red|amber|muted|green"] rules live around L6045;
    we add `indigo` and `yellow` here so urgency steps read clearly. --- */
 .admin-pill[data-tone="indigo"] {
-  background: var(--indigo-100, #E8E4F2);
-  color: var(--indigo, #453A70);
+  background: var(--indigo-100, #DDD3FA);
+  color: var(--indigo, #6938EF);
 }
 .admin-pill[data-tone="yellow"] {
   background: rgba(199, 126, 46, 0.10);
@@ -11800,12 +11800,12 @@ details.admin-chez__analysis-section pre {
   font: 600 10px var(--sans);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   margin: 0;
 }
 .admin-focused__notes-block p {
   font: 400 14px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   line-height: 1.55;
   margin: 0;
   padding: 12px 14px;
@@ -11841,7 +11841,7 @@ details.admin-chez__analysis-section pre {
    space but is the first thing read. */
 .cockpit-queue__case-household {
   font: 600 11px var(--sans);
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   letter-spacing: 0.01em;
   margin-bottom: 4px;
   display: flex;
@@ -11853,10 +11853,10 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-queue__case-homeowner {
   font-weight: 400;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 .cockpit-queue__case.is-active .cockpit-queue__case-household {
-  color: var(--brand-strong, #ED6955);
+  color: var(--brand-strong, #6938EF);
 
 .admin-overview__activity-row {
   align-items: baseline;
@@ -11887,7 +11887,7 @@ details.admin-chez__analysis-section pre {
   background: var(--white, #fff);
   border: 1px solid var(--neutral-200, #EDEEF0);
   border-radius: var(--radius-sm, 10px);
-  box-shadow: 0 12px 36px rgba(42, 34, 82, 0.18);
+  box-shadow: 0 12px 36px rgba(15, 10, 40, 0.18);
   max-height: 320px;
   overflow-y: auto;
   padding: 6px;
@@ -11898,7 +11898,7 @@ details.admin-chez__analysis-section pre {
   background: transparent;
   border: 0;
   border-radius: 8px;
-  color: var(--text, #2A2252);
+  color: var(--text, #0A0A0A);
   cursor: pointer;
   display: flex;
   font: 400 13px var(--sans);
@@ -11910,7 +11910,7 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-slash-picker__row.is-active,
 .cockpit-slash-picker__row:hover {
-  background: var(--indigo-50, #F2EFF8);
+  background: var(--indigo-50, #F4F0FE);
 }
 
 .cockpit-slash-picker__row-left {
@@ -11921,12 +11921,12 @@ details.admin-chez__analysis-section pre {
 }
 
 .cockpit-slash-picker__row strong {
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   font: 600 13px var(--mono, ui-monospace, monospace);
 }
 
 .cockpit-slash-picker__preview {
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -11953,7 +11953,7 @@ details.admin-chez__analysis-section pre {
   background: var(--neutral-200, #EDEEF0);
   border: 0;
   border-radius: 999px;
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   cursor: pointer;
   display: inline-flex;
   font: 600 11px var(--sans);
@@ -11972,34 +11972,34 @@ details.admin-chez__analysis-section pre {
 .cockpit-tag-chip--add {
   background: transparent;
   border: 1px dashed var(--neutral-300, #D8DADF);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 .cockpit-tag-chip--add:hover {
-  background: var(--indigo-50, #F2EFF8);
-  border-color: var(--indigo-100, #E8E4F2);
-  color: var(--indigo, #453A70);
+  background: var(--indigo-50, #F4F0FE);
+  border-color: var(--indigo-100, #DDD3FA);
+  color: var(--indigo, #6938EF);
 }
 
 /* Color variants — one per tag_definitions.color enum value. */
-.cockpit-tag-chip--indigo { background: var(--indigo-100, #E8E4F2); color: var(--indigo, #453A70); }
-.cockpit-tag-chip--salmon { background: var(--salmon-pale, #FFE8E2); color: #B23E2C; }
+.cockpit-tag-chip--indigo { background: var(--indigo-100, #DDD3FA); color: var(--indigo, #6938EF); }
+.cockpit-tag-chip--salmon { background: var(--salmon-pale, #EFEAFE); color: #B23E2C; }
 .cockpit-tag-chip--amber  { background: rgba(199, 126, 46, 0.14); color: #7E4F18; }
-.cockpit-tag-chip--green  { background: rgba(74, 124, 89, 0.14); color: #3A6448; }
+.cockpit-tag-chip--green  { background: rgba(10, 10, 15, 0.14); color: #3A6448; }
 .cockpit-tag-chip--red    { background: rgba(214, 71, 60, 0.12); color: #C03A2D; }
-.cockpit-tag-chip--muted  { background: var(--neutral-200, #EDEEF0); color: var(--text-muted, #6F6A88); }
+.cockpit-tag-chip--muted  { background: var(--neutral-200, #EDEEF0); color: var(--text-muted, #6B6B7B); }
 
 /* --- Tag picker dropdown --- */
 .cockpit-tag-picker {
   background: var(--white, #fff);
   border: 1px solid var(--neutral-200, #EDEEF0);
   border-radius: var(--radius-sm, 10px);
-  box-shadow: 0 12px 36px rgba(42, 34, 82, 0.18);
+  box-shadow: 0 12px 36px rgba(15, 10, 40, 0.18);
   max-width: 280px;
   padding: 8px;
 }
 
 .cockpit-tag-picker__head {
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
   font: 700 10px var(--sans);
   letter-spacing: 0.12em;
   padding: 6px 8px 10px;
@@ -12020,17 +12020,17 @@ details.admin-chez__analysis-section pre {
   width: 100%;
 }
 .cockpit-tag-picker__row:hover {
-  background: var(--indigo-50, #F2EFF8);
+  background: var(--indigo-50, #F4F0FE);
 }
 
 /* ============================================================================
  * Phase 86C — Vendor card action buttons (Email / Counter)
  * ============================================================================ */
 .cockpit-vendor__act {
-  background: var(--indigo-50, #F2EFF8);
-  border: 1px solid var(--indigo-100, #E8E4F2);
+  background: var(--indigo-50, #F4F0FE);
+  border: 1px solid var(--indigo-100, #DDD3FA);
   border-radius: 6px;
-  color: var(--indigo, #453A70);
+  color: var(--indigo, #6938EF);
   cursor: pointer;
   font: 600 11px var(--sans);
   margin-left: 6px;
@@ -12038,17 +12038,17 @@ details.admin-chez__analysis-section pre {
   transition: background 120ms ease, border-color 120ms ease;
 }
 .cockpit-vendor__act:hover {
-  background: var(--indigo-100, #E8E4F2);
-  border-color: var(--indigo, #453A70);
+  background: var(--indigo-100, #DDD3FA);
+  border-color: var(--indigo, #6938EF);
 }
 .cockpit-vendor__act--counter {
-  background: var(--salmon-50, #FFF5F2);
-  border-color: var(--salmon-pale, #FFE8E2);
+  background: var(--salmon-50, #F4F0FE);
+  border-color: var(--salmon-pale, #EFEAFE);
   color: #B23E2C;
 }
 .cockpit-vendor__act--counter:hover {
-  background: var(--salmon-pale, #FFE8E2);
-  border-color: var(--salmon, #ED6955);
+  background: var(--salmon-pale, #EFEAFE);
+  border-color: var(--salmon, #6938EF);
 }
 
 .cockpit-vendor__form-feedback {
@@ -12078,15 +12078,15 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-queue-tag:hover { opacity: 0.85; }
 .cockpit-queue-tag.is-active {
-  box-shadow: 0 0 0 2px var(--indigo-700, #524580);
+  box-shadow: 0 0 0 2px var(--indigo-700, #8B6FF5);
 }
 
 .cockpit-queue-tag--clear {
   background: transparent;
   border: 1px dashed var(--neutral-300, #D8DADF);
-  color: var(--text-muted, #6F6A88);
+  color: var(--text-muted, #6B6B7B);
 }
 .cockpit-queue-tag--clear:hover {
-  background: var(--indigo-50, #F2EFF8);
-  color: var(--indigo, #453A70);
+  background: var(--indigo-50, #F4F0FE);
+  color: var(--indigo, #6938EF);
 }

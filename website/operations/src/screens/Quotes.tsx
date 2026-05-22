@@ -604,7 +604,7 @@ export default function QuotesScreen() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(42, 34, 82, 0.55)",
+            background: "rgba(15, 10, 40, 0.55)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -621,7 +621,7 @@ export default function QuotesScreen() {
               maxHeight: "85vh",
               display: "flex",
               flexDirection: "column",
-              boxShadow: "0 20px 50px rgba(42, 34, 82, 0.25)",
+              boxShadow: "0 20px 50px rgba(15, 10, 40, 0.25)",
             }}
           >
             <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--neutral-200)" }}>
@@ -736,10 +736,10 @@ function toneCss(t: PillTone): string {
   switch (t) {
     case "indigo":   return "var(--indigo)";
     case "salmon":   return "var(--salmon)";
-    case "success":  return "#4A7C59";
-    case "warning":  return "#C77E2E";
-    case "critical": return "#C25A5E";
-    case "info":     return "#5A8DB5";
+    case "success":  return "#0A0A0A";
+    case "warning":  return "#6938EF";
+    case "critical": return "#0A0A0A";
+    case "info":     return "#6B6B7B";
     default:         return "var(--neutral-400)";
   }
 }
@@ -766,8 +766,8 @@ function QuestionsPanel({ quote, comments, workspaceId, busy, onReplied }: Quest
       marginBottom: 16,
       padding: 18,
       borderRadius: 14,
-      background: "linear-gradient(155deg, #FFF5F2 0%, #FFE8E2 100%)",
-      border: "1px solid rgba(237, 105, 85, 0.35)",
+      background: "linear-gradient(155deg, #F4F0FE 0%, #EFEAFE 100%)",
+      border: "1px solid rgba(105, 56, 239, 0.35)",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Icon name="message" size={14} stroke={2} color="var(--salmon-dark)" />
@@ -842,7 +842,7 @@ function QuestionItem({
       padding: 14,
       borderRadius: 12,
       background: "#fff",
-      border: "1px solid rgba(42, 34, 82, 0.08)",
+      border: "1px solid rgba(15, 10, 40, 0.08)",
     }}>
       <div style={{
         fontSize: 10, fontWeight: 700, letterSpacing: "0.14em",
@@ -1313,12 +1313,12 @@ function TimelineRow({
         borderRadius: 999,
         background: isCurrent ? "var(--salmon)" : "#fff",
         border: isCurrent ? "none" : "2px solid var(--neutral-300, #D8DADF)",
-        boxShadow: isCurrent ? "0 0 0 3px rgba(237, 105, 85, 0.18)" : "none",
+        boxShadow: isCurrent ? "0 0 0 3px rgba(105, 56, 239, 0.18)" : "none",
       }} />
 
       <div style={{
-        background: isCurrent ? "var(--salmon-50, #FFF5F2)" : "#fff",
-        border: `1px solid ${isCurrent ? "rgba(237, 105, 85, 0.35)" : "var(--neutral-200)"}`,
+        background: isCurrent ? "var(--salmon-50, #F4F0FE)" : "#fff",
+        border: `1px solid ${isCurrent ? "rgba(105, 56, 239, 0.35)" : "var(--neutral-200)"}`,
         borderRadius: 10,
         padding: "10px 14px",
       }}>
@@ -1348,7 +1348,7 @@ function TimelineRow({
             <span style={{
               fontSize: 11,
               fontWeight: 600,
-              color: shiftTone === "down" ? "#4A7C59" : "#C25A5E",
+              color: shiftTone === "down" ? "#0A0A0A" : "#0A0A0A",
               fontVariantNumeric: "tabular-nums",
             }}>
               {shiftLabel}

@@ -226,6 +226,38 @@ final class DatabaseService {
             .value
     }
 
+    /// Fetch household users AND augment with linked family members not
+    /// already represented in the users table. Defensive against the
+    /// case where a `users` row has a stale or NULL `household_id` but
+    /// the same user IS in `family_members` with `linked_user_id` set —
+    /// the wife sign-in scenario where Tom (homeowner) had vanished
+    /// from the assignee picker because his users.household_id never
+    /// got stamped after early-onboarding migrations. Synthesized rows
+    /// carry `householdId: nil` (we don't actually know it); the
+    /// downstream consumer only cares about `id` for `assigned_to_user_id`
+    /// writes and `fullName`/`email` for display.
+    func fetchHouseholdUsersAugmented() async throws -> [UserRow] {
+        let users = (try? await fetchHouseholdUsers()) ?? []
+        let family = (try? await fetchFamilyMembers()) ?? []
+        let staff = (try? await fetchHouseholdStaff()) ?? []
+        let presentIds = Set(users.map(\.id))
+        let synthesized: [UserRow] = (family + staff).compactMap { member in
+            guard let linked = member.linkedUserId, !presentIds.contains(linked) else { return nil }
+            let fullName = [member.firstName, member.lastName]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            return UserRow(
+                id: linked,
+                householdId: nil,
+                email: member.email ?? "",
+                fullName: fullName.isEmpty ? nil : fullName,
+                role: "member",
+                createdAt: nil
+            )
+        }
+        return users + synthesized
+    }
+
     // MARK: - Documents
 
     func fetchDocuments(category: String? = nil, status: String? = nil) async throws -> [DocumentRow] {
@@ -938,6 +970,206 @@ final class DatabaseService {
             .update(payload)
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    /// Mirror of the edge function's `CATEGORY_TO_PROVIDER_TYPE`. Phase X+1:
+    /// after a user creates a contractor via VendorReviewForm, we attempt
+    /// to upsert a row into the global `utility_providers` catalog so the
+    /// vendor benefits other households once 2+ independently add the same
+    /// company. Mapping is by canonical contractor.category → catalog
+    /// provider_type. Categories not in this map are user-pending only
+    /// (no catalog contribution) — typical for free-text categories the
+    /// user typed in.
+    private static let categoryToProviderType: [String: String] = [
+        "HVAC": "hvac",
+        "Plumbing": "plumbing",
+        "Electrical": "electrical",
+        "Roofing": "roofing",
+        "Tree Service": "tree_service",
+        "Garage Door": "garage_door",
+        "Well System": "well_water_service",
+        "Septic System": "septic_pumper",
+        "Chimney": "chimney_sweep",
+        "Landscaping": "landscaping",
+        "Pest Control": "pest_control",
+        "Pool/Spa": "pool_service",
+        "Solar": "solar",
+        "Security System": "security",
+        "Irrigation": "irrigation",
+        "Waterproofing": "waterproofing"
+    ]
+
+    /// Categories where user-contributed rows would pollute the catalog
+    /// (electric/gas/insurance carriers are dominated by 2-5 national
+    /// brands; insurance "brokers" are a different product than carriers).
+    /// Skip the contribution for these — keep them admin-curated only.
+    private static let catalogContributionExcludedCategories: Set<String> = [
+        "electric", "natural_gas", "home_insurance", "auto_insurance"
+    ]
+
+    /// Phase X+1: after a household creates a contractor, attempt to
+    /// upsert a row into the global `utility_providers` catalog so real
+    /// user activity grows the shared database. Network-effect gate
+    /// keeps single-household contributions hidden from other
+    /// households (source = 'user_pending', contribution_count = 1)
+    /// until a second household adds the same vendor (matched by
+    /// normalized phone OR website domain) at which point the row
+    /// promotes to 'user_verified'.
+    ///
+    /// Silent failure — never block the contractor create on this. The
+    /// household-scoped contractors row is the source of truth.
+    func contributeToUtilityProvidersCatalog(
+        contractor: ContractorRow,
+        propertyTown: String,
+        propertyState: String
+    ) async {
+        guard let rawCategory = contractor.category else { return }
+        let category = rawCategory.trimmingCharacters(in: .whitespaces)
+        guard !category.isEmpty else { return }
+        guard let providerType = Self.categoryToProviderType[category] else { return }
+        if Self.catalogContributionExcludedCategories.contains(providerType) { return }
+
+        // Normalize identity keys so two households entering the same
+        // vendor with slight formatting differences still match.
+        let normalizedPhone = Self.normalizePhone(contractor.phone)
+        let normalizedDomain = Self.normalizeDomain(contractor.website)
+
+        // No identity signal → skip. Without phone OR website we'd
+        // create a row that can never match a second contribution,
+        // defeating the network-effect gate.
+        if normalizedPhone.isEmpty && normalizedDomain.isEmpty { return }
+
+        do {
+            // Find existing row by phone OR website domain match,
+            // scoped to the same provider_type so an electrician and
+            // a plumber sharing a phone don't collide.
+            let existing = try await findExistingCatalogContribution(
+                providerType: providerType,
+                normalizedPhone: normalizedPhone,
+                normalizedDomain: normalizedDomain
+            )
+            let stateUpper = propertyState.uppercased()
+            if let existing {
+                // Bump count + union regions. Promote pending → verified
+                // at count >= 2.
+                var existingRegions = existing.regions ?? []
+                if !existingRegions.contains(propertyTown) { existingRegions.append(propertyTown) }
+                if !existingRegions.contains(stateUpper) { existingRegions.append(stateUpper) }
+                let newCount = (existing.contributionCount ?? 1) + 1
+                let newSource: String = {
+                    let currentSource = existing.source ?? "user_pending"
+                    if currentSource == "user_pending" && newCount >= 2 { return "user_verified" }
+                    return currentSource
+                }()
+                struct ContributionUpdate: Encodable {
+                    let regions: [String]
+                    let contributionCount: Int
+                    let source: String
+                    enum CodingKeys: String, CodingKey {
+                        case regions, source
+                        case contributionCount = "contribution_count"
+                    }
+                }
+                _ = try await from("utility_providers")
+                    .update(ContributionUpdate(
+                        regions: existingRegions,
+                        contributionCount: newCount,
+                        source: newSource
+                    ))
+                    .eq("id", value: existing.id.uuidString)
+                    .execute()
+            } else {
+                // First-time contribution → insert as user_pending.
+                let slug = Self.slugifyContribution(name: contractor.companyName)
+                var insert = UtilityProviderInsert(
+                    name: contractor.companyName,
+                    slug: slug,
+                    providerType: providerType
+                )
+                insert.website = contractor.website
+                insert.phone = contractor.phone
+                insert.logoUrl = contractor.logoUrl
+                insert.brandColor = contractor.brandColor
+                insert.regions = [propertyTown, stateUpper]
+                insert.source = "user_pending"
+                insert.contributionCount = 1
+                _ = try await from("utility_providers")
+                    .insert(insert)
+                    .execute()
+            }
+        } catch {
+            // Silent — contractor creation already succeeded; the
+            // catalog contribution is best-effort.
+            print("[contributeToUtilityProvidersCatalog] skipped: \(error)")
+        }
+    }
+
+    /// Probe for an existing catalog row to attribute the new
+    /// contribution to. Match strategy: same provider_type AND
+    /// (phone match OR website-domain match). Phone is normalized to
+    /// digits-only; domain is normalized to lowercased root host.
+    private func findExistingCatalogContribution(
+        providerType: String,
+        normalizedPhone: String,
+        normalizedDomain: String
+    ) async throws -> UtilityProviderRow? {
+        var matchers: [String] = []
+        if !normalizedPhone.isEmpty {
+            // PostgREST `like` filter on phone — strip non-digits at
+            // query time would require an RPC; instead we fetch a
+            // small candidate set by partial match then filter
+            // client-side. Phone search by partial match is sufficient
+            // since contractor.phone is small.
+            matchers.append("phone.ilike.%\(normalizedPhone.suffix(7))%")
+        }
+        if !normalizedDomain.isEmpty {
+            matchers.append("website.ilike.%\(normalizedDomain)%")
+        }
+        guard !matchers.isEmpty else { return nil }
+
+        let candidates: [UtilityProviderRow] = try await from("utility_providers")
+            .select()
+            .eq("provider_type", value: providerType)
+            .or(matchers.joined(separator: ","))
+            .limit(10)
+            .execute()
+            .value
+
+        return candidates.first(where: { row in
+            let rowPhone = Self.normalizePhone(row.phone)
+            let rowDomain = Self.normalizeDomain(row.website)
+            if !normalizedPhone.isEmpty && rowPhone == normalizedPhone { return true }
+            if !normalizedDomain.isEmpty && rowDomain == normalizedDomain { return true }
+            return false
+        })
+    }
+
+    private static func normalizePhone(_ raw: String?) -> String {
+        guard let raw else { return "" }
+        return raw.filter { $0.isNumber }
+    }
+
+    private static func normalizeDomain(_ raw: String?) -> String {
+        guard let raw else { return "" }
+        let trimmed = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmed.isEmpty else { return "" }
+        var stripped = trimmed
+        if stripped.hasPrefix("https://") { stripped.removeFirst("https://".count) }
+        if stripped.hasPrefix("http://") { stripped.removeFirst("http://".count) }
+        if stripped.hasPrefix("www.") { stripped.removeFirst("www.".count) }
+        if let slash = stripped.firstIndex(of: "/") { stripped = String(stripped[..<slash]) }
+        return stripped
+    }
+
+    private static func slugifyContribution(name: String) -> String {
+        let base = name.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
+        // Append a short UUID suffix so concurrent user contributions
+        // with identical names don't collide on the slug UNIQUE index.
+        let suffix = UUID().uuidString.prefix(6).lowercased()
+        return "uc-\(base.isEmpty ? "vendor" : base)-\(suffix)"
     }
 
     /// Insert a user-supplied utility provider into the global catalog. Used

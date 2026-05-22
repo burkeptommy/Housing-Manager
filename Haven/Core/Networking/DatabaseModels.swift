@@ -4361,15 +4361,33 @@ struct UtilityProviderRow: Codable, Identifiable {
     /// decoding so older rows pre-migration just fall back to the
     /// alphabetical bucket.
     let prominenceRank: Int?
+    /// Phase X+1 (provenance): provenance discriminator. One of
+    /// 'admin' (manual seed), 'google_places' (Places snapshot),
+    /// 'vendor_application' (vendor self-applied), 'user_pending'
+    /// (one household added it), 'user_verified' (2+ households,
+    /// promoted from user_pending). Resilient decode keeps older
+    /// payloads compatible.
+    let source: String?
+    /// Phase X+1: counter for the network-effect gate. 1 on initial
+    /// admin/google_places/user_pending insert; bumped on each
+    /// additional household contribution; promotes the row to
+    /// user_verified at count >= 2 (for user_pending only).
+    let contributionCount: Int?
+    /// Phase X+1: Google Places stable identifier for rows sourced
+    /// from the Places API. UNIQUE in the catalog so the bulk-seed
+    /// and live-query upserts dedup cleanly.
+    let googlePlaceId: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, slug, website, phone, regions
+        case id, name, slug, website, phone, regions, source
         case providerType = "provider_type"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
         case bundlesWithHome = "bundles_with_home"
         case bundlesWithAuto = "bundles_with_auto"
         case prominenceRank = "prominence_rank"
+        case contributionCount = "contribution_count"
+        case googlePlaceId = "google_place_id"
     }
 
     init(from decoder: Decoder) throws {
@@ -4386,6 +4404,9 @@ struct UtilityProviderRow: Codable, Identifiable {
         bundlesWithAuto = try? c.decodeIfPresent(Bool.self, forKey: .bundlesWithAuto)
         regions = try? c.decodeIfPresent([String].self, forKey: .regions)
         prominenceRank = try? c.decodeIfPresent(Int.self, forKey: .prominenceRank)
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        contributionCount = try? c.decodeIfPresent(Int.self, forKey: .contributionCount)
+        googlePlaceId = try? c.decodeIfPresent(String.self, forKey: .googlePlaceId)
     }
 }
 
@@ -4397,12 +4418,21 @@ struct UtilityProviderInsert: Codable {
     var brandColor: String?
     var website: String?
     var phone: String?
+    // Phase X+1: provenance + region fields for the user-contribution
+    // upsert path. Omitted from the wire payload when nil so existing
+    // callers (which construct without these) round-trip unchanged.
+    var regions: [String]?
+    var source: String?
+    var googlePlaceId: String?
+    var contributionCount: Int?
 
     enum CodingKeys: String, CodingKey {
-        case name, slug, website, phone
+        case name, slug, website, phone, regions, source
         case providerType = "provider_type"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
+        case googlePlaceId = "google_place_id"
+        case contributionCount = "contribution_count"
     }
 }
 

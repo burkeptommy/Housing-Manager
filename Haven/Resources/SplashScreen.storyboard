@@ -42,7 +42,7 @@
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
         <namedColor name="ChezLaunchBackground">
-            <color alpha="1.000" blue="0.380" green="0.192" red="0.259" customColorSpace="sRGB" colorSpace="custom"/>
+            <color alpha="1.000" blue="0.937" green="0.220" red="0.412" customColorSpace="sRGB" colorSpace="custom"/>
         </namedColor>
     </resources>
 </document>

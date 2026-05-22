@@ -483,10 +483,10 @@ function toneCss(tone: PillTone): string {
   switch (tone) {
     case "indigo":   return "var(--indigo)";
     case "salmon":   return "var(--salmon)";
-    case "success":  return "#4A7C59";
-    case "warning":  return "#C77E2E";
-    case "critical": return "#C25A5E";
-    case "info":     return "#5A8DB5";
+    case "success":  return "#0A0A0A";
+    case "warning":  return "#6938EF";
+    case "critical": return "#0A0A0A";
+    case "info":     return "#6B6B7B";
     default:         return "var(--neutral-300)";
   }
 }

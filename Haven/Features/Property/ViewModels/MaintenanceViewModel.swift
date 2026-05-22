@@ -261,7 +261,11 @@ final class MaintenanceViewModel: ObservableObject {
             tasks = t
             properties = p
             contractors = c
-            users = (try? await db.fetchHouseholdUsers()) ?? []
+            // Augmented load so linked family members whose `users` row
+            // has a stale `household_id` still appear in the assignee
+            // picker. Defensive against the early-onboarding state where
+            // Tom's auth-side household linkage didn't get stamped.
+            users = (try? await db.fetchHouseholdUsersAugmented()) ?? []
             vehicles = (try? await db.fetchVehicles()) ?? []
             // Build 87 (Home Manager expansion): merge family + staff into
             // a single `familyMembers` array so the existing `linkedUserId`

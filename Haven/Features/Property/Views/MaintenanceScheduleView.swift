@@ -241,6 +241,11 @@ struct MaintenanceScheduleView: View {
     /// "Add my own instead" — fires the existing ContractorDirectoryView
     /// add sheet so they can type a contractor manually.
     @State private var showManualAddFromFindVendor = false
+    /// Phase X feedback: carries the canonical picker category propagated
+    /// from FindLocalVendorSheet's "Add my own" notification, so the
+    /// downstream ContractorDirectoryView's "+" → AddVendorSheet
+    /// pre-selects the right specialty.
+    @State private var manualAddFromFindVendorCategory: String? = nil
 
     /// Build 88: "Add Your Own" flow from the no-vendor card's dual CTA.
     /// Captures the task so the contractor selection can link back to it.
@@ -506,27 +511,35 @@ struct MaintenanceScheduleView: View {
         // FindLocalVendorSheet, that sheet posts .openManualContractorAdd
         // and dismisses. We catch the notification here and present the
         // existing manual contractor add flow as the next sheet.
-        .onReceive(NotificationCenter.default.publisher(for: .openManualContractorAdd)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .openManualContractorAdd)) { notification in
+            // Phase X feedback: read the category that FindLocalVendorSheet
+            // propagated (`userInfo["system_category"]`). Sub-system inputs
+            // like "Crawl Space" arrive already mapped to their picker key
+            // ("Waterproofing") via `SystemCategoryRegistry.pickerCategoryFor`.
+            manualAddFromFindVendorCategory = notification.userInfo?["system_category"] as? String
             showManualAddFromFindVendor = true
         }
         .sheet(isPresented: $showManualAddFromFindVendor) {
             NavigationStack {
-                ContractorDirectoryView(onSelect: { contractor in
-                    // Build 88: if triggered from a no-vendor card's "Add Your Own"
-                    // CTA, link the contractor to the task and reframe it.
-                    if let task = addOwnVendorTask {
-                        Task {
-                            await viewModel.convertToVendorManaged(
-                                taskId: task.id,
-                                contractor: contractor
-                            )
-                            await viewModel.loadTasks()
-                            Haptics.success()
+                ContractorDirectoryView(
+                    onSelect: { contractor in
+                        // Build 88: if triggered from a no-vendor card's "Add Your Own"
+                        // CTA, link the contractor to the task and reframe it.
+                        if let task = addOwnVendorTask {
+                            Task {
+                                await viewModel.convertToVendorManaged(
+                                    taskId: task.id,
+                                    contractor: contractor
+                                )
+                                await viewModel.loadTasks()
+                                Haptics.success()
+                            }
+                            addOwnVendorTask = nil
                         }
-                        addOwnVendorTask = nil
-                    }
-                    showManualAddFromFindVendor = false
-                })
+                        showManualAddFromFindVendor = false
+                    },
+                    prefilledCategoryOnAdd: manualAddFromFindVendorCategory
+                )
             }
         }
     }

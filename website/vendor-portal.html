@@ -77,9 +77,9 @@
     }
     .portal-auth-feedback.show { display: block; }
     .portal-auth-feedback.success {
-      background: rgba(74, 124, 89, 0.12);
+      background: rgba(10, 10, 15, 0.12);
       color: var(--success);
-      border: 1px solid rgba(74, 124, 89, 0.28);
+      border: 1px solid rgba(10, 10, 15, 0.28);
     }
     .portal-auth-feedback.error {
       background: var(--salmon-50);
@@ -102,7 +102,7 @@
     .portal-status strong { font-weight: 600; }
     .portal-status--pending { background: rgba(199, 126, 46, 0.12); color: var(--warning); border: 1px solid rgba(199, 126, 46, 0.28); }
     .portal-status--live    { background: var(--indigo-50); color: var(--indigo); border: 1px solid var(--indigo-100); }
-    .portal-status--cert    { background: rgba(74, 124, 89, 0.12); color: var(--success); border: 1px solid rgba(74, 124, 89, 0.28); }
+    .portal-status--cert    { background: rgba(10, 10, 15, 0.12); color: var(--success); border: 1px solid rgba(10, 10, 15, 0.28); }
     .portal-status--reject  { background: var(--salmon-50); color: var(--salmon-dark); border: 1px solid var(--salmon-pale); }
 
     /* ---------- Completion hero ---------- */
@@ -111,7 +111,7 @@
       color: var(--white);
       border-radius: var(--radius-lg);
       padding: 28px 32px;
-      box-shadow: 0 12px 32px rgba(42, 34, 82, 0.18);
+      box-shadow: 0 12px 32px rgba(15, 10, 40, 0.18);
     }
     .portal-completion h2 {
       font-family: var(--serif);
@@ -347,7 +347,7 @@
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      background: rgba(42, 34, 82, 0.78);
+      background: rgba(15, 10, 40, 0.78);
       color: var(--white);
       border: none;
       cursor: pointer;
@@ -407,7 +407,7 @@
       justify-content: space-between;
       gap: 16px;
       z-index: 50;
-      box-shadow: 0 -8px 24px rgba(42, 34, 82, 0.06);
+      box-shadow: 0 -8px 24px rgba(15, 10, 40, 0.06);
     }
     .portal-savebar.show { display: flex; }
     .portal-savebar-msg { font: 500 14px var(--sans); color: var(--text); }
@@ -448,7 +448,7 @@
     }
     .portal-toast.show { display: block; }
     .portal-toast.success {
-      background: rgba(74, 124, 89, 0.95);
+      background: rgba(10, 10, 15, 0.95);
       color: var(--white);
     }
     .portal-toast.error {
@@ -582,7 +582,7 @@
           <label>Brand color (optional)</label>
           <div style="display:flex; gap:12px; align-items:center;">
             <input type="color" id="brand_color" style="width:54px; height:40px; padding:0; border:1.5px solid var(--neutral-300); border-radius:8px; background:transparent; cursor:pointer;">
-            <input type="text" id="brand_color_text" maxlength="7" placeholder="#ED6955" style="max-width:140px;">
+            <input type="text" id="brand_color_text" maxlength="7" placeholder="#6938EF" style="max-width:140px;">
             <button type="button" class="btn btn-ghost btn-sm" id="brand_color_clear">Clear</button>
           </div>
           <div class="portal-field-helper" style="margin-top:6px;">Used as an accent on your iOS card. Defaults to Chez salmon if blank.</div>
@@ -953,7 +953,7 @@
 
     // Brand color
     const bc = app.brand_color || "";
-    $("brand_color").value = bc || "#ED6955";
+    $("brand_color").value = bc || "#6938EF";
     $("brand_color_text").value = bc || "";
 
     // Logo tile

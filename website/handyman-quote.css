@@ -31,7 +31,7 @@ body {
   overflow: hidden;
   padding: 36px 36px 40px;
   border-radius: var(--radius-xl);
-  background: linear-gradient(155deg, #524580 0%, #453A70 50%, #3D2F66 100%);
+  background: linear-gradient(155deg, #8B6FF5 0%, #6938EF 50%, #5025D1 100%);
   color: var(--text-on-indigo);
   box-shadow: var(--shadow-lg);
   margin-bottom: 20px;
@@ -134,7 +134,7 @@ body {
 }
 
 .status-chip.success {
-  background: rgba(74, 124, 89, 0.22);
+  background: rgba(10, 10, 15, 0.22);
   color: #C8E5D2;
 }
 
@@ -144,7 +144,7 @@ body {
 }
 
 .status-chip.accent {
-  background: rgba(237, 105, 85, 0.22);
+  background: rgba(105, 56, 239, 0.22);
   color: var(--salmon-light);
 }
 
@@ -156,7 +156,7 @@ body {
   backdrop-filter: none;
 }
 .quote-total-row .status-chip.success {
-  background: rgba(74, 124, 89, 0.12);
+  background: rgba(10, 10, 15, 0.12);
   color: var(--success);
 }
 .quote-total-row .status-chip.warning {
@@ -174,7 +174,7 @@ body {
 
 .surface-card {
   background: var(--white);
-  border: 1px solid rgba(42, 34, 82, 0.06);
+  border: 1px solid rgba(15, 10, 40, 0.06);
   border-radius: var(--radius-lg);
   padding: 26px 28px;
   box-shadow: var(--shadow);
@@ -256,7 +256,7 @@ body {
   padding: 16px;
   border-radius: var(--radius);
   background: var(--cream);
-  border: 1px solid rgba(42, 34, 82, 0.04);
+  border: 1px solid rgba(15, 10, 40, 0.04);
 }
 
 .context-cell {
@@ -336,7 +336,7 @@ body {
   padding: 16px 18px;
   border-radius: var(--radius);
   background: var(--cream);
-  border: 1px solid rgba(42, 34, 82, 0.05);
+  border: 1px solid rgba(15, 10, 40, 0.05);
 }
 
 .line-item-head {
@@ -468,23 +468,23 @@ textarea {
 .primary-button {
   background: var(--salmon);
   color: var(--text-on-salmon);
-  box-shadow: 0 6px 16px rgba(237, 105, 85, 0.28);
+  box-shadow: 0 6px 16px rgba(105, 56, 239, 0.28);
 }
 .primary-button:hover {
   background: var(--salmon-dark);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(237, 105, 85, 0.36);
+  box-shadow: 0 8px 20px rgba(105, 56, 239, 0.36);
 }
 
 .secondary-button {
   background: var(--salmon);
   color: var(--text-on-salmon);
-  box-shadow: 0 6px 16px rgba(237, 105, 85, 0.28);
+  box-shadow: 0 6px 16px rgba(105, 56, 239, 0.28);
 }
 .secondary-button:hover {
   background: var(--salmon-dark);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(237, 105, 85, 0.36);
+  box-shadow: 0 8px 20px rgba(105, 56, 239, 0.36);
 }
 
 .ghost-button {
@@ -538,7 +538,7 @@ textarea {
   padding: 14px 16px;
   border-radius: var(--radius);
   background: var(--cream);
-  border: 1px solid rgba(42, 34, 82, 0.04);
+  border: 1px solid rgba(15, 10, 40, 0.04);
 }
 
 .timeline-meta {
@@ -565,7 +565,7 @@ textarea {
 .signature-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(42, 34, 82, 0.5);
+  background: rgba(15, 10, 40, 0.5);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
