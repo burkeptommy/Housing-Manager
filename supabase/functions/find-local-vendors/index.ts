@@ -1180,19 +1180,29 @@ serve(async (req: Request) => {
             if (!placeId) continue;
             const domain = rootDomain(v.website);
 
-            // Prefer domain match (collapses brand shards across
-            // physical locations). Fall back to place-id match.
-            const existing =
-              (domain ? existingByRootDomain.get(domain) : undefined) ??
-              existingByPlaceId.get(placeId);
+            // Prefer place-id match first (exact same Google listing —
+            // ALWAYS merge regions, no state guard needed since it's
+            // literally the same record). Fall back to domain match
+            // (collapses brand shards across different listings).
+            const existingByPlace = existingByPlaceId.get(placeId);
+            const existingByDomainOnly = domain ? existingByRootDomain.get(domain) : undefined;
+            const existing = existingByPlace ?? existingByDomainOnly;
 
-            // Cross-state guard: if existing has a single anchored
-            // state and it isn't this search's state, treat as a
-            // separate row instead of merging regions across states.
+            // Cross-state guard ONLY applies to domain-only matches
+            // (different google_place_id, same brand domain). For
+            // exact place_id matches we always merge — same listing
+            // surfacing in two adjacent-area searches is normal for
+            // genuinely multi-market operators (e.g. Connecticut
+            // Basement Systems serving CT + NY). The guard prevents
+            // CT-only LLCs from getting MI regions tacked on via
+            // domain-relevance bleed.
+            const isPlaceIdMatch = existingByPlace !== undefined;
             const existingHomeState = existing ? homeStateOf(existing.regions) : null;
             const safeToMerge = !existing
               ? false
-              : existingHomeState === null || existingHomeState === stateUpper;
+              : isPlaceIdMatch
+                ? true  // same listing — always merge
+                : existingHomeState === null || existingHomeState === stateUpper;
 
             if (existing && safeToMerge) {
               // Expand the existing row's regions with this town/state.
