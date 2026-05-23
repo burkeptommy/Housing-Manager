@@ -271,7 +271,45 @@ interface VendorCandidate {
   isFromCatalog: boolean;
   logoUrl: string | null;
   brandColor: string | null;
+  // Phase X+6: explicit "this vendor services the user's town" flag.
+  // Set true when the catalog row's `regions` array contains the
+  // user's town verbatim. Used by iOS for the "Top Picks" sort
+  // (town-match adds +0.3 to the Bayesian score) and for the
+  // "Serves your area" pill on cards. Google-derived rows without
+  // a catalog row default to false unless their formatted_address
+  // mentions the user's town.
+  servesYourTown: boolean;
 }
+
+// Phase X+6: service-trade categories. National brands tagged
+// `regions = ['US']` (e.g. Eversource, ADT, Allstate) DO belong in
+// utility-style categories (electric/gas/insurance/internet) but DO
+// NOT belong in service-trade results — a homeowner looking for an
+// HVAC pro doesn't want a national franchise placeholder. Strict
+// town-match + state fallback gives every real local option.
+const SERVICE_TRADE_PROVIDER_TYPES = new Set([
+  "hvac",
+  "plumbing",
+  "electrical",
+  "roofing",
+  "tree_service",
+  "garage_door",
+  "septic_pumper",
+  "well_water_service",
+  "chimney_sweep",
+  "landscaping",
+  "irrigation",
+  "pest_control",
+  "pool_service",
+  "solar",
+  "security",
+  "waterproofing",
+  "generator",
+  "crawl_space",
+  "water_heater",
+  "siding",
+  "handyman",
+]);
 
 // Phase X feedback: map iOS category strings → `utility_providers.provider_type`
 // values so the catalog merge knows what to query. Keys are lowercased
@@ -427,6 +465,11 @@ async function mergeVendorApplications(
       isFromCatalog: false,
       logoUrl: null,
       brandColor: null,
+      // vendor_applications are matched at the state level (the
+      // application form captures service_area_states, not individual
+      // towns), so we can't claim a town-level match here. iOS still
+      // shows them as in-network via the existing Chez Certified pill.
+      servesYourTown: false,
     }));
 
     // Sort: chez_certified > live_unverified. The SQL ORDER BY already
@@ -476,30 +519,72 @@ async function mergeUtilityProviders(
       return existingVendors;
     }
 
-    // Query: provider_type match AND regions array overlaps with
-    // [town, state]. Reads from `utility_providers_visible` so
+    // Phase X+6: strict town-match first, with state fallback when town
+    // coverage is thin. Reads from `utility_providers_visible` so
     // single-household user_pending rows stay private until promoted.
     // When `searchQuery` is set (user typed a vendor name in find-a-pro),
     // also filter by name ILIKE — surfaces the catalog row first before
     // we ever hit Google Places for the same name.
+    //
+    // The earlier `regions && [town, state]` overlap was too broad: a
+    // vendor tagged only with state-level regions (national franchise,
+    // admin-seeded brand) showed up for every user in that state even
+    // when they had no real local presence. Tom's instruction: "only
+    // show vendors that would service that town the user lives in."
     const stateUpper = state.toUpperCase();
-    let query = supabase
+    const escapedQuery = searchQuery && searchQuery.trim().length > 0
+      ? searchQuery.trim().replace(/[%_]/g, "\\$&")
+      : null;
+    const isServiceTrade = SERVICE_TRADE_PROVIDER_TYPES.has(providerType);
+    const TOWN_FALLBACK_THRESHOLD = 10;
+
+    // --- Strict town match ---
+    let townQuery = supabase
       .from("utility_providers_visible")
       .select("id, name, slug, website, phone, logo_url, brand_color, regions, address, rating, review_count")
       .eq("provider_type", providerType)
-      .overlaps("regions", [town, state, stateUpper])
-      .limit(60);
-    if (searchQuery && searchQuery.trim().length > 0) {
-      // Escape % and _ characters so user input doesn't accidentally
-      // become a wildcard. PostgREST passes the value straight through
-      // to ILIKE.
-      const escaped = searchQuery.trim().replace(/[%_]/g, "\\$&");
-      query = query.ilike("name", `%${escaped}%`);
-    }
-    const { data: catalogRows, error } = await query;
+      .contains("regions", [town])
+      .limit(40);
+    if (escapedQuery) townQuery = townQuery.ilike("name", `%${escapedQuery}%`);
+    const { data: townRows, error: townError } = await townQuery;
+    if (townError) console.warn("[find-local-vendors] town-match query failed:", townError);
 
-    if (error || !catalogRows || catalogRows.length === 0) {
-      if (error) console.warn("[find-local-vendors] catalog merge query failed:", error);
+    // --- State fallback (only when town match is thin) ---
+    const townMatchCount = townRows?.length ?? 0;
+    let stateRows: typeof townRows = [];
+    if (townMatchCount < TOWN_FALLBACK_THRESHOLD) {
+      let stateQuery = supabase
+        .from("utility_providers_visible")
+        .select("id, name, slug, website, phone, logo_url, brand_color, regions, address, rating, review_count")
+        .eq("provider_type", providerType)
+        .overlaps("regions", [state, stateUpper])
+        .limit(60);
+      if (escapedQuery) stateQuery = stateQuery.ilike("name", `%${escapedQuery}%`);
+      const { data: sRows, error: stateError } = await stateQuery;
+      if (stateError) console.warn("[find-local-vendors] state-fallback query failed:", stateError);
+      stateRows = sRows ?? [];
+    }
+
+    // Merge dedup'd by id, town-matches first so isTownMatch can be
+    // assigned correctly downstream.
+    const townIds = new Set((townRows ?? []).map((r) => r.id));
+    const combined = [
+      ...(townRows ?? []),
+      ...(stateRows ?? []).filter((r) => !townIds.has(r.id)),
+    ];
+
+    // For service-trade categories, exclude US-national brands —
+    // homeowners want real local options, not national franchise
+    // placeholders. Utility-style categories keep them since
+    // Eversource / Optimum / Allstate ARE the right answer.
+    const catalogRows = isServiceTrade
+      ? combined.filter((r) => {
+          const regs = (r.regions ?? []).map((x: string) => x.toUpperCase());
+          return !regs.includes("US");
+        })
+      : combined;
+
+    if (catalogRows.length === 0) {
       return existingVendors;
     }
 
@@ -540,24 +625,24 @@ async function mergeUtilityProviders(
     );
 
     // Rank: town-match first (more relevant), then state-only.
+    // Phase X+6: iOS now drives the final sort, but we keep this
+    // ordering as a stable input — if iOS picks an alphabetical or
+    // "most reviewed" sort, equal-score ties preserve town-relevance.
     const townLower = town.toLowerCase();
+    const isTownMatchRow = (row: typeof catalogRows[number]): boolean =>
+      (row.regions ?? []).some((r: string) => r.toLowerCase() === townLower);
     const ranked = realCatalogRows
       .filter((row) => {
         const dom = normalizeDomain(row.website);
         return dom.length === 0 || !existingDomains.has(dom);
       })
       .sort((a, b) => {
-        const aTown = (a.regions ?? []).some(
-          (r: string) => r.toLowerCase() === townLower,
-        );
-        const bTown = (b.regions ?? []).some(
-          (r: string) => r.toLowerCase() === townLower,
-        );
+        const aTown = isTownMatchRow(a);
+        const bTown = isTownMatchRow(b);
         if (aTown !== bTown) return aTown ? -1 : 1;
-        // Tiebreak alphabetical so results are deterministic.
         return a.name.localeCompare(b.name);
       })
-      .slice(0, 10);
+      .slice(0, 15);  // Phase X+6: bumped 10 → 15 for richer initial list
 
     const catalogVendors: VendorCandidate[] = ranked.map((row) => ({
       name: row.name,
@@ -584,6 +669,8 @@ async function mergeUtilityProviders(
       isFromCatalog: true,
       logoUrl: row.logo_url ?? null,
       brandColor: row.brand_color ?? null,
+      // Phase X+6: explicit town-match flag for iOS sort + UI pill.
+      servesYourTown: isTownMatchRow(row),
     }));
 
     // Catalog rows go FIRST in the response — they're our seeded data,
@@ -673,6 +760,9 @@ serve(async (req: Request) => {
       console.log(
         `[find-local-vendors] cache HIT: ${town}, ${state}, ${cacheCategory} (${cached.length} rows)`
       );
+      const townLowerForCache = town.toLowerCase();
+      const addressMentionsTown = (addr: string | null): boolean =>
+        typeof addr === "string" && addr.toLowerCase().includes(townLowerForCache);
       const vendors = cached.map((row): VendorCandidate => ({
         name: row.vendor_name,
         address: row.address,
@@ -691,6 +781,10 @@ serve(async (req: Request) => {
         isFromCatalog: false,
         logoUrl: null,
         brandColor: null,
+        // Phase X+6: derive town-match from address text — Google
+        // returns name-relevant results that can spill into neighboring
+        // towns, so we don't blanket-trust every cache hit.
+        servesYourTown: addressMentionsTown(row.address),
       }));
       const merged = await mergeVendorApplications(supabase, vendors, state, rawCategory);
       // Phase X feedback: also merge the seeded `utility_providers`
@@ -898,6 +992,10 @@ serve(async (req: Request) => {
       .slice(0, 2);
 
     // Build the final ranked list.
+    // Phase X+6: derive servesYourTown from each candidate's address.
+    const townLowerForLive = town.toLowerCase();
+    const addressMentionsTown = (addr: string | null): boolean =>
+      typeof addr === "string" && addr.toLowerCase().includes(townLowerForLive);
     const finalVendors: VendorCandidate[] = [];
     let rank = 1;
     for (const p of havenCertified) {
@@ -915,6 +1013,7 @@ serve(async (req: Request) => {
         isFromCatalog: false,
         logoUrl: null,
         brandColor: null,
+        servesYourTown: addressMentionsTown(p.address),
       });
     }
     for (const p of suggested) {
@@ -932,6 +1031,7 @@ serve(async (req: Request) => {
         isFromCatalog: false,
         logoUrl: null,
         brandColor: null,
+        servesYourTown: addressMentionsTown(p.address),
       });
     }
 

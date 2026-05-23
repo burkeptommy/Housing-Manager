@@ -291,6 +291,10 @@ enum AnalyticsEvent: String {
     case contractorViewed = "contractor_viewed"
     case contractorSearched = "contractor_searched"
     case contractorWebsiteImport = "contractor_website_import"
+    /// Phase X+6 — user changed the sort method on FindLocalVendorSheet.
+    /// Payload: `sort` = SortOption.rawValue (top_picks / highest_rated /
+    /// most_reviewed / a_to_z). Tracks which sorts users actually pick.
+    case findVendorSortChanged = "find_vendor_sort_changed"
     case contractorContactPickerUsed = "contractor_contact_picker_used"
     case contractorReviewSubmitted = "contractor_review_submitted"
     case contractorDeleted = "contractor_deleted"

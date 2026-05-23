@@ -87,6 +87,19 @@ struct FindLocalVendorSheet: View {
     /// actually needs to make a call.
     @State private var requirePhone: Bool = false
 
+    /// Phase X+6 (sort transparency): the active sort method chosen by
+    /// the user. Persists across sessions via AppStorage so a user who
+    /// prefers "Most Reviewed" keeps it every time they open Add a Pro.
+    /// Default is `.topPicks` — our proprietary Bayesian-weighted score
+    /// with a town-match boost, in line with how Yelp/Thumbtack/Angi
+    /// surface their default sort under a branded name ("Recommended",
+    /// "Best Match"). The label is visible at the top of the list so
+    /// users never wonder how vendors are ordered.
+    @AppStorage("findVendorSort") private var sortStorage: String = SortOption.topPicks.rawValue
+    private var sortOption: SortOption {
+        get { SortOption(rawValue: sortStorage) ?? .topPicks }
+    }
+
     /// Minimum-rating filter chip. Catalog rows have nil rating
     /// (no ratings yet from Google), so the `all` case lets them
     /// through; the rating-gated cases exclude them since "no
@@ -114,6 +127,42 @@ struct FindLocalVendorSheet: View {
             case .fourPlus: return "★ 4+"
             case .fourFivePlus: return "★ 4.5+"
             case .fourEightPlus: return "★ 4.8+"
+            }
+        }
+    }
+
+    /// Phase X+6 sort method. `.topPicks` is the default — a Bayesian-
+    /// weighted rating with a +0.3 boost for vendors that explicitly
+    /// service the user's town. Industry-standard approach (IMDB Top 250,
+    /// Amazon, Netflix use the same Bayesian smoothing) that avoids the
+    /// classic `rating × reviews` pitfall where a 4.5★/600-reviews vendor
+    /// beats a 5.0★/500-reviews one. The other three options give the
+    /// user explicit control — research confirms that local-service apps
+    /// (Yelp, Thumbtack, Angi) always expose alternates alongside the
+    /// proprietary default.
+    enum SortOption: String, CaseIterable, Identifiable {
+        case topPicks = "top_picks"
+        case highestRated = "highest_rated"
+        case mostReviewed = "most_reviewed"
+        case alphabetical = "a_to_z"
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .topPicks:      return "Top Picks"
+            case .highestRated:  return "Highest Rated"
+            case .mostReviewed:  return "Most Reviewed"
+            case .alphabetical:  return "A → Z"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .topPicks:      return "sparkles"
+            case .highestRated:  return "star.fill"
+            case .mostReviewed:  return "text.bubble.fill"
+            case .alphabetical:  return "textformat"
             }
         }
     }
@@ -171,6 +220,7 @@ struct FindLocalVendorSheet: View {
                         // state shouldn't show empty chips.
                         if shouldRenderVendorList && !isLoading && loadError == nil {
                             filterChipsRow
+                            sortHeaderRow
                         }
 
                         if isLoading {
@@ -516,16 +566,63 @@ struct FindLocalVendorSheet: View {
         }
     }
 
-    /// Smart-sort comparator: ranks by rating × review count (well-rated
-    /// AND well-reviewed beats well-rated obscure). Phase X+5: this now
-    /// applies uniformly to catalog rows AND Google rows since both
-    /// carry rating data. The within-section sort gives users the best
-    /// vendors first regardless of source.
-    private func smartRank(_ a: HavenSupabase.LocalVendorResult, _ b: HavenSupabase.LocalVendorResult) -> Bool {
-        let aScore = (a.rating ?? 0) * Double(max(a.reviewCount ?? 0, 1))
-        let bScore = (b.rating ?? 0) * Double(max(b.reviewCount ?? 0, 1))
-        if aScore != bScore { return aScore > bScore }
-        return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+    /// Phase X+6 ranking. Per the SortOption chosen by the user:
+    ///
+    /// * `.topPicks` (default): Bayesian-weighted rating + town-match
+    ///   boost. Formula matches IMDB's Top 250 approach. The naive
+    ///   `rating × reviews` sort (Phase X+5) had a known flaw — a
+    ///   4.5★/600-reviews vendor would beat a 5.0★/500-reviews one,
+    ///   contrary to user intuition. Bayesian smoothing fixes that by
+    ///   weighting the observed rating against a prior (the global
+    ///   catalog average) until enough reviews accumulate to trust
+    ///   the rating on its own.
+    /// * `.highestRated`: simple rating DESC, reviews tiebreak. Power
+    ///   users who only trust top-rated picks.
+    /// * `.mostReviewed`: reviewCount DESC, rating tiebreak. "Show me
+    ///   who has the most happy customers, period."
+    /// * `.alphabetical`: name ASC. Predictable scanning for users
+    ///   who already know what they're looking for.
+    private static let bayesianPrior: Double = 4.5   // global catalog avg
+    private static let bayesianConfidence: Double = 25.0  // min reviews
+    private static let townMatchBoost: Double = 0.3
+
+    private func bayesianScore(_ v: HavenSupabase.LocalVendorResult) -> Double {
+        let r = v.rating ?? 0
+        let v_n = Double(v.reviewCount ?? 0)
+        let m = Self.bayesianConfidence
+        let C = Self.bayesianPrior
+        // weighted = (v / (v + m)) * R + (m / (v + m)) * C
+        let weighted = (v_n / (v_n + m)) * r + (m / (v_n + m)) * C
+        let townBoost = v.servesYourTown ? Self.townMatchBoost : 0.0
+        return weighted + townBoost
+    }
+
+    private func rank(_ a: HavenSupabase.LocalVendorResult, _ b: HavenSupabase.LocalVendorResult) -> Bool {
+        switch sortOption {
+        case .topPicks:
+            let aScore = bayesianScore(a)
+            let bScore = bayesianScore(b)
+            if aScore != bScore { return aScore > bScore }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        case .highestRated:
+            let aR = a.rating ?? 0
+            let bR = b.rating ?? 0
+            if aR != bR { return aR > bR }
+            let aC = a.reviewCount ?? 0
+            let bC = b.reviewCount ?? 0
+            if aC != bC { return aC > bC }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        case .mostReviewed:
+            let aC = a.reviewCount ?? 0
+            let bC = b.reviewCount ?? 0
+            if aC != bC { return aC > bC }
+            let aR = a.rating ?? 0
+            let bR = b.rating ?? 0
+            if aR != bR { return aR > bR }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        case .alphabetical:
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
     }
 
     private var isVendorSearchActive: Bool {
@@ -589,6 +686,69 @@ struct FindLocalVendorSheet: View {
         }
     }
 
+    /// Phase X+6: visible sort label + menu. Industry-standard pattern
+    /// (Yelp / Thumbtack / Angi all do this) — give users a clear
+    /// proprietary default sort with a recognizable label, plus the
+    /// ability to switch to a predictable alternate sort. Persists
+    /// across sessions via @AppStorage.
+    private var sortHeaderRow: some View {
+        let active = sortOption
+        let count = filteredVendors.count
+        return HStack(spacing: HavenTheme.spacing8) {
+            Menu {
+                ForEach(SortOption.allCases) { option in
+                    Button {
+                        Haptics.selection()
+                        sortStorage = option.rawValue
+                        Analytics.track(.findVendorSortChanged, ["sort": option.rawValue])
+                    } label: {
+                        Label {
+                            Text(option.label)
+                            if option == active {
+                                Text("✓").foregroundStyle(HavenColors.action)
+                            }
+                        } icon: {
+                            Image(systemName: option.systemImage)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: active.systemImage)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                    Text("Sort:")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Text(active.label)
+                        .font(HavenTypography.uiLabel.weight(.semibold))
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(HavenColors.creamLight)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(HavenColors.beige200, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            // Result count gives the user a sense of catalog depth and
+            // confirms the filter/sort produced something meaningful.
+            Text("\(count) \(count == 1 ? "result" : "results")")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(.horizontal, 2)
+        .padding(.top, HavenTheme.spacing4)
+    }
+
     private var vendorList: some View {
         // Phase 72: filter precedence — Chez Certified first (real human
         // verification, navy badge), then Top-Rated (Google heuristic, green
@@ -617,7 +777,7 @@ struct FindLocalVendorSheet: View {
         // (ChezFieldProviderCard) with a different adoption mechanic
         // (routes to the desktop command center), so it can't be
         // mechanically merged into the same ForEach.
-        let merged = filteredVendors.sorted(by: smartRank)
+        let merged = filteredVendors.sorted(by: rank)
         let isHandyman = systemCategory.lowercased() == "handyman"
         let chezSectionVisible = isHandyman || !chezFieldProviders.isEmpty
 
@@ -1017,6 +1177,27 @@ struct FindLocalVendorSheet: View {
                         .background(HavenColors.navy800)
                         .clipShape(Capsule())
                     }
+                }
+
+                // Phase X+6: trust indicator for vendors who actually
+                // service the user's town (regions contains user's town
+                // verbatim for catalog rows, address mentions user's
+                // town for Google rows). Makes the sort result legible
+                // — user sees both how the list is ordered AND why a
+                // specific card is where it is.
+                if vendor.servesYourTown {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(HavenColors.success)
+                        Text("Serves \(town)")
+                            .font(HavenTypography.uiCaption.weight(.medium))
+                            .foregroundStyle(HavenColors.success)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(HavenColors.success.opacity(0.1))
+                    .clipShape(Capsule())
                 }
 
                 if let address = vendor.address, !address.isEmpty {

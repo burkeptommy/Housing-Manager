@@ -1580,6 +1580,15 @@ enum HavenSupabase {
         // Nil for Google-derived and vendor_application rows.
         let logoUrl: String?
         let brandColor: String?
+        // Phase X+6: server-computed flag that the vendor actually
+        // services the user's town (rather than just being state-wide).
+        // For catalog rows: vendor's `regions` array contains the
+        // user's town verbatim. For Google rows: vendor's formatted
+        // address mentions the user's town. Drives both the "Top Picks"
+        // sort boost and the on-card "Serves your area" pill. Defaults
+        // to false for backward compat with cached server responses
+        // pre-dating the field.
+        let servesYourTown: Bool
 
         let rankPosition: Int
 
@@ -1601,6 +1610,7 @@ enum HavenSupabase {
             self.isFromCatalog = (try? c.decode(Bool.self, forKey: .isFromCatalog)) ?? false
             self.logoUrl = try? c.decodeIfPresent(String.self, forKey: .logoUrl)
             self.brandColor = try? c.decodeIfPresent(String.self, forKey: .brandColor)
+            self.servesYourTown = (try? c.decode(Bool.self, forKey: .servesYourTown)) ?? false
             self.rankPosition = (try? c.decode(Int.self, forKey: .rankPosition)) ?? 0
         }
 
@@ -1618,6 +1628,7 @@ enum HavenSupabase {
             isFromCatalog: Bool = false,
             logoUrl: String? = nil,
             brandColor: String? = nil,
+            servesYourTown: Bool = false,
             rankPosition: Int
         ) {
             self.name = name
@@ -1632,6 +1643,7 @@ enum HavenSupabase {
             self.isFromCatalog = isFromCatalog
             self.logoUrl = logoUrl
             self.brandColor = brandColor
+            self.servesYourTown = servesYourTown
             self.rankPosition = rankPosition
         }
     }
