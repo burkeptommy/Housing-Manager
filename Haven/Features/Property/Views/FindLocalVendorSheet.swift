@@ -603,50 +603,32 @@ struct FindLocalVendorSheet: View {
         // DIRECTORY of remaining live Google results, smart-ranked by
         // rating × review count. Filter chips (4+, 4.5+, 4.8+) apply
         // across every section uniformly.
-        // Phase X+5: catalog rows now carry rating data so they sort
-        // by smartRank too (within FROM YOUR AREA). Rows without rating
-        // (some admin national brands) sort to the bottom but stay
-        // visible. The edge function still ranks town-match first
-        // before passing to iOS, so within each rating tier the
-        // closest-region vendor wins.
-        let fromCatalog = filteredVendors
-            .filter { $0.isFromCatalog }
-            .sorted(by: smartRank)
-        let chezCertified = filteredVendors
-            .filter { !$0.isFromCatalog && $0.isChezCertified }
-            .sorted(by: smartRank)
-        let directory = filteredVendors
-            .filter { !$0.isFromCatalog && !$0.isChezCertified }
-            .sorted(by: smartRank)
+        // Phase X+6: one merged directory. The earlier 3-section split
+        // (FROM YOUR AREA / CHEZ CERTIFIED / DIRECTORY) was tech debt
+        // from when catalog rows didn't carry rating + address — they
+        // couldn't be smart-ranked alongside Google rows. Phase X+5
+        // closed that gap; every row now has the same data shape, so
+        // the sections were just visual noise. The service-area scope
+        // is already enforced server-side (regions && [town, state]
+        // overlap), so every row in the response is in-area. Within
+        // that scope we just want the most popular vendors first.
+        //
+        // ON CHEZ stays as its own section — different card component
+        // (ChezFieldProviderCard) with a different adoption mechanic
+        // (routes to the desktop command center), so it can't be
+        // mechanically merged into the same ForEach.
+        let merged = filteredVendors.sorted(by: smartRank)
         let isHandyman = systemCategory.lowercased() == "handyman"
         let chezSectionVisible = isHandyman || !chezFieldProviders.isEmpty
 
         return VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
-            // Phase X feedback: catalog rows ("FROM YOUR AREA") render
-            // above every other tier because they're seeded, sourced,
-            // and region-matched — the highest-relevance signal we have
-            // before a human verifies. No badge color claim ("Top-Rated"
-            // is Google's heuristic and "Chez Certified" is operator
-            // verification); this section is just "from our catalog."
-            if !fromCatalog.isEmpty {
-                Text("FROM YOUR AREA")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.2)
-                    .foregroundStyle(HavenColors.navy700)
-                VStack(spacing: HavenTheme.spacing12) {
-                    ForEach(fromCatalog) { vendor in
-                        vendorCard(vendor)
-                    }
-                }
-            }
-
             // Chez Field providers — registered via the desktop command
-            // center, opted into the homeowner directory. Render at the
-            // top because they're already in the network and have
+            // center, opted into the homeowner directory. Renders at
+            // the top because they're already in the network and have
             // verified workspace identity. For handyman category we
-            // always render the section so the user can discover the
-            // directory and browse it actively, even when no providers
-            // auto-match in their area.
+            // always show the section so the user can browse the
+            // directory actively, even when no providers auto-match
+            // in their area.
             if chezSectionVisible {
                 Text("ON CHEZ")
                     .font(HavenTypography.uiSectionHeader)
@@ -682,38 +664,19 @@ struct FindLocalVendorSheet: View {
                 }
             }
 
-            // Phase 72: real Chez Certified — vendors who applied + we
-            // personally verified. Highest-trust tier, navy badge.
-            if !chezCertified.isEmpty {
-                Text("CHEZ CERTIFIED")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.2)
-                    .foregroundStyle(HavenColors.navy800)
-                    .padding(.top, (chezSectionVisible || !fromCatalog.isEmpty) ? HavenTheme.spacing8 : 0)
+            // Phase X+6: one merged directory of every vendor in the
+            // user's service area, sorted by popularity (rating ×
+            // reviews). No section header — the directory IS the
+            // surface. Chez Certified vendors keep their navy pill on
+            // the card itself, so the verification signal survives the
+            // section removal. Filter chips apply uniformly.
+            if !merged.isEmpty {
                 VStack(spacing: HavenTheme.spacing12) {
-                    ForEach(chezCertified) { vendor in
+                    ForEach(merged) { vendor in
                         vendorCard(vendor)
                     }
                 }
-            }
-
-            // Phase X+5: flat directory replaces the prior Top-Rated +
-            // Suggested split. One section, smart-ranked by rating ×
-            // review count. The rating filter chips still apply, so a
-            // user who wants only 4.5+ rated vendors gets them via the
-            // filter — no need for a separate "Top-Rated" label that
-            // implied verification we didn't actually do.
-            if !directory.isEmpty {
-                Text("DIRECTORY")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.2)
-                    .foregroundStyle(HavenColors.textTertiary)
-                    .padding(.top, (chezCertified.isEmpty && !chezSectionVisible && fromCatalog.isEmpty) ? 0 : HavenTheme.spacing8)
-                VStack(spacing: HavenTheme.spacing12) {
-                    ForEach(directory) { vendor in
-                        vendorCard(vendor)
-                    }
-                }
+                .padding(.top, chezSectionVisible ? HavenTheme.spacing8 : 0)
             }
 
             // Phase X feedback: when the user typed a name that doesn't
@@ -742,7 +705,7 @@ struct FindLocalVendorSheet: View {
                 && lastSearchedQuery.caseInsensitiveCompare(
                     vendorSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
                 ) == .orderedSame
-                && chezCertified.isEmpty && directory.isEmpty && fromCatalog.isEmpty {
+                && merged.isEmpty {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                     Text("No matches for \"\(vendorSearchQuery)\"")
                         .font(HavenTypography.bodySmall.weight(.semibold))
