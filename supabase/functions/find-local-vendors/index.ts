@@ -989,12 +989,27 @@ serve(async (req: Request) => {
         // AND aren't in the category-pollution blocklist for this
         // category. Sorted by rating + review count, capped at 15 per
         // (town, category) to keep upserts tight.
+        //
+        // Phase X+5: also REJECT candidates whose formatted address
+        // is in a state other than the one being searched. Google
+        // Places matches on name-relevance and will surface (e.g.)
+        // Redding, California businesses for a "near Redding, CT"
+        // query because the town name matches. Without this check
+        // we snapshot CA rows tagged with CT regions and a CT user
+        // typing "Redding" in find-a-pro sees California companies.
+        const addressStateMatches = (address: string | null): boolean => {
+          if (!address) return true;  // no address → can't reject, accept
+          const m = address.match(/, ([A-Z]{2}) \d{5}/);
+          if (!m) return true;  // unparseable → accept
+          return m[1].toUpperCase() === stateUpper;
+        };
         const catalogCandidates = serviceProviders
           .filter((p) =>
             (p.website && p.website.trim().length > 0) ||
             (p.phone && p.phone.trim().length > 0)
           )
           .filter((p) => !isCategoryPolluter(providerType, p.name))
+          .filter((p) => addressStateMatches(p.address))
           .sort((a, b) => {
             if (b.rating !== a.rating) return b.rating - a.rating;
             return b.reviewCount - a.reviewCount;
