@@ -6,6 +6,16 @@ struct VendorActionItem: Identifiable {
     let systemName: String
 }
 
+/// Dashboard noise audit (May 2026): Identifiable wrappers so
+/// Recent Activity taps can present focused detail sheets via
+/// `.sheet(item:)` against a raw UUID payload.
+struct DashboardActivityDocumentRef: Identifiable {
+    let id: UUID
+}
+struct DashboardActivityVehicleRef: Identifiable {
+    let id: UUID
+}
+
 struct DashboardView: View {
     private static let phase66ReleaseDate = ISO8601DateFormatter().date(from: "2026-04-20T00:00:00Z") ?? Date.distantPast
 
@@ -23,6 +33,15 @@ struct DashboardView: View {
     @State private var hasAppeared = false
     @State private var selectedDashboardTask: MaintenanceTaskDBRow?
     @AppStorage("hasSeenSecurityBadge") private var hasSeenSecurityBadge = false
+    // Dashboard noise audit (May 2026) — mirror each enrichment-nudge
+    // card's @AppStorage dismissal so the priority resolver in this
+    // view can pick the single highest-priority active card and skip
+    // the rest. The cards themselves still own the writes; we only
+    // read here to gate which one renders.
+    @AppStorage("maintenanceReorganizedCardDismissed_v1") private var maintenanceReorganizedDismissed = false
+    @AppStorage("hasSeenLegacyTasksCleanupP61") private var legacyTasksDismissed = false
+    @AppStorage("hnwSubtypeReviewDismissed") private var hnwSubtypeReviewDismissedRaw: String = ""
+    @AppStorage("whatsNewPhase57Dismissed") private var whatsNewPhase57Dismissed = false
     @State private var gettingStartedExpanded = false
     @State private var showServiceContractSheet = false
     @State private var serviceContractType: String = ""
@@ -58,6 +77,15 @@ struct DashboardView: View {
     /// `selectedMemberForProfile` stays for tapping a family-member-joined
     /// activity event in the recent feed; chooser + add form are gone.
     @State private var selectedMemberForProfile: FamilyMemberRow?
+    // Dashboard noise audit (May 2026): Recent Activity taps land on
+    // focused detail sheets instead of generic tab roots. Each entity
+    // event sets its own state and a `.sheet(item:)` presents the
+    // matching detail view. Same pattern as `selectedDashboardTask` /
+    // `selectedMemberForProfile`.
+    @State private var selectedActivityContractor: ContractorRow?
+    @State private var selectedActivitySystem: HomeSystemRow?
+    @State private var selectedActivityDocument: DashboardActivityDocumentRef?
+    @State private var selectedActivityVehicle: DashboardActivityVehicleRef?
     @State private var showAddressCompletion = false
     @State private var activeQuizProperty: PropertyRow?
     @State private var showQuizSkipDialog = false
@@ -139,6 +167,12 @@ struct DashboardView: View {
         // becomes near-invisible against the navy backdrop.
         .toolbarBackground(HavenColors.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        // `.toolbarBackground` sets the bar color but iOS 17 still picks
+        // status-bar text + toolbar tint from the brightness of content
+        // scrolled underneath. Lock to light scheme so the shield / Chez
+        // wordmark / inbox / settings stay dark on pearl-white at every
+        // scroll position.
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 
     /// Phase 95.3 — toolbar content moved out of the body's modifier
@@ -479,6 +513,30 @@ struct DashboardView: View {
                 }
                 .presentationDetents([.large])
             }
+            // Dashboard noise audit (May 2026): Recent Activity rows
+            // present focused detail sheets so taps land on the specific
+            // contractor / system / document / vehicle instead of a
+            // generic tab root.
+            .sheet(item: $selectedActivityContractor) { contractor in
+                NavigationStack {
+                    ContractorDetailView(contractor: contractor)
+                }
+            }
+            .sheet(item: $selectedActivitySystem) { system in
+                NavigationStack {
+                    SystemDetailRowView(system: system)
+                }
+            }
+            .sheet(item: $selectedActivityDocument) { ref in
+                NavigationStack {
+                    DocumentDetailView(documentID: ref.id)
+                }
+            }
+            .sheet(item: $selectedActivityVehicle) { ref in
+                NavigationStack {
+                    VehicleDetailView(vehicleID: ref.id)
+                }
+            }
             .fullScreenCover(isPresented: $showScenarioStudio) {
                 ScenarioStudioView()
             }
@@ -594,6 +652,18 @@ struct DashboardView: View {
             // when a member is added/removed via Settings or the quiz.
             // viewModel.refresh() already loads both lists.
             .onReceive(NotificationCenter.default.publisher(for: .householdMemberChanged)) { _ in
+                Task { await viewModel.refresh() }
+            }
+            // Dashboard noise audit Round 3 (May 2026): the Chez
+            // ownership view now stages toggles and commits on Save.
+            // When that commit fires `.chezOwnershipGroupsChanged`, the
+            // Chez at-a-glance row at the top of this view needs to
+            // re-read `chezActiveGroupCount` so the headline updates
+            // without the user having to pull-to-refresh.
+            .onReceive(NotificationCenter.default.publisher(for: .chezOwnershipGroupsChanged)) { _ in
+                Task { await viewModel.refresh() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .chezDelegationChanged)) { _ in
                 Task { await viewModel.refresh() }
             }
             .sheet(isPresented: $showDashboardDelegationSheet) {
@@ -886,63 +956,19 @@ struct DashboardView: View {
         // pending → scheduled → en_route → in_progress →
         // submitted → awaiting_review. Suppresses the
         // quiz prompt + Coverage Hero while active.
-        if let assessment = viewModel.homeAssessment {
-            HomeAssessmentPendingCard(
-                assessment: assessment,
-                handymanFirstName: nil,  // Wired post-dispatch from chez_pending_assessments_v
-                handymanPhotoURL: nil,
-                scheduledWindowText: nil,
-                onReviewCaptured: {
-                    NotificationCenter.default.post(
-                        name: .openChezAssessmentReview,
-                        object: nil,
-                        userInfo: ["assessment_id": assessment.id.uuidString]
-                    )
-                },
-                onReschedule: {
-                    showAssessmentRescheduleSheet = true
-                },
-                onSwitchToDIY: {
-                    confirmAssessmentCancel = true
-                },
-                // Round 5: whole card tap opens the consolidated detail
-                // sheet (visit info + prep checklist + actions). The
-                // standalone HomeAssessmentPrepCard below is gone — its
-                // 3 prep rows are now inside the detail sheet, cutting
-                // dashboard bulk roughly in half for this surface.
-                onTapCard: {
-                    Haptics.light()
-                    showAssessmentDetailSheet = true
-                }
-            )
-        }
+        // Dashboard noise audit (May 2026): HomeAssessmentPendingCard
+        // moved out of the setup-banner stack. The handyman assessment
+        // is conceptually an upcoming visit (one in the process of
+        // being booked), so it now renders as the topmost row inside
+        // upcomingScheduledSection — same shape as a vendor-visit row
+        // with a state pill in place of the date. Reschedule and
+        // switch-to-DIY actions live inside AssessmentDetailSheet,
+        // which the row taps into.
 
-        // Phase 66: One-time "We reorganized your
-        // maintenance" card for existing TestFlight
-        // users. Dismisses permanently via @AppStorage.
-        //
-        // Phase 95.1 fix: gate on accountCreatedAt < phase66ReleaseDate
-        // in addition to hasCompletedAnyQuiz, so brand-new signups (who
-        // never saw the old layout) don't see a "we reorganized" message
-        // about a tab they've never seen the old version of. Mirrors the
-        // WhatsNewPhase57Card pattern documented in CLAUDE.md. Caught by
-        // overnight E2E (W4S16 — card was dominating first-launch
-        // viewport on the seeded test user, who was created after
-        // Phase 66 shipped).
-        if viewModel.hasCompletedAnyQuiz,
-           let accountCreated = viewModel.accountCreatedAt,
-           accountCreated < Self.phase66ReleaseDate {
-            MaintenanceReorganizedCard(
-                onLearnMore: {
-                    NotificationCenter.default.post(
-                        name: .switchToTab,
-                        object: nil,
-                        userInfo: ["tab": 1]
-                    )
-                },
-                onDismiss: {}
-            )
-        }
+        // Dashboard noise audit (May 2026): MaintenanceReorganizedCard
+        // moved into `enrichmentNudgeSlot` so the one-time TestFlight
+        // notice is priority-ranked alongside HNW review / Phase 57 /
+        // Legacy tasks instead of competing with the quiz hero.
 
         // 2. Getting Started / Quiz hero — Day 0 focal point.
         // Phase 50 (sub-phase B first-login): only renders
@@ -989,25 +1015,16 @@ struct DashboardView: View {
         // routes to the new What Chez Handles page where
         // the homeowner can flip group toggles or browse
         // their inventory of delegated entities.
+        // Dashboard noise audit (May 2026): collapsed the Chez
+        // ownership hero from a card-with-CTA to a single tappable row.
+        // The row stays as the at-a-glance entry; ChezOwnershipView
+        // itself owns the Full Mode toggle + explainer copy.
         if viewModel.hasCompletedAnyQuiz {
             ChezOwnershipHeroCard(
                 activeGroupCount: viewModel.chezActiveGroupCount,
                 delegatedItemCount: viewModel.chezDelegatedItemCount,
                 onTap: {
                     Haptics.light()
-                    navigationPath.append("chez_ownership")
-                },
-                onHandOffEverything: {
-                    // Phase 95 audit fix — direct shortcut
-                    // into ChezOwnershipView with the
-                    // "hand off everything" confirmation
-                    // dialog already armed. UserInfo flag
-                    // is read by ChezOwnershipView's
-                    // .task to surface the modal.
-                    NotificationCenter.default.post(
-                        name: .triggerChezFullMode,
-                        object: nil
-                    )
                     navigationPath.append("chez_ownership")
                 }
             )
@@ -1094,7 +1111,9 @@ struct DashboardView: View {
         }
 
         if viewModel.hasCompletedAnyQuiz,
-           (!viewModel.upcomingVendorVisits.isEmpty || viewModel.nextStandingVisit != nil) {
+           (viewModel.homeAssessment != nil
+             || !viewModel.upcomingVendorVisits.isEmpty
+             || viewModel.nextStandingVisit != nil) {
             upcomingScheduledSection
         }
 
@@ -1109,9 +1128,27 @@ struct DashboardView: View {
                 onUploadDoc: {
                     showUploadDocument = true
                 },
-                onScenarioStudio: {
-                    showScenarioStudio = true
-                    Analytics.track(.scenarioStudioOpened, ["source": "dashboard_quick_action"])
+                onAskChez: {
+                    // Dashboard noise audit (May 2026): "Plan ahead"
+                    // tile replaced with Chez compose. Scenario Studio
+                    // is still reachable via the floating What-If
+                    // button on every tab. Posting
+                    // `.openChezRequestComposer` lets MainTabView
+                    // present the compose sheet globally; that
+                    // handler also tracks `chezEntryButtonTapped`.
+                    Haptics.light()
+                    NotificationCenter.default.post(
+                        name: .openChezRequestComposer,
+                        object: nil,
+                        userInfo: [
+                            "category": ChezCategory.general.rawValue,
+                            "context": [
+                                "_source": "dashboard_quick_action",
+                                "source_entity_type": "dashboard",
+                                "source_entity_label": "Dashboard quick action",
+                            ],
+                        ]
+                    )
                 },
                 onAddVendor: {
                     showDashboardAddVendor = true
@@ -1123,51 +1160,16 @@ struct DashboardView: View {
     /// Phase 95.2 — What's New, legacy tasks, cadence suggestion, pickup banner, recent activity, Chez entry pill, make-it-yours, expecting members.
     @ViewBuilder
     private var dashboardActivityStack: some View {
-        // Phase 57: "What's New" card surfaces the new
-        // HNW routines to existing users. Only renders for
-        // properties created before the release cutoff and
-        // stays dismissed once the user closes it. Opens
-        // `UpdateHomeDetailsSheet` for opt-in review.
-        if viewModel.hasCompletedAnyQuiz,
-           let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
-            WhatsNewPhase57Card(
-                property: primaryProperty,
-                onReviewComplete: {
-                    Task { await viewModel.refresh() }
-                }
-            )
-        }
-
-        // Phase 3.1: HNW subtype review for newly onboarded
-        // properties. The Phase 57 "What's New" card targets
-        // existing pre-release users; this companion card runs
-        // the same opt-in review for properties created within
-        // the last 14 days, while the homeowner is still
-        // actively configuring the home. Dismissal is tracked
-        // per-property so multi-property households can review
-        // each one independently.
-        if viewModel.hasCompletedAnyQuiz,
-           let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
-            HNWSubtypeReviewCard(
-                property: primaryProperty,
-                onReviewComplete: {
-                    Task { await viewModel.refresh() }
-                }
-            )
-        }
-
-        // Phase 61: Legacy task cleanup notification.
-        // Renders only when the household has archived tasks
-        // AND the user hasn't dismissed. Tapping opens the
-        // LegacyTasksView sheet directly from the Dashboard.
-        if viewModel.hasCompletedAnyQuiz,
-           let accountCreated = viewModel.accountCreatedAt,
-           accountCreated < Self.phase66ReleaseDate {
-            LegacyTasksNotificationCard(
-                legacyCount: viewModel.legacyTaskCount,
-                onViewDetails: { showLegacyTasks = true }
-            )
-        }
+        // Dashboard noise audit (May 2026): single enrichment-nudge
+        // slot. Renders only the highest-priority active card so
+        // pre-release users + new-property users don't see stacked
+        // "Review your home" prompts. Priority: Maintenance Reorganized
+        // (one-time cleanup) > Legacy Tasks (TestFlight cleanup) >
+        // HNW Subtype Review (new property, 14-day window) > What's
+        // New Phase 57 (existing pre-release users). Each card's own
+        // dismissal @AppStorage still gates the writes; we mirror
+        // the reads here.
+        enrichmentNudgeSlot
 
         // Chez v1: FindHandymanCard moved to Tasks → Handyman
         // hero ("Find a handyman" CTA). One canonical entry
@@ -1222,7 +1224,7 @@ struct DashboardView: View {
         // "View all activity" → ActivityLogView.
         if viewModel.hasCompletedAnyQuiz && !viewModel.dashboardActivityEvents.isEmpty {
             RecentActivityFeed(
-                events: Array(viewModel.dashboardActivityEvents.prefix(7)),
+                events: Array(viewModel.dashboardActivityEvents.prefix(5)),
                 totalEventCount: viewModel.allActivityEvents.count,
                 onTap: { event in
                     handleActivityTap(event)
@@ -1240,25 +1242,11 @@ struct DashboardView: View {
         // entry points remain without the dashboard
         // clutter.
 
-        // Phase 80 — Chez Concierge entry. Subtle
-        // "Need help with anything? Ask Chez" pill
-        // anchored near the bottom of the dashboard.
-        // Gated on `hasCompletedAnyQuiz` so first-day
-        // users aren't pulled away from the quiz CTA;
-        // post-quiz it's the universal escape hatch.
-        if viewModel.hasCompletedAnyQuiz {
-            ChezEntryButton(
-                category: .general,
-                label: "Need help? Ask Chez",
-                caption: "Chez replies within 1 business day.",
-                context: [
-                    "_source": "dashboard_post_quiz",
-                    "source_entity_type": "dashboard",
-                    "source_entity_label": "Dashboard concierge request",
-                ]
-            )
-            .padding(.top, HavenTheme.spacing4)
-        }
+        // Phase 80 bottom "Need help? Ask Chez" pill removed in the
+        // dashboard noise audit (May 2026). Chez compose is promoted to
+        // a primary Quick Actions tile; the Ownership row above and 17
+        // in-context entry points across the app keep delegation
+        // reachable.
 
         // ── Conditional sections ──
 
@@ -1486,6 +1474,106 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Dashboard noise audit (May 2026): the single enrichment-nudge
+    /// slot. Priority order (high → low): Maintenance Reorganized
+    /// (one-time TestFlight notice) → Legacy Tasks → HNW Subtype Review
+    /// → What's New Phase 57. Only the highest-priority active card
+    /// renders. Each card's own @AppStorage dismissal flag is still
+    /// the source of truth — we read the same key here so the resolver
+    /// stays in sync.
+    @ViewBuilder
+    private var enrichmentNudgeSlot: some View {
+        if shouldShowMaintenanceReorganizedNudge {
+            MaintenanceReorganizedCard(
+                onLearnMore: {
+                    // Dashboard noise audit (May 2026): the card
+                    // announces "we reorganized your maintenance into
+                    // a single hub" — that hub now lives on the Tasks
+                    // tab (Phase 67 V5 TasksHubView), not the Property
+                    // tab. Route there so "Learn more" lands the user
+                    // on the new surface the card is explaining.
+                    NotificationCenter.default.post(
+                        name: .switchToTab,
+                        object: nil,
+                        userInfo: ["tab": 2]
+                    )
+                },
+                onDismiss: {}
+            )
+        } else if shouldShowLegacyTasksNudge {
+            LegacyTasksNotificationCard(
+                legacyCount: viewModel.legacyTaskCount,
+                onViewDetails: { showLegacyTasks = true }
+            )
+        } else if shouldShowHNWReviewNudge,
+                  let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
+            HNWSubtypeReviewCard(
+                property: primaryProperty,
+                onReviewComplete: {
+                    Task { await viewModel.refresh() }
+                }
+            )
+        } else if shouldShowPhase57Nudge,
+                  let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }) {
+            WhatsNewPhase57Card(
+                property: primaryProperty,
+                onReviewComplete: {
+                    Task { await viewModel.refresh() }
+                }
+            )
+        }
+    }
+
+    private var shouldShowMaintenanceReorganizedNudge: Bool {
+        guard viewModel.hasCompletedAnyQuiz,
+              !maintenanceReorganizedDismissed,
+              let accountCreated = viewModel.accountCreatedAt else {
+            return false
+        }
+        return accountCreated < Self.phase66ReleaseDate
+    }
+
+    private var shouldShowLegacyTasksNudge: Bool {
+        guard viewModel.hasCompletedAnyQuiz,
+              !legacyTasksDismissed,
+              viewModel.legacyTaskCount > 0,
+              let accountCreated = viewModel.accountCreatedAt else {
+            return false
+        }
+        return accountCreated < Self.phase66ReleaseDate
+    }
+
+    private var shouldShowHNWReviewNudge: Bool {
+        guard viewModel.hasCompletedAnyQuiz,
+              let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }),
+              let createdAt = primaryProperty.createdAt else {
+            return false
+        }
+        // Mirror HNWSubtypeReviewCard.dismissedIds parsing — comma-joined
+        // UUID list keyed on property id so multi-property households
+        // dismiss per-property.
+        let dismissed = Set(
+            hnwSubtypeReviewDismissedRaw
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+        )
+        if dismissed.contains(primaryProperty.id.uuidString) { return false }
+        let interval = Date().timeIntervalSince(createdAt)
+        let windowSeconds = Double(HNWSubtypeReviewCard.visibilityWindowDays) * 24 * 60 * 60
+        return interval >= 0 && interval <= windowSeconds
+    }
+
+    private var shouldShowPhase57Nudge: Bool {
+        guard viewModel.hasCompletedAnyQuiz,
+              !whatsNewPhase57Dismissed,
+              let primaryProperty = viewModel.properties.first(where: { $0.id == viewModel.primaryPropertyId }),
+              let createdAt = primaryProperty.createdAt else {
+            return false
+        }
+        return createdAt < WhatsNewPhase57Card.phase57ReleaseDate
+    }
+
     @ViewBuilder
     private var upcomingScheduledSection: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
@@ -1521,7 +1609,33 @@ struct DashboardView: View {
 
             HavenCard {
                 VStack(spacing: 0) {
+                    // Dashboard noise audit (May 2026): handyman
+                    // assessment renders as the topmost row of the
+                    // Upcoming list when active. Same row family as a
+                    // vendor visit — only the state pill marks it as
+                    // in-flight rather than booked.
                     let visits = Array(viewModel.upcomingVendorVisits.prefix(3))
+                    let visitRowsCount: Int = {
+                        if !visits.isEmpty { return visits.count }
+                        return viewModel.nextStandingVisit != nil ? 1 : 0
+                    }()
+
+                    if let assessment = viewModel.homeAssessment {
+                        Button {
+                            Haptics.light()
+                            showAssessmentDetailSheet = true
+                        } label: {
+                            assessmentUpcomingRow(assessment)
+                        }
+                        .buttonStyle(.plain)
+
+                        if visitRowsCount > 0 {
+                            Divider()
+                                .background(HavenColors.beige200)
+                                .padding(.leading, 44)
+                        }
+                    }
+
                     if !visits.isEmpty {
                         ForEach(Array(visits.enumerated()), id: \.element.id) { index, visit in
                             Button {
@@ -1543,7 +1657,16 @@ struct DashboardView: View {
                         }
                     } else if let nextStandingVisit = viewModel.nextStandingVisit {
                         Button {
-                            navigationPath.append("maintenance")
+                            // Dashboard noise audit (May 2026): standing
+                            // visits are routine-based recurring visits
+                            // without a dedicated detail view. The
+                            // Calendar layout of MaintenanceScheduleView
+                            // is the canonical "see all my upcoming
+                            // visits in context" surface — closer to
+                            // what the tapper wants than the generic
+                            // MaintenanceHub. Surface the visit on the
+                            // calendar where it lives.
+                            navigationPath.append("maintenance_calendar")
                         } label: {
                             upcomingVisitRow(
                                 title: nextStandingVisit.title,
@@ -1556,6 +1679,98 @@ struct DashboardView: View {
                 }
             }
         }
+    }
+
+    /// Dashboard noise audit (May 2026): the handyman assessment lives
+    /// inside the Upcoming list as a single row. Same visual family as
+    /// `upcomingVisitRow` — purple-tinted Chez icon, headline copy
+    /// reflecting the assessment lifecycle, optional state pill on the
+    /// right. Tap routes to AssessmentDetailSheet where reschedule +
+    /// switch-to-DIY actions live.
+    private func assessmentUpcomingRow(_ assessment: HomeAssessmentRow) -> some View {
+        HStack(spacing: HavenTheme.spacing12) {
+            Image(systemName: "person.fill.questionmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(HavenColors.action)
+                .frame(width: 32, height: 32)
+                .background(HavenColors.action.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(assessmentRowTitle(for: assessment))
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text("Chez handyman · Free")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            assessmentStatePill(for: assessment.status)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(.vertical, HavenTheme.spacing12)
+    }
+
+    private func assessmentRowTitle(for assessment: HomeAssessmentRow) -> String {
+        switch assessment.status {
+        case .pending:
+            return "Home assessment"
+        case .scheduled:
+            return "Home assessment"
+        case .enRoute:
+            return "Home assessment · Heading your way"
+        case .inProgress:
+            return "Home assessment · Visit in progress"
+        case .submitted, .awaitingReview:
+            return "Home assessment · Review needed"
+        case .correctionsRequested:
+            return "Home assessment · Corrections in progress"
+        case .ingestionFailed:
+            return "Home assessment · Action needed"
+        case .completed, .cancelled:
+            return "Home assessment"
+        }
+    }
+
+    private func assessmentStatePill(for status: HomeAssessmentStatus) -> some View {
+        let (label, tint): (String, Color) = {
+            switch status {
+            case .pending:
+                return ("Being assigned", HavenColors.action)
+            case .scheduled:
+                return ("Scheduled", HavenColors.navy700)
+            case .enRoute:
+                return ("En route", HavenColors.action)
+            case .inProgress:
+                return ("In progress", HavenColors.action)
+            case .submitted, .awaitingReview:
+                return ("Review", HavenColors.warning)
+            case .correctionsRequested:
+                return ("In progress", HavenColors.action)
+            case .ingestionFailed:
+                return ("Action", HavenColors.warning)
+            case .completed:
+                return ("Complete", Color.green)
+            case .cancelled:
+                return ("Cancelled", HavenColors.textTertiary)
+            }
+        }()
+
+        return Text(label)
+            .font(HavenTypography.uiLabelSmall)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(tint.opacity(0.12))
+            .clipShape(Capsule())
     }
 
     private func upcomingVisitRow(title: String, vendor: String, date: String) -> some View {
@@ -2402,6 +2617,12 @@ struct DashboardView: View {
 
     // MARK: - Activity Tap Handler
 
+    /// Dashboard noise audit (May 2026): tapping a Recent Activity row
+    /// lands on the SPECIFIC entity's detail view, not the generic tab
+    /// root. Each branch looks up the entity by `event.entityId` against
+    /// the loaded view-model collections; if the lookup fails (entity
+    /// archived, household swapped, etc.) we fall back to the closest
+    /// focused destination rather than dumping the user on the tab.
     private func handleActivityTap(_ event: RecentActivityEvent) {
         switch event.eventType {
         case .taskCompleted:
@@ -2412,12 +2633,44 @@ struct DashboardView: View {
                 selectedDashboardTask = task
             }
         case .documentProcessed, .invoiceProcessed:
-            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
-        case .vendorLinked, .systemAdded, .propertyAdded, .projectCreated:
+            // Land on the specific document (or its parent inbox item
+            // if we haven't loaded it). DocumentDetailView fetches its
+            // own data from the document ID so we don't need the row.
+            if let id = event.entityId {
+                selectedActivityDocument = DashboardActivityDocumentRef(id: id)
+            } else {
+                navigationPath.append("inbox")
+            }
+        case .vendorLinked:
+            if let id = event.entityId,
+               let contractor = viewModel.dashboardContractors.first(where: { $0.id == id }) {
+                selectedActivityContractor = contractor
+            } else {
+                // Fall back to the Contacts section of the property
+                // tab — closer than the bare property landing.
+                routeToPropertySection("contacts")
+            }
+        case .systemAdded:
+            if let id = event.entityId,
+               let system = viewModel.homeSystems.first(where: { $0.id == id }) {
+                selectedActivitySystem = system
+            } else {
+                routeToPropertySection("overview")
+            }
+        case .propertyAdded:
+            // Single-property households land directly on the property
+            // detail when switchToTab fires (PropertyListView auto-
+            // navigates). Multi-property households see the list and
+            // pick — both better than nothing.
             NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+        case .projectCreated:
+            // ProjectDetailView requires a ProjectsViewModel that lives
+            // inside PropertyDetailView, so route to the Projects
+            // section there instead of presenting the detail as a sheet.
+            routeToPropertySection("projects")
         case .vehicleAdded:
-            if event.entityId != nil {
-                navigationPath.append("vehicles")
+            if let id = event.entityId {
+                selectedActivityVehicle = DashboardActivityVehicleRef(id: id)
             } else {
                 NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
             }
@@ -2433,11 +2686,32 @@ struct DashboardView: View {
                 navigationPath.append("inbox")
             }
         case .recallDetected:
-            navigationPath.append("vehicles")
+            // Land on the specific vehicle so the recall is in context.
+            if let id = event.entityId {
+                selectedActivityVehicle = DashboardActivityVehicleRef(id: id)
+            } else {
+                navigationPath.append("vehicles")
+            }
         case .scenarioRun:
             NotificationCenter.default.post(name: .openScenarioStudio, object: nil)
         case .gapAnalysisRun:
+            // Gap analysis output IS the maintenance task list, so
+            // landing on the Tasks tab is correct here.
             NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+        }
+    }
+
+    /// Shared helper: switch to Property tab and tell PropertyDetailView
+    /// which section to open. Mirrors the pattern in
+    /// `handleRecommendationAction(.navigateToProperty)`.
+    private func routeToPropertySection(_ section: String) {
+        NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            NotificationCenter.default.post(
+                name: .navigateToPropertySection,
+                object: nil,
+                userInfo: ["section": section]
+            )
         }
     }
 

@@ -221,7 +221,16 @@ final class DashboardViewModel: ObservableObject {
         // contractor is linked) — "Next vendor visit: Vendor · Aug 6"
         // reads as broken rather than informative. Reframe around the
         // task title instead.
-        if let next = nextScheduledService {
+        //
+        // Dashboard noise audit (May 2026): suppress this branch when
+        // the Upcoming section below the Hero is already rendering the
+        // same next visit. The greeting caption + Hero + Upcoming used
+        // to all say "Next service: …" — the Upcoming list is the
+        // canonical surface, so we let that be the single voice and
+        // fall through to the seasonal tip (or quiet) here.
+        if !upcomingVendorVisits.isEmpty {
+            // Upcoming will render the same fact — skip to branch 5.
+        } else if let next = nextScheduledService {
             let formatted = Self.formatFriendlyDate(next.date) ?? next.date
             let vendor = next.vendorName.trimmingCharacters(in: .whitespacesAndNewlines)
             let isPlaceholder = vendor.isEmpty || vendor.caseInsensitiveCompare("Vendor") == .orderedSame

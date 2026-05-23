@@ -32,6 +32,9 @@ struct ChezOwnershipView: View {
             VStack(alignment: .leading, spacing: 18) {
                 threeModesHeader
                 heroCount
+                if viewModel.hasPendingChanges {
+                    pendingPreviewBanner
+                }
                 groupTogglesSection
                 if !viewModel.delegations.isEmpty {
                     inventorySection
@@ -44,6 +47,11 @@ struct ChezOwnershipView: View {
         .navigationTitle("What Chez handles")
         .navigationBarTitleDisplayMode(.inline)
         .background(HavenColors.background.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if viewModel.hasPendingChanges {
+                pendingSaveBar
+            }
+        }
         .task { await viewModel.load() }
         .refreshable { await viewModel.load() }
         .onReceive(NotificationCenter.default.publisher(for: .chezDelegationChanged)) { _ in
@@ -52,28 +60,14 @@ struct ChezOwnershipView: View {
         .onReceive(NotificationCenter.default.publisher(for: .chezOwnershipGroupsChanged)) { _ in
             Task { await viewModel.load() }
         }
-        // Phase 95 audit fix — Dashboard's "Hand off everything" CTA
-        // posts this notification before pushing this view. We pick it
-        // up on first render and auto-open the confirmation dialog so
-        // the homeowner doesn't have to find the Full mode button.
+        // Dashboard noise audit Round 3 (May 2026): the
+        // .triggerChezFullMode notification was used by the old
+        // Dashboard "Hand off everything" CTA (removed in Round 1) to
+        // auto-confirm Full mode. With the staged-toggle model, we
+        // simply stage every toggle to ON and let the user review
+        // the workload preview before tapping Save.
         .onReceive(NotificationCenter.default.publisher(for: .triggerChezFullMode)) { _ in
-            viewModel.confirmingFullMode = true
-        }
-        .alert("Hand off everything?", isPresented: $viewModel.confirmingFullMode) {
-            Button("Hand off all", role: .none) {
-                Task { await viewModel.applyFullMode() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Chez will take over every category. Routines, systems, vendors, projects, bills, documents, insurance, vehicles. You can revoke any of them anytime.")
-        }
-        .alert("Take it all back?", isPresented: $viewModel.confirmingDIYMode) {
-            Button("Take it back") {
-                Task { await viewModel.applyDIYMode() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This turns OFF every group toggle. Existing per-entity ownership stays. You'll need to revoke individual items separately.")
+            viewModel.stageFullMode()
         }
         .trackScreen("ChezOwnershipView")
     }
@@ -94,22 +88,22 @@ struct ChezOwnershipView: View {
                     emoji: "🛠️",
                     title: "Manage it yourself",
                     subtitle: "DIY",
-                    isActive: viewModel.currentMode == .diy,
-                    action: { viewModel.confirmingDIYMode = true }
+                    isActive: viewModel.effectiveMode == .diy,
+                    action: { viewModel.stageDIYMode() }
                 )
                 modePill(
                     emoji: "🤝",
                     title: "Blend",
                     subtitle: "Mix & match",
-                    isActive: viewModel.currentMode == .blend,
+                    isActive: viewModel.effectiveMode == .blend,
                     action: { /* visual marker only — actual blending is per-toggle below */ }
                 )
                 modePill(
                     emoji: "✨",
                     title: "Chez handles it",
                     subtitle: "Full",
-                    isActive: viewModel.currentMode == .full,
-                    action: { viewModel.confirmingFullMode = true }
+                    isActive: viewModel.effectiveMode == .full,
+                    action: { viewModel.stageFullMode() }
                 )
             }
         }
@@ -196,6 +190,147 @@ struct ChezOwnershipView: View {
         }
     }
 
+    // MARK: - Pending preview banner
+
+    /// Live workload-offload preview. Renders only when there are
+    /// pending toggle changes. Names every group being turned on /
+    /// off and shows the workload-percentage delta in plain language.
+    /// Lives between the hero count and the group toggles section so
+    /// the user sees the impact of each flip immediately above the
+    /// thing they just flipped.
+    private var pendingPreviewBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.action)
+                Text("PREVIEW")
+                    .font(HavenTypography.uiSectionHeader)
+                    .foregroundStyle(HavenColors.action)
+                    .tracking(1.0)
+                Spacer()
+            }
+
+            Text(previewHeadline)
+                .font(HavenTypography.title3)
+                .foregroundStyle(HavenColors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let detail = previewDetailLine {
+                Text(detail)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text("Tap **Save** to confirm — nothing moves until you do.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            HavenColors.action.opacity(0.08),
+                            HavenColors.action.opacity(0.02),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(HavenColors.action.opacity(0.30), lineWidth: 1)
+        )
+    }
+
+    private var previewHeadline: String {
+        let from = viewModel.currentlyOffloadedPercent
+        let to = viewModel.afterSavePercent
+        return "Workload to Chez: \(from)% → \(to)%"
+    }
+
+    private var previewDetailLine: String? {
+        let on = viewModel.groupsBeingTurnedOn
+        let off = viewModel.groupsBeingTurnedOff
+        let addedNames = on.map { $0.shortLabel }
+        let removedNames = off.map { $0.shortLabel }
+        switch (addedNames.isEmpty, removedNames.isEmpty) {
+        case (false, true):
+            return "Adding: \(addedNames.joinedNaturally())."
+        case (true, false):
+            return "Taking back: \(removedNames.joinedNaturally())."
+        case (false, false):
+            return "Adding \(addedNames.joinedNaturally()). Taking back \(removedNames.joinedNaturally())."
+        case (true, true):
+            return nil
+        }
+    }
+
+    // MARK: - Sticky Save bar
+
+    /// Sticky bottom bar. Surfaces only when there are pending changes.
+    /// Tap Save → commits every pending toggle in parallel; Discard →
+    /// reverts the toggles to their server state.
+    private var pendingSaveBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .background(HavenColors.beige300)
+            HStack(spacing: 12) {
+                Button {
+                    viewModel.discardPending()
+                } label: {
+                    Text("Discard")
+                        .font(HavenTypography.uiButton)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(
+                            RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous)
+                                .fill(HavenColors.surface)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous)
+                                .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSaving)
+
+                Button {
+                    Task { await viewModel.saveAllPending() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if viewModel.isSaving {
+                            ProgressView()
+                                .tint(HavenColors.textOnAction)
+                                .scaleEffect(0.85)
+                        }
+                        Text(viewModel.isSaving ? "Saving…" : "Save changes")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous)
+                            .fill(HavenColors.action)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.isSaving)
+            }
+            .padding(.horizontal, HavenTheme.pageMargin)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+            .background(HavenColors.background)
+        }
+    }
+
     // MARK: - Group toggles
 
     private var groupTogglesSection: some View {
@@ -213,36 +348,47 @@ struct ChezOwnershipView: View {
     }
 
     private func groupToggleRow(_ group: ChezOwnershipGroup) -> some View {
-        let isOn = viewModel.isGroupOn(group)
-        let isUpdating = viewModel.updatingGroup == group
+        let effective = viewModel.effectiveValue(for: group)
+        let isPending = viewModel.isPendingChange(for: group)
         return HStack(spacing: 12) {
             Image(systemName: group.icon)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(isOn ? HavenColors.action : HavenColors.textSecondary)
+                .foregroundStyle(effective ? HavenColors.action : HavenColors.textSecondary)
                 .frame(width: 32, height: 32)
                 .background(
-                    Circle().fill(HavenColors.action.opacity(isOn ? 0.12 : 0.05))
+                    Circle().fill(HavenColors.action.opacity(effective ? 0.12 : 0.05))
                 )
             VStack(alignment: .leading, spacing: 2) {
-                Text(group.title)
-                    .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.textPrimary)
-                Text(group.subtitle(isOn: isOn))
+                HStack(spacing: 6) {
+                    Text(group.title)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if isPending {
+                        Text("Pending")
+                            .font(HavenTypography.uiLabelSmall.weight(.semibold))
+                            .foregroundStyle(HavenColors.action)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(HavenColors.action.opacity(0.12)))
+                    }
+                }
+                Text(group.subtitle(isOn: effective))
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            if isUpdating {
-                ProgressView().scaleEffect(0.8).tint(HavenColors.action)
-            } else {
-                Toggle("", isOn: Binding(
-                    get: { isOn },
-                    set: { newVal in Task { await viewModel.setGroup(group, on: newVal) } }
-                ))
-                .labelsHidden()
-                .tint(HavenColors.action)
-            }
+            // Dashboard noise audit Round 3 (May 2026): toggles flip
+            // local pending state only. The actual write happens on
+            // Save. While `isSaving` is true we disable further flips
+            // so the user can't restart pending mid-commit.
+            Toggle("", isOn: Binding(
+                get: { effective },
+                set: { _ in viewModel.toggleGroupLocally(group) }
+            ))
+            .labelsHidden()
+            .tint(HavenColors.action)
+            .disabled(viewModel.isSaving)
         }
         .padding(14)
         .background(
@@ -251,7 +397,11 @@ struct ChezOwnershipView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(isOn ? HavenColors.action.opacity(0.3) : HavenColors.beige300, lineWidth: 1)
+                .strokeBorder(
+                    isPending ? HavenColors.action.opacity(0.5)
+                              : (effective ? HavenColors.action.opacity(0.3) : HavenColors.beige300),
+                    lineWidth: isPending ? 1.5 : 1
+                )
         )
     }
 
@@ -463,6 +613,39 @@ enum ChezOwnershipGroup: String, CaseIterable {
         case .allVehicles: return "car.fill"
         }
     }
+
+    /// Short capitalized label used in the pending-preview banner
+    /// (e.g. "Adding: Routines, Vendors and Vehicles."). Drops the
+    /// "Chez handles my " prefix that's appropriate in the toggle
+    /// title but reads awkwardly in inline lists.
+    var shortLabel: String {
+        switch self {
+        case .allRoutines: return "Routines"
+        case .allSystems: return "Systems"
+        case .allVendors: return "Vendors"
+        case .allProjects: return "Projects"
+        case .allBills: return "Bills"
+        case .allDocuments: return "Documents"
+        case .allInsurance: return "Insurance"
+        case .allVehicles: return "Vehicles"
+        }
+    }
+}
+
+/// Natural-language join helper used in the pending-preview banner.
+/// Two-item lists render as "A and B"; longer lists become
+/// "A, B, C and D" (Oxford-comma off for HNW copy register).
+private extension Array where Element == String {
+    func joinedNaturally() -> String {
+        switch count {
+        case 0: return ""
+        case 1: return self[0]
+        case 2: return "\(self[0]) and \(self[1])"
+        default:
+            let head = self.prefix(count - 1).joined(separator: ", ")
+            return "\(head) and \(self.last ?? "")"
+        }
+    }
 }
 
 // MARK: - View model
@@ -473,18 +656,35 @@ final class ChezOwnershipViewModel: ObservableObject {
 
     @Published var household: HouseholdRow?
     @Published var delegations: [InventoryItem] = []
-    @Published var updatingGroup: ChezOwnershipGroup?
-    @Published var confirmingFullMode: Bool = false
-    @Published var confirmingDIYMode: Bool = false
     @Published var errorMessage: String?
+
+    /// Dashboard noise audit Round 3 (May 2026): group toggles are now
+    /// staged locally instead of writing on every flip. Each entry maps
+    /// a group → the user's pending toggle value. Empty until the user
+    /// flips a toggle. Cleared after `saveAllPending()` succeeds, or
+    /// when `discardPending()` is called. The view reads the effective
+    /// value via `effectiveValue(for:)` (pending if set, else server).
+    @Published var pendingGroupToggles: [ChezOwnershipGroup: Bool] = [:]
+
+    /// True while `saveAllPending()` is in flight. Drives the Save
+    /// button's loading state and disables further toggle flips.
+    @Published var isSaving: Bool = false
 
     /// Phase 95 audit fix — exposed for the inventory section's
     /// "View activity →" deep-link into ChezActivityView. The household
     /// id is set during `load()` once we resolve the user.
     var householdId: UUID? { household?.id }
 
+    /// Server-truth count — does not include pending changes. Used for
+    /// the "current %" leg of the preview banner.
     var activeGroupCount: Int {
         ChezOwnershipGroup.allCases.filter { isGroupOn($0) }.count
+    }
+
+    /// Count after pending changes are applied. Used for the "after
+    /// save %" leg of the preview banner.
+    var effectiveActiveGroupCount: Int {
+        ChezOwnershipGroup.allCases.filter { effectiveValue(for: $0) }.count
     }
 
     var currentMode: Mode {
@@ -494,8 +694,150 @@ final class ChezOwnershipViewModel: ObservableObject {
         return .blend
     }
 
+    /// Mode after pending changes are applied. Drives mode-pill
+    /// highlight so the user sees their target state, not the stale
+    /// server state, while they're staging changes.
+    var effectiveMode: Mode {
+        let active = effectiveActiveGroupCount
+        if active == 0 && delegations.isEmpty { return .diy }
+        if active == ChezOwnershipGroup.allCases.count { return .full }
+        return .blend
+    }
+
+    /// Server-truth value for a group. Does not include pending changes.
     func isGroupOn(_ group: ChezOwnershipGroup) -> Bool {
         household?.isOwnershipGroupOn(group.rawValue) ?? false
+    }
+
+    /// Effective value the user is targeting: pending value if they've
+    /// flipped this group, otherwise the server value.
+    func effectiveValue(for group: ChezOwnershipGroup) -> Bool {
+        if let pending = pendingGroupToggles[group] { return pending }
+        return isGroupOn(group)
+    }
+
+    /// True when the user has staged a change for this group (pending
+    /// value differs from server value). The view paints a subtle
+    /// "pending" ring around the toggle to surface it.
+    func isPendingChange(for group: ChezOwnershipGroup) -> Bool {
+        guard let pending = pendingGroupToggles[group] else { return false }
+        return pending != isGroupOn(group)
+    }
+
+    /// True when at least one toggle has a pending change. Drives the
+    /// preview banner + Save bar visibility.
+    var hasPendingChanges: Bool {
+        ChezOwnershipGroup.allCases.contains { isPendingChange(for: $0) }
+    }
+
+    /// Groups the user is staging to turn ON (pending=true, server=false).
+    var groupsBeingTurnedOn: [ChezOwnershipGroup] {
+        ChezOwnershipGroup.allCases.filter { isPendingChange(for: $0) && effectiveValue(for: $0) }
+    }
+
+    /// Groups the user is staging to turn OFF (pending=false, server=true).
+    var groupsBeingTurnedOff: [ChezOwnershipGroup] {
+        ChezOwnershipGroup.allCases.filter { isPendingChange(for: $0) && !effectiveValue(for: $0) }
+    }
+
+    /// Equal-weight workload accounting: 8 groups, 12.5% each. Rounded
+    /// to the nearest integer percent for display.
+    var currentlyOffloadedPercent: Int {
+        Self.percentForGroupCount(activeGroupCount)
+    }
+
+    var afterSavePercent: Int {
+        Self.percentForGroupCount(effectiveActiveGroupCount)
+    }
+
+    /// Net percentage delta from saving. Positive = more to Chez,
+    /// negative = more back to homeowner.
+    var workloadDeltaPercent: Int {
+        afterSavePercent - currentlyOffloadedPercent
+    }
+
+    private static func percentForGroupCount(_ count: Int) -> Int {
+        let total = ChezOwnershipGroup.allCases.count
+        guard total > 0 else { return 0 }
+        let raw = Double(count) / Double(total) * 100.0
+        return Int(raw.rounded())
+    }
+
+    /// Toggle one group locally — does not write to the server. The
+    /// user has to tap Save to commit.
+    func toggleGroupLocally(_ group: ChezOwnershipGroup) {
+        let serverValue = isGroupOn(group)
+        let nextValue = !effectiveValue(for: group)
+        if nextValue == serverValue {
+            // User flipped back to the server value — drop the pending
+            // entry so the row no longer reads as "pending."
+            pendingGroupToggles.removeValue(forKey: group)
+        } else {
+            pendingGroupToggles[group] = nextValue
+        }
+        Haptics.light()
+    }
+
+    /// Stage every group toggle to ON (preview the Full mode jump).
+    /// Doesn't write — user must tap Save.
+    func stageFullMode() {
+        var next: [ChezOwnershipGroup: Bool] = [:]
+        for group in ChezOwnershipGroup.allCases {
+            if !isGroupOn(group) {
+                next[group] = true
+            }
+        }
+        pendingGroupToggles = next
+        Haptics.medium()
+    }
+
+    /// Stage every group toggle to OFF (preview the DIY pull-back).
+    /// Doesn't write — user must tap Save.
+    func stageDIYMode() {
+        var next: [ChezOwnershipGroup: Bool] = [:]
+        for group in ChezOwnershipGroup.allCases {
+            if isGroupOn(group) {
+                next[group] = false
+            }
+        }
+        pendingGroupToggles = next
+        Haptics.medium()
+    }
+
+    /// Discard any pending changes — reverts toggles to server values.
+    func discardPending() {
+        pendingGroupToggles.removeAll()
+        Haptics.light()
+    }
+
+    /// Commit every pending group toggle in parallel. Clears pending
+    /// state on success, surfaces the first error on failure.
+    func saveAllPending() async {
+        guard hasPendingChanges else { return }
+        isSaving = true
+        defer { isSaving = false }
+        let pending = pendingGroupToggles
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for (chezGroup, value) in pending {
+                    group.addTask {
+                        _ = try await HavenSupabase.setChezOwnershipGroup(
+                            group: chezGroup.rawValue,
+                            on: value
+                        )
+                    }
+                }
+                try await group.waitForAll()
+            }
+            pendingGroupToggles.removeAll()
+            Haptics.success()
+            NotificationCenter.default.post(name: .chezOwnershipGroupsChanged, object: nil)
+            NotificationCenter.default.post(name: .chezDelegationChanged, object: nil)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+            Haptics.error()
+        }
     }
 
     func load() async {
@@ -622,53 +964,6 @@ final class ChezOwnershipViewModel: ObservableObject {
             errorMessage = error.localizedDescription
             print("[ChezOwnership] load failed: \(error)")
         }
-    }
-
-    func setGroup(_ group: ChezOwnershipGroup, on: Bool) async {
-        updatingGroup = group
-        defer { updatingGroup = nil }
-        do {
-            _ = try await HavenSupabase.setChezOwnershipGroup(group: group.rawValue, on: on)
-            Haptics.success()
-            NotificationCenter.default.post(name: .chezOwnershipGroupsChanged, object: nil)
-            NotificationCenter.default.post(name: .chezDelegationChanged, object: nil)
-            await load()
-        } catch {
-            errorMessage = error.localizedDescription
-            Haptics.error()
-        }
-    }
-
-    func applyFullMode() async {
-        for group in ChezOwnershipGroup.allCases where !isGroupOn(group) {
-            updatingGroup = group
-            do {
-                _ = try await HavenSupabase.setChezOwnershipGroup(group: group.rawValue, on: true)
-            } catch {
-                errorMessage = error.localizedDescription
-                break
-            }
-        }
-        updatingGroup = nil
-        Haptics.success()
-        NotificationCenter.default.post(name: .chezOwnershipGroupsChanged, object: nil)
-        await load()
-    }
-
-    func applyDIYMode() async {
-        for group in ChezOwnershipGroup.allCases where isGroupOn(group) {
-            updatingGroup = group
-            do {
-                _ = try await HavenSupabase.setChezOwnershipGroup(group: group.rawValue, on: false)
-            } catch {
-                errorMessage = error.localizedDescription
-                break
-            }
-        }
-        updatingGroup = nil
-        Haptics.success()
-        NotificationCenter.default.post(name: .chezOwnershipGroupsChanged, object: nil)
-        await load()
     }
 
     func revoke(_ item: InventoryItem) async {

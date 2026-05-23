@@ -1,102 +1,93 @@
 import SwiftUI
 
-/// Phase 84 — Dashboard hero card showing how much of the home Chez is
-/// currently managing. Tapping opens `ChezOwnershipView` where the
-/// homeowner can adjust delegation level (DIY → Blend → Full) or browse
-/// what Chez is handling for them today.
+/// Phase 84 — Dashboard at-a-glance entry to "what Chez is running for me."
+/// Tapping opens `ChezOwnershipView` where the homeowner adjusts delegation
+/// level (DIY → Blend → Full) and browses delegated entities.
 ///
-/// Three rendering states:
-///   • DIY (no group toggles on, no individual entities delegated):
-///     "You're running your house yourself. Tap any item to hand it off."
-///   • Blend (some delegation): "Chez handles X · You handle the rest."
-///   • Full (every group toggle on): "Chez is running your home."
+/// Dashboard noise audit — Round 2 (May 2026): rebuilt to the
+/// `ChezActivityCard` visual signature (subtle purple linear-gradient
+/// wash + purple stroke + purple icon in tinted circle + `title3`
+/// headline + `bodySmall` subtitle) so this card reads as a sibling
+/// to the other Chez-branded surfaces on the dashboard instead of a
+/// generic cream/beige row. Round 1 collapsed the original card to a
+/// one-line row and removed the salmon "Hand off everything" button;
+/// Round 2 corrects the typography weight, sizing, and brand
+/// signature Tom called out.
+///
+/// Three headline states (unchanged from Round 1):
+///   • DIY (no group toggles on, no items delegated):
+///     "Chez can run your house"
+///   • Blend (some delegation):
+///     "Chez handles N categor(y|ies) for you"
+///   • Full (every group on):
+///     "Chez is running your home"
 struct ChezOwnershipHeroCard: View {
     let activeGroupCount: Int
     let delegatedItemCount: Int
     let onTap: () -> Void
-    /// Phase 95 audit fix — direct shortcut into Full Mode when the user
-    /// has zero delegation today. Renders alongside the existing tap-
-    /// the-card affordance; lets a homeowner one-tap "have Chez run my
-    /// entire home" without first having to read the explainer.
-    var onHandOffEverything: (() -> Void)? = nil
-
-    private var isFreshDIY: Bool {
-        activeGroupCount == 0 && delegatedItemCount == 0
-    }
 
     var body: some View {
-        VStack(spacing: 12) {
-            Button(action: onTap) {
-                HStack(spacing: 14) {
-                    // Phase 95.1 fix: this card is informational ("Chez
-                    // handles N things for you" + chevron to manage). The
-                    // primary CTA inside is the optional "Hand off
-                    // everything" button which keeps salmon. The card
-                    // itself, the icon, and the icon background should
-                    // read as ink/structure, not action.
-                    ZStack {
-                        Circle()
-                            .fill(HavenColors.navy800.opacity(0.10))
-                            .frame(width: 44, height: 44)
-                        Image(systemName: "person.fill.questionmark")
-                            .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy800)
-                    }
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(headline)
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.textPrimary)
-                            .multilineTextAlignment(.leading)
-                        Text(subtitle)
-                            .font(HavenTypography.caption)
-                            .foregroundStyle(HavenColors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.leading)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(HavenColors.textSecondary)
+        Button(action: {
+            Haptics.light()
+            onTap()
+        }) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(HavenColors.action.opacity(0.16))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "person.fill.questionmark")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain)
 
-            if isFreshDIY, let onHandOffEverything {
-                Button {
-                    Haptics.medium()
-                    onHandOffEverything()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Hand off everything")
-                            .font(HavenTypography.uiButton)
-                    }
-                    .foregroundStyle(HavenColors.textOnAction)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .background(HavenColors.action)
-                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(headline)
+                        .font(HavenTypography.title3)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text(subtitle)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 12)
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(cardBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge, style: .continuous)
+                    .stroke(HavenColors.action.opacity(0.18), lineWidth: 1)
+            )
         }
-        // Phase 95.1 fix: was salmon-tinted background + border. The
-        // card is informational, not a CTA, so it inherits the standard
-        // pure-white card surface with a subtle navy border.
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(HavenColors.creamLight)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(HavenColors.beige300, lineWidth: 1)
-        )
+        .buttonStyle(.plain)
         .padding(.horizontal, HavenTheme.spacing20)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(headline). \(subtitle).")
+    }
+
+    /// Matches `ChezActivityCard.cardBackground` exactly so the two cards
+    /// read as a visual family on the dashboard.
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: HavenTheme.radiusLarge, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        HavenColors.action.opacity(0.08),
+                        HavenColors.action.opacity(0.02),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
     }
 
     private var headline: String {
@@ -114,11 +105,11 @@ struct ChezOwnershipHeroCard: View {
 
     private var subtitle: String {
         if activeGroupCount == 0 && delegatedItemCount == 0 {
-            return "Free Home Manager service. Hand off as much or as little as you want. Anytime."
+            return "Free Home Manager service"
         }
         if activeGroupCount >= 8 {
-            return "Chez is managing your routines, systems, vendors, projects, bills, documents, insurance, and vehicles."
+            return "Tap to review what's covered"
         }
-        return "Tap to adjust what Chez handles or hand off more."
+        return "Tap to adjust what's covered"
     }
 }

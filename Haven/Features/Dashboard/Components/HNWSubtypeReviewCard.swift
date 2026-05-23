@@ -72,9 +72,11 @@ struct HNWSubtypeReviewCard: View {
         if shouldShow {
             HavenCard {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    // Dashboard noise audit (May 2026): dropped the
+                    // decorative sparkle icon so the eyebrow row matches
+                    // the rest of the dashboard's plain uppercase
+                    // section-header treatment.
                     HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(HavenColors.action)
                         Text("REVIEW YOUR HOME")
                             .font(HavenTypography.uiSectionHeader)
                             .tracking(1.5)

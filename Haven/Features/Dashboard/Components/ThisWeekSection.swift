@@ -9,28 +9,32 @@ struct ThisWeekSection: View {
     let onSnooze: (ThisWeekItem) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("NEEDS YOUR ATTENTION")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
+        // Dashboard noise audit (May 2026): hide the entire section
+        // (header + card) when there's nothing to surface. Premium
+        // convention — silence reads as "all good" without a
+        // comfort card eating viewport.
+        if items.isEmpty {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("NEEDS YOUR ATTENTION")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
 
-                Spacer()
+                    Spacer()
 
-                if totalTaskCount > items.count {
-                    Button(action: onSeeAll) {
-                        Text("See all (\(totalTaskCount))")
-                            .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.textPrimary)
+                    if totalTaskCount > items.count {
+                        Button(action: onSeeAll) {
+                            Text("See all (\(totalTaskCount))")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
-            }
 
-            if items.isEmpty {
-                emptyState
-            } else {
                 HavenCard {
                     VStack(spacing: 0) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -45,32 +49,6 @@ struct ThisWeekSection: View {
                     }
                 }
             }
-        }
-    }
-
-    private var emptyState: some View {
-        HStack(spacing: HavenTheme.spacing12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(Color.green)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Nothing needs your attention right now.")
-                    .font(HavenTypography.body.weight(.semibold))
-                    .foregroundStyle(HavenColors.textPrimary)
-                Text("Chez is handling the rest for now.")
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(HavenColors.textSecondary)
-            }
-
-            Spacer()
-        }
-        .padding(HavenTheme.spacing16)
-        .background(HavenColors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
-        .overlay {
-            RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
-                .strokeBorder(Color.green.opacity(0.2), lineWidth: 1)
         }
     }
 

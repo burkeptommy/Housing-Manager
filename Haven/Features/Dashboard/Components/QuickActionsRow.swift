@@ -4,7 +4,11 @@ import SwiftUI
 struct QuickActionsRow: View {
     let onAskAlfred: () -> Void
     let onUploadDoc: () -> Void
-    let onScenarioStudio: () -> Void
+    /// Dashboard noise audit (May 2026): swapped "Plan ahead" for
+    /// "Ask Chez". Scenario Studio is still reachable from the floating
+    /// What-If button on every tab, but Chez was orphaned at the bottom
+    /// of the scroll. Promoting it gives the concierge top-line slot.
+    let onAskChez: () -> Void
     let onAddVendor: () -> Void
 
     var body: some View {
@@ -35,9 +39,9 @@ struct QuickActionsRow: View {
             )
 
             quickAction(
-                icon: "sparkles",
-                label: "Plan ahead",
-                action: onScenarioStudio
+                icon: "person.fill.questionmark",
+                label: "Ask Chez",
+                action: onAskChez
             )
 
             quickAction(

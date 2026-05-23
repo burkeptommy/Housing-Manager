@@ -499,8 +499,12 @@ struct FindLocalVendorSheet: View {
         }()
 
         return base.filter { vendor in
-            // Rating filter — catalog rows have nil rating, so the
-            // `all` case is the only one that passes them through.
+            // Rating filter applies across every row including catalog
+            // rows — as of Phase X+5 the catalog carries rating data
+            // backfilled from Google Places at upsert time, so this
+            // filter is now uniform across FROM YOUR AREA, ON CHEZ, and
+            // DIRECTORY sections. Rows without rating data are filtered
+            // out under any non-`all` chip (no false-positive inclusion).
             if let minRating = ratingFilter.minimumRating {
                 guard let r = vendor.rating, r >= minRating else { return false }
             }
@@ -512,11 +516,11 @@ struct FindLocalVendorSheet: View {
         }
     }
 
-    /// Smart-sort comparator: ranks within a tier by rating × review
-    /// count (well-rated AND well-reviewed beats well-rated obscure).
-    /// Used inside each section (TOP-RATED, SUGGESTED) below.
-    /// Catalog rows sit on their existing edge-function rank (town match
-    /// first) since they don't carry Google ratings.
+    /// Smart-sort comparator: ranks by rating × review count (well-rated
+    /// AND well-reviewed beats well-rated obscure). Phase X+5: this now
+    /// applies uniformly to catalog rows AND Google rows since both
+    /// carry rating data. The within-section sort gives users the best
+    /// vendors first regardless of source.
     private func smartRank(_ a: HavenSupabase.LocalVendorResult, _ b: HavenSupabase.LocalVendorResult) -> Bool {
         let aScore = (a.rating ?? 0) * Double(max(a.reviewCount ?? 0, 1))
         let bScore = (b.rating ?? 0) * Double(max(b.reviewCount ?? 0, 1))
@@ -590,24 +594,29 @@ struct FindLocalVendorSheet: View {
         // verification, navy badge), then Top-Rated (Google heuristic, green
         // badge), then everything else (live_unverified applications +
         // Google Suggested, no badge).
-        // Phase X feedback: vendor sections now read from `filteredVendors`
-        // so the inline name search filters across every tier at once.
-        // Catalog rows (sourced regional providers from `utility_providers`)
-        // get their own dedicated section above everything else — same
-        // search filter applies via `filteredVendors`.
-        // Phase X+3: smart-sort applied to each Google-derived tier
-        // (rating × review count, alphabetical tiebreak). Catalog rows
-        // keep their existing edge-function rank (town-match first)
-        // since they don't carry Google ratings.
-        let fromCatalog = filteredVendors.filter { $0.isFromCatalog }
+        // Phase X+5: directory model. The prior tiering ("Top-Rated" +
+        // "Suggested") was a Google-relevance heuristic, not a quality
+        // judgment, and felt confusing alongside FROM YOUR AREA and ON
+        // CHEZ which carry real meaning. Now: FROM YOUR AREA (catalog
+        // rows local to the user) + ON CHEZ (vendor_applications) +
+        // CHEZ CERTIFIED (manually verified applicants) + one flat
+        // DIRECTORY of remaining live Google results, smart-ranked by
+        // rating × review count. Filter chips (4+, 4.5+, 4.8+) apply
+        // across every section uniformly.
+        // Phase X+5: catalog rows now carry rating data so they sort
+        // by smartRank too (within FROM YOUR AREA). Rows without rating
+        // (some admin national brands) sort to the bottom but stay
+        // visible. The edge function still ranks town-match first
+        // before passing to iOS, so within each rating tier the
+        // closest-region vendor wins.
+        let fromCatalog = filteredVendors
+            .filter { $0.isFromCatalog }
+            .sorted(by: smartRank)
         let chezCertified = filteredVendors
             .filter { !$0.isFromCatalog && $0.isChezCertified }
             .sorted(by: smartRank)
-        let havenCertified = filteredVendors
-            .filter { !$0.isFromCatalog && !$0.isChezCertified && $0.isTopRated }
-            .sorted(by: smartRank)
-        let suggested = filteredVendors
-            .filter { !$0.isFromCatalog && !$0.isChezCertified && !$0.isTopRated }
+        let directory = filteredVendors
+            .filter { !$0.isFromCatalog && !$0.isChezCertified }
             .sorted(by: smartRank)
         let isHandyman = systemCategory.lowercased() == "handyman"
         let chezSectionVisible = isHandyman || !chezFieldProviders.isEmpty
@@ -688,30 +697,20 @@ struct FindLocalVendorSheet: View {
                 }
             }
 
-            // Top-Rated — Google review heuristic (4.7+, 25+ reviews, non-chain).
-            // Renamed from "Chez Certified" in Phase 71 because the heuristic
-            // isn't real verification.
-            if !havenCertified.isEmpty {
-                Text("TOP-RATED")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.2)
-                    .foregroundStyle(HavenColors.success)
-                    .padding(.top, (chezSectionVisible || !chezCertified.isEmpty || !fromCatalog.isEmpty) ? HavenTheme.spacing8 : 0)
-                VStack(spacing: HavenTheme.spacing12) {
-                    ForEach(havenCertified) { vendor in
-                        vendorCard(vendor)
-                    }
-                }
-            }
-
-            if !suggested.isEmpty {
-                Text("SUGGESTED")
+            // Phase X+5: flat directory replaces the prior Top-Rated +
+            // Suggested split. One section, smart-ranked by rating ×
+            // review count. The rating filter chips still apply, so a
+            // user who wants only 4.5+ rated vendors gets them via the
+            // filter — no need for a separate "Top-Rated" label that
+            // implied verification we didn't actually do.
+            if !directory.isEmpty {
+                Text("DIRECTORY")
                     .font(HavenTypography.uiSectionHeader)
                     .tracking(1.2)
                     .foregroundStyle(HavenColors.textTertiary)
-                    .padding(.top, (havenCertified.isEmpty && chezCertified.isEmpty && !chezSectionVisible && fromCatalog.isEmpty) ? 0 : HavenTheme.spacing8)
+                    .padding(.top, (chezCertified.isEmpty && !chezSectionVisible && fromCatalog.isEmpty) ? 0 : HavenTheme.spacing8)
                 VStack(spacing: HavenTheme.spacing12) {
-                    ForEach(suggested) { vendor in
+                    ForEach(directory) { vendor in
                         vendorCard(vendor)
                     }
                 }
@@ -743,7 +742,7 @@ struct FindLocalVendorSheet: View {
                 && lastSearchedQuery.caseInsensitiveCompare(
                     vendorSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
                 ) == .orderedSame
-                && chezCertified.isEmpty && havenCertified.isEmpty && suggested.isEmpty && fromCatalog.isEmpty {
+                && chezCertified.isEmpty && directory.isEmpty && fromCatalog.isEmpty {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                     Text("No matches for \"\(vendorSearchQuery)\"")
                         .font(HavenTypography.bodySmall.weight(.semibold))
@@ -1034,9 +1033,14 @@ struct FindLocalVendorSheet: View {
                         }
                     }
                     Spacer(minLength: 4)
-                    // Phase 72: Chez Certified beats Top-Rated. Real human
-                    // verification gets the navy badge with checkmark seal.
-                    // The Top-Rated heuristic gets the muted star pill.
+                    // Phase X+5: dropped the "Top-Rated" pill (was a
+                    // Google heuristic, not real verification — confused
+                    // users into thinking it was a quality endorsement).
+                    // Chez Certified stays — that's actual manual
+                    // operator verification of self-signup vendors via
+                    // the getchez.com/vendor-apply pipeline. The star
+                    // rating + review count already conveys quality
+                    // without needing a redundant pill.
                     if vendor.isChezCertified {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.seal.fill")
@@ -1048,18 +1052,6 @@ struct FindLocalVendorSheet: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(HavenColors.navy800)
-                        .clipShape(Capsule())
-                    } else if vendor.isTopRated {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star.circle.fill")
-                                .font(.system(size: 10))
-                            Text("Top-Rated")
-                                .font(.system(size: 10, weight: .semibold))
-                        }
-                        .foregroundStyle(HavenColors.success)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(HavenColors.success.opacity(0.12))
                         .clipShape(Capsule())
                     }
                 }

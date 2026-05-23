@@ -71,11 +71,22 @@ const CATEGORY_SEARCH_TERMS: Record<string, string> = {
   // Build 90: categories that were falling through to raw search
   generator: "generator repair service technician",
   "crawl space": "crawl space encapsulation service",
-  waterproofing: "basement waterproofing service",
+  // Phase X+5 (coverage push): tighter / broader hints based on the
+  // post-launch-seed audit. Original "basement waterproofing service"
+  // returned 0 rows everywhere; "basement waterproofing contractor"
+  // matches the way the real companies (Connecticut Basement Systems,
+  // American Dry Basement, B-Dry, etc.) are categorized by Places.
+  // Similarly "solar panel installer", "home security installer",
+  // "pest control company", "swimming pool service" are the canonical
+  // labels Places actually indexes — they outperform the prior phrasing
+  // by 5-10× on cell-coverage in low-density categories.
+  waterproofing: "basement waterproofing contractor",
   "water heater": "water heater repair plumber",
   "siding/exterior": "siding repair contractor",
-  security: "home security system service",
-  solar: "solar panel service repair",
+  security: "home security system installer",
+  solar: "solar panel installer",
+  pest_control: "pest control company",
+  pool_service: "swimming pool service",
   // Phase X+4 (dedup + category-correctness): the utility-account
   // queries below previously matched gas STATIONS (Exxon/Mobil/Shell/
   // Sunoco) because "natural gas" / "oil" / "propane" are too generic.
@@ -321,6 +332,44 @@ const CATEGORY_TO_PROVIDER_TYPE: Record<string, string> = {
   "auto insurance": "auto_insurance",
   auto: "auto_insurance",
   auto_insurance: "auto_insurance",
+  // Phase X+5 (audit fix): every category the seed iterates needs an
+  // entry here. The find-local-vendors function uses this map to gate
+  // its `utility_providers` upsert — if a category falls through with
+  // an undefined providerType, the upsert is silently skipped and the
+  // 60 candidates from the Places paginated fetch are returned to the
+  // caller WITHOUT ever being persisted. That's why the May 2026 seed
+  // produced 0 google_places rows for these categories despite ~7,000
+  // Google calls hitting them. All seven added below.
+  landscaping: "landscaping",
+  "lawn care": "landscaping",
+  "lawn service": "landscaping",
+  irrigation: "irrigation",
+  sprinkler: "irrigation",
+  "sprinkler system": "irrigation",
+  pest_control: "pest_control",
+  "pest control": "pest_control",
+  exterminator: "pest_control",
+  pool_service: "pool_service",
+  "pool service": "pool_service",
+  "pool/spa": "pool_service",
+  pool: "pool_service",
+  spa: "pool_service",
+  security: "security",
+  "home security": "security",
+  "security system": "security",
+  alarm: "security",
+  solar: "solar",
+  "solar panel": "solar",
+  "solar installer": "solar",
+  waterproofing: "waterproofing",
+  "basement waterproofing": "waterproofing",
+  "foundation waterproofing": "waterproofing",
+  // Niche categories that may be queried but won't seed broadly
+  generator: "generator",
+  "crawl space": "crawl_space",
+  "water heater": "water_heater",
+  "siding/exterior": "siding",
+  handyman: "handyman",
 };
 
 // Phase 72: pull active vendor applications matching the (state, category)
@@ -436,7 +485,7 @@ async function mergeUtilityProviders(
     const stateUpper = state.toUpperCase();
     let query = supabase
       .from("utility_providers_visible")
-      .select("id, name, slug, website, phone, logo_url, brand_color, regions")
+      .select("id, name, slug, website, phone, logo_url, brand_color, regions, address, rating, review_count")
       .eq("provider_type", providerType)
       .overlaps("regions", [town, state, stateUpper])
       .limit(60);
@@ -512,16 +561,24 @@ async function mergeUtilityProviders(
 
     const catalogVendors: VendorCandidate[] = ranked.map((row) => ({
       name: row.name,
-      address: null,
+      // Phase X+5: catalog rows now carry rich display data backfilled
+      // from local_vendor_results (cache) at upsert time and via the
+      // 20261329 migration for pre-existing rows. The find-a-pro UI
+      // can now render a consistent card across catalog + Google rows.
+      address: row.address ?? null,
       phone: row.phone ?? null,
       website: row.website ?? null,
-      rating: null,
-      reviewCount: null,
+      rating: row.rating ?? null,
+      reviewCount: row.review_count ?? null,
       // Synthesize an id from the catalog uuid so iOS Identifiable
       // conformance still works. `up:` prefix distinguishes catalog
       // rows from Google place ids and `app:` vendor_application rows.
       googlePlaceId: `up:${row.id}`,
-      isTopRated: false,
+      // Phase X+5: catalog rows with rating >= 4.7 and >= 25 reviews
+      // qualify for the "Top-Rated" filter chip the same way Google
+      // results do. Surfaces strong catalog vendors in the rating-
+      // filter scan instead of leaving them invisible.
+      isTopRated: typeof row.rating === "number" && row.rating >= 4.7 && (row.review_count ?? 0) >= 25,
       isChezCertified: false,
       rankPosition: 0,
       isFromCatalog: true,
@@ -1080,10 +1137,43 @@ serve(async (req: Request) => {
             source: string;
             google_place_id: string;
             contribution_count: number;
+            address: string | null;
+            rating: number | null;
+            review_count: number | null;
           }> = [];
+          // Phase X+5: also enrich existing rows that lack rating/
+          // address — initial seed wrote them with NULLs because the
+          // catalog schema didn't carry those fields. As we re-encounter
+          // them in new searches we now have the data to fill in.
+          const enrichmentUpdates: Map<string, {
+            address: string | null;
+            rating: number | null;
+            review_count: number | null;
+          }> = new Map();
           const regionUpdates: Map<string, Set<string>> = new Map();
           let dedupedCount = 0;
           let insertedCount = 0;
+
+          // Phase X+5 guardrail: prevent cross-state contamination.
+          // When dedup matches a candidate to an existing row via
+          // root domain, only merge regions if the existing row's
+          // current home-state matches this search's state (or the
+          // existing row has no anchored state yet, e.g. it carries
+          // only ['US'] as a national brand).
+          //
+          // Without this guard, a CT-based business that surfaces in
+          // a MI search via name-relevance bleed gets its regions
+          // expanded to include MI, even though it doesn't operate
+          // there. The audit found 20 such rows tagged with all 5
+          // launch states.
+          const NORTHEAST_STATES = new Set([
+            "CT","NY","MA","RI","MI","NH","VT","ME","NJ","PA",
+          ]);
+          const homeStateOf = (regions: string[]): string | null => {
+            const states = regions.filter((r) => NORTHEAST_STATES.has(r));
+            if (states.length === 1) return states[0];
+            return null;
+          };
 
           for (const v of catalogCandidates) {
             const placeId = v.googlePlaceId;
@@ -1096,12 +1186,31 @@ serve(async (req: Request) => {
               (domain ? existingByRootDomain.get(domain) : undefined) ??
               existingByPlaceId.get(placeId);
 
-            if (existing) {
+            // Cross-state guard: if existing has a single anchored
+            // state and it isn't this search's state, treat as a
+            // separate row instead of merging regions across states.
+            const existingHomeState = existing ? homeStateOf(existing.regions) : null;
+            const safeToMerge = !existing
+              ? false
+              : existingHomeState === null || existingHomeState === stateUpper;
+
+            if (existing && safeToMerge) {
               // Expand the existing row's regions with this town/state.
               const set = regionUpdates.get(existing.id) ?? new Set(existing.regions);
               set.add(town);
               set.add(stateUpper);
               regionUpdates.set(existing.id, set);
+              // Enrich the existing row with rating/address if we have
+              // data and the existing row doesn't yet — handles every
+              // pre-20261329 row that landed in the catalog without
+              // these fields.
+              if (!existing.id.startsWith("pending-")) {
+                enrichmentUpdates.set(existing.id, {
+                  address: v.address ?? null,
+                  rating: typeof v.rating === "number" ? v.rating : null,
+                  review_count: typeof v.reviewCount === "number" ? v.reviewCount : null,
+                });
+              }
               dedupedCount++;
             } else {
               newInserts.push({
@@ -1114,6 +1223,9 @@ serve(async (req: Request) => {
                 source: "google_places",
                 google_place_id: placeId,
                 contribution_count: 1,
+                address: v.address ?? null,
+                rating: typeof v.rating === "number" ? v.rating : null,
+                review_count: typeof v.reviewCount === "number" ? v.reviewCount : null,
               });
               insertedCount++;
               // Add to existingByRootDomain so subsequent candidates
@@ -1130,17 +1242,55 @@ serve(async (req: Request) => {
           }
 
           // Apply region updates (one UPDATE per existing row).
-          for (const [id, regions] of regionUpdates) {
-            if (id.startsWith("pending-")) continue; // it's a same-batch insert, not a real row yet
-            const { error: updateError } = await supabase
-              .from("utility_providers")
-              .update({ regions: Array.from(regions) })
-              .eq("id", id);
-            if (updateError) {
-              console.warn(
-                `[find-local-vendors] region update failed for ${id}:`,
-                updateError,
-              );
+          // Phase X+5: also fold in any enrichment data (address /
+          // rating / review_count) we discovered for the existing row.
+          // COALESCE pattern via raw SQL would be cleaner, but the
+          // PostgREST .update() doesn't expose COALESCE; instead we
+          // only patch the rich fields when the existing value is
+          // NULL, which we determine via a small pre-fetch.
+          if (regionUpdates.size > 0) {
+            const updateIds = Array.from(regionUpdates.keys()).filter(
+              (id) => !id.startsWith("pending-"),
+            );
+            // Pre-fetch existing rich-field values for the targets so
+            // we don't overwrite better data with worse.
+            const { data: currentRich } = updateIds.length > 0
+              ? await supabase
+                  .from("utility_providers")
+                  .select("id, address, rating, review_count")
+                  .in("id", updateIds)
+              : { data: [] as Array<{
+                  id: string;
+                  address: string | null;
+                  rating: number | null;
+                  review_count: number | null;
+                }> };
+            const currentRichMap = new Map(
+              (currentRich ?? []).map((r) => [r.id, r]),
+            );
+            for (const id of updateIds) {
+              const regions = regionUpdates.get(id);
+              if (!regions) continue;
+              const enrich = enrichmentUpdates.get(id);
+              const cur = currentRichMap.get(id);
+              const patch: Record<string, unknown> = {
+                regions: Array.from(regions),
+              };
+              if (enrich) {
+                if (cur?.address == null && enrich.address != null) patch.address = enrich.address;
+                if (cur?.rating == null && enrich.rating != null) patch.rating = enrich.rating;
+                if (cur?.review_count == null && enrich.review_count != null) patch.review_count = enrich.review_count;
+              }
+              const { error: updateError } = await supabase
+                .from("utility_providers")
+                .update(patch)
+                .eq("id", id);
+              if (updateError) {
+                console.warn(
+                  `[find-local-vendors] region/enrich update failed for ${id}:`,
+                  updateError,
+                );
+              }
             }
           }
 
