@@ -411,10 +411,20 @@ final class AppState: ObservableObject {
                         // task rows on existing TestFlight households.
                         // Idempotent — reconciler skips templates that
                         // already have a templateId match in the DB.
+                        //
+                        // _v2: the first attempt landed when the new DIY
+                        // templates carried `routingOverride: .diyDefault`,
+                        // which routed them to handyman_punch_items via
+                        // Phase 67E/F's single-rail check instead of to
+                        // maintenance_tasks. Dropping the override on
+                        // those templates was the fix; bumping the gate
+                        // version so the reconciler runs again and
+                        // creates the maintenance_tasks rows the user
+                        // actually sees on the Maintenance tab.
                         if let householdId = primaryProperty?.householdId,
-                           !UserDefaults.standard.bool(forKey: "hasSeededPhase70A1LibraryExpansion_v1") {
+                           !UserDefaults.standard.bool(forKey: "hasSeededPhase70A1LibraryExpansion_v2") {
                             _ = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
-                            UserDefaults.standard.set(true, forKey: "hasSeededPhase70A1LibraryExpansion_v1")
+                            UserDefaults.standard.set(true, forKey: "hasSeededPhase70A1LibraryExpansion_v2")
                             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                         }
                     }

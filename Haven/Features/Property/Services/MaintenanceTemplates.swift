@@ -909,8 +909,7 @@ enum MaintenanceTemplates {
                 professionalRequired: false,
                 notes: "Late June or early July is the sweet spot — pollen and leaf-out debris is settled, you're ahead of the storm season. About 15 minutes from the ground. Bring binoculars if you have them.",
                 assignmentType: .either,
-                diyEffortMinutes: 15,
-                routingOverride: .diyDefault
+                diyEffortMinutes: 15
             ),
             // Phase 70.A1 (Winter fill): ice-dam ground walk. Different
             // from the Fall walk-roofline visit (which is professional)
@@ -931,7 +930,6 @@ enum MaintenanceTemplates {
                 notes: "Cosmetic icicles ≠ ice dam. The dam is what forms above them when warm roof melts snow that re-freezes at the cold eave. Persistent icicles in the same spot year after year usually mean an attic-insulation or ventilation issue worth fixing in the off-season.",
                 assignmentType: .either,
                 diyEffortMinutes: 10,
-                routingOverride: .diyDefault,
                 regionalPack: .northeast
             ),
         ]),
@@ -1117,8 +1115,7 @@ enum MaintenanceTemplates {
                 notes: "Mid-July is the sweet spot — past pollen + cottonwood season, ahead of August heat. Power-off is critical (the fan blade is right there). If fins are visibly bent, a fin comb is $8 on Amazon; flagging it for the spring tune-up is also fine.",
                 requiredSubtypes: ["has_ac"],
                 assignmentType: .either,
-                diyEffortMinutes: 10,
-                routingOverride: .diyDefault
+                diyEffortMinutes: 10
             ),
         ]),
 
@@ -1239,8 +1236,7 @@ enum MaintenanceTemplates {
                 professionalRequired: false,
                 notes: "Mid-July after a few months of summer use is when problems surface. Soft drip = washer; persistent drip when shut tight = stem cartridge; wet drywall behind the bib = call a plumber today.",
                 assignmentType: .either,
-                diyEffortMinutes: 10,
-                routingOverride: .diyDefault
+                diyEffortMinutes: 10
             ),
             // Phase 70.A1 (Winter fill): frozen pipe risk walk during
             // active cold snaps. Northeast regional. Different from
@@ -1259,7 +1255,6 @@ enum MaintenanceTemplates {
                 notes: "If you find a frozen section, open the closest faucet downstream (so any melt has somewhere to go) and apply heat gently — hair dryer, heat tape, never an open flame. Burst pipes are 4-figure repairs; catching the freeze before the burst is the goal.",
                 assignmentType: .either,
                 diyEffortMinutes: 15,
-                routingOverride: .diyDefault,
                 regionalPack: .northeast
             ),
         ]),
@@ -2135,7 +2130,6 @@ enum MaintenanceTemplates {
                 notes: "Most NE winters have at least one multi-day outage; the generator gets used hard for 24-72 hours straight. This check is what makes sure it actually starts when you need it.",
                 assignmentType: .either,
                 diyEffortMinutes: 10,
-                routingOverride: .diyDefault,
                 regionalPack: .northeast
             ),
         ]),
@@ -3154,7 +3148,6 @@ enum MaintenanceTemplates {
                 notes: "A $15 digital hygrometer is plenty accurate. HNW homes with fine furniture, art, or instruments should target 40-45% specifically.",
                 assignmentType: .either,
                 diyEffortMinutes: 10,
-                routingOverride: .diyDefault,
                 regionalPack: .northeast
             ),
         ]),
