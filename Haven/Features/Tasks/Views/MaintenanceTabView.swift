@@ -603,9 +603,17 @@ struct MaintenanceTabView: View {
 
     private func programsSubtitle(_ programs: [RoutineRow]) -> String {
         let chezCount = programs.filter { $0.chezOwned }.count
-        if chezCount == 0 { return "On autopilot" }
-        if chezCount == programs.count { return "Chez is handling these" }
-        return "On autopilot · \(chezCount) handled by Chez"
+        let visits = activeFeed.routineVisitCount
+        let visitsPart: String? = visits > 0
+            ? "\(visits) visit\(visits == 1 ? "" : "s") this \(activeSeason.displayName.lowercased())"
+            : nil
+        let chezPart: String?
+        if chezCount == 0 { chezPart = nil }
+        else if chezCount == programs.count { chezPart = "Chez is handling these" }
+        else { chezPart = "\(chezCount) handled by Chez" }
+
+        let parts = [visitsPart, chezPart, "On autopilot"].compactMap { $0 }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - Phase 70 lookups (contractor / bundle children / routines)
@@ -898,9 +906,12 @@ struct SeasonFeed {
     /// Sorted by urgency (overdue first, then within-7-days, then by date).
     let decisions: [DecisionEntry]
 
-    /// All in-season work organized chronologically by month. Bundle parents,
-    /// standalone tasks, and routine occurrences mixed together within each
-    /// month, sorted by anchor date within the month.
+    /// All in-season TASK work organized chronologically by month. Bundle
+    /// parents and standalone tasks. Routine occurrences are deliberately
+    /// EXCLUDED here — they were flooding the summer feed with 10+ rows
+    /// per month of weekly Blue Fox / Doody Calls / Mosquito & Tick.
+    /// Active Programs section is their canonical home; the season
+    /// visit-count caption there carries the density signal.
     let monthSections: [MonthSection]
 
     /// Active routines for the "Your active programs" section. Includes
@@ -908,8 +919,15 @@ struct SeasonFeed {
     /// renders a salmon Chez pill inline. Collapsed by default in the UI.
     let programs: [RoutineRow]
 
+    /// Total recurring-visit count for this season's active routines.
+    /// Surfaces in the Active Programs section subtitle ("12 visits this
+    /// summer · On autopilot") so the user knows the routine cadence
+    /// without seeing every Wednesday-Blue-Fox row in the season feed.
+    let routineVisitCount: Int
+
     /// Convenience: ribbon tile counts. Excludes vehicle work (Vehicles
-    /// section owns its own count).
+    /// section owns its own count). Routine visits are NOT counted as
+    /// "items" — the Active Programs section count covers them.
     var totalItems: Int {
         decisions.count + monthSections.reduce(0) { $0 + $1.entries.count } + programs.count
     }
@@ -1282,11 +1300,20 @@ final class MaintenanceTabViewModel: ObservableObject {
                 : .standaloneTask(task)
             monthBuckets[month, default: []].append(entry)
         }
-        for occurrence in occurrences {
-            let month = calendar.component(.month, from: occurrence.date)
-            guard season.months.contains(month) else { continue }
-            monthBuckets[month, default: []].append(.routineOccurrence(occurrence))
-        }
+        // Phase 70.A1 fix: routine occurrences are NOT appended to the
+        // monthly feed. The summer screenshot showed Blue Fox /
+        // Doody Calls / Mosquito & Tick weekly visits flooding June,
+        // July, August with 10+ rows per month — burying the actual
+        // task work. The Active Programs section at the bottom of the
+        // screen lists every active routine ONCE with a "N visits this
+        // <season>" caption that communicates the cadence density.
+        // Tapping a program row drills into RoutineDetailView where
+        // the per-occurrence schedule is visible. The Up Next 14-day
+        // strip (planned for 70.A2) will surface the nearest
+        // occurrences as a separate forward-looking signal.
+        let routineVisitCountInSeason = occurrences.filter { occ in
+            season.months.contains(calendar.component(.month, from: occ.date))
+        }.count
 
         // Build sorted MonthSection list. Winter's chronological order is
         // Dec → Jan → Feb (December comes first within the season window);
@@ -1306,7 +1333,8 @@ final class MaintenanceTabViewModel: ObservableObject {
             season: season,
             decisions: combinedDecisions,
             monthSections: monthSections,
-            programs: mergedPrograms
+            programs: mergedPrograms,
+            routineVisitCount: routineVisitCountInSeason
         )
     }
 
