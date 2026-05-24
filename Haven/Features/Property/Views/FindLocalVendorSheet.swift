@@ -587,7 +587,19 @@ struct FindLocalVendorSheet: View {
     private static let townMatchBoost: Double = 0.3
 
     private func bayesianScore(_ v: HavenSupabase.LocalVendorResult) -> Double {
-        let r = v.rating ?? 0
+        // Phase X+7 fix: rows with no rating data at all should NOT
+        // benefit from the Bayesian prior (4.5) or the town boost.
+        // Without this guard, a town-matched unrated admin row would
+        // score 4.5 + 0.3 = 4.8 and beat a genuinely good 4.3★/500-
+        // reviews vendor (4.31). That's how high-quality vendors
+        // ended up below unrated rows. Now: no rating data → score
+        // 0, sinks to the bottom of the list. The vendor stays
+        // VISIBLE (still in the array) but won't float above rated
+        // competitors. Catalog rows that lack rating today are
+        // mostly admin national brands (Eversource etc.) for which
+        // sinking is fine — the homeowner can search by name if
+        // they want a specific brand.
+        guard let r = v.rating, r > 0 else { return 0.0 }
         let v_n = Double(v.reviewCount ?? 0)
         let m = Self.bayesianConfidence
         let C = Self.bayesianPrior
