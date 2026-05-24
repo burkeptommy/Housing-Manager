@@ -113,6 +113,29 @@ extension Notification.Name {
     /// global sheet so any entry point can fire it without owning the
     /// sheet state itself.
     static let openChezRequestComposer = Notification.Name("openChezRequestComposer")
+
+    /// Round 5 routing audit: universal deep-link primitive for tasks.
+    /// `userInfo["task_id"]` carries the UUID string. MainTabView's
+    /// listener async-fetches the task row and presents
+    /// `MaintenanceTaskDetailSheet` on top of whatever tab is active —
+    /// matches the modal-sheet pattern Tom chose so the user can
+    /// dismiss and return to where they were.
+    ///
+    /// Callers: AppDelegate (`task_assignment`, `task_completed`,
+    /// `maintenance_due`, `maintenance_overdue`, `visit_reminder`
+    /// push types), Dashboard activity feed, any in-app surface that
+    /// wants to deep-link a task without owning its own sheet state.
+    static let openTask = Notification.Name("openTask")
+
+    /// Round 5 routing audit: universal deep-link primitive for
+    /// routines. `userInfo["routine_id"]` carries the UUID string.
+    /// MainTabView's listener async-fetches the routine + property
+    /// and presents `RoutineEditSheet`.
+    ///
+    /// Callers: AppDelegate (`chez_routine_visit_scheduled`,
+    /// `standing_appointment_resumed` push types), any in-app
+    /// surface that wants to deep-link a specific routine.
+    static let openRoutine = Notification.Name("openRoutine")
 }
 
 struct MainTabView: View {
@@ -122,6 +145,22 @@ struct MainTabView: View {
     @State private var showScenarioStudio = false
     @State private var scenarioInitialQuery: String?
     @State private var isKeyboardVisible = false
+
+    /// Round 4 friend feedback: after a vendor is saved, render a brief
+    /// confirmation toast at the top so the homeowner sees their save
+    /// actually landed. Set on `.contractorAdded` via the `userInfo`
+    /// payload (which `VendorReviewForm`'s save() already posts) and
+    /// auto-clears 2.4s later.
+    @State private var contractorSavedToast: String?
+
+    /// Round 5 routing audit: payloads for the universal deep-link
+    /// primitives `.openTask` and `.openRoutine`. The listeners fetch
+    /// the entity by id and assign these — sheets bound via
+    /// `.sheet(item:)` then present `MaintenanceTaskDetailSheet` and
+    /// `RoutineEditSheet` respectively. Sheet item is cleared on
+    /// dismiss so re-firing the notification for the same id works.
+    @State private var deepLinkTaskInput: DeepLinkTaskInput?
+    @State private var deepLinkRoutineInput: DeepLinkRoutineInput?
 
     // Phase 80 — Chez Concierge composer presentation. Any entry point
     // (FindLocalVendorSheet, MaintenanceTaskDetailSheet, HandymanPunchListView,
@@ -274,6 +313,112 @@ struct MainTabView: View {
                 "context_keys": context.keys.sorted().joined(separator: ","),
             ])
         }
+        // Round 5 routing audit: .openTask deep-link primitive. Any push
+        // (task_assignment, task_completed, maintenance_due,
+        // maintenance_overdue, visit_reminder) or in-app surface that
+        // posts this with a `task_id` lands the user on the specific
+        // task's detail sheet, regardless of which tab they're on.
+        .onReceive(NotificationCenter.default.publisher(for: .openTask)) { notification in
+            guard let taskIdString = notification.userInfo?["task_id"] as? String,
+                  let taskId = UUID(uuidString: taskIdString) else { return }
+            Task {
+                // fetchMaintenanceTasks is the only fetch path in
+                // DatabaseService that returns the task row by id —
+                // filter the results because there's no `fetchMaintenanceTask(id:)`
+                // singular helper.
+                let all = (try? await DatabaseService.shared.fetchMaintenanceTasks(includeArchived: false)) ?? []
+                guard let task = all.first(where: { $0.id == taskId }) else { return }
+                await MainActor.run {
+                    deepLinkTaskInput = DeepLinkTaskInput(task: task)
+                }
+            }
+        }
+        .sheet(item: $deepLinkTaskInput) { input in
+            MaintenanceTaskDetailSheet(task: input.task)
+        }
+        // Round 5 routing audit: .openRoutine deep-link primitive.
+        // Mirrors .openTask but for routine rows. Fired on the
+        // `chez_routine_visit_scheduled` push and on
+        // `standing_appointment_resumed` (which now maps to routines
+        // post-Phase 55.3).
+        .onReceive(NotificationCenter.default.publisher(for: .openRoutine)) { notification in
+            guard let routineIdString = notification.userInfo?["routine_id"] as? String,
+                  let routineId = UUID(uuidString: routineIdString) else { return }
+            Task {
+                guard let routine = try? await DatabaseService.shared.fetchRoutine(id: routineId) else { return }
+                // RoutineEditSheet needs (householdId, propertyId?,
+                // existing) — household + property are on the row.
+                await MainActor.run {
+                    deepLinkRoutineInput = DeepLinkRoutineInput(
+                        routine: routine,
+                        householdId: routine.householdId,
+                        propertyId: routine.propertyId
+                    )
+                }
+            }
+        }
+        .sheet(item: $deepLinkRoutineInput) { input in
+            NavigationStack {
+                RoutineEditSheet(
+                    householdId: input.householdId,
+                    propertyId: input.propertyId,
+                    existing: input.routine,
+                    onSaved: { /* sheet dismisses itself via .dismiss() */ }
+                )
+            }
+        }
+        // Round 4 friend feedback: success toast after a vendor save.
+        // `VendorReviewForm` (and other vendor-add paths) post
+        // `.contractorAdded` with `companyName` so the message reads
+        // "Renata Dias saved" instead of a generic "Vendor saved."
+        .onReceive(NotificationCenter.default.publisher(for: .contractorAdded)) { notification in
+            let companyName = notification.userInfo?["companyName"] as? String
+            let trimmed = companyName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let label: String
+            if let trimmed, !trimmed.isEmpty {
+                label = "\(trimmed) saved"
+            } else {
+                label = "Vendor saved"
+            }
+            withAnimation { contractorSavedToast = label }
+            // Auto-clear after 2.4s — long enough to read, short enough
+            // to not block subsequent interactions.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
+                withAnimation {
+                    if contractorSavedToast == label {
+                        contractorSavedToast = nil
+                    }
+                }
+            }
+        }
+        .overlay(alignment: .top) {
+            if let toast = contractorSavedToast {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(HavenColors.success)
+                    Text(toast)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(HavenColors.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
+                .padding(.horizontal, HavenTheme.pageMargin)
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: contractorSavedToast)
     }
 
     /// Phase 80 — Identifiable wrapper so SwiftUI's `.sheet(item:)` can
@@ -283,6 +428,23 @@ struct MainTabView: View {
         let category: ChezCategory
         let contextHints: [String: String]
         let isCategoryFixed: Bool
+    }
+
+    /// Round 5 routing audit: payload for the `.openTask` listener.
+    /// New `id` per notification so `.sheet(item:)` re-presents cleanly
+    /// even if the same task fires twice in a row.
+    fileprivate struct DeepLinkTaskInput: Identifiable {
+        let id = UUID()
+        let task: MaintenanceTaskDBRow
+    }
+
+    /// Round 5 routing audit: payload for the `.openRoutine` listener.
+    /// Carries the household + property context RoutineEditSheet needs.
+    fileprivate struct DeepLinkRoutineInput: Identifiable {
+        let id = UUID()
+        let routine: RoutineRow
+        let householdId: UUID
+        let propertyId: UUID?
     }
 
     private func normalizedChezContext(_ rawContext: [String: String], category: ChezCategory) -> [String: String] {

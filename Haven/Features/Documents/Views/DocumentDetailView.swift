@@ -1013,6 +1013,18 @@ struct DocumentDetailView: View {
                 content.title = "Document Reminder"
                 content.body = "\(viewModel.document?.title ?? "Document"): \(flag.message)"
                 content.sound = .default
+                // Round 5 routing audit: stamp document_id + type so the
+                // tap routes through the existing `.navigateToInboxItem`
+                // path (DashboardView's listener) instead of falling
+                // through to the default Tasks tab. Same payload shape
+                // as DocumentUploadManager's `documents_processed` push
+                // so the AppDelegate case handles both.
+                if let docId = viewModel.document?.id {
+                    content.userInfo = [
+                        "type": "document_flag_reminder",
+                        "first_document_id": docId.uuidString,
+                    ]
+                }
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 86400 * 7, repeats: false)
                 let request = UNNotificationRequest(
                     identifier: "flag-\(viewModel.document?.id.uuidString ?? "")-\(flag.message.prefix(20))",

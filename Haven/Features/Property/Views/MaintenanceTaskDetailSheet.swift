@@ -1091,6 +1091,13 @@ struct MaintenanceTaskDetailSheet: View {
             content.title = "Maintenance Reminder"
             content.body = "\(task.title) is due in \(timing.daysBefore) day\(timing.daysBefore == 1 ? "" : "s")."
             content.sound = .default
+            // Round 5 routing audit: stamp task_id so the tap routes
+            // through `.openTask` to this specific task's detail sheet
+            // instead of falling through to the default Tasks tab.
+            content.userInfo = [
+                "type": "task_reminder",
+                "task_id": task.id.uuidString,
+            ]
 
             let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: alertDate)
             let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)

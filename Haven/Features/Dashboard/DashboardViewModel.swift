@@ -105,6 +105,14 @@ final class DashboardViewModel: ObservableObject {
     @Published var uncoveredCoverageItems: [VendorCoverageItem] = []
     @Published var coveredCoverageItems: [VendorCoverageItem] = []
 
+    /// May 2026 friend feedback Round 3: active find_vendor /
+    /// find_handyman Chez requests. Loaded inside `loadVendorVisits`
+    /// alongside the other coverage inputs and fed into
+    /// `SystemCategoryRegistry.vendorCoverageItems` so categories the
+    /// homeowner already delegated to Chez drop out of the gap list.
+    /// Refreshes on `.chezRequestChanged`.
+    @Published var activeChezVendorRequests: [ChezRequestRow] = []
+
     // Phase 50: Recent activity events for the dashboard feed
     @Published var recentActivityEvents: [RecentActivityEvent] = []
     /// Phase 52: Full (un-truncated) activity event list for ActivityLogView.
@@ -861,9 +869,14 @@ final class DashboardViewModel: ObservableObject {
 
     func subscribeToChanges() {
         guard cancellables.isEmpty else { return }
+        // May 2026 friend feedback Round 3: include `.chezRequestChanged`
+        // so submitting a "Have Chez handle it" request from
+        // VendorCoverageSheet immediately refreshes the gap list and
+        // the just-delegated category disappears.
         let names: [Notification.Name] = [
             .maintenanceTaskChanged, .homeSystemChanged, .contractorChanged,
-            .documentChanged, .propertyChanged, .projectChanged
+            .documentChanged, .propertyChanged, .projectChanged,
+            .chezRequestChanged
         ]
         for name in names {
             NotificationCenter.default.publisher(for: name)
@@ -1473,6 +1486,16 @@ final class DashboardViewModel: ObservableObject {
             .filter { !SystemCategoryRegistry.showInVendorCoverage(category: $0.category, parentSystemId: nil) }
             .sorted { $0.category < $1.category }
 
+        // May 2026 friend feedback Round 3: active Chez vendor requests
+        // suppress matching gaps in the coverage list. Fetched alongside
+        // the other inputs so the strip and the Vendor Coverage sheet
+        // see a consistent view.
+        if let householdId = primaryHouseholdId {
+            activeChezVendorRequests = (try? await DatabaseService.shared.fetchActiveChezVendorRequests(householdId: householdId)) ?? []
+        } else {
+            activeChezVendorRequests = []
+        }
+
         computeCoverage(allTasks: allTasks, contractors: contractors, systems: systems)
     }
 
@@ -1819,10 +1842,15 @@ final class DashboardViewModel: ObservableObject {
         // Build 91: filter out categories the user has previously swiped
         // "Hide" on (persisted in `dismissed_categories`) so the row
         // doesn't reappear on every refresh.
+        // May 2026 friend feedback Round 3: pass active Chez vendor
+        // requests so categories the homeowner already delegated to
+        // Chez drop out of the gap list. `activeChezVendorRequests`
+        // is loaded inside `loadVendorVisits` before this call.
         let registryCoverage = SystemCategoryRegistry.vendorCoverageItems(
             existingSystems: systems,
             contractors: contractors,
-            vendorTasks: vendorTasks
+            vendorTasks: vendorTasks,
+            activeChezVendorRequests: activeChezVendorRequests
         )
         uncoveredCoverageItems = registryCoverage.uncovered.filter {
             !dismissedCoverageCategories.contains($0.id)

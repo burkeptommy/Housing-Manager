@@ -1841,12 +1841,18 @@ struct PropertyDetailView: View {
                     spacing: 8
                 ) {
                     ForEach(groups) { group in
-                        let needsAttention = group.systems.contains { $0.preferredContractorId == nil }
+                        // May 2026 friend feedback Round 3: per-tile
+                        // attention dots removed. The verification banner
+                        // above ("0 of N systems verified") and the
+                        // BROWSE caption ("N systems · M need profile")
+                        // already communicate the same state, and the
+                        // dot rule ("any system lacks a preferred
+                        // contractor") didn't actually match either
+                        // surface — confusing for users.
                         PropertySystemsCategoryTile(
                             icon: group.icon,
                             title: group.name,
                             systemCount: group.systems.count,
-                            needsAttention: needsAttention,
                             onTap: {
                                 selectedSystemGroup = group
                             }
@@ -2217,7 +2223,8 @@ struct PropertyDetailView: View {
             contractors: viewModel.contractors,
             vendorTasks: viewModel.maintenanceTasks.filter {
                 $0.vehicleId == nil && $0.assignmentType?.lowercased() == "vendor"
-            }
+            },
+            activeChezVendorRequests: viewModel.activeChezVendorRequests
         )
         return (coverage.covered.count, coverage.uncovered.count)
     }

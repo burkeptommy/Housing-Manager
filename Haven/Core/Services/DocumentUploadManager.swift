@@ -348,7 +348,8 @@ final class DocumentUploadManager: ObservableObject {
     // MARK: - Notifications
 
     private func sendCompletionNotification() async {
-        let successCount = queue.filter { $0.isComplete && $0.error == nil }.count
+        let successItems = queue.filter { $0.isComplete && $0.error == nil }
+        let successCount = successItems.count
         let failCount = queue.filter { $0.error != nil }.count
 
         guard successCount > 0 || failCount > 0 else { return }
@@ -364,13 +365,29 @@ final class DocumentUploadManager: ObservableObject {
             content.body = "\(successCount) processed successfully, \(failCount) failed. Tap to review."
         }
 
+        // Round 4 friend feedback: stamp the routing payload onto
+        // userInfo so AppDelegate's switch can deep-link the tap to the
+        // Dashboard → inbox-item review surface. Without this, the
+        // notification fell through to the `default → tab: 2 (Tasks)`
+        // branch and the user landed on the Maintenance stream wondering
+        // where their documents went.
+        let firstDocId = successItems.compactMap(\.documentId).first
+        var info: [String: Any] = [
+            "type": "documents_processed",
+            "document_count": successCount,
+        ]
+        if let firstDocId {
+            info["first_document_id"] = firstDocId.uuidString
+        }
+        content.userInfo = info
+
         // Fire immediately (1 second delay for background delivery)
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "batch-upload-\(UUID().uuidString)", content: content, trigger: trigger)
 
         do {
             try await UNUserNotificationCenter.current().add(request)
-            print("[UploadManager] Completion notification scheduled")
+            print("[UploadManager] Completion notification scheduled (first_doc_id: \(firstDocId?.uuidString ?? "none"))")
         } catch {
             print("[UploadManager] Failed to schedule notification: \(error)")
         }

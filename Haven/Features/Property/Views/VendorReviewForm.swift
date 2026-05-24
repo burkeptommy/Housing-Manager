@@ -18,6 +18,13 @@ struct VendorReviewForm: View {
     // DB value is always a registry-recognized key.
     @State private var selectedCategory: String?
 
+    // Round 4 friend feedback: post-save routine-link prompt for
+    // service-anchored vendors (Cleaning, Snow Removal, etc.). When the
+    // newly-saved contractor has a matching pending-vendor routine, this
+    // gets populated and the `.sheet(item:)` modifier presents
+    // `VendorRoutineLinkSheet` so the homeowner can link in one tap.
+    @State private var routineLinkContext: RoutineLinkContext?
+
     // System assignment after save
     @State private var systems: [HomeSystemRow] = []
     @State private var selectedSystemIds: Set<UUID> = []
@@ -79,7 +86,13 @@ struct VendorReviewForm: View {
                     }
                 }
 
-                Section("Type") {
+                // Round 4 friend feedback: surface required fields up front
+                // so users don't tap Save and wonder what's missing. The
+                // Save toolbar button is `.disabled` until all three
+                // required fields are filled. Footer caption mirrors the
+                // Apple Calendar / Reminders convention of explaining the
+                // required-field state in plain language.
+                Section {
                     Picker("Vendor Type", selection: $vendor.contactType) {
                         ForEach(contactTypes, id: \.self) { Text($0).tag($0) }
                     }
@@ -92,7 +105,7 @@ struct VendorReviewForm: View {
                     // contractors landed with `category = nil` and never
                     // matched any vendor-coverage entry.
                     if vendor.contactType == "Contractor / Service Provider" {
-                        Picker("Primary specialty", selection: Binding(
+                        Picker(selection: Binding(
                             get: { selectedCategory ?? "" },
                             set: { selectedCategory = $0.isEmpty ? nil : $0 }
                         )) {
@@ -100,18 +113,41 @@ struct VendorReviewForm: View {
                             ForEach(pickerCategories, id: \.self) { cat in
                                 Text(cat).tag(cat)
                             }
+                        } label: {
+                            requiredFieldLabel(
+                                "Primary specialty",
+                                isUnmet: (selectedCategory ?? "").isEmpty
+                            )
                         }
+                    }
+                } header: {
+                    Text("Type")
+                } footer: {
+                    if isMissingRequiredSpecialty {
+                        Text("Pick a specialty so we can route \(vendor.companyName.isEmpty ? "this vendor" : vendor.companyName) to the right systems and routines.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
 
-                Section("Contact Information") {
-                    TextField("Company / Business Name", text: $vendor.companyName)
+                Section {
+                    HStack {
+                        TextField("Company / Business Name", text: $vendor.companyName)
+                        if vendor.companyName.isEmpty {
+                            requiredBadge
+                        }
+                    }
                     TextField("Contact Person", text: Binding(
                         get: { vendor.contactName ?? "" },
                         set: { vendor.contactName = $0.isEmpty ? nil : $0 }
                     ))
-                    TextField("Phone", text: $vendor.phone)
-                        .keyboardType(.phonePad)
+                    HStack {
+                        TextField("Phone", text: $vendor.phone)
+                            .keyboardType(.phonePad)
+                        if vendor.phone.isEmpty {
+                            requiredBadge
+                        }
+                    }
                     TextField("Email", text: $vendor.email)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
@@ -120,6 +156,8 @@ struct VendorReviewForm: View {
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                } header: {
+                    Text("Contact Information")
                 }
 
                 Section("License (Optional)") {
@@ -146,8 +184,14 @@ struct VendorReviewForm: View {
                     if isSaving {
                         ProgressView().tint(HavenColors.navy)
                     } else {
+                        // Round 4 friend feedback: Save now requires a
+                        // Primary specialty when the vendor is a
+                        // "Contractor / Service Provider" — without it
+                        // the contractor lands with category=nil and is
+                        // invisible to Vendor Coverage matching, which
+                        // the user perceives as "Save didn't save."
                         Button("Save") { Task { await save() } }
-                            .disabled(vendor.companyName.isEmpty || vendor.phone.isEmpty)
+                            .disabled(isSaveDisabled)
                     }
                 }
             }
@@ -192,7 +236,84 @@ struct VendorReviewForm: View {
                     }
                 )
             }
+            // Round 4 friend feedback: post-save routine link for
+            // service-anchored vendors. Only presents when the just-saved
+            // vendor's canonical category maps to a `RoutineKind` AND
+            // the household has a matching routine without a vendor.
+            .sheet(item: $routineLinkContext) { context in
+                VendorRoutineLinkSheet(
+                    contractor: context.contractor,
+                    candidates: context.candidates,
+                    onLink: { selected in
+                        await linkContractorToRoutines(
+                            contractor: context.contractor,
+                            routines: selected
+                        )
+                        completePostSave(contractorId: context.contractor.id)
+                    },
+                    onSkip: {
+                        completePostSave(contractorId: context.contractor.id)
+                    }
+                )
+            }
         }
+    }
+
+    // MARK: - Required-field helpers
+
+    /// Save disabled when any required field is unmet. Required fields:
+    /// company name, phone, and (when contactType == Contractor / Service
+    /// Provider) Primary specialty. Estate-type rows encode their
+    /// specialty in `contactType` itself so they don't trigger the
+    /// specialty gate.
+    private var isSaveDisabled: Bool {
+        vendor.companyName.isEmpty
+            || vendor.phone.isEmpty
+            || isMissingRequiredSpecialty
+    }
+
+    private var isMissingRequiredSpecialty: Bool {
+        vendor.contactType == "Contractor / Service Provider"
+            && (selectedCategory ?? "").isEmpty
+    }
+
+    /// Inline "Required" amber pill rendered next to a TextField when its
+    /// value is empty. Mirrors the visual weight Tom used to expect on
+    /// required-field forms (small, muted, not alarming).
+    private var requiredBadge: some View {
+        Text("Required")
+            .font(HavenTypography.uiLabelSmall)
+            .foregroundStyle(HavenColors.warning)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Capsule().fill(HavenColors.warning.opacity(0.12))
+            )
+    }
+
+    /// Picker / label variant that appends the required pill inline when
+    /// the picker hasn't been resolved. The HStack form keeps the label
+    /// + pill on the same row as the picker's trailing chevron.
+    @ViewBuilder
+    private func requiredFieldLabel(_ title: String, isUnmet: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+            if isUnmet {
+                requiredBadge
+            }
+        }
+    }
+
+    // MARK: - Routine-link context
+
+    /// Identifiable payload passed to the `.sheet(item:)` modifier so
+    /// SwiftUI can present + dismiss the routine-link sheet without
+    /// stale state. The struct stays fileprivate to this view because
+    /// it's not consumed by any caller.
+    fileprivate struct RoutineLinkContext: Identifiable {
+        let id = UUID()
+        let contractor: ContractorRow
+        let candidates: [RoutineRow]
     }
 
     private var allServiceCategories: [String] {
@@ -344,9 +465,29 @@ struct VendorReviewForm: View {
                 )
             }
 
-            // Load systems for assignment
+            // Load systems for assignment.
+            //
+            // May 2026 friend feedback Round 3: the sheet only has value
+            // when there's actually system-anchored work to do. Three
+            // cases skip it and complete the save directly:
+            //   (1) Property has no systems yet (legacy path).
+            //   (2) Vendor's canonical category is "service-only" —
+            //       Cleaning, Trash, Snow, Handyman, etc. don't service
+            //       a discrete `home_systems` row, so asking the user
+            //       to pick one is noise.
+            //   (3) Vendor's category has no overlap with any existing
+            //       system on this property — the canonical-coverage
+            //       set landed empty, so the sheet would just show the
+            //       full unfiltered grid.
+            // In all three cases the saved `contractors.category` field
+            // is enough for `vendorCoverageItems` to pick the vendor up.
             let allSystems = (try? await DatabaseService.shared.fetchHomeSystems()) ?? []
-            if !allSystems.isEmpty {
+            let canonicalCat = SystemCategoryRegistry.canonical(category: resolvedCategory)
+            let isServiceOnly = canonicalCat
+                .map { SystemCategoryRegistry.serviceOnlyCategoryKeys.contains($0) } ?? false
+
+            var shouldPresentSheet = false
+            if !allSystems.isEmpty && !isServiceOnly {
                 systems = allSystems
 
                 // Pre-select systems whose canonical category matches
@@ -357,9 +498,9 @@ struct VendorReviewForm: View {
                 // my {Category} systems" toggle on the sheet so users
                 // coming from a gap card with a known specialty can
                 // tap Done without hunting through irrelevant rows.
-                if let canonicalCat = SystemCategoryRegistry.canonical(category: resolvedCategory) {
-                    relevantCategoryLabel = canonicalCat
-                    let coverageSet = SystemCategoryRegistry.canonicalCoverageSet(for: canonicalCat)
+                if let canonical = canonicalCat {
+                    relevantCategoryLabel = canonical
+                    let coverageSet = SystemCategoryRegistry.canonicalCoverageSet(for: canonical)
                     let matchingIds = allSystems.compactMap { system -> UUID? in
                         guard let canonicalSystemCat = SystemCategoryRegistry.canonical(category: system.category),
                               coverageSet.contains(canonicalSystemCat) else { return nil }
@@ -373,28 +514,89 @@ struct VendorReviewForm: View {
                     selectedSystemIds = []
                 }
 
+                // Only worth showing the sheet when there's a match to
+                // pre-select. Without matches, the sheet's only value is
+                // letting the user manually link arbitrary systems —
+                // rarely what they actually want post-save.
+                shouldPresentSheet = !relevantSystemIds.isEmpty
+            }
+
+            if shouldPresentSheet {
                 showSystemAssignment = true
+            } else if isServiceOnly,
+                      let canonical = canonicalCat,
+                      let routineKind = RoutineGroupingEngine.routineKindFor(systemCategory: canonical) {
+                // Round 4 friend feedback: service-anchored vendor →
+                // prompt to link onto a matching routine when at least
+                // one routine of the matching kind exists without a
+                // vendor. The system-assignment sheet was already
+                // skipped above (service-only category), so this is the
+                // right moment to offer the routine-link follow-up.
+                let routines = (try? await DatabaseService.shared.fetchRoutines(householdId: householdId)) ?? []
+                let candidates = routines.filter { routine in
+                    routine.routineKind == routineKind.rawValue
+                        && routine.vendorId == nil
+                        && routine.archivedAt == nil
+                }
+                if !candidates.isEmpty {
+                    routineLinkContext = RoutineLinkContext(
+                        contractor: contractor,
+                        candidates: candidates
+                    )
+                } else {
+                    completePostSave(contractorId: contractor.id)
+                }
             } else {
-                // No systems — just complete. Phase 95 audit fix:
-                // we still need to fire .contractorChanged + .contractorAdded
-                // so PropertyDetailView's Contacts tab and the dashboard
-                // delegation re-fire path see the new vendor without a
-                // restart. The system-assignment branch posts these from
-                // assignSystems() — this branch was previously silent.
-                NotificationCenter.default.post(name: .contractorChanged, object: nil)
-                NotificationCenter.default.post(
-                    name: .contractorAdded,
-                    object: nil,
-                    userInfo: ["contractorId": contractor.id.uuidString]
-                )
-                onSave?()
-                dismiss()
+                completePostSave(contractorId: contractor.id)
             }
         } catch {
             self.error = error.localizedDescription
             Haptics.error()
         }
         isSaving = false
+    }
+
+    /// Fans out the standard post-save notifications + onSave callback +
+    /// dismiss. Extracted from `save()` so the new routine-link branch
+    /// can call it on either Link or Skip without duplicating the logic.
+    private func completePostSave(contractorId: UUID) {
+        NotificationCenter.default.post(name: .contractorChanged, object: nil)
+        // Round 4 friend feedback: include the company name so MainTabView
+        // can render a personalized "{vendor} saved" confirmation toast.
+        NotificationCenter.default.post(
+            name: .contractorAdded,
+            object: nil,
+            userInfo: [
+                "contractorId": contractorId.uuidString,
+                "companyName": vendor.companyName,
+            ]
+        )
+        onSave?()
+        dismiss()
+    }
+
+    /// Round 4 friend feedback: stamps the just-saved contractor onto
+    /// every routine the user confirmed in the link sheet. Each routine
+    /// flips to `setupState = "active"` so the Day1Curator's
+    /// pending-vendor "Pick a pro for X" cards drop off the Maintenance
+    /// hub. Posts `.routineChanged` once at the end so listeners refresh.
+    private func linkContractorToRoutines(
+        contractor: ContractorRow,
+        routines: [RoutineRow]
+    ) async {
+        guard !routines.isEmpty else { return }
+        for routine in routines {
+            var update = RoutineUpdate()
+            update.vendorId = contractor.id
+            update.setupState = "active"
+            _ = try? await DatabaseService.shared.updateRoutine(id: routine.id, update)
+        }
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
+        Analytics.track(.routineActivated, [
+            "contractor_id": contractor.id.uuidString,
+            "linked_routine_count": routines.count,
+            "source": "post_save_routine_link"
+        ])
     }
 
     private func assignSystems() async {
@@ -454,10 +656,15 @@ struct VendorReviewForm: View {
         NotificationCenter.default.post(name: .contractorChanged, object: nil)
         NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        // Round 4 friend feedback: include company name so the MainTabView
+        // success toast can be personalized.
         NotificationCenter.default.post(
             name: .contractorAdded,
             object: nil,
-            userInfo: ["contractorId": contractorId.uuidString]
+            userInfo: [
+                "contractorId": contractorId.uuidString,
+                "companyName": vendor.companyName,
+            ]
         )
         onSave?()
         dismiss()
@@ -505,6 +712,13 @@ struct SystemAssignmentSheet: View {
     var onDone: () -> Void
     @Environment(\.dismiss) private var dismiss
 
+    /// May 2026 friend feedback Round 3: collapse the full system list
+    /// behind a "Show all systems" disclosure so the default view shows
+    /// only the matches the pre-selection picked. Most users tap Save
+    /// without ever expanding this — the matches are correct out of the
+    /// box.
+    @State private var showAllSystems: Bool = false
+
     private var relevantSystems: [HomeSystemRow] {
         systems.filter { relevantSystemIds.contains($0.id) }
     }
@@ -534,7 +748,7 @@ struct SystemAssignmentSheet: View {
 
     private var subtitleText: String {
         if let label = categoryLabel, !relevantSystemIds.isEmpty {
-            return "We've checked your \(label) systems below. Adjust if needed."
+            return "We've linked \(vendorName) to your \(label) systems. Anything else they service?"
         }
         return "Which systems does \(vendorName) service?"
     }
@@ -579,12 +793,31 @@ struct SystemAssignmentSheet: View {
                     }
 
                     if !otherSystems.isEmpty {
-                        Section {
-                            ForEach(otherSystems) { system in
-                                systemRow(system)
+                        if relevantSystems.isEmpty {
+                            Section {
+                                ForEach(otherSystems) { system in
+                                    systemRow(system)
+                                }
+                            } header: {
+                                Text("Your systems")
                             }
-                        } header: {
-                            Text(relevantSystems.isEmpty ? "Your systems" : "Other systems")
+                        } else {
+                            // May 2026 friend feedback Round 3: hide
+                            // the rest of the household's systems behind
+                            // a disclosure so the user isn't scanning
+                            // unrelated rows when the pre-selection
+                            // already covered the obvious matches.
+                            Section {
+                                DisclosureGroup(isExpanded: $showAllSystems) {
+                                    ForEach(otherSystems) { system in
+                                        systemRow(system)
+                                    }
+                                } label: {
+                                    Text("Show all systems")
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
+                            }
                         }
                     }
                 }

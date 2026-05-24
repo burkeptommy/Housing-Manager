@@ -101,13 +101,18 @@ struct MiniHeroContent: View {
             }
             .padding(.bottom, 10)
 
-            // Progress bar (6pt tall, salmon fill)
+            // Progress bar (6pt tall, white fill on the purple gradient
+            // card). Was `HavenColors.action` (purple) on a purple
+            // gradient — the fill blended into the background and the
+            // bar was illegible. White fills pop against purple; the
+            // track stays a low-opacity white so the unfilled segment
+            // still reads as bar instead of dissolving into the card.
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(Color.white.opacity(0.16))
+                        .fill(Color.white.opacity(0.22))
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(HavenColors.action)
+                        .fill(Color.white)
                         .frame(width: geo.size.width * CGFloat(pct) / 100.0)
                         .animation(HavenTheme.animationProgress, value: pct)
                 }

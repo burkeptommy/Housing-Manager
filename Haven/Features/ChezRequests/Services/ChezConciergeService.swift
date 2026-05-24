@@ -21,6 +21,25 @@ extension DatabaseService {
             .value
     }
 
+    /// May 2026 friend feedback Round 3: active find_vendor /
+    /// find_handyman requests for use by the vendor-coverage gap list.
+    /// When Chez is actively sourcing a vendor for a category, that
+    /// category shouldn't render as an "uncovered" gap on the dashboard
+    /// or property surface — the homeowner already delegated it and
+    /// the Chez hero card communicates the state. Resolved requests
+    /// fall out automatically; the gap re-appears so the homeowner
+    /// sees the final assignment land.
+    func fetchActiveChezVendorRequests(householdId: UUID) async throws -> [ChezRequestRow] {
+        try await HavenSupabase.from("chez_requests")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .in("status", values: ["open", "waiting_customer"])
+            .in("category", values: ["find_vendor", "find_handyman"])
+            .order("last_message_at", ascending: false)
+            .execute()
+            .value
+    }
+
     /// Fetch a single request by id.
     func fetchChezRequest(id: UUID) async throws -> ChezRequestRow? {
         let rows: [ChezRequestRow] = try await HavenSupabase.from("chez_requests")

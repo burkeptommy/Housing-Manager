@@ -31,6 +31,14 @@ final class PropertyDetailViewModel: ObservableObject {
     /// underlying data the Tasks tab Maintenance segment uses.
     @Published var routines: [RoutineRow] = []
 
+    /// May 2026 friend feedback Round 3: active find_vendor /
+    /// find_handyman Chez requests. Passed into
+    /// `SystemCategoryRegistry.vendorCoverageItems` from the
+    /// `vendorCoverageCounts` computed property + the Vendor Coverage
+    /// sheet so categories the homeowner already delegated to Chez
+    /// disappear from the gap list.
+    @Published var activeChezVendorRequests: [ChezRequestRow] = []
+
     /// Guards auto-refresh so it only fires once per VM lifecycle.
     private var hasAttemptedAutoRefresh = false
     private let db = DatabaseService.shared
@@ -282,6 +290,14 @@ final class PropertyDetailViewModel: ObservableObject {
         content.title = "Maintenance Reminder"
         content.body = "\(task.title) needs attention."
         content.sound = .default
+        // Round 5 routing audit: stamp the type + task_id so the tap
+        // routes through `.openTask` and lands on the specific task's
+        // detail sheet instead of falling through to the default Tasks
+        // tab via the AppDelegate switch's `default` branch.
+        content.userInfo = [
+            "type": "task_reminder",
+            "task_id": task.id.uuidString,
+        ]
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: reminderDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         let request = UNNotificationRequest(identifier: "task-\(task.id.uuidString)", content: content, trigger: trigger)
@@ -519,13 +535,18 @@ final class PropertyDetailViewModel: ObservableObject {
             // Phase 56.1: contractor ids referenced by any active routine.
             // Powers the Contacts sub-tab "Routines" filter and the
             // per-row "Routine" badge.
+            // May 2026 friend feedback Round 3: also load the active
+            // Chez vendor requests so coverage gaps drop categories
+            // the homeowner already delegated to Chez.
             if let householdId = property?.householdId {
                 let fetched = (try? await db.fetchRoutines(householdId: householdId)) ?? []
                 routines = fetched
                 routineVendorIds = Set(fetched.compactMap { $0.vendorId })
+                activeChezVendorRequests = (try? await db.fetchActiveChezVendorRequests(householdId: householdId)) ?? []
             } else {
                 routines = []
                 routineVendorIds = []
+                activeChezVendorRequests = []
             }
         } catch {
             self.error = error.localizedDescription

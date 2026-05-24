@@ -182,13 +182,17 @@ struct PropertyTimelineDivider: View {
 // MARK: - Systems Browse grid tile
 
 /// Category tile for the Systems "Browse" 2-column grid. Renders a
-/// 36pt indigo-50 icon tile, the category name, system count, and an
-/// optional salmon attention dot in the top-right corner.
+/// 36pt indigo-50 icon tile, the category name, and the system count.
+///
+/// May 2026 friend feedback Round 3: the optional per-tile attention
+/// dot was removed. The verification banner above the grid and the
+/// "X need profile" caption already communicate per-property state;
+/// the dot rule ("any system lacks a preferred contractor") didn't
+/// match either signal and read as visual noise.
 struct PropertySystemsCategoryTile: View {
     let icon: String
     let title: String
     let systemCount: Int
-    var needsAttention: Bool = false
     var onTap: () -> Void
 
     var body: some View {
@@ -197,28 +201,14 @@ struct PropertySystemsCategoryTile: View {
             onTap()
         }) {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(HavenColors.navy)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(HavenColors.indigo50)
-                        )
-
-                    if needsAttention {
-                        // Phase 95.1 fix: was HavenColors.action (salmon).
-                        // Salmon is reserved for primary CTAs, not
-                        // attention-indicator dots. Semantic warning
-                        // (amber) preserves the visual signal without
-                        // the rule violation.
-                        Circle()
-                            .fill(HavenColors.warning)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 8, y: -4)
-                    }
-                }
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(HavenColors.navy)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(HavenColors.indigo50)
+                    )
 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))

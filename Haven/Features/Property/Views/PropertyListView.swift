@@ -515,13 +515,18 @@ struct PropertyCardRow: View {
         // Fix 1: registry coverage — single source of truth with dashboard.
         // Must also filter by dismissed categories (the dashboard does this
         // at DashboardViewModel:1299-1300) so the denominator matches.
+        // May 2026 friend feedback Round 3: also pass active Chez vendor
+        // requests so per-property coverage pills agree with the
+        // dashboard hero card after the user delegates a gap to Chez.
         let vendorTasks = tasks.filter {
             $0.assignmentType?.lowercased() == "vendor" && $0.vehicleId == nil
         }
+        let chezRequests = (try? await db.fetchActiveChezVendorRequests(householdId: property.householdId)) ?? []
         let coverage = SystemCategoryRegistry.vendorCoverageItems(
             existingSystems: systems,
             contractors: contractors,
-            vendorTasks: vendorTasks
+            vendorTasks: vendorTasks,
+            activeChezVendorRequests: chezRequests
         )
         let dismissed = Set(
             ((try? await db.fetchDismissedCategories()) ?? []).map(\.category)
