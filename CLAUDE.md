@@ -823,6 +823,43 @@ Match → insert into `handyman_punch_items` with `source = "auto_seed_handyman_
 - Do not re-introduce the Day1TaskCurator handyman branch — duplicate routing breaks the single-rail invariant.
 - Do not add a third visit parent template (e.g. "Summer handyman check") without a matching deletion path — the seasonal reminder card is the canonical coordination surface.
 
+## Tasks v2 — seasonal timing + library expansion (Phase 70)
+
+User feedback flagged three structural problems on the Tasks tab: (1) the YearRibbon Spring tile shows "30+ tasks" but only ~5 rows render, (2) semi-annual tasks fired only once per year (e.g. gutter cleaning showed in April but never October), and (3) common Northeast HNW services (chimney sweeping, plumbing inspection) had thin or no library coverage. Phase 70 addresses bullets 2 and 3 at the data layer; the UI rewrite (Section A from the plan) lands in a follow-up phase.
+
+**Spring/Fall dual-anchor model.** `MaintenanceTaskReconciler.plannedDueDates(for:today:seasonalTimingOverride:) -> [Date]` returns ALL planned surface dates for a template — one date per recognized seasonal anchor. "Spring/Fall"-tagged templates return two dates (April + October anchors); single-anchor templates return one. `initialDueDate(...)` is now a thin wrapper that returns `.first` to preserve the prior single-date signature for the bundle / opt-in / migration callsites. Standalone-template callers can iterate the array to create one task row per anchor.
+
+**Paired Fall bundles are how semi-annual work actually fires twice.** Bundle members anchor to the bundle id's parsed season (`seasonFromBundleId`), not the child template's `seasonalTiming`. So a child tagged "Spring/Fall" inside a `Roofing:spring` bundle still only fires in April. The fix is to ADD paired Fall bundles with sibling Fall templates, not to make a single bundle dual-anchor. Phase 70 ships these paired bundles:
+- `Roofing:fall` — Clean gutters (fall) + Walk roofline for ice dam risk. Bundle title: "Fall Roof and Gutter Service".
+- `Siding/Exterior:fall` — Power wash siding (fall). Bundle title: "Fall Exterior Wash".
+- `Landscaping:synthetic_turf_fall` — Power rake and groom turf (fall). Bundle title: "Synthetic Turf Fall Service".
+- `Chimney:spring` — Spring wood chimney inspection (wood subtype only). Bundle title: "Spring Chimney Inspection".
+- `Landscaping:fall` gained a Prune shrubs (fall) sibling (existing bundle).
+
+Fall siblings share user-facing titles with their Spring counterparts but carry a distinct `stableId` (e.g. `"Roofing:Clean gutters and downspouts (fall)"`) so the `templateKey` lookup (`stableId ?? "category:title"`) stays unambiguous. The bundle context tells the homeowner when.
+
+**Bundle expansions (visible scope, no new task rows).** Bundle children render as line items in the parent's "What's included" notes; they don't create their own task rows. So adding child template entries with an existing `bundleId` is purely additive — the bundle's user-facing task count doesn't change, but the visible scope grows.
+- `Chimney:fall` gained Check creosote level (wood) + Test damper operation as explicit line items.
+- `Water Heater:annual` gained Inspect anode rod (tank) + Verify temperature setting as explicit line items.
+
+**New Plumbing:annual bundle.** Phase 58 dissolved the prior Plumbing bundle, folding washing-machine-hose check + sump pump test + pressure check into Handyman:spring. Phase 70 restores a Plumbing bundle with PRO-only children (Annual plumbing inspection · Water pressure regulator check · Main shutoff exercise · Fixture leak walkthrough) that don't overlap with the Handyman:spring DIY items. The homeowner now finds plumbing under the Plumbing category instead of having every plumbing concern buried inside the handyman bundle.
+
+**Standalone specialty templates** for separate visits that need their own specialist:
+- `Chimney:Flue liner video scope` — every 3 years, opt-in, distinct camera-tech specialist.
+- `Chimney:Re-mortar crown` — every 10 years, opt-in, masonry visit.
+
+**Dethatch lawn moved Fall → Spring.** Phase 97 had retagged dethatch to Fall to match bundle membership, but the botany was wrong. Cool-season Northeast grasses recover better from early-spring dethatching; fall dethatching weakens the lawn going into dormancy. Template moved to `Landscaping:spring` with notes explaining the timing.
+
+**One-time migration: `MaintenanceTaskReconciler.reseedSeasonalTasksPhase70OnceIfNeeded`** runs once per install (gated on UserDefaults `hasReseededSeasonalTasksPhase70_v1`). Walks every active template-based task, re-dates any whose template moved between seasons (catches Dethatch's Fall → Spring move and any future season changes). Skips user-touched rows (completed once OR explicitly scheduled). Wired into `AppState.initialize()` after the May 2026 dismissal-snooze backfill. Pattern mirrors Phase 54A's `reseedSeasonalTasksOnceIfNeeded`.
+
+**Hard rules for new template work:**
+- **Bundle children with `routingOverride: .diyDefault` route to handyman_punch_items** (Phase 67E/F invariant), not into bundles. Don't add DIY-default templates to vendor bundles — they'll bypass the bundle entirely.
+- **Fall siblings of Spring bundle members need a distinct `stableId`** to keep templateKey lookup unambiguous. Pattern: `"<Category>:<Title> (fall)"`. The user-facing title can match the Spring sibling — the bundle context disambiguates.
+- **Standalone Spring/Fall templates** (no `bundleId`) consumers should iterate `plannedDueDates(...)` to create one task row per anchor. Bundle members are scheduled by the bundle's id-encoded season; tagging a bundle member "Spring/Fall" is informational only — to actually fire twice, add a paired Fall bundle.
+- **The bundle parent's frequency comes from `firstTemplate.frequency`** — when adding new bundles, order the children so the most-representative cadence (typically Annual or Semi-annual) is first.
+
+**Files touched:** [Haven/Features/Property/Services/MaintenanceTemplates.swift](Haven/Features/Property/Services/MaintenanceTemplates.swift) (template additions + seasonal tag changes), [Haven/Features/Property/Services/MaintenanceTaskReconciler.swift](Haven/Features/Property/Services/MaintenanceTaskReconciler.swift) (`plannedDueDates`, reseed migration), [Haven/App/AppState.swift](Haven/App/AppState.swift) (migration call site).
+
 ## Chez Handyman Operations Desk (Web — Phase 67)
 
 Eight-screen authenticated React + Vite SPA at `website/operations/`. Replaces the 9 embedded workspace tabs that `handyman.html` was inflating after auth. Lives at `/operations/*` routes; `handyman.html` keeps the auth pitch + sign-in/sign-up form and redirects to `/operations/` after a successful session, preserving `?next=` deep links from the SPA.
