@@ -8,6 +8,55 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 70.A1 — Tasks v2 unified view (the visibility fix) (2026-05-24)
+
+The follow-on session to Phase 70 Section B+C. Built the UI rewrite that solves the "30 tasks but I only see 5 rows" complaint. Five commits on `claude/tasks-v2` after the Section B+C work:
+
+- `d38c6996` — Foundation: `bundleChildren` helper + `SeasonFeed` types + view-model refactor
+- `c3f83689` — Bundle cornerstone: `BundleParentCard` + `BundleChildList` + `ChezOwnedPill`
+- `7becad2a` — Primitives: `SeasonScopeBanner` + `MonthSubheader` + `QuickSchedulingSheet`
+- `32e02ed8` — Integration: unified view body + deep-link contract + tap-to-filter ribbon
+- (this entry's commit) — CLAUDE.md / PROGRESS.md updates + final polish
+
+**Visibility fix architecture:** Single source of truth via `MaintenanceTabViewModel.seasonFeed(_:propertyId:)`. Every consumer — YearRibbon counts, MiniHero stats, Needs Your Attention section, This Season's Tasks feed, Active Programs — reads from one `SeasonFeed` instance. Ribbon count == row count by construction.
+
+**Bundle children visible inline.** `BundleParentCard` renders one bundle = one homeowner visit with `BundleChildList` showing "Includes 5 things" inline. Children resolve via `MaintenanceTemplates.bundleChildren(...)` at render time — Section C's expanded children surface on existing installs without migration. Vendor brand-color 3pt left edge (Apple Wallet pattern).
+
+**Deep-link contract — every task/routine notification deep-links to its row.** `Notification.Name.openMaintenanceTask` carries `task_id` / `routine_id` / `occurrence_date` / `property_id` / `season`. `MaintenanceTabView.handleDeepLink` applies scope + sets `highlightedTaskId` for a 1.5s salmon ring pulse. Push handlers (`task_assignment`, `chez_routine_visit_scheduled`) updated to post the new notification with their userInfo as payload.
+
+**Premier polish baked in:** vendor brand-color edge accents, concrete dates ("Tue, Sep 20" not "in 3 days"), homeowner-voice microcopy ("Book Tyler Heating · Fall Chimney Service" not "Schedule HVAC tune-up"), `QuickSchedulingSheet` for 1-tap booking (This week / Next week / Pick a date), animated season transitions, selection haptics throughout.
+
+**Chez merged inline.** Pre-Phase-70 the view had separate `programsSection` + `chezHandlingSection` — same routines surfaced twice. Phase 70 merges them via `ChezOwnedPill` rendered inline on routine cards. One row per routine, salmon pill says who owns it.
+
+**8 new components, ~1,500 lines of new code, ~12-16h of work over two sessions.** Build-verified clean via `xcodebuild Chez` after every meaningful change.
+
+**Backwards/forwards compat preserved:**
+- Pre-Phase-70 section helpers (`decisionsSection`, `programsSection`, `chezHandlingSection`) remain in the file unused. Easy rollback if a regression surfaces.
+- `SeasonFeed` and new methods purely additive; existing view-model methods preserved.
+- All sheets, navigation destinations, notifications preserved.
+- Bundle children read from current template library (forward compat — Section C additions show up immediately).
+- Resilient decoders on all new model types.
+
+**Deferred to follow-up phases:**
+- Full UnifiedTaskCard variant polish pass (70.A2) — current standalone rows are functional but minimal
+- Swipe actions on rows (70.A2) — pull-to-refresh preserved from existing view
+- Skeleton loaders + inline error states (70.A2)
+- "Show full year" mode beyond season-cycle placeholder (70.A2)
+- Up Next 14-day horizontal strip (70.A2)
+- Search overlay (70.A3)
+- Insurance/tax renewal templates (70.D-HNW)
+- Build-year-aware templates (70.D-HNW)
+- DashboardView `"maintenance_calendar"` route repoint to `"maintenance"`
+
+**What needs simulator-verification on real device (Tom):**
+- Open Tasks tab on a real household. Tap each season tile. Verify count == visible row count.
+- Find a bundle parent (Fall Chimney Service, Spring HVAC, etc.). Verify children render inline ("Includes 5 things") with `+ N more` chevron.
+- Tap a routine card. Verify it pushes to RoutineDetailView via the existing destination.
+- Tap "Book it" on a bundle parent. Verify QuickSchedulingSheet presents at half-detent.
+- Send yourself a task_assignment push. Verify it routes to Tasks tab + highlights the task row.
+
+---
+
 ## Phase 70 (Tasks v2) — Section B + early Section C: seasonal timing + library expansion (2026-05-24)
 
 Tom flagged three structural problems on the Tasks tab: (1) Spring tile count says "30+" but only ~5 rows render, (2) Spring landscaping and Fall landscaping anchor to the same date so semi-annual work fires only once, (3) common Northeast HNW services (chimney sweeping, plumbing inspection) had thin or zero library coverage. Hint (Martha Stewart's home app, summer 2026) is also a direct competitive threat — proactive AI + "give us your address that's it" onboarding.

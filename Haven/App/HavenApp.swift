@@ -225,7 +225,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if let type = userInfo["type"] as? String {
             switch type {
             case "task_assignment":
-                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+                // Phase 70 (Tasks v2): route to the Tasks tab (index 2)
+                // and post .openMaintenanceTask so MaintenanceTabView
+                // scrolls + highlights the matching row. userInfo
+                // carries `task_id` / `property_id` / `season` per the
+                // deep-link contract on `Notification.Name.openMaintenanceTask`.
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                NotificationCenter.default.post(
+                    name: .openMaintenanceTask,
+                    object: nil,
+                    userInfo: userInfo
+                )
             case "vehicle_recall":
                 // Navigate to Property tab where vehicles are shown
                 NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
@@ -308,7 +318,18 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             // because the routine_id is already on userInfo for any
             // future deep-link surface to read.
             case "chez_routine_visit_scheduled":
+                // Phase 70 (Tasks v2): the push payload already carries
+                // `routine_id` + (optionally) `occurrence_date` —
+                // forward those to MaintenanceTabView so it can
+                // expand the matching routine card and pulse the
+                // highlight overlay. Pre-Phase-70 the routine_id sat
+                // on userInfo unused.
                 NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                NotificationCenter.default.post(
+                    name: .openMaintenanceTask,
+                    object: nil,
+                    userInfo: userInfo
+                )
 
             // Phase 80 — Chez Concierge pushes. Server sends
             // `type: "chez_request_reply"` (Tom replied), `"chez_status_change"`
