@@ -131,6 +131,26 @@ struct MaintenanceTabView: View {
                 await viewModel.load(householdId: householdId)
             }
             await maintenanceVM.loadTasks()
+
+            // Phase 70.A1 (Summer/Winter library expansion v3): seed
+            // the 8 new templates onto existing households once. The
+            // AppState-level migration was firing too early (before
+            // primaryProperty resolved) so the inflated user-facing
+            // chip counts never updated. Moving the trigger to the
+            // Tasks tab's `.task` block guarantees the household
+            // context is loaded — the user is literally looking at
+            // the Maintenance tab — so the reconciler has everything
+            // it needs.
+            //
+            // Gate: UserDefaults `hasSeededPhase70A1LibraryExpansion_v3`.
+            // Idempotent — reconciler skips templates already on file.
+            if let householdId,
+               !UserDefaults.standard.bool(forKey: "hasSeededPhase70A1LibraryExpansion_v3") {
+                _ = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
+                UserDefaults.standard.set(true, forKey: "hasSeededPhase70A1LibraryExpansion_v3")
+                await maintenanceVM.loadTasks()
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            }
         }
         .refreshable {
             if let householdId { await viewModel.load(householdId: householdId) }
