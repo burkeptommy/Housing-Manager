@@ -1254,19 +1254,25 @@ struct FindLocalVendorSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
             .overlay {
                 // Phase X+7: directory model — every card uses the
-                // same 1px beige border so the list reads as one
-                // continuous directory. Chez Certified (real human
-                // verification) keeps a subtle navy-tinted 1.5px
-                // border as the only differentiator. The earlier
-                // green Top-Rated border was Google heuristic, not
-                // verification, and made the bottom 4 cards look
-                // visually distinct from the rest of the list — which
-                // contradicted the "this is just a directory" goal.
+                // same 1px neutral-gray border so the list reads as
+                // one continuous directory. Chez Certified (real
+                // human verification) keeps a subtle purple-tinted
+                // 1.5px border as the only differentiator. The
+                // earlier green Top-Rated border was a Google
+                // heuristic, not verification, and made high-rated
+                // cards look visually distinct from the rest of the
+                // list — contradicting the "this is just a directory"
+                // goal.
+                //
+                // Tokens are the design-system aliases preserved
+                // from the pre-purple-pivot palette: `navy800` now
+                // renders #6938EF (Vibrant Purple), `beige200`
+                // renders #EDEEF0 (Cool Neutral Gray).
                 RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
                     .strokeBorder(
                         vendor.isChezCertified
-                            ? HavenColors.navy800.opacity(0.6)
-                            : HavenColors.beige200,
+                            ? HavenColors.navy800.opacity(0.6)  // purple, 60%
+                            : HavenColors.beige200,             // neutral gray
                         lineWidth: vendor.isChezCertified ? 1.5 : 1
                     )
             }
