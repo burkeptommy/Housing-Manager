@@ -82,6 +82,14 @@ const TOWNS_BY_STATE = {
     "Pound Ridge", "Rye", "Scarsdale", "Sleepy Hollow", "Somers",
     "Tarrytown", "Tuckahoe", "White Plains", "Yonkers", "Yorktown",
     "Yorktown Heights",
+    // Phase X+8: missing Westchester municipalities surfaced by the
+    // coverage audit. Each has 0 town-matched vendors in 10 trade
+    // categories despite being in the launch service area. Hartsdale
+    // is a CDP within Greenburgh (already seeded) but vendors often
+    // tag themselves with the hamlet name. New Castle is the township
+    // containing Chappaqua. Ossining + Peekskill + Croton-on-Hudson
+    // are real towns we just forgot.
+    "Croton-on-Hudson", "Hartsdale", "New Castle", "Ossining", "Peekskill",
     // Putnam
     "Brewster", "Carmel", "Cold Spring", "Garrison", "Mahopac",
     "Patterson", "Putnam Valley", "Southeast", "Kent",
@@ -103,10 +111,14 @@ const TOWNS_BY_STATE = {
     "Malden", "Marlborough", "Medford", "Melrose", "Natick", "Newton",
     "Reading", "Somerville", "Stoneham", "Sudbury", "Waltham", "Watertown",
     "Wayland", "Weston", "Wilmington", "Winchester", "Woburn",
-    // Essex County (North Shore)
+    // Essex County (North Shore). Phase X+8: also include "Manchester"
+    // alias (Manchester-by-the-Sea was renamed in 1989 — locals still
+    // call it Manchester, and Google Places sometimes tags vendors
+    // with the short form. Catalog stays accurate for both queries).
     "Amesbury", "Andover", "Beverly", "Boxford", "Danvers", "Essex",
     "Georgetown", "Gloucester", "Groveland", "Hamilton", "Haverhill",
-    "Ipswich", "Lawrence", "Lynn", "Lynnfield", "Manchester-by-the-Sea",
+    "Ipswich", "Lawrence", "Lynn", "Lynnfield", "Manchester",
+    "Manchester-by-the-Sea",
     "Marblehead", "Merrimac", "Methuen", "Middleton", "Nahant", "Newbury",
     "Newburyport", "North Andover", "Peabody", "Rockport", "Rowley",
     "Salem", "Salisbury", "Saugus", "Swampscott", "Topsfield", "Wenham",
