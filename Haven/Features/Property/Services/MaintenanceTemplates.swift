@@ -731,6 +731,82 @@ enum MaintenanceTemplates {
         return nil
     }
 
+    /// Phase 70 (Tasks v2): Quick check for whether a `templateId` value
+    /// refers to a bundle parent. A task with `templateId == "Roofing:fall"`
+    /// is the bundle parent (its bundleId encodes the season); a task with
+    /// `templateId == "Roofing:Annual roof inspection"` is a standalone
+    /// template member that happens to live inside the Roofing:spring bundle.
+    ///
+    /// Implementation: scan `allTemplates` for any template whose `bundleId`
+    /// matches. Cheaper than a full `bundleChildren(...)` resolution because
+    /// it short-circuits on first match. Used by `SeasonFeed` to decide
+    /// whether a task row renders as a `BundleParentCard` or a standalone
+    /// `UnifiedTaskCard`.
+    static func isBundleId(_ templateId: String?) -> Bool {
+        guard let id = templateId, !id.isEmpty else { return false }
+        for (_, templates) in allTemplates {
+            if templates.contains(where: { $0.bundleId == id }) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Phase 70 (Tasks v2): Returns the child templates that compose a bundle,
+    /// filtered by the household's actual subtypes + regional pack. Used by
+    /// `BundleChildList` to render the "Includes N things" inline list inside
+    /// a bundle parent card.
+    ///
+    /// Reading from the current template library (not from the task's frozen
+    /// notes field) means that when new children are added to an existing
+    /// bundle (e.g. Phase 70 Section C's expanded Water Heater :annual or
+    /// Chimney:fall children), every existing TestFlight install picks up
+    /// the new children immediately — no migration, no re-creation of the
+    /// bundle parent task.
+    ///
+    /// Filtering mirrors `templates(for:activeSubtypes:regionalPack:)`:
+    /// - Subtype filter: child's `requiredSubtypes` must be empty OR a subset
+    ///   of the household's `activeSubtypes`. So a gas-only chimney household
+    ///   never sees a "Check creosote level" line item that's wood-only.
+    /// - Regional filter: child's `regionalPack` must be nil (universal) OR
+    ///   match the property's pack.
+    /// - Admin-catalog cut respected (same as `template(forKey:)`).
+    ///
+    /// Returns children in declaration order (the order they appear in
+    /// `allTemplates`), which IS the canonical display order for the
+    /// "What's included" list — bundle authors intentionally list the
+    /// most-recognizable child first so it sets the user's mental anchor.
+    ///
+    /// - Parameter forTemplateId: the bundle's id (e.g. `"Roofing:fall"`,
+    ///   `"Plumbing:annual"`, `"Chimney:fall"`).
+    /// - Parameter activeSubtypes: household subtypes from
+    ///   `activeSubtypes(category:subtype:fuelType:flags:)`. Pass `[]` when
+    ///   the household state is unknown — only universal children will pass.
+    /// - Parameter regionalPack: the property's regional pack (Phase 57).
+    ///   Pass nil when the state is unknown — only universal children pass.
+    static func bundleChildren(
+        forTemplateId templateId: String,
+        activeSubtypes: Set<String> = [],
+        regionalPack: RegionalPack? = nil
+    ) -> [MaintenanceTemplate] {
+        var matches: [MaintenanceTemplate] = []
+        for (_, templates) in allTemplates {
+            for template in templates where template.bundleId == templateId {
+                guard !AdminCatalogService.shared.isTaskTemplateCut(template) else { continue }
+                let subtypeOK = template.requiredSubtypes.isEmpty
+                    || template.requiredSubtypes.isSubset(of: activeSubtypes)
+                let regionOK: Bool = {
+                    guard let templateRegion = template.regionalPack else { return true }
+                    return templateRegion == regionalPack
+                }()
+                if subtypeOK && regionOK {
+                    matches.append(template)
+                }
+            }
+        }
+        return matches
+    }
+
     // MARK: - Master Template Database
 
     static let allTemplates: [(String, [MaintenanceTemplate])] = [

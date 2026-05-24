@@ -448,10 +448,122 @@ private struct DecisionVendorPicker: View {
 
 // MARK: - View Model
 
+// MARK: - Phase 70 (Tasks v2) SeasonFeed types
+
+/// Phase 70 (Tasks v2): the single source of truth for one season of the
+/// Tasks tab. Every consumer — YearRibbon tile counts, MiniHero % covered,
+/// "Needs your attention" section, "This Season's Tasks" feed, "Your active
+/// programs" section — derives from a `SeasonFeed` instance. Avoids the
+/// pre-Phase-70 bug class where the ribbon claimed 30 items but the screen
+/// rendered 5; with this struct, count and rows can't diverge.
+struct SeasonFeed {
+    let season: Season
+
+    /// Routines + standalone tasks that need user action this season.
+    /// Sorted by urgency (overdue first, then within-7-days, then by date).
+    let decisions: [DecisionEntry]
+
+    /// All in-season work organized chronologically by month. Bundle parents,
+    /// standalone tasks, and routine occurrences mixed together within each
+    /// month, sorted by anchor date within the month.
+    let monthSections: [MonthSection]
+
+    /// Active routines for the "Your active programs" section. Includes
+    /// Chez-owned routines (no separate section in Tasks v2) — the row
+    /// renders a salmon Chez pill inline. Collapsed by default in the UI.
+    let programs: [RoutineRow]
+
+    /// Convenience: ribbon tile counts. Excludes vehicle work (Vehicles
+    /// section owns its own count).
+    var totalItems: Int {
+        decisions.count + monthSections.reduce(0) { $0 + $1.entries.count } + programs.count
+    }
+
+    var actionItems: Int { decisions.count }
+}
+
+/// One row in the "Needs your attention" section. Backed by either a
+/// pending-vendor routine (the existing model) or a standalone task that
+/// needs a contractor picked. D-HNW will add a third case for time-
+/// sensitive financial renewals.
+enum DecisionEntry: Identifiable {
+    case routinePendingVendor(RoutineRow)
+    case taskNeedsVendor(MaintenanceTaskDBRow)
+
+    var id: String {
+        switch self {
+        case .routinePendingVendor(let r): return "routine:\(r.id.uuidString)"
+        case .taskNeedsVendor(let t): return "task:\(t.id.uuidString)"
+        }
+    }
+
+    var sortDate: Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        switch self {
+        case .routinePendingVendor(let r): return formatter.date(from: r.nextExpectedDate)
+        case .taskNeedsVendor(let t):
+            let s = t.scheduledDate ?? t.nextDueDate
+            return formatter.date(from: s)
+        }
+    }
+}
+
+/// One month within the active season. Months without entries are omitted
+/// from the SeasonFeed (no empty subheaders for May when nothing's there).
+struct MonthSection: Identifiable {
+    /// 1-indexed month number (1 = January, 12 = December).
+    let month: Int
+    /// Bundle parents + standalone tasks + routine occurrences within
+    /// this month, sorted by date.
+    let entries: [SeasonEntry]
+
+    var id: Int { month }
+}
+
+/// One row inside a `MonthSection`. The case discriminator drives which
+/// card variant the view renders: `BundleParentCard` for `.bundle`,
+/// the existing `UnifiedTaskCard` for `.standaloneTask`, and a routine-
+/// occurrence-specific variant for `.routineOccurrence`.
+enum SeasonEntry: Identifiable {
+    case bundle(MaintenanceTaskDBRow)
+    case standaloneTask(MaintenanceTaskDBRow)
+    case routineOccurrence(RoutineOccurrence)
+
+    var id: String {
+        switch self {
+        case .bundle(let t): return "bundle:\(t.id.uuidString)"
+        case .standaloneTask(let t): return "task:\(t.id.uuidString)"
+        case .routineOccurrence(let o): return "occurrence:\(o.id)"
+        }
+    }
+
+    /// The date that drives sort order within a month.
+    var sortDate: Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        switch self {
+        case .bundle(let t), .standaloneTask(let t):
+            let s = t.scheduledDate ?? t.nextDueDate
+            return formatter.date(from: s)
+        case .routineOccurrence(let o):
+            return o.date
+        }
+    }
+}
+
 @MainActor
 final class MaintenanceTabViewModel: ObservableObject {
     @Published private(set) var routines: [RoutineRow] = []
     @Published private(set) var isLoading = false
+
+    /// Phase 70 (Tasks v2): per-session active property scope. When non-nil,
+    /// `seasonFeed(_:)` filters everything to this property. When nil
+    /// (single-property household or fresh launch), no property filtering
+    /// happens — the feed shows all household work. The multi-property
+    /// switcher UI lands in 70.D-HNW; the state model lands now so we
+    /// don't migrate stored values when the switcher ships.
+    @Published var activePropertyId: UUID?
 
     /// Catalog count for the BrowseBand subtitle. Computed from
     /// `RecommendedServicesView`'s underlying templates list — but we don't
@@ -586,29 +698,175 @@ final class MaintenanceTabViewModel: ObservableObject {
         return !hasShopRoutine
     }
 
+    // MARK: Phase 70 (Tasks v2) — SeasonFeed (single source of truth)
+
+    /// Compose a `SeasonFeed` for the given season + active property scope.
+    /// Every Tasks-v2 surface (YearRibbon counts, MiniHero stats, Needs
+    /// Your Attention section, This Season's Tasks feed, Active Programs)
+    /// reads from a SeasonFeed instance. Ribbon count == row count by
+    /// construction — they share the same backing arrays.
+    ///
+    /// Filtering:
+    /// - Property scope: `activePropertyId` (or this method's explicit
+    ///   override) restricts to one property; nil means all properties
+    ///   in the household (single-property fallback).
+    /// - Vehicles excluded: vehicle tasks have their own section, not
+    ///   the season feed (different mental model — mileage vs season).
+    /// - Active only: lastCompletedDate == nil, isArchived != true.
+    ///
+    /// Decisions ordering: pending-vendor routines come first (they're
+    /// the user's primary "pick a vendor" prompts), then needs-vendor
+    /// standalone tasks, then sorted within each bucket by date
+    /// (overdue first).
+    ///
+    /// Programs include both regular active routines AND chez-owned
+    /// routines — the v2 design merges them with a salmon Chez pill
+    /// rendered inline.
+    func seasonFeed(_ season: Season, propertyId: UUID? = nil) -> SeasonFeed {
+        let propScope = propertyId ?? self.activePropertyId
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        // Filter raw tasks once. All subsequent filtering layers on top.
+        let allTasks = MaintenanceViewModel.shared.tasks.filter { task in
+            if let scope = propScope, task.propertyId != scope { return false }
+            guard task.vehicleId == nil else { return false }
+            if let last = task.lastCompletedDate, !last.isEmpty { return false }
+            if (task.isArchived ?? false) == true { return false }
+            return true
+        }
+
+        // ── Decisions ──────────────────────────────────────────────
+        // (a) pending-vendor routines for this season (no Chez routines)
+        let routineDecisions = pendingDecisions(scopedTo: season)
+            .map { DecisionEntry.routinePendingVendor($0) }
+        // (b) standalone tasks needing a vendor pick (find-a-pro variants)
+        let taskDecisions = allTasks
+            .filter { task in
+                task.parentRoutineId == nil &&
+                task.assignmentType == "vendor" &&
+                task.assignedContractorId == nil &&
+                isTask(task, in: season)
+            }
+            .map { DecisionEntry.taskNeedsVendor($0) }
+        let combinedDecisions = (routineDecisions + taskDecisions)
+            .sorted { lhs, rhs in
+                let lhsDate = lhs.sortDate ?? .distantFuture
+                let rhsDate = rhs.sortDate ?? .distantFuture
+                return lhsDate < rhsDate
+            }
+
+        // ── Programs (active + Chez-owned merged) ──────────────────
+        let regularPrograms = activePrograms(scopedTo: season)
+        let chezPrograms = chezHandlingPrograms(scopedTo: season)
+        let mergedPrograms: [RoutineRow] = {
+            var seen: Set<UUID> = []
+            var result: [RoutineRow] = []
+            for routine in regularPrograms + chezPrograms where !seen.contains(routine.id) {
+                seen.insert(routine.id)
+                result.append(routine)
+            }
+            return result
+        }()
+
+        // ── This Season's Tasks feed (grouped by month) ─────────────
+        let seasonStandaloneTasks = allTasks.filter { task in
+            task.parentRoutineId == nil && isTask(task, in: season)
+        }
+        // Routine occurrences inside the season's month range.
+        let now = Date()
+        let currentYear = calendar.component(.year, from: now)
+        let sortedSeasonMonths = season.months.sorted()
+        let firstMonth = sortedSeasonMonths.first ?? 1
+        let lastMonth = sortedSeasonMonths.last ?? 12
+        // Winter spans Dec-Feb (months {12,1,2}). Build a window that
+        // covers all of them — for Winter, start in current year's Dec
+        // and end the following Feb. Other seasons stay within one year.
+        let isWinter = sortedSeasonMonths == [1, 2, 12]
+        var startComps = DateComponents()
+        var endComps = DateComponents()
+        if isWinter {
+            startComps.year = currentYear
+            startComps.month = 12
+            startComps.day = 1
+            endComps.year = currentYear + 1
+            endComps.month = 3   // exclusive
+            endComps.day = 1
+        } else {
+            startComps.year = currentYear
+            startComps.month = firstMonth
+            startComps.day = 1
+            endComps.year = currentYear
+            endComps.month = lastMonth + 1
+            endComps.day = 1
+        }
+        let windowStart = calendar.date(from: startComps) ?? now
+        let windowEnd = calendar.date(from: endComps) ?? now
+        let occurrences = RoutineOccurrenceExpander.occurrences(
+            routines: routines.filter { propScope == nil || $0.propertyId == propScope },
+            from: windowStart,
+            through: windowEnd.addingTimeInterval(-1),
+            calendar: calendar
+        )
+
+        // Bucket entries by month.
+        var monthBuckets: [Int: [SeasonEntry]] = [:]
+        for task in seasonStandaloneTasks {
+            let dateString = task.scheduledDate ?? task.nextDueDate
+            guard let date = formatter.date(from: dateString) else { continue }
+            let month = calendar.component(.month, from: date)
+            // Constrain to season's months — isTask already enforces this
+            // for tasks with seasonalTiming, but custom user tasks fall
+            // through to month bucketing where the date might land outside.
+            guard season.months.contains(month) else { continue }
+            let entry: SeasonEntry = MaintenanceTemplates.isBundleId(task.templateId)
+                ? .bundle(task)
+                : .standaloneTask(task)
+            monthBuckets[month, default: []].append(entry)
+        }
+        for occurrence in occurrences {
+            let month = calendar.component(.month, from: occurrence.date)
+            guard season.months.contains(month) else { continue }
+            monthBuckets[month, default: []].append(.routineOccurrence(occurrence))
+        }
+
+        // Build sorted MonthSection list. Winter's chronological order is
+        // Dec → Jan → Feb (December comes first within the season window);
+        // other seasons are simple ascending.
+        let monthOrder: [Int] = isWinter ? [12, 1, 2] : sortedSeasonMonths
+        let monthSections = monthOrder.compactMap { month -> MonthSection? in
+            guard var entries = monthBuckets[month], !entries.isEmpty else { return nil }
+            entries.sort { lhs, rhs in
+                let lhsDate = lhs.sortDate ?? .distantFuture
+                let rhsDate = rhs.sortDate ?? .distantFuture
+                return lhsDate < rhsDate
+            }
+            return MonthSection(month: month, entries: entries)
+        }
+
+        return SeasonFeed(
+            season: season,
+            decisions: combinedDecisions,
+            monthSections: monthSections,
+            programs: mergedPrograms
+        )
+    }
+
     // MARK: Season summaries (for YearRibbon)
 
     func seasonSummaries(activeSeason: Season) -> [Season: YearRibbonSummary] {
+        // Phase 70 (Tasks v2): derive ribbon tile counts from `seasonFeed(_:)`
+        // so they MUST match the count of rendered rows. The legacy
+        // implementation maintained its own filter logic which diverged from
+        // the rendered sections — that's the source of the "ribbon says 30,
+        // screen shows 5" bug Phase 70 fixes.
         var result: [Season: YearRibbonSummary] = [:]
         for season in Season.allCases {
-            let totalRoutines = routines.filter {
-                $0.activeMonths.contains(anyOf: season.months)
-            }.count
-            let actionRoutines = pendingDecisions(scopedTo: season).count
-            let totalTasks = MaintenanceViewModel.shared.tasks.filter {
-                $0.lastCompletedDate == nil &&
-                ($0.isArchived ?? false) == false &&
-                isTask($0, in: season)
-            }.count
-            let actionTasks = MaintenanceViewModel.shared.tasks.filter {
-                $0.lastCompletedDate == nil &&
-                ($0.isArchived ?? false) == false &&
-                ($0.assignmentType == "vendor" && $0.assignedContractorId == nil) &&
-                isTask($0, in: season)
-            }.count
+            let feed = seasonFeed(season)
             result[season] = YearRibbonSummary(
-                totalItems: totalRoutines + totalTasks,
-                actionItems: actionRoutines + actionTasks
+                totalItems: feed.totalItems,
+                actionItems: feed.actionItems
             )
         }
         return result
