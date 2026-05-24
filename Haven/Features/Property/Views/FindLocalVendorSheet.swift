@@ -1241,14 +1241,21 @@ struct FindLocalVendorSheet: View {
             .background(HavenColors.surface)
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
             .overlay {
+                // Phase X+7: directory model — every card uses the
+                // same 1px beige border so the list reads as one
+                // continuous directory. Chez Certified (real human
+                // verification) keeps a subtle navy-tinted 1.5px
+                // border as the only differentiator. The earlier
+                // green Top-Rated border was Google heuristic, not
+                // verification, and made the bottom 4 cards look
+                // visually distinct from the rest of the list — which
+                // contradicted the "this is just a directory" goal.
                 RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
                     .strokeBorder(
                         vendor.isChezCertified
                             ? HavenColors.navy800.opacity(0.6)
-                            : (vendor.isTopRated
-                                ? HavenColors.success.opacity(0.4)
-                                : HavenColors.beige200),
-                        lineWidth: (vendor.isChezCertified || vendor.isTopRated) ? 1.5 : 1
+                            : HavenColors.beige200,
+                        lineWidth: vendor.isChezCertified ? 1.5 : 1
                     )
             }
         }
