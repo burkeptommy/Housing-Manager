@@ -986,6 +986,75 @@ enum MaintenanceTemplates {
             // hose check, sump pump test, and water pressure check all
             // folded into Handyman:spring defaults. Drain cleaning stays
             // as the sole standalone vendor task.
+            //
+            // Phase 70 (Tasks v2 / Section C.2): Plumbing:annual bundle
+            // restored — but with PRO-only children (visible pipe
+            // inspection, fixture leak walk, pressure regulator) that
+            // don't overlap with Handyman:spring's DIY items. The user
+            // now sees a clean "Schedule the plumber" annual visit
+            // surfaced under the Plumbing category instead of having
+            // every plumbing concern buried inside the handyman bundle.
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Annual plumbing inspection",
+                description: "Plumber walks the home looking for slow leaks, corrosion on visible supply lines, condensation on cold lines indicating insulation gaps, and signs of failing supply valves. Catches the small problems that turn into water damage between annual visits.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$150–$300",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Post-winter timing catches any freeze damage to supply lines, fixtures, and outdoor hose bibs. Most plumbers will quote this as a 60-90 minute walkthrough.",
+                assignmentType: .vendor,
+                stableId: "Plumbing:Annual inspection",
+                bundleId: "Plumbing:annual",
+                bundleTitle: "Annual Plumbing Inspection"
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Check water pressure regulator",
+                description: "Plumber gauges incoming water pressure at an outdoor hose bib and confirms it falls in the 50–70 psi range. High pressure (above 80 psi) silently damages fixtures, toilet fill valves, and dishwasher / washing machine inlet valves; low pressure (below 40 psi) indicates a failing regulator.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (part of inspection)",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Pressure regulators fail silently and most homeowners only discover the issue after a $4,000 burst-pipe insurance claim. Worth doing every visit.",
+                assignmentType: .vendor,
+                stableId: "Plumbing:Water pressure regulator check",
+                bundleId: "Plumbing:annual"
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Exercise main shutoff valve",
+                description: "Plumber operates the main water shutoff valve in both directions to confirm it moves freely. Seized shutoff valves are the #1 reason a small leak becomes a flood — when seconds matter you need the valve to move on the first try.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (part of inspection)",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Ball valves usually keep working; older gate valves are the ones that seize. If the plumber notes the valve is hard to turn or won't fully close, plan to replace before the next freeze.",
+                assignmentType: .vendor,
+                stableId: "Plumbing:Main shutoff exercise",
+                bundleId: "Plumbing:annual"
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Fixture leak walkthrough",
+                description: "Plumber inspects every fixture (sinks, toilets, showers, hose bibs, washing machine connections, dishwasher line) for active drips, condensation, mineral staining, or signs of past leaks. Tightens packing nuts and checks supply-line condition; flags anything showing wear.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (part of inspection)",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Easy to ignore a slow drip under a vanity until the floor rots out. Annual fixture walks catch these before they become structural damage.",
+                assignmentType: .vendor,
+                stableId: "Plumbing:Fixture leak walkthrough",
+                bundleId: "Plumbing:annual"
+            ),
             MaintenanceTemplate(systemCategory: "Plumbing", title: "Drain cleaning", description: "Plumber runs a power auger or hydro-jet through the main waste line to clear accumulated grease, soap scum, hair, and root intrusion before it becomes a backup. Includes a camera scope on the cleanout if any line shows resistance. Older homes with cast-iron or clay laterals benefit most.", frequency: "Every 2 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this. The same root that's slowing one drain will eventually back up the whole house.", assignmentType: .vendor, stableId: "Plumbing:Professional drain cleaning"),
             // Phase 62: Sump pump battery backup test. Gated on sump_pump
             // AND has_sump_battery_backup — both subtypes must be present.
@@ -1016,6 +1085,45 @@ enum MaintenanceTemplates {
         ("Water Heater", [
             MaintenanceTemplate(systemCategory: "Water Heater", title: "Flush water heater", description: "Plumber drains and flushes sediment from the tank, tests the T&P relief valve, and inspects the sacrificial anode rod (replace if more than 50% depleted). Standard package keeps the tank free of buildup that drives up gas/electric usage and shortens lifespan.", frequency: "Annually", priority: "High", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Anode rod inspection is part of the standard flush. Pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16\" socket and breaker bar, both of which the plumber already has on the truck.", requiredSubtypes: ["tank"], equipmentKeywords: ["water heater"], assignmentType: .vendor, bundleId: "Water Heater:annual", bundleTitle: "Annual Water Heater Service"),
             MaintenanceTemplate(systemCategory: "Water Heater", title: "Test T&P relief valve", description: "Plumber tests the temperature and pressure relief valve for proper operation. Typically bundled with the annual water heater flush.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (part of flush)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Safety-critical valve check", equipmentKeywords: ["water heater"], assignmentType: .vendor, bundleId: "Water Heater:annual"),
+            // Phase 70 (Tasks v2 / Section C.2): expand the bundle's
+            // "What's included" line items so the homeowner sees what
+            // the plumber actually does on the annual visit. The Flush
+            // template's description already mentions anode rod and
+            // sediment work, but those don't surface as visible line
+            // items in the bundle's checklist until they're their own
+            // template entries. Adding them as bundle members makes
+            // the visit's scope visible without adding extra task rows.
+            MaintenanceTemplate(
+                systemCategory: "Water Heater",
+                title: "Inspect anode rod",
+                description: "Plumber pulls the sacrificial anode rod and visually checks remaining material. Anode rods sacrifice themselves to corrosion so the tank doesn't — once depleted past ~50% the tank starts corroding. Replacement runs ~$50 in parts and 20 minutes of labor; replacement of the whole tank when the anode is ignored is $1,500+.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (inspection part of flush) / $50–$100 if replacement",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "Tank water heaters only. Tankless units don't have anode rods. Replacement requires partial drain plus a 1-1/16\" socket — your plumber has both on the truck.",
+                requiredSubtypes: ["tank"],
+                equipmentKeywords: ["water heater"],
+                assignmentType: .vendor,
+                bundleId: "Water Heater:annual"
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Water Heater",
+                title: "Verify temperature setting",
+                description: "Plumber confirms the thermostat is set between 120°F (energy code default) and 130°F (kills Legionella). Settings creep upward over time when each household member nudges it; settings above 140°F can scald within 5 seconds and waste 5–10% on energy.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$0 (part of flush)",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "Households with elderly residents, young children, or anyone immunocompromised should sit at 130°F. The plumber can adjust during the visit.",
+                equipmentKeywords: ["water heater"],
+                assignmentType: .vendor,
+                bundleId: "Water Heater:annual"
+            ),
             MaintenanceTemplate(systemCategory: "Water Heater", title: "Descale tankless heater", description: "Plumber flushes a vinegar or commercial descaler solution through the tankless unit's heat exchanger for 30–45 minutes, then rinses with fresh water. Removes mineral scale that builds up on the heat exchanger plates and slowly chokes flow rate, drives up gas/electric usage, and shortens lifespan. Critical for warranty.", frequency: "Annually", priority: "High", estimatedCostRange: "$0–$150", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Hard water areas (well water + most municipal water in the Northeast) may need every 6 months. If you notice the unit cycling more often or hot water taking longer to arrive, you're already overdue. Most manufacturer warranties require documented annual descaling.", requiredSubtypes: ["tankless"], equipmentKeywords: ["water heater"], assignmentType: .vendor, safetyFloor: true),
         ]),
 
@@ -1243,6 +1351,111 @@ enum MaintenanceTemplates {
                 assignmentType: .vendor,
                 stableId: "Chimney:Annual gas fireplace service",
                 bundleId: "Chimney:fall",
+                safetyFloor: true
+            ),
+            // Phase 70 (Tasks v2 / Section C.1): expand the bundle's
+            // "What's included" so the homeowner can see the full scope
+            // of the annual visit. These are explicit child line items —
+            // the sweep DOES check creosote level and damper operation
+            // as part of the standard visit, but those items weren't
+            // visible in the bundle's checklist.
+            MaintenanceTemplate(
+                systemCategory: "Chimney",
+                title: "Check creosote level",
+                description: "Sweep measures creosote buildup at the smoke shelf and flue. Creosote above 1/8\" is a chimney-fire risk; the sweep removes any accumulation as part of the visit but the measurement itself is what informs the cadence (heavy burners may need more frequent sweeps).",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (part of sweep)",
+                isDIY: false,
+                seasonalTiming: "Fall",
+                professionalRequired: true,
+                notes: "Wood-burning chimneys only. Heavy burners (daily use through winter) sometimes need a mid-season check between annual sweeps.",
+                requiredSubtypes: ["wood"],
+                assignmentType: .vendor,
+                stableId: "Chimney:Check creosote level",
+                bundleId: "Chimney:fall",
+                safetyFloor: true
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Chimney",
+                title: "Test damper operation",
+                description: "Sweep operates the top and bottom dampers in both directions, confirms they seal cleanly when closed (you should feel no draft when the damper's shut), and verifies the cable / chain / lever doesn't bind.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (part of sweep)",
+                isDIY: false,
+                seasonalTiming: "Fall",
+                professionalRequired: true,
+                notes: "Top dampers (cap-mounted) seal better and last longer than throat dampers. If yours doesn't seal, the sweep can quote a replacement.",
+                assignmentType: .vendor,
+                stableId: "Chimney:Damper test",
+                bundleId: "Chimney:fall"
+            ),
+            // Phase 70 (Tasks v2 / Section C.1): Chimney:spring bundle
+            // for wood-burning households. Post-burn-season inspection
+            // catches the issues that would otherwise simmer through
+            // summer until the next fall sweep — animal nests in the
+            // cap, residual creosote in the smoke shelf, masonry damage
+            // from any winter freeze-thaw cycles. Gas chimneys skip
+            // this entirely — they don't have the same winter wear
+            // pattern.
+            MaintenanceTemplate(
+                systemCategory: "Chimney",
+                title: "Spring wood chimney inspection",
+                description: "Sweep performs a post-burn-season inspection — checks for animal nests in the cap, residual creosote in the smoke shelf, signs of masonry damage from freeze-thaw cycles, and verifies the flue liner is intact going into the off-season. Cheaper to address damage in spring than to discover it in October when you want to start using the fireplace again.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$150–$300",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "Time it for April or May after the last freeze. Birds and squirrels start nesting in uncapped chimneys by late May — earlier is better for animal exclusion.",
+                requiredSubtypes: ["wood"],
+                assignmentType: .vendor,
+                stableId: "Chimney:Spring wood inspection",
+                bundleId: "Chimney:spring",
+                bundleTitle: "Spring Chimney Inspection",
+                safetyFloor: true
+            ),
+            // Standalone — specialty visit (camera tech), not part of
+            // the annual sweep. Every 3 years catches cracks, missing
+            // mortar, and animal-damage entry points the visual sweep
+            // can't see from below.
+            MaintenanceTemplate(
+                systemCategory: "Chimney",
+                title: "Flue liner video scope inspection",
+                description: "Specialty camera service runs a video scope down the flue from above, recording the full liner condition. Detects cracks, missing mortar joints, bird nests, and animal damage that the standard sweep can't see from below. The video is yours to keep — useful for insurance claims and resale disclosure.",
+                frequency: "Every 3 years",
+                priority: "Medium",
+                estimatedCostRange: "$300–$500",
+                isDIY: false,
+                seasonalTiming: nil,
+                professionalRequired: true,
+                notes: "Different specialist than your annual sweep. Book separately. Required by some insurance carriers after a chimney fire or major repair.",
+                isEssential: false,
+                assignmentType: .vendor,
+                stableId: "Chimney:Flue liner video scope",
+                safetyFloor: true
+            ),
+            // Opt-in — masonry repair on a long cadence. Crown is the
+            // exposed cement cap that sheds water off the top of the
+            // chimney; cracks let water into the structure and start
+            // long-term damage. Most masonry chimneys need re-mortar
+            // every 5-10 years; older brick chimneys sooner.
+            MaintenanceTemplate(
+                systemCategory: "Chimney",
+                title: "Re-mortar chimney crown",
+                description: "Mason patches or rebuilds the chimney crown — the cement cap at the very top that sheds water off the structure. Crown mortar erodes from rainfall and freeze-thaw; once it cracks, water gets into the masonry below and accelerates damage to the flue liner and brick.",
+                frequency: "Every 10 years",
+                priority: "Medium",
+                estimatedCostRange: "$500–$1,500",
+                isDIY: false,
+                seasonalTiming: "Summer",
+                professionalRequired: true,
+                notes: "Major masonry work; book in summer when the weather lets the mortar cure properly. Annual cap/crown inspection (Chimney:fall) catches the need for this — you'll see it coming a year or two ahead.",
+                isEssential: false,
+                assignmentType: .vendor,
+                stableId: "Chimney:Re-mortar crown",
                 safetyFloor: true
             ),
         ]),
