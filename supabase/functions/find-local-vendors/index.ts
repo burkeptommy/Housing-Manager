@@ -538,11 +538,20 @@ async function mergeUtilityProviders(
     const isServiceTrade = SERVICE_TRADE_PROVIDER_TYPES.has(providerType);
     const TOWN_FALLBACK_THRESHOLD = 10;
 
-    // --- Strict town match ---
-    let townQuery = supabase
+    // Phase X+7: query both primary AND secondary provider_types. The
+    // 20261332 migration added secondary_provider_types so multi-service
+    // operators (T.Webber: plumbing/hvac/electric, 128 Plumbing:
+    // hvac/plumbing/electric, Rick's Pump: well_water_service/plumbing)
+    // appear in EVERY category they service, not just the one Google
+    // randomly snapshotted them under first.
+    const SELECT_COLUMNS = "id, name, slug, website, phone, logo_url, brand_color, regions, address, rating, review_count, secondary_provider_types";
+    const buildBaseQuery = () => supabase
       .from("utility_providers_visible")
-      .select("id, name, slug, website, phone, logo_url, brand_color, regions, address, rating, review_count")
-      .eq("provider_type", providerType)
+      .select(SELECT_COLUMNS)
+      .or(`provider_type.eq.${providerType},secondary_provider_types.cs.{${providerType}}`);
+
+    // --- Strict town match ---
+    let townQuery = buildBaseQuery()
       .contains("regions", [town])
       .limit(40);
     if (escapedQuery) townQuery = townQuery.ilike("name", `%${escapedQuery}%`);
@@ -553,10 +562,7 @@ async function mergeUtilityProviders(
     const townMatchCount = townRows?.length ?? 0;
     let stateRows: typeof townRows = [];
     if (townMatchCount < TOWN_FALLBACK_THRESHOLD) {
-      let stateQuery = supabase
-        .from("utility_providers_visible")
-        .select("id, name, slug, website, phone, logo_url, brand_color, regions, address, rating, review_count")
-        .eq("provider_type", providerType)
+      let stateQuery = buildBaseQuery()
         .overlaps("regions", [state, stateUpper])
         .limit(60);
       if (escapedQuery) stateQuery = stateQuery.ilike("name", `%${escapedQuery}%`);
@@ -565,13 +571,40 @@ async function mergeUtilityProviders(
       stateRows = sRows ?? [];
     }
 
+    // --- Phase X+7 cross-category name search ---
+    // When the user types a vendor name, search the WHOLE catalog (any
+    // category) in their region. The classic fail mode: user types
+    // "Rick's Pump" while in well_water_service category, but Rick's
+    // got classified as plumbing by the seed — name search returns
+    // nothing. Now: if a name was typed, also run a category-agnostic
+    // query and merge results.
+    let nameSearchRows: typeof townRows = [];
+    if (escapedQuery) {
+      const { data: nRows, error: nameError } = await supabase
+        .from("utility_providers_visible")
+        .select(SELECT_COLUMNS)
+        .ilike("name", `%${escapedQuery}%`)
+        .overlaps("regions", [town, state, stateUpper])
+        .limit(40);
+      if (nameError) console.warn("[find-local-vendors] cross-cat name search failed:", nameError);
+      nameSearchRows = nRows ?? [];
+    }
+
     // Merge dedup'd by id, town-matches first so isTownMatch can be
-    // assigned correctly downstream.
-    const townIds = new Set((townRows ?? []).map((r) => r.id));
-    const combined = [
-      ...(townRows ?? []),
-      ...(stateRows ?? []).filter((r) => !townIds.has(r.id)),
-    ];
+    // assigned correctly downstream. Cross-cat name search results
+    // are appended last so they only surface when nothing better is
+    // found in the primary/secondary category match.
+    const seenIds = new Set<string>();
+    const combined: typeof townRows = [];
+    for (const r of (townRows ?? [])) {
+      if (!seenIds.has(r.id)) { seenIds.add(r.id); combined.push(r); }
+    }
+    for (const r of (stateRows ?? [])) {
+      if (!seenIds.has(r.id)) { seenIds.add(r.id); combined.push(r); }
+    }
+    for (const r of nameSearchRows) {
+      if (!seenIds.has(r.id)) { seenIds.add(r.id); combined.push(r); }
+    }
 
     // For service-trade categories, exclude US-national brands —
     // homeowners want real local options, not national franchise
