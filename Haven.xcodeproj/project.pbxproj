@@ -240,6 +240,7 @@
 		3DD2EE0BBA165846E20C85EF /* ScenarioResultContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F64F05BDA19678526107F59C /* ScenarioResultContainerView.swift */; };
 		3E4D05BF7D0390CA71CEB17A /* PropertyProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD254FA3D98BCA417B34DD9 /* PropertyProjectsView.swift */; };
 		3EA7104F651A1836953DAC90 /* SecurityReassuranceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7562B159537CB9B3AC80F087 /* SecurityReassuranceCard.swift */; };
+		3ED3882D1B2C9AE773A3C7D8 /* StandaloneTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E9C9D439169BA07CDAB851 /* StandaloneTaskRow.swift */; };
 		3F3492B52380A130EC5788A2 /* Day1TaskCurator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303DA8C75FD4DBAD4CB347A3 /* Day1TaskCurator.swift */; };
 		3F694A7E22AA6E4ACE14FB2E /* AssessmentPendingCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D8D097C2BF6F956A8DA7876 /* AssessmentPendingCard.swift */; };
 		3FAAD032F09399F7E3B8DA80 /* ScreenshotPrevention.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C817E777D24E732912FBCA /* ScreenshotPrevention.swift */; };
@@ -488,6 +489,7 @@
 		814E77BA0FA8FBF5A6905785 /* AddSystemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58EF9C9FB14640084B3DC45 /* AddSystemView.swift */; };
 		817799A7803A8345B4E5AFD4 /* PauseAppointmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85FDEA4F5E833F18CD0012A /* PauseAppointmentSheet.swift */; };
 		81AC7FA9EA5E2FBEF702175D /* ATTOMHelloCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8FB53B9002A2303DA43673A /* ATTOMHelloCard.swift */; };
+		81BEF81111B171B05646BAFC /* TasksV2RoutineOccurrenceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF82284A2F4F724BB5EF025A /* TasksV2RoutineOccurrenceRow.swift */; };
 		81DB7AF5968F9E41BC70E9B6 /* ContactPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012A4D8E967F9F73E579FAB8 /* ContactPickerView.swift */; };
 		81EE6D934AAC2EDAAF568083 /* MaintenanceTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF47343974F44B306A4C18DE /* MaintenanceTaskRow.swift */; };
 		83473B17FD2FDF0C0B07330D /* SystemGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C235D5924950601DBEC89D /* SystemGroup.swift */; };
@@ -530,6 +532,7 @@
 		8EE3DF1D2033FC9F32D8965B /* PropertyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */; };
 		8EF2B378249168288CAE289A /* PersonalQuizQuestionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CB3E3AFBFACE1E3B2F4BC6 /* PersonalQuizQuestionLibrary.swift */; };
 		8F1D2D71CADE93F741FB79B8 /* AssessmentReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5BB53A681620165B7C097F /* AssessmentReviewView.swift */; };
+		8FBAFE246BE54D26FB6DF5BB /* StandaloneTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E9C9D439169BA07CDAB851 /* StandaloneTaskRow.swift */; };
 		8FD68D2E5CD959C8229DD664 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023E3D28374E39856E2661A0 /* NewProjectView.swift */; };
 		8FD7DE0B6179607692B15DB9 /* VendorLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F404802C9E338E592601FED /* VendorLogoView.swift */; };
 		8FDEE014FD307093EF940542 /* RoutinesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B226FE8C4A4BA9B47699F359 /* RoutinesListView.swift */; };
@@ -785,6 +788,7 @@
 		D79D3ADB6657E1F1050F3DB3 /* QuizCompletionSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEBD3CEF411D5B294A285315 /* QuizCompletionSummary.swift */; };
 		D837D3A79CD237F1347E54E7 /* HouseQuizFeedbackLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E46DF762D5BA8899ED32545 /* HouseQuizFeedbackLibrary.swift */; };
 		D844043A66B8175E097112F4 /* LogHistoricalProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D23A1E29045F54B58096BB6 /* LogHistoricalProjectView.swift */; };
+		D8C8947E5C4BB0D7A0B0AD15 /* TasksV2RoutineOccurrenceRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF82284A2F4F724BB5EF025A /* TasksV2RoutineOccurrenceRow.swift */; };
 		D902C72D4D8BBBD1DB526558 /* UIView+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C5AFD1BADB59224057E364 /* UIView+Extensions.swift */; };
 		D915AC0B9E76B379DC4D8C62 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168915F51136FFCD45ECA6E8 /* RoutineDetailView.swift */; };
 		D93E663937D781D4056E849B /* SaleSimulatorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A66FCC4419639B9845F596B /* SaleSimulatorSheet.swift */; };
@@ -1384,6 +1388,7 @@
 		E5FE9A44DDCE5AAD3CD1A46F /* EquipmentIdentifySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentIdentifySheet.swift; sourceTree = "<group>"; };
 		E6966723A75149E0AA831822 /* WarrantyTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarrantyTrackerView.swift; sourceTree = "<group>"; };
 		E7CB3E3AFBFACE1E3B2F4BC6 /* PersonalQuizQuestionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalQuizQuestionLibrary.swift; sourceTree = "<group>"; };
+		E7E9C9D439169BA07CDAB851 /* StandaloneTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StandaloneTaskRow.swift; sourceTree = "<group>"; };
 		E8097FAE3CDDC7B7D6B43462 /* FrequencyPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrequencyPickerSheet.swift; sourceTree = "<group>"; };
 		E80AFE03CC0595186E4E4DC0 /* MaintenancePreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenancePreferencesView.swift; sourceTree = "<group>"; };
 		E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizProgressBar.swift; sourceTree = "<group>"; };
@@ -1437,6 +1442,7 @@
 		FE3B76CC625DC29A26D88C5B /* ScenarioRunnerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioRunnerService.swift; sourceTree = "<group>"; };
 		FEEEF7014024523EB1E9CB7E /* ContractorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractorViewModel.swift; sourceTree = "<group>"; };
 		FF285398DF308A59B99CB085 /* AddVendorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddVendorSheet.swift; sourceTree = "<group>"; };
+		FF82284A2F4F724BB5EF025A /* TasksV2RoutineOccurrenceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksV2RoutineOccurrenceRow.swift; sourceTree = "<group>"; };
 		FFF8707048D7DE950C27CE2D /* ScenarioResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioResult.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -2159,6 +2165,8 @@
 				B93E1514C83463298FD01CC4 /* QuickSchedulingSheet.swift */,
 				2F46C404DDF9C3E7AAD11601 /* SeasonScopeBanner.swift */,
 				17B1BB4C90A506E3389C3CA8 /* SectionLabel.swift */,
+				E7E9C9D439169BA07CDAB851 /* StandaloneTaskRow.swift */,
+				FF82284A2F4F724BB5EF025A /* TasksV2RoutineOccurrenceRow.swift */,
 				CCA360ED13A11F5410214A5D /* TasksV5Tokens.swift */,
 				84EBCC1E36E5ADE525CE044D /* YearRibbon.swift */,
 			);
@@ -3094,6 +3102,7 @@
 				8ED76C1CE6A11663C9BA5E77 /* SkipToastView.swift in Sources */,
 				C00E1EE90D914C08E76A9115 /* SmartRecommendations.swift in Sources */,
 				5A1C3093C03B8AFED6788CA1 /* SpecialtySuggestionCard.swift in Sources */,
+				3ED3882D1B2C9AE773A3C7D8 /* StandaloneTaskRow.swift in Sources */,
 				2C0D368F7BC8413BA2E46C82 /* StandingAppointmentViewModel.swift in Sources */,
 				7AB52FBD973A44821424BCD2 /* String+Extensions.swift in Sources */,
 				C54E9E86A2E66ED38F6AB3C9 /* SubscriptionView.swift in Sources */,
@@ -3109,6 +3118,7 @@
 				9C9F18A6F3E1A26A1E9B6465 /* SystemSubtypePicker.swift in Sources */,
 				7ABECB7847B769DA380C004E /* TaskRoutingPicker.swift in Sources */,
 				D4C367F578C66AB771CE8828 /* TasksHubView.swift in Sources */,
+				81BEF81111B171B05646BAFC /* TasksV2RoutineOccurrenceRow.swift in Sources */,
 				44276791EA103562B77068DD /* TasksV5Tokens.swift in Sources */,
 				7946A368062338C429CF0C1C /* ThisWeekSection.swift in Sources */,
 				1C3BA73E2D4A5F70BFF0F104 /* TokenManager.swift in Sources */,
@@ -3575,6 +3585,7 @@
 				C31A5C166E6B8C3ACB5D2415 /* SkipToastView.swift in Sources */,
 				EBF4EA3F7931586FD8D7E071 /* SmartRecommendations.swift in Sources */,
 				6F20FB822DB9FEDCF9C7B57F /* SpecialtySuggestionCard.swift in Sources */,
+				8FBAFE246BE54D26FB6DF5BB /* StandaloneTaskRow.swift in Sources */,
 				F4095A55172FA4167A6A4E29 /* StandingAppointmentViewModel.swift in Sources */,
 				6C51B919596AE2D672258D80 /* String+Extensions.swift in Sources */,
 				61DB2DCA3310F9F000B1E821 /* SubscriptionView.swift in Sources */,
@@ -3590,6 +3601,7 @@
 				9AB8E07CFCDAECA953661AC4 /* SystemSubtypePicker.swift in Sources */,
 				84415A7199695F29F715BE8A /* TaskRoutingPicker.swift in Sources */,
 				DA3F06114698FE50588D3D69 /* TasksHubView.swift in Sources */,
+				D8C8947E5C4BB0D7A0B0AD15 /* TasksV2RoutineOccurrenceRow.swift in Sources */,
 				1010D0747773C78FF9F12A4D /* TasksV5Tokens.swift in Sources */,
 				A9B3178587F8282A29A85980 /* ThisWeekSection.swift in Sources */,
 				AF55FEC179B73D00611A3004 /* TokenManager.swift in Sources */,

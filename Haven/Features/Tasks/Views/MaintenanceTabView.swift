@@ -24,6 +24,16 @@ struct MaintenanceTabView: View {
     @State private var pushTarget: MaintenancePush?
     @State private var pickerForRoutine: RoutineRow?
 
+    /// Phase 70 (Tasks v2): The task currently being scheduled via the
+    /// inline QuickSchedulingSheet. Non-nil while the half-detent sheet
+    /// is open; set back to nil after the user picks a date or cancels.
+    @State private var quickScheduleTask: MaintenanceTaskDBRow?
+
+    /// Phase 70 (Tasks v2): Task id whose row should pulse a salmon
+    /// highlight ring after a deep-link arrival (`.openMaintenanceTask`).
+    /// Cleared automatically ~1.5s later by `handleDeepLink`.
+    @State private var highlightedTaskId: UUID?
+
     /// Caller passes a closure so the title-switcher can swap modes
     /// without owning navigation state.
     let onSwitchMode: () -> Void
@@ -60,25 +70,41 @@ struct MaintenanceTabView: View {
                     summaries: viewModel.seasonSummaries(activeSeason: currentSeason),
                     currentSeason: currentSeason,
                     onTap: { season in
-                        // Tap any tile → push into the Calendar layout
-                        // anchored to that season's first month so the
-                        // homeowner can see the actual items behind the
-                        // count. The MiniHero scoping was a side effect
-                        // that doesn't show the items themselves.
-                        pushTarget = .scheduleViewForSeason(season)
+                        // Phase 70 (Tasks v2): Tap = filter the screen
+                        // to that season. The binding update already
+                        // re-renders the feed via `activeFeed`; this
+                        // closure just animates the transition + tracks
+                        // analytics. The pre-Phase-70 behavior (push to
+                        // Calendar view) is replaced by the inline feed
+                        // — the Calendar destination still exists for
+                        // PropertyDetailView's property-scoped push.
+                        withAnimation(HavenTheme.animationStandard) {
+                            activeSeason = season
+                        }
+                        Haptics.selection()
+                        Analytics.track(.tasksV2SeasonTapped, [
+                            "season": season.rawValue,
+                            "source": "ribbon"
+                        ])
                     }
                 )
 
                 miniHeroSection
 
-                decisionsSection
+                // Phase 70 (Tasks v2): unified view sections.
+                //
+                // Replaces the prior decisionsSection / programsSection /
+                // chezHandlingSection trio. Single source of truth via
+                // `viewModel.seasonFeed(activeSeason)` so the YearRibbon
+                // count == the rendered row count. The old section
+                // helpers are kept below for safety + rollback.
+                seasonScopeBannerSection
 
-                programsSection
+                needsAttentionSection
 
-                // Phase 85 — Chez-handling section. Renders below the
-                // homeowner's own programs and only when chez_owned
-                // routines exist. Empty by default for DIY-default users.
-                chezHandlingSection
+                thisSeasonTasksSection
+
+                combinedProgramsSection
 
                 vehiclesSection
 
@@ -109,6 +135,33 @@ struct MaintenanceTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
             Task { await maintenanceVM.loadTasks() }
+        }
+        // Phase 70 (Tasks v2) — deep-link contract. Push handlers, inbox
+        // action menus, and activity-feed "view task" links all post this
+        // notification. The handler applies property + season scope and
+        // briefly highlights the matching row.
+        .onReceive(NotificationCenter.default.publisher(for: .openMaintenanceTask)) { notification in
+            handleDeepLink(notification)
+        }
+        // Phase 70 (Tasks v2) — inline 1-tap scheduler. Presented when
+        // the homeowner taps the "Book it" CTA on a bundle parent card.
+        // Half-detent so the user keeps scroll context behind it.
+        .sheet(item: $quickScheduleTask) { task in
+            QuickSchedulingSheet(
+                taskTitle: task.title,
+                vendorName: contractorFor(task: task).map { MaintenanceViewModel.vendorDisplayName($0.companyName) },
+                onSchedule: { date in
+                    Task {
+                        await commitQuickSchedule(task: task, date: date)
+                    }
+                    quickScheduleTask = nil
+                },
+                onCancel: {
+                    quickScheduleTask = nil
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
             Button("Add a routine") { pushTarget = .routinesList }
@@ -322,6 +375,388 @@ struct MaintenanceTabView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Phase 70 (Tasks v2) — new section helpers
+
+    /// Cached feed for the active season. Computed once per body re-render.
+    /// All Phase 70 sections read from this so the user can't see a count
+    /// (ribbon) that disagrees with the rows (sections).
+    private var activeFeed: SeasonFeed {
+        viewModel.seasonFeed(activeSeason)
+    }
+
+    /// SeasonScopeBanner — the 44pt pill below MiniHero that names the
+    /// active scope + exposes search + show-full-year toggle.
+    private var seasonScopeBannerSection: some View {
+        SeasonScopeBanner(
+            season: activeSeason,
+            totalItems: activeFeed.totalItems,
+            actionItems: activeFeed.actionItems,
+            onSearch: {
+                // Search overlay ships in 70.A1.10; for now no-op so the
+                // affordance is present and discoverable but inert.
+                Analytics.track(.tasksV2SearchTapped, [:])
+            },
+            onToggleScope: {
+                // 70.A1: "Show full year" is wired but defers behavior to
+                // a follow-up (no current single-state "full year" mode
+                // without changing the YearRibbon's binding shape). For
+                // now, tapping cycles to the next season as a placeholder
+                // so the affordance does SOMETHING. 70.A2 will replace
+                // this with a proper nil-season "all" mode.
+                withAnimation(HavenTheme.animationStandard) {
+                    activeSeason = activeSeason.next
+                }
+                Analytics.track(.tasksV2ShowFullYearTapped, [:])
+            }
+        )
+        .padding(.horizontal, TasksV5.pageMargin)
+        .padding(.bottom, TasksV5.sectionGap)
+    }
+
+    /// Phase 70 "Needs your attention" — combined section that surfaces
+    /// pending-vendor routines AND standalone tasks needing a contractor.
+    /// Pre-Phase-70 the latter were invisible (only the routine half
+    /// rendered). Capped at 5 visible with a "See all" link to the
+    /// full schedule view.
+    @ViewBuilder
+    private var needsAttentionSection: some View {
+        let decisions = activeFeed.decisions
+        if !decisions.isEmpty {
+            SectionLabel(
+                eyebrow: "Needs your attention",
+                sub: viewModel.dueLabel(),
+                action: decisions.count > 5 ? .init(title: "See all", perform: {
+                    pushTarget = .scheduleView
+                }) : nil
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            VStack(spacing: TasksV5.rowGap) {
+                ForEach(decisions.prefix(5)) { entry in
+                    decisionRow(for: entry)
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
+    @ViewBuilder
+    private func decisionRow(for entry: DecisionEntry) -> some View {
+        switch entry {
+        case .routinePendingVendor(let routine):
+            DecisionRow(
+                icon: routine.resolvedIcon,
+                title: routine.presentationLabel,
+                meta: viewModel.decisionMeta(for: routine),
+                ctaTitle: "Choose vendor"
+            ) {
+                pickerForRoutine = routine
+            }
+        case .taskNeedsVendor(let task):
+            // Standalone tasks needing a vendor render like a routine
+            // decision row visually, but the CTA pushes the existing
+            // schedule view so the user can pick a contractor or convert
+            // back to personal. Same affordance as the route the v5
+            // "needs vendor" tasks already use today.
+            DecisionRow(
+                icon: decisionIconFor(task: task),
+                title: task.title,
+                meta: standaloneDecisionMeta(for: task),
+                ctaTitle: "Find a pro"
+            ) {
+                pushTarget = .scheduleView
+            }
+        }
+    }
+
+    /// Phase 70 "This Season's Tasks" — bundle parents (with children
+    /// inline), standalone tasks, and routine occurrences with scheduled
+    /// visits this season. Grouped by MonthSubheader. The section the
+    /// "I have 30 tasks but only see 5 rows" complaint was pointed at.
+    @ViewBuilder
+    private var thisSeasonTasksSection: some View {
+        let monthSections = activeFeed.monthSections
+        if !monthSections.isEmpty {
+            SectionLabel(
+                eyebrow: "This season",
+                sub: "What's coming up"
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            VStack(spacing: 0) {
+                ForEach(monthSections) { monthSection in
+                    MonthSubheader(month: monthSection.month)
+                    VStack(spacing: TasksV5.rowGap) {
+                        ForEach(monthSection.entries) { entry in
+                            seasonEntryRow(for: entry)
+                        }
+                    }
+                    .padding(.horizontal, TasksV5.pageMargin)
+                }
+            }
+            .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
+    @ViewBuilder
+    private func seasonEntryRow(for entry: SeasonEntry) -> some View {
+        switch entry {
+        case .bundle(let task):
+            BundleParentCard(
+                task: task,
+                contractor: contractorFor(task: task),
+                children: childrenFor(task: task),
+                isChezOwned: task.isChezOwned,
+                isHighlighted: highlightedTaskId == task.id,
+                onTap: {
+                    Analytics.track(.tasksV2BundleExpanded, [
+                        "bundle_id": task.templateId ?? "",
+                        "child_count": String(childrenFor(task: task).count)
+                    ])
+                    // Bundle detail sheet — defer to the existing
+                    // MaintenanceTaskDetailSheet pushed from the schedule
+                    // view path until task 70.A1.10 wires it inline here.
+                    pushTarget = .scheduleView
+                },
+                onBookIt: {
+                    quickScheduleTask = task
+                }
+            )
+
+        case .standaloneTask(let task):
+            // Reuse the existing UnifiedTaskCard via a row helper. Task
+            // 70.A1.9 polishes the variants; for 70.A1's visibility ship
+            // a basic row is enough to surface the row as VISIBLE.
+            StandaloneTaskRow(
+                task: task,
+                contractor: contractorFor(task: task),
+                isHighlighted: highlightedTaskId == task.id,
+                onTap: {
+                    pushTarget = .scheduleView
+                }
+            )
+
+        case .routineOccurrence(let occurrence):
+            TasksV2RoutineOccurrenceRow(
+                occurrence: occurrence,
+                routine: routineFor(occurrence: occurrence),
+                contractor: contractorForOccurrence(occurrence),
+                onTap: {
+                    if let routine = routineFor(occurrence: occurrence),
+                       let householdId {
+                        pushTarget = .routineDetail(routine, householdId)
+                    }
+                }
+            )
+        }
+    }
+
+    /// Phase 70 "Your active programs" — REPLACES the prior pair of
+    /// `programsSection` + `chezHandlingSection`. Chez-owned routines
+    /// render inline with a salmon CHEZ pill via `ChezOwnedPill` instead
+    /// of being split into a second section. Single source of truth per
+    /// routine; no duplicate rows.
+    @ViewBuilder
+    private var combinedProgramsSection: some View {
+        let programs = activeFeed.programs
+        if programs.isEmpty {
+            SectionLabel(
+                eyebrow: "Your active programs",
+                sub: "On autopilot"
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            emptyProgramsCard
+                .padding(.horizontal, TasksV5.pageMargin)
+                .padding(.bottom, TasksV5.sectionGap)
+        } else {
+            SectionLabel(
+                eyebrow: "Your active programs",
+                sub: programsSubtitle(programs),
+                action: programs.count > 4 ? .init(title: "See all", perform: {
+                    pushTarget = .routinesList
+                }) : nil
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            VStack(spacing: TasksV5.rowGap) {
+                ForEach(programs.prefix(4)) { routine in
+                    ProgramRow(
+                        icon: routine.resolvedIcon,
+                        name: routine.presentationLabel,
+                        nextEventLabel: viewModel.nextEventLabel(for: routine),
+                        chezOwned: routine.chezOwned
+                    ) {
+                        if let householdId {
+                            pushTarget = .routineDetail(routine, householdId)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
+    private func programsSubtitle(_ programs: [RoutineRow]) -> String {
+        let chezCount = programs.filter { $0.chezOwned }.count
+        if chezCount == 0 { return "On autopilot" }
+        if chezCount == programs.count { return "Chez is handling these" }
+        return "On autopilot · \(chezCount) handled by Chez"
+    }
+
+    // MARK: - Phase 70 lookups (contractor / bundle children / routines)
+
+    /// Look up the contractor linked to a task. Resolves through the
+    /// shared `MaintenanceViewModel.contractors` cache so we don't hit
+    /// the DB on every render.
+    private func contractorFor(task: MaintenanceTaskDBRow) -> ContractorRow? {
+        guard let contractorId = task.assignedContractorId else { return nil }
+        return maintenanceVM.contractors.first { $0.id == contractorId }
+    }
+
+    /// Resolve the bundle's child line items. Pre-Phase-70 the bundle
+    /// notes were a frozen snapshot; this reads from the current template
+    /// library so Section C additions surface on existing installs.
+    ///
+    /// 70.A1 ships with empty activeSubtypes (universal children only).
+    /// Subtype-gated children (wood vs gas chimney, etc.) are added in
+    /// a follow-up when the home_system + property lookup wires through
+    /// to this helper.
+    private func childrenFor(task: MaintenanceTaskDBRow) -> [MaintenanceTemplate] {
+        guard let templateId = task.templateId else { return [] }
+        let pack = appState.primaryProperty?.regionalPack.flatMap { RegionalPack(rawValue: $0) }
+        return MaintenanceTemplates.bundleChildren(
+            forTemplateId: templateId,
+            activeSubtypes: [],
+            regionalPack: pack
+        )
+    }
+
+    private func routineFor(occurrence: RoutineOccurrence) -> RoutineRow? {
+        viewModel.routines.first { $0.id == occurrence.routineId }
+    }
+
+    private func contractorForOccurrence(_ occurrence: RoutineOccurrence) -> ContractorRow? {
+        guard let routine = routineFor(occurrence: occurrence),
+              let vendorId = routine.vendorId else { return nil }
+        return maintenanceVM.contractors.first { $0.id == vendorId }
+    }
+
+    /// Decision-row icon for a standalone task. Derives from the task's
+    /// system category (parsed from templateId) so the user sees a
+    /// category-relevant symbol even before a vendor is linked.
+    private func decisionIconFor(task: MaintenanceTaskDBRow) -> String {
+        guard let templateId = task.templateId,
+              let colonRange = templateId.range(of: ":") else {
+            return "wrench.and.screwdriver"
+        }
+        let category = String(templateId[..<colonRange.lowerBound]).lowercased()
+        switch category {
+        case "roofing":              return "house.fill"
+        case "plumbing":             return "drop.fill"
+        case "hvac":                 return "thermometer"
+        case "chimney":              return "flame.fill"
+        case "electrical":           return "bolt.fill"
+        case "septic system":        return "drop.triangle.fill"
+        case "landscaping":          return "leaf.fill"
+        case "pool/spa", "hot tub":  return "drop.circle.fill"
+        case "generator":            return "bolt.batteryblock.fill"
+        case "water heater":         return "drop.degreesign.fill"
+        case "appliance":            return "oven.fill"
+        case "pest control":         return "ladybug.fill"
+        case "security system":     return "lock.shield.fill"
+        case "snow removal":         return "snowflake"
+        default:                     return "wrench.and.screwdriver"
+        }
+    }
+
+    /// Concrete-date meta for a standalone task in the Needs Attention
+    /// section. "Due Tue, Sept 20" — homeowner voice.
+    private func standaloneDecisionMeta(for task: MaintenanceTaskDBRow) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateString = task.scheduledDate ?? task.nextDueDate
+        if !dateString.isEmpty, let date = formatter.date(from: dateString) {
+            let display = DateFormatter()
+            display.dateFormat = "EEE, MMM d"
+            return "Due \(display.string(from: date)) · Pick a vendor."
+        }
+        return "Pick a vendor."
+    }
+
+    // MARK: - Phase 70 inline scheduling
+
+    /// Persist a date chosen from `QuickSchedulingSheet`. Writes
+    /// `scheduled_date` on the task row + posts the standard
+    /// `.maintenanceTaskChanged` so other surfaces (Dashboard,
+    /// MaintenanceScheduleView) refresh.
+    @MainActor
+    private func commitQuickSchedule(task: MaintenanceTaskDBRow, date: Date) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateString = formatter.string(from: date)
+
+        var update = MaintenanceTaskUpdate()
+        update.scheduledDate = dateString
+        do {
+            _ = try await DatabaseService.shared.updateMaintenanceTask(id: task.id, update)
+            Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            await maintenanceVM.loadTasks()
+
+            let daysOut = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+            Analytics.track(.tasksV2QuickScheduled, [
+                "task_id": task.id.uuidString,
+                "days_out": String(daysOut)
+            ])
+        } catch {
+            print("[MaintenanceTabView] commitQuickSchedule failed: \(error)")
+        }
+    }
+
+    // MARK: - Phase 70 deep-link handler
+
+    /// Handle a `.openMaintenanceTask` notification posted by the push
+    /// handler / inbox / activity feed. Sets the season filter, scrolls
+    /// to the row (TODO: ScrollViewReader wire-up), and renders the
+    /// highlight overlay for ~1.5 seconds.
+    private func handleDeepLink(_ notification: Notification) {
+        let userInfo = notification.userInfo ?? [:]
+        // Apply property scope first so multi-property households jump
+        // to the right property's feed.
+        if let propString = userInfo["property_id"] as? String,
+           let propUUID = UUID(uuidString: propString) {
+            viewModel.activePropertyId = propUUID
+        }
+        // Apply season override.
+        if let seasonRaw = userInfo["season"] as? String,
+           let season = Season(rawValue: seasonRaw) {
+            withAnimation(HavenTheme.animationStandard) {
+                activeSeason = season
+            }
+        }
+        // Apply highlight.
+        if let taskString = userInfo["task_id"] as? String,
+           let taskUUID = UUID(uuidString: taskString) {
+            highlightedTaskId = taskUUID
+            // Clear the highlight after ~1.5s so the ring fades.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                if highlightedTaskId == taskUUID {
+                    withAnimation(HavenTheme.animationStandard) {
+                        highlightedTaskId = nil
+                    }
+                }
+            }
+        }
+        Analytics.track(.tasksV2DeepLinkOpened, [
+            "has_task_id": userInfo["task_id"] != nil ? "true" : "false",
+            "has_routine_id": userInfo["routine_id"] != nil ? "true" : "false",
+            "has_season": userInfo["season"] != nil ? "true" : "false"
+        ])
     }
 
     // MARK: - Navigation destinations

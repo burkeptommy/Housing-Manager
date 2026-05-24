@@ -587,6 +587,29 @@ enum AnalyticsEvent: String {
     case chezDelegationToggled = "chez_delegation_toggled"
     case chezProposalDecided = "chez_proposal_decided"
 
+    // MARK: - Phase 70 (Tasks v2)
+    /// Tile tap on YearRibbon. Properties: season ("Spring|Summer|Fall|Winter"),
+    /// source ("ribbon" | "banner" | "deep_link").
+    case tasksV2SeasonTapped = "tasks_v2_season_tapped"
+    /// Bundle parent card expanded inline. Properties: bundle_id, child_count.
+    case tasksV2BundleExpanded = "tasks_v2_bundle_expanded"
+    /// "Show full year" toggle tap on SeasonScopeBanner.
+    case tasksV2ShowFullYearTapped = "tasks_v2_show_full_year_tapped"
+    /// Active program card expanded to show its season's child visits.
+    case tasksV2ProgramExpanded = "tasks_v2_program_expanded"
+    /// Search icon tap on SeasonScopeBanner.
+    case tasksV2SearchTapped = "tasks_v2_search_tapped"
+    /// Inline scheduling sheet committed a date. Properties: source
+    /// ("this_week" | "next_week" | "custom"), days_out.
+    case tasksV2QuickScheduled = "tasks_v2_quick_scheduled"
+    /// .openMaintenanceTask deep link received + handled. Properties:
+    /// has_task_id, has_routine_id, has_season.
+    case tasksV2DeepLinkOpened = "tasks_v2_deep_link_opened"
+    /// Emitted once per Tasks-tab open: ribbon_count vs visible_row_count.
+    /// Pre-ship value should be the "30 vs 5" gap; post-ship should converge
+    /// to 1.0. This is the post-launch verification metric for the visibility fix.
+    case tasksV2VisibilityRatio = "tasks_v2_visibility_ratio"
+
     // MARK: - Errors
     case errorOccurred = "error_occurred"
 }
