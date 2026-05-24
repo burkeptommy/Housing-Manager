@@ -749,7 +749,7 @@ enum MaintenanceTemplates {
             // inspection, flashing, shingles, and gutters.)
             MaintenanceTemplate(systemCategory: "Roofing", title: "Annual roof inspection", description: "Inspect for damage, wear, and potential leaks.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, stableId: "Roofing:Professional roof inspection", bundleId: "Roofing:spring", safetyFloor: true),
             MaintenanceTemplate(systemCategory: "Roofing", title: "Check for damaged shingles", description: "Roofer walks the roof looking for missing, curled, or cracked shingles. Part of the annual inspection or a dedicated post-storm visit.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Also after major storms", requiredSubtypes: ["roof_asphalt"], assignmentType: .vendor, bundleId: "Roofing:spring", safetyFloor: true),
-            MaintenanceTemplate(systemCategory: "Roofing", title: "Clean gutters and downspouts", description: "Roofer or gutter service clears debris and verifies downspouts drain away from the foundation.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Spring and fall", assignmentType: .vendor, bundleId: "Roofing:spring", bundleTitle: "Roof and Gutter Service", safetyFloor: true),
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Clean gutters and downspouts", description: "Roofer or gutter service clears debris and verifies downspouts drain away from the foundation.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Spring and fall — both occurrences needed; the spring clear catches winter debris before the rainy season, the fall clear handles leaves before ice can dam in frozen downspouts.", assignmentType: .vendor, bundleId: "Roofing:spring", bundleTitle: "Roof and Gutter Service", safetyFloor: true),
             // Phase 97 — see "Annual roof inspection" note above.
             // Retagged from Fall → Spring to match the bundle intent.
             MaintenanceTemplate(systemCategory: "Roofing", title: "Inspect flashing around chimney/vents", description: "Roofer verifies flashing around chimneys, vents, and skylights is intact and properly sealed.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (part of inspection)", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, isEssential: false, assignmentType: .vendor, bundleId: "Roofing:spring", safetyFloor: true),
@@ -772,14 +772,63 @@ enum MaintenanceTemplates {
                 notes: "Often bundled into the fall handyman visit or roof inspection.",
                 assignmentType: .vendor
             ),
+            // Phase 70 (Tasks v2 / Section B.3): Roofing:fall bundle.
+            // The Spring bundle ("Roof and Gutter Service") handles
+            // inspection + shingles + flashing + spring gutter clear.
+            // The new Fall bundle handles the post-leaf-drop gutter
+            // clean and pre-winter ice-dam walk — both critical in the
+            // Northeast and previously hidden inside a once-a-year
+            // Spring visit. Gutter cleaning intentionally appears in
+            // both bundles' "What's included:" lists because it's
+            // genuinely semi-annual work — two distinct vendor visits,
+            // one per anchor.
+            MaintenanceTemplate(
+                systemCategory: "Roofing",
+                title: "Clean gutters and downspouts",
+                description: "Gutter service clears leaf and debris buildup before winter, when frozen downspouts can back water into the roofline and create ice dams. Includes a downspout flow check and confirmation that water clears the foundation.",
+                frequency: "Semi-annually",
+                priority: "High",
+                estimatedCostRange: "$150–$300",
+                isDIY: false,
+                seasonalTiming: "Fall",
+                professionalRequired: true,
+                notes: "Schedule for late October or early November after the heaviest leaf drop. Wait too long and the first freeze locks debris into the channel; schedule too early and you'll need a second visit anyway.",
+                assignmentType: .vendor,
+                stableId: "Roofing:Clean gutters and downspouts (fall)",
+                bundleId: "Roofing:fall",
+                bundleTitle: "Fall Roof and Gutter Service",
+                safetyFloor: true
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Roofing",
+                title: "Walk roofline for ice dam risk",
+                description: "Roofer or gutter pro walks the eave and identifies cold spots, insulation gaps, or persistent debris where ice dams typically form. Catches problem areas before the first heavy snow turns them into water in the ceiling.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (often bundled with the fall gutter clean)",
+                isDIY: false,
+                seasonalTiming: "Fall",
+                professionalRequired: true,
+                notes: "Most gutter services will do this walk-through at no extra charge as part of the fall clean. Worth asking when you book.",
+                assignmentType: .vendor,
+                stableId: "Roofing:Ice dam risk walk",
+                bundleId: "Roofing:fall"
+            ),
         ]),
 
         // ──────────────────────────────────────────────
         // SIDING / EXTERIOR
         // ──────────────────────────────────────────────
         ("Siding/Exterior", [
-            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pressure washer soft-washes siding to remove dirt, mildew, and algae buildup.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Semi-annual is right for vinyl in our region. Wood, brick, and fiber-cement homes can stretch this to once a year. Mixed-material homes follow the more frequent cadence wherever vinyl is present.", assignmentType: .vendor, bundleId: "Siding/Exterior:annual", bundleTitle: "Annual Exterior Maintenance"),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pressure washer soft-washes siding to remove dirt, mildew, and algae buildup.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Semi-annual is right for vinyl in our region. Wood, brick, and fiber-cement homes can stretch this to once a year. Spring wash catches winter grime (salt, sand, tree drip); fall wash clears summer pollen and algae before winter rain amplifies mildew. Mixed-material homes follow the more frequent cadence wherever vinyl is present.", assignmentType: .vendor, bundleId: "Siding/Exterior:annual", bundleTitle: "Annual Exterior Maintenance"),
             MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Deck and patio annual service", description: "Handyman or deck pro inspects deck boards, railings, and stairs for rot or loose fasteners; spot-seals as needed. Full stain or seal every 2-3 years.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Seal or stain every 2-3 years", isEssential: false, assignmentType: .vendor, bundleId: "Siding/Exterior:annual"),
+            // Phase 70 (Tasks v2 / Section B.3): Fall sibling bundle.
+            // The "annual" bundle covers Spring (deck inspect, spring
+            // wash); this new fall bundle covers the second wash before
+            // winter rain amplifies mildew on shaded north faces. HNW
+            // vinyl/mixed-material homes notice algae growth fast, so
+            // the dual-anchor model better matches reality.
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pre-winter soft-wash removes summer pollen, algae, and grime that would otherwise lock into the siding over winter rain. Catches mildew growth on shaded north and east faces before it stains permanently.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Schedule for late September or early October — after pollen season ends but before the first hard freeze locks moisture into siding pockets.", assignmentType: .vendor, stableId: "Siding/Exterior:Power wash exterior siding (fall)", bundleId: "Siding/Exterior:fall", bundleTitle: "Fall Exterior Wash"),
             // Phase 54C: value-preservation exterior walkarounds. These
             // are NOT bundled into the annual exterior bundle because
             // they require different pros (painter vs handyman) and
@@ -1266,21 +1315,28 @@ enum MaintenanceTemplates {
             // surfaces only in Recommended Services and the homeowner
             // opts in. Stays in the Landscaping:spring bundle so it
             // joins the spring landscaping visit when opted in.
-            MaintenanceTemplate(systemCategory: "Landscaping", title: "Prune shrubs and hedges", description: "Landscaper trims overgrown shrubs and hedges for health and appearance. Spring and fall.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, isEssential: false, assignmentType: .vendor, bundleId: "Landscaping:spring"),
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Prune shrubs and hedges", description: "Landscaper trims overgrown shrubs and hedges for health and appearance. Spring and fall.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Spring pruning shapes new growth; fall pruning removes dead wood and prepares plants for dormancy. Both occurrences improve plant health.", isEssential: false, assignmentType: .vendor, bundleId: "Landscaping:spring"),
+            // Phase 70 (Tasks v2 / Section B.3): Fall sibling so the
+            // Landscaping:fall bundle includes pruning as a line item.
+            // Distinct stableId from the Spring entry to keep template-
+            // key lookup unambiguous; same title because the homeowner
+            // recognizes the work, the bundle context tells them when.
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Prune shrubs and hedges", description: "Landscaper trims overgrown shrubs and hedges for dormancy. Removes dead wood, shapes for winter wind load, and identifies any branches at risk of breaking under snow.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Fall pruning removes dead wood and prepares plants for dormancy. Time it after the first hard frost but before leaf drop is complete.", isEssential: false, assignmentType: .vendor, stableId: "Landscaping:Prune shrubs and hedges (fall)", bundleId: "Landscaping:fall"),
 
             // NATURAL LAWN templates — seasonal bundle members
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Fertilize natural lawn", description: "Landscaper applies seasonal fertilizer appropriate for grass type and season. Three rounds per year keeps roots strong and color deep.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$50–$150", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, requiredSubtypes: ["natural_lawn"], assignmentType: .vendor, bundleId: "Landscaping:spring", bundleTitle: "Spring Landscaping Service"),
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Core aerate natural lawn", description: "Landscaper pulls soil plugs to reduce compaction and let water and nutrients reach roots. Paired with fall overseeding.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: nil, requiredSubtypes: ["natural_lawn"], assignmentType: .vendor, bundleId: "Landscaping:fall"),
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Overseed bare patches", description: "Landscaper spreads fresh seed in thin or bare areas. Best paired with fall aeration so seed-to-soil contact is maximized.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$30–$120", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Cool-season grasses seed best in early fall", requiredSubtypes: ["natural_lawn"], assignmentType: .vendor, bundleId: "Landscaping:fall"),
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Pre-emergent weed control", description: "Landscaper applies pre-emergent herbicide before crabgrass and other weeds germinate.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$30–$80", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Timed to soil temps in the low 50s. Usually mid-March to mid-April in {state}", requiredSubtypes: ["natural_lawn"], assignmentType: .vendor, bundleId: "Landscaping:spring"),
-            // Phase 97 — was tagged seasonalTiming: "Spring" but bundled
-            // in "Landscaping:fall", so the data contradicted itself.
-            // Phase 97's bundle-season override means the contradiction
-            // no longer affects scheduling, but cleaning it up keeps the
-            // templates honest. Fall dethatching matches the bundle
-            // intent for cool-season grass; spring dethatching is also
-            // valid but the bundle structure expects Fall.
-            MaintenanceTemplate(systemCategory: "Landscaping", title: "Dethatch lawn", description: "Landscaper uses a power rake or thatching attachment to remove built-up thatch. Skipped when thatch is under 1/2\".", frequency: "Annually", priority: "Low", estimatedCostRange: "$50–$150", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: nil, requiredSubtypes: ["natural_lawn"], isEssential: false, assignmentType: .vendor, bundleId: "Landscaping:fall"),
+            // Phase 70 (Tasks v2 / Section B.4): moved from Fall to
+            // Spring. The Phase 97 change retagged this template to
+            // match bundle membership but the botany was wrong — for
+            // cool-season Northeast grasses the right window is early
+            // spring (April–May) when the grass is actively growing
+            // and can recover. Fall dethatching weakens the lawn
+            // entering dormancy. Bundle moved to Landscaping:spring
+            // alongside fertilize + pre-emergent + mulch + pruning.
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Dethatch lawn", description: "Landscaper uses a power rake or thatching attachment to remove built-up thatch. Skipped when thatch is under 1/2\".", frequency: "Annually", priority: "Low", estimatedCostRange: "$50–$150", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Time it for early spring when grass is actively growing and can recover. Fall dethatching leaves cool-season grasses weakened going into winter.", requiredSubtypes: ["natural_lawn"], isEssential: false, assignmentType: .vendor, bundleId: "Landscaping:spring"),
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Soil pH test and lime application", description: "Landscaper pulls soil core samples from a few representative spots, runs a pH test, and applies dolomitic or calcitic lime in measured amounts to bring acidic soil back to 6.0–7.0 where cool-season grasses thrive. Acidic soil locks out nutrients even when you're fertilizing. Without correcting pH first, the fertilizer is wasted money.", frequency: "Every 2 years", priority: "Low", estimatedCostRange: "$80–$200", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Lime needs 3–6 months to fully react with soil, so fall application gives it the winter to do its work before spring growth. Northeast soils are naturally acidic from rainfall; if you've never tested, you're almost certainly low.", requiredSubtypes: ["natural_lawn"], isEssential: false, assignmentType: .vendor),
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Fall leaf cleanup", description: "Landscaping crew clears leaves from the lawn and garden beds. Letting them sit through winter smothers the grass and invites snow mold.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$200–$600", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: nil, requiredSubtypes: ["natural_lawn"], assignmentType: .vendor, bundleId: "Landscaping:fall", bundleTitle: "Fall Landscaping Service"),
 
@@ -1295,7 +1351,11 @@ enum MaintenanceTemplates {
             // intentionally NOT included — different trade (lighting
             // electrician).
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Top up turf infill", description: "Turf specialist refreshes the rubber or silica sand infill that holds the synthetic fibers upright. Infill migrates over time from rain runoff, foot traffic, and seasonal grooming. Without it, fibers mat down and the turf looks worn long before its 12–15 year design life.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Most synthetic-turf vendors offer this as part of an annual service plan. If you've noticed footprints staying visible after walking on the turf, you're already overdue.", requiredSubtypes: ["synthetic_turf"], assignmentType: .vendor, bundleId: "Landscaping:synthetic_turf_annual", bundleTitle: "Synthetic Turf Annual Service"),
-            MaintenanceTemplate(systemCategory: "Landscaping", title: "Power rake and groom turf", description: "Turf specialist runs a power rake or groomer across the surface to lift matted fibers, redistribute migrated infill, and remove debris that's worked into the pile. Keeps the turf looking new and bouncy through year 15+ instead of going flat at year 5.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Twice-a-year is the manufacturer recommendation for most premium turf. Spring grooming opens up the pile after winter compaction; fall grooming clears leaves and acorns before they break down into organic matter (which then feeds weed growth between blades).", requiredSubtypes: ["synthetic_turf"], assignmentType: .vendor, bundleId: "Landscaping:synthetic_turf_annual"),
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Power rake and groom turf", description: "Turf specialist runs a power rake or groomer across the surface to lift matted fibers, redistribute migrated infill, and remove debris that's worked into the pile. Keeps the turf looking new and bouncy through year 15+ instead of going flat at year 5.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Twice-a-year is the manufacturer recommendation for most premium turf. Spring grooming opens up the pile after winter compaction; fall grooming clears leaves and acorns before they break down into organic matter (which then feeds weed growth between blades).", requiredSubtypes: ["synthetic_turf"], assignmentType: .vendor, bundleId: "Landscaping:synthetic_turf_annual"),
+            // Phase 70 (Tasks v2 / Section B.3): Fall sibling so the
+            // fall grooming visit lands as a distinct October event
+            // instead of getting lost inside the spring annual bundle.
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Power rake and groom turf", description: "Fall grooming clears leaves, acorns, and seed pods before they break down into organic matter inside the turf pile (which then feeds weed growth between blades). Different from the spring grooming visit which opens up winter-compacted fibers.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Schedule after leaf drop is mostly complete but before the first hard freeze. Late October is the sweet spot in the Northeast.", requiredSubtypes: ["synthetic_turf"], assignmentType: .vendor, stableId: "Landscaping:Power rake and groom turf (fall)", bundleId: "Landscaping:synthetic_turf_fall", bundleTitle: "Synthetic Turf Fall Service"),
             MaintenanceTemplate(systemCategory: "Landscaping", title: "Deep clean synthetic turf", description: "Turf cleaning service uses a power groomer + extraction vacuum to pull embedded debris, pollen, dust, and pet residue out of the infill layer. Goes deeper than the annual top-up + grooming visit. Extends usable turf life by 3–5 years and resets the look to near-new for HNW homeowners who notice surface fade.", frequency: "Every 2 years", priority: "Low", estimatedCostRange: "$300–$800", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Schedule for early spring before the heaviest pollen weeks. That way the infill is clean before the year's accumulation starts. If you have dogs or kids using the turf heavily, consider every year rather than every two.", requiredSubtypes: ["synthetic_turf"], isEssential: false, assignmentType: .vendor, bundleId: "Landscaping:synthetic_turf_annual"),
             // Phase 57: Outdoor landscape lighting service. HNW homes
             // often have a low-voltage lighting install separate from

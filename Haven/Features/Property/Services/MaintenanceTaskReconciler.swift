@@ -1407,12 +1407,35 @@ enum MaintenanceTaskReconciler {
         }
     }
 
-    static func initialDueDate(
+    /// Phase 70 (Tasks v2): returns ALL planned due dates for a template
+    /// in calendar order, so callers can create one task row per anchor
+    /// for dual-season ("Spring/Fall") templates.
+    ///
+    /// - Annual+ templates with a recognized `seasonalTiming` return
+    ///   one or two anchored dates (April / July / October / January
+    ///   for single seasons; April + October for "Spring/Fall").
+    /// - Sub-annual and unanchored templates return a single
+    ///   interval-based date (today + interval), preserving existing
+    ///   behavior — they don't benefit from seasonal anchoring.
+    /// - Lead-time subtraction + the 14-day "not due tomorrow" floor
+    ///   are applied per anchor; dates in the past for the current
+    ///   year are dropped in favor of next year's surface date.
+    ///
+    /// Empty array is impossible by construction — the function always
+    /// falls back to `today + interval` if every other path fails. The
+    /// non-Optional return type reflects that.
+    static func plannedDueDates(
         for template: MaintenanceTemplate,
         today: Date = Date(),
         seasonalTimingOverride: String? = nil
-    ) -> Date {
+    ) -> [Date] {
         let calendar = Calendar.current
+        let fallback: [Date] = {
+            if let d = calendar.date(byAdding: template.interval, to: today) {
+                return [d]
+            }
+            return [today]
+        }()
 
         let isAnnualOrLonger: Bool = {
             switch template.frequency.lowercased() {
@@ -1439,7 +1462,7 @@ enum MaintenanceTaskReconciler {
         guard isAnnualOrLonger,
               let timing = timingSource?.lowercased(),
               !timing.isEmpty else {
-            return calendar.date(byAdding: template.interval, to: today) ?? today
+            return fallback
         }
 
         let candidateMonths: [Int] = {
@@ -1453,23 +1476,7 @@ enum MaintenanceTaskReconciler {
             }
         }()
 
-        guard !candidateMonths.isEmpty else {
-            return calendar.date(byAdding: template.interval, to: today) ?? today
-        }
-
-        let currentYear = calendar.component(.year, from: today)
-        var executionDates: [Date] = []
-        for yearOffset in 0...1 {
-            for month in candidateMonths {
-                var comps = DateComponents()
-                comps.year = currentYear + yearOffset
-                comps.month = month
-                comps.day = 1
-                if let date = calendar.date(from: comps) {
-                    executionDates.append(date)
-                }
-            }
-        }
+        guard !candidateMonths.isEmpty else { return fallback }
 
         // Phase 67C: PROACTIVE surfacing. Subtract the template's lead
         // time from each candidate execution anchor so the task appears
@@ -1478,24 +1485,59 @@ enum MaintenanceTaskReconciler {
         // (Apr 1 anchor, 42-day lead) now surfaces around Feb 18 — the
         // homeowner has 6 weeks to schedule before April.
         let leadDays = template.effectiveLeadTimeDays
-        let surfaceDates = executionDates.compactMap {
-            calendar.date(byAdding: .day, value: -leadDays, to: $0)
+        let earliestAcceptable = calendar.date(byAdding: .day, value: 14, to: today) ?? today
+        let currentYear = calendar.component(.year, from: today)
+
+        // Phase 70: pair each anchor month with its own surface-date
+        // candidates and pick one date per anchor. Dual-anchor templates
+        // ("Spring/Fall") get two picks; single-anchor get one. Each
+        // pick prefers a surface date that's at least 14 days out, but
+        // falls back to the nearest future date when lead-time math
+        // produced a past date for current-season anchors (so a freshly
+        // seeded Spring task in mid-March surfaces as overdue, not
+        // pushed to next year).
+        var picks: [Date] = []
+        for month in candidateMonths {
+            // Build this anchor's candidate execution dates across
+            // current and next year, then apply lead-time subtraction.
+            var anchorSurfaces: [Date] = []
+            for yearOffset in 0...1 {
+                var comps = DateComponents()
+                comps.year = currentYear + yearOffset
+                comps.month = month
+                comps.day = 1
+                guard let exec = calendar.date(from: comps),
+                      let surface = calendar.date(byAdding: .day, value: -leadDays, to: exec) else {
+                    continue
+                }
+                anchorSurfaces.append(surface)
+            }
+            anchorSurfaces.sort()
+
+            if let pick = anchorSurfaces.first(where: { $0 >= earliestAcceptable }) {
+                picks.append(pick)
+            } else if let nearest = anchorSurfaces.first(where: { $0 >= today }) {
+                picks.append(nearest)
+            }
         }
 
-        // Earliest acceptable: at least 14 days out, so a freshly seeded
-        // task isn't due tomorrow. If lead-time math produced a date in
-        // the past for current-season tasks, accept the next future
-        // surface date even if it's < 14 days out so the homeowner sees
-        // the task surface as overdue, which is exactly right.
-        let earliestAcceptable = calendar.date(byAdding: .day, value: 14, to: today) ?? today
-        let valid = surfaceDates.filter { $0 >= earliestAcceptable }.sorted()
-        if let pick = valid.first {
-            return pick
-        }
-        if let nearest = surfaceDates.sorted().first(where: { $0 >= today }) {
-            return nearest
-        }
-        return calendar.date(byAdding: template.interval, to: today) ?? today
+        return picks.isEmpty ? fallback : picks.sorted()
+    }
+
+    /// Phase 70: thin wrapper for callers that only need the next
+    /// (earliest) planned due date. Preserves the pre-Phase-70
+    /// signature so existing call sites (bundle scheduling, opt-in
+    /// scheduling, migrations) don't have to opt into the array model.
+    static func initialDueDate(
+        for template: MaintenanceTemplate,
+        today: Date = Date(),
+        seasonalTimingOverride: String? = nil
+    ) -> Date {
+        plannedDueDates(
+            for: template,
+            today: today,
+            seasonalTimingOverride: seasonalTimingOverride
+        ).first ?? today
     }
 
     /// Phase 54A: One-time re-dating pass for existing template-based tasks
@@ -1544,6 +1586,68 @@ enum MaintenanceTaskReconciler {
         }
 
         print("[Phase54A] Re-seeded \(redated) seasonal tasks")
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        if redated > 0 {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+    }
+
+    /// Phase 70 (Tasks v2 / Section B.6): re-dates tasks affected by
+    /// the Phase 70 template changes. Specifically catches templates
+    /// whose seasonalTiming or bundleId moved between seasons (e.g.
+    /// "Dethatch lawn" moved from Fall → Spring), where the existing
+    /// task row's nextDueDate no longer matches the template's new
+    /// planned anchor.
+    ///
+    /// Differs from `reseedSeasonalTasksOnceIfNeeded` (Phase 54A) only
+    /// by the gate key — the logic is the same broad sweep over all
+    /// template-based tasks, comparing current vs. computed dates and
+    /// re-dating when the delta exceeds 30 days. Tasks the user has
+    /// touched (completed once OR explicitly scheduled) are skipped.
+    ///
+    /// Safe to ship before B.3's paired-bundle work converges — bundle
+    /// parent rows aren't affected (their templateId is the bundleId,
+    /// not the child template's key), only standalone task rows whose
+    /// template moved between seasons.
+    @MainActor
+    static func reseedSeasonalTasksPhase70OnceIfNeeded() async {
+        let migrationKey = "hasReseededSeasonalTasksPhase70_v1"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+
+        let db = DatabaseService.shared
+        guard let tasks = try? await db.fetchAllMaintenanceTasks() else { return }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        var redated = 0
+        for task in tasks {
+            if let last = task.lastCompletedDate, !last.isEmpty { continue }
+            if task.scheduledDate != nil { continue }
+            if task.isArchived == true { continue }
+            if task.vehicleId != nil { continue }
+
+            guard let templateKey = task.templateId,
+                  let template = MaintenanceTemplates.template(forKey: templateKey),
+                  let timing = template.seasonalTiming,
+                  !timing.isEmpty else { continue }
+
+            let newDue = initialDueDate(for: template)
+            let newDueString = formatter.string(from: newDue)
+
+            if let currentDue = formatter.date(from: task.nextDueDate),
+               abs(newDue.timeIntervalSince(currentDue)) < 30 * 86400 {
+                continue
+            }
+
+            var update = MaintenanceTaskUpdate()
+            update.nextDueDate = newDueString
+            if (try? await db.updateMaintenanceTask(id: task.id, update)) != nil {
+                redated += 1
+            }
+        }
+
+        print("[Phase70] Re-seeded \(redated) seasonal tasks")
         UserDefaults.standard.set(true, forKey: migrationKey)
         if redated > 0 {
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)

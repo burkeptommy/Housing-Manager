@@ -397,6 +397,13 @@ final class AppState: ObservableObject {
                         // in-app Coverage view. Gated on UserDefaults
                         // hasConvertedQuizDismissalsToSnoozes_v1.
                         await Self.convertQuizDismissalsToSnoozesOnceIfNeeded()
+
+                        // Phase 70 (Tasks v2 / Section B.6): re-date
+                        // tasks whose templates moved between seasons.
+                        // Catches "Dethatch lawn" (Fall → Spring) and
+                        // any future template-level season change.
+                        // Skips user-touched rows.
+                        await MaintenanceTaskReconciler.reseedSeasonalTasksPhase70OnceIfNeeded()
                     }
                     Task { await Self.archivePreQuizChoreTasksOnce() }
                     Task { await Self.backfillUniversalSystemsOnce() }
