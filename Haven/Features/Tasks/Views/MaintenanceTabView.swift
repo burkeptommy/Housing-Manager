@@ -1169,6 +1169,28 @@ final class MaintenanceTabViewModel: ObservableObject {
             guard task.vehicleId == nil else { return false }
             if let last = task.lastCompletedDate, !last.isEmpty { return false }
             if (task.isArchived ?? false) == true { return false }
+            // Phase 70.A1 fix: hide bundle children from the standalone
+            // feed. Phase 67's reconciler creates child task rows for
+            // bundle members (one row per member) — but the children
+            // live as inline line items inside the bundle parent card
+            // (rendered by `BundleChildList`), never as their own
+            // standalone row. Without this filter the verifier sees
+            // ghost duplicate rows below every Generator / Water Heater
+            // / Garage Door / Painting bundle parent.
+            //
+            // Detection: lookup the task's template, check if the
+            // template has a `bundleId` set. `bundle_parent_task_id`
+            // exists on the schema but is never populated by the
+            // reconciler — the canonical signal is the template's
+            // `bundleId` field. We separately keep the bundle PARENT
+            // task itself (its templateId IS the bundleId, so it has
+            // no template lookup match in the standard library, but
+            // `isBundleId(templateId)` returns true).
+            if let templateKey = task.templateId,
+               let template = MaintenanceTemplates.template(forKey: templateKey),
+               template.bundleId != nil {
+                return false
+            }
             return true
         }
 
