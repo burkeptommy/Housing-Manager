@@ -1247,22 +1247,31 @@ serve(async (req: Request) => {
 
           // Also pull by google_place_id so re-discovery of the SAME
           // Place ID merges cleanly (the existing UNIQUE constraint
-          // path).
+          // path). Phase X+7: also select provider_type +
+          // secondary_provider_types so we can auto-populate secondary
+          // when we re-encounter the same vendor under a NEW category.
+          // This is the preventive fix for the Rick's Pump bug — every
+          // future seed run that hits an existing vendor under a new
+          // category writes the multi-cat tag automatically.
           const { data: existingByPlace } = candidatePlaceIds.length > 0
             ? await supabase
                 .from("utility_providers")
-                .select("id, google_place_id, regions, source")
+                .select("id, google_place_id, regions, source, provider_type, secondary_provider_types")
                 .in("google_place_id", candidatePlaceIds)
             : { data: [] as Array<{
                 id: string;
                 google_place_id: string | null;
                 regions: string[] | null;
                 source: string | null;
+                provider_type: string;
+                secondary_provider_types: string[] | null;
               }> };
           const existingByPlaceId = new Map<string, {
             id: string;
             regions: string[];
             source: string | null;
+            provider_type: string;
+            secondary_provider_types: string[];
           }>();
           for (const row of (existingByPlace ?? [])) {
             if (!row.google_place_id) continue;
@@ -1270,8 +1279,13 @@ serve(async (req: Request) => {
               id: row.id,
               regions: row.regions ?? [],
               source: row.source,
+              provider_type: row.provider_type,
+              secondary_provider_types: row.secondary_provider_types ?? [],
             });
           }
+          // Track which existing rows need a secondary_provider_types
+          // update — applied alongside the region merge below.
+          const secondaryUpdates: Map<string, string[]> = new Map();
 
           // Walk candidates: each becomes either an UPDATE of an
           // existing row's regions OR a fresh INSERT.
@@ -1368,6 +1382,21 @@ serve(async (req: Request) => {
                   rating: typeof v.rating === "number" ? v.rating : null,
                   review_count: typeof v.reviewCount === "number" ? v.reviewCount : null,
                 });
+                // Phase X+7 prevention: if this vendor existed under a
+                // DIFFERENT primary provider_type than the one we're
+                // searching, add the current category to secondary so
+                // future searches in the new category surface them.
+                // This is the lock that stops the Rick's Pump bug from
+                // recurring with new seed runs.
+                if (existingByPlace) {
+                  const existingPrimary = existingByPlace.provider_type;
+                  const existingSecondary = existingByPlace.secondary_provider_types;
+                  if (existingPrimary !== providerType &&
+                      !existingSecondary.includes(providerType)) {
+                    const merged = [...existingSecondary, providerType].sort();
+                    secondaryUpdates.set(existing.id, merged);
+                  }
+                }
               }
               dedupedCount++;
             } else {
@@ -1439,13 +1468,18 @@ serve(async (req: Request) => {
                 if (cur?.rating == null && enrich.rating != null) patch.rating = enrich.rating;
                 if (cur?.review_count == null && enrich.review_count != null) patch.review_count = enrich.review_count;
               }
+              // Phase X+7: fold in the multi-category update if we
+              // discovered the vendor under a new provider_type this
+              // call.
+              const sec = secondaryUpdates.get(id);
+              if (sec) patch.secondary_provider_types = sec;
               const { error: updateError } = await supabase
                 .from("utility_providers")
                 .update(patch)
                 .eq("id", id);
               if (updateError) {
                 console.warn(
-                  `[find-local-vendors] region/enrich update failed for ${id}:`,
+                  `[find-local-vendors] region/enrich/secondary update failed for ${id}:`,
                   updateError,
                 );
               }
