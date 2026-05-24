@@ -404,6 +404,19 @@ final class AppState: ObservableObject {
                         // any future template-level season change.
                         // Skips user-touched rows.
                         await MaintenanceTaskReconciler.reseedSeasonalTasksPhase70OnceIfNeeded()
+
+                        // Phase 70.A1 (Summer/Winter library expansion):
+                        // re-run reconcileAllForHousehold so the 8 new
+                        // templates added in this phase materialize as
+                        // task rows on existing TestFlight households.
+                        // Idempotent — reconciler skips templates that
+                        // already have a templateId match in the DB.
+                        if let householdId = primaryProperty?.householdId,
+                           !UserDefaults.standard.bool(forKey: "hasSeededPhase70A1LibraryExpansion_v1") {
+                            _ = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
+                            UserDefaults.standard.set(true, forKey: "hasSeededPhase70A1LibraryExpansion_v1")
+                            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        }
                     }
                     Task { await Self.archivePreQuizChoreTasksOnce() }
                     Task { await Self.backfillUniversalSystemsOnce() }
