@@ -890,6 +890,50 @@ enum MaintenanceTemplates {
                 stableId: "Roofing:Ice dam risk walk",
                 bundleId: "Roofing:fall"
             ),
+            // Phase 70.A1 (Summer fill): pre-thunderstorm-season walk.
+            // Northeast summer convective storms hit hardest mid-Jun
+            // through mid-Aug. A 15-minute DIY ground walk before the
+            // first big system catches sagging downspouts, early-season
+            // debris piles, and bird-nest blockages that cause overflow
+            // and foundation pooling. Routes to handyman punch list via
+            // Phase 67E/F single-rail (diyDefault + ≤60 min effort).
+            MaintenanceTemplate(
+                systemCategory: "Roofing",
+                title: "Pre-storm gutter and downspout walk",
+                description: "Walk the perimeter looking up: are gutters sagging? Any visible debris piles, bird nests, or sections separating from the fascia? Are downspouts intact and aimed away from the foundation? Five months of spring pollen + leaf-out drop usually leaves something — better to catch it before the first July thunderstorm pushes it into a clog.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (DIY)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Late June or early July is the sweet spot — pollen and leaf-out debris is settled, you're ahead of the storm season. About 15 minutes from the ground. Bring binoculars if you have them.",
+                assignmentType: .either,
+                diyEffortMinutes: 15,
+                routingOverride: .diyDefault
+            ),
+            // Phase 70.A1 (Winter fill): ice-dam ground walk. Different
+            // from the Fall walk-roofline visit (which is professional)
+            // — this is a DIY between-storms check during active winter.
+            // Spotting an ice dam early lets the homeowner roof-rake or
+            // call a vendor before water gets behind the underlayment.
+            // Northeast regional pack.
+            MaintenanceTemplate(
+                systemCategory: "Roofing",
+                title: "Ice dam ground check",
+                description: "After any snowfall of 6\"+, walk the perimeter and look for ice icicles forming along the eaves or below valleys. Icicles are the visible symptom; the dam itself is the trapped water on the roof behind them. If you spot one, get it addressed — roof rake from the ground, or call a vendor for steam removal.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (DIY)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Cosmetic icicles ≠ ice dam. The dam is what forms above them when warm roof melts snow that re-freezes at the cold eave. Persistent icicles in the same spot year after year usually mean an attic-insulation or ventilation issue worth fixing in the off-season.",
+                assignmentType: .either,
+                diyEffortMinutes: 10,
+                routingOverride: .diyDefault,
+                regionalPack: .northeast
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1052,6 +1096,30 @@ enum MaintenanceTemplates {
                 bundleId: "HVAC:spring",
                 routingOverride: .diyCapable
             ),
+            // Phase 70.A1 (Summer fill): mid-summer condenser coil rinse.
+            // The outdoor condenser pulls in cottonwood seed, pollen,
+            // and grass clippings all spring + early summer. By mid-
+            // July the coil is matted, the unit works ~15% harder for
+            // the same cooling, and the homeowner doesn't notice until
+            // the system trips on a 95°F day. 5-minute DIY rinse with
+            // a garden hose (no chemicals, no soap — just water) gets
+            // efficiency back. Routes to handyman punch list.
+            MaintenanceTemplate(
+                systemCategory: "HVAC",
+                title: "Rinse outdoor AC condenser",
+                description: "Shut off power at the disconnect, clear leaves and grass clippings from the cabinet, gently rinse the condenser fins from inside-out with a garden hose. Don't use a pressure washer — bent fins are a service call. About 5 minutes once a year keeps the unit running 10-15% more efficiently through the heat wave.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (DIY)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Mid-July is the sweet spot — past pollen + cottonwood season, ahead of August heat. Power-off is critical (the fan blade is right there). If fins are visibly bent, a fin comb is $8 on Amazon; flagging it for the spring tune-up is also fine.",
+                requiredSubtypes: ["has_ac"],
+                assignmentType: .either,
+                diyEffortMinutes: 10,
+                routingOverride: .diyDefault
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1152,6 +1220,47 @@ enum MaintenanceTemplates {
                 assignmentType: .either,
                 diyEffortMinutes: 10,
                 routingOverride: .diyDefault
+            ),
+            // Phase 70.A1 (Summer fill): outdoor faucet + hose-bib walk.
+            // The annual plumbing inspection in Spring catches major
+            // hose-bib issues, but the summer walkthrough catches the
+            // drip you didn't notice (or the connection that loosened
+            // after the first heavy use of the season). 10 min DIY,
+            // universal, routes to handyman punch list.
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Outdoor faucet and hose-bib walk",
+                description: "Walk every outdoor faucet, hose bib, and irrigation valve. Turn each on briefly and look for active drips at the spigot, slow seepage from the wall connection, or hissing inside the wall (frost-free hose bibs can leak inside the house if the seal degrades — you only notice it as wet drywall a month later).",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (DIY)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Mid-July after a few months of summer use is when problems surface. Soft drip = washer; persistent drip when shut tight = stem cartridge; wet drywall behind the bib = call a plumber today.",
+                assignmentType: .either,
+                diyEffortMinutes: 10,
+                routingOverride: .diyDefault
+            ),
+            // Phase 70.A1 (Winter fill): frozen pipe risk walk during
+            // active cold snaps. Northeast regional. Different from
+            // the Fall winterization (which is preventive, vendor-side)
+            // — this is the DIY check during the deep freeze itself.
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Frozen pipe risk walk",
+                description: "During any sustained cold snap below 20°F, walk every pipe in an unheated space (crawl, garage, exterior wall closets, basement bays near sill plates). Listen for unusual hissing, feel for frost on the pipe itself, check fixtures for slow flow. A pipe that's still drippable when you open a faucet is still flowing — full freeze means no water at all, and that's an emergency.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (DIY)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "If you find a frozen section, open the closest faucet downstream (so any melt has somewhere to go) and apply heat gently — hair dryer, heat tape, never an open flame. Burst pipes are 4-figure repairs; catching the freeze before the burst is the goal.",
+                assignmentType: .either,
+                diyEffortMinutes: 15,
+                routingOverride: .diyDefault,
+                regionalPack: .northeast
             ),
         ]),
 
@@ -1895,6 +2004,30 @@ enum MaintenanceTemplates {
                 assignmentType: .either,
                 diyEffortMinutes: 15
             ),
+            // Phase 70.A1 (Summer fill): mid-season pool service.
+            // Opening (Spring) sets the season up; closing (Fall) takes
+            // it down. The summer mid-season check catches problems
+            // that opening missed once the system has been running
+            // under load for 6-8 weeks: pump bearings starting to
+            // whine, filter pressure climbing, salt cell efficiency
+            // dropping. Catching them in July is a service call;
+            // catching them in August right before vacation is an
+            // emergency.
+            MaintenanceTemplate(
+                systemCategory: "Pool/Spa",
+                title: "Mid-season pool service",
+                description: "Pool tech runs a full system check at the mid-point of the season: pump and motor sound, filter pressure delta, heater operation, chemistry feeder calibration, skimmer + main drain operation, and a deep chemistry test. Catches drift that the weekly visits don't surface and lets you head off August problems before the household is depending on the pool full-time.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$150–$300",
+                isDIY: false,
+                seasonalTiming: "Summer",
+                professionalRequired: true,
+                notes: "Mid-July through early August. Most pool services don't push for this — you have to ask. Worth it for HNW households where the pool is heavily used.",
+                requiredSubtypes: ["pool"],
+                assignmentType: .vendor,
+                stableId: "Pool/Spa:Mid-season pool service"
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1981,6 +2114,30 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(systemCategory: "Generator", title: "Replace spark plugs", description: "Replace spark plugs per manufacturer recommendations. Usually done as part of annual service.", frequency: "Annually", priority: "Low", estimatedCostRange: "$50–$100", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Generator:annual"),
             MaintenanceTemplate(systemCategory: "Generator", title: "Annual generator service", description: "Full service including all fluids, filters, and electrical check.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Before winter storm season", assignmentType: .vendor, stableId: "Generator:Professional generator service", bundleId: "Generator:annual", safetyFloor: true, maxIntervalDays: 420, warrantyLinked: true),
             MaintenanceTemplate(systemCategory: "Generator", title: "Test automatic transfer switch", description: "Test of transfer switch operation during annual service.", frequency: "Annually", priority: "High", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Generator:annual"),
+            // Phase 70.A1 (Winter fill): pre-storm dry run. Standby
+            // generators self-exercise weekly, but the homeowner check
+            // is "did the test cycle run cleanly?" — read the panel
+            // status, confirm no fault codes, verify the fuel level
+            // (propane gauge or natural gas pressure if your unit has
+            // a service interruption alarm). 5 minutes DIY, NE
+            // regional. Catches the silent failure ("I thought it ran
+            // last week...") that you only discover during an outage.
+            MaintenanceTemplate(
+                systemCategory: "Generator",
+                title: "Winter generator status check",
+                description: "Walk to the generator, read the panel, confirm the most recent self-test ran without fault. Check the fuel gauge (propane) or that the gas valve is open and uninterrupted (natural gas). Listen for the next scheduled exercise cycle — if it's been more than 7 days since the last run, something's wrong.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (DIY)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Most NE winters have at least one multi-day outage; the generator gets used hard for 24-72 hours straight. This check is what makes sure it actually starts when you need it.",
+                assignmentType: .either,
+                diyEffortMinutes: 10,
+                routingOverride: .diyDefault,
+                regionalPack: .northeast
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -2976,6 +3133,29 @@ enum MaintenanceTemplates {
                 assignmentType: .either,
                 diyEffortMinutes: 30,
                 routingOverride: .diyCapable
+            ),
+            // Phase 70.A1 (Winter fill): indoor humidity check. Dry
+            // NE winters drop indoor RH below 30%, which dries out
+            // hardwoods, art, instruments, and skin/sinuses. The fix
+            // is the existing humidifier — but the homeowner has to
+            // verify it's running + calibrated, not just installed.
+            // Universal (helpful even without a whole-home humidifier
+            // — informs whether to add portable units).
+            MaintenanceTemplate(
+                systemCategory: "Air Quality",
+                title: "Winter indoor humidity check",
+                description: "Read a hygrometer in two rooms (typically the main living area and a bedroom). Target 30–50% RH in winter. Below 30% means hardwoods will gap, art will craze, and everyone gets dry sinuses; above 50% means condensation on windows + mold risk. Adjust the whole-home humidifier setting or move a portable into rooms that drift.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$0 (DIY)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "A $15 digital hygrometer is plenty accurate. HNW homes with fine furniture, art, or instruments should target 40-45% specifically.",
+                assignmentType: .either,
+                diyEffortMinutes: 10,
+                routingOverride: .diyDefault,
+                regionalPack: .northeast
             ),
         ]),
     ]

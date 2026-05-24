@@ -34,6 +34,12 @@ struct MaintenanceTabView: View {
     /// Cleared automatically ~1.5s later by `handleDeepLink`.
     @State private var highlightedTaskId: UUID?
 
+    /// Phase 70.A1 (post-screenshot fix): full-year scope toggle. When
+    /// true, the screen shows every month across all 4 seasons; when
+    /// false, scopes to the active season (default). Tapping any
+    /// YearRibbon tile sets this back to false so the user can re-focus.
+    @State private var fullYearMode: Bool = false
+
     /// Caller passes a closure so the title-switcher can swap modes
     /// without owning navigation state.
     let onSwitchMode: () -> Void
@@ -72,14 +78,14 @@ struct MaintenanceTabView: View {
                     onTap: { season in
                         // Phase 70 (Tasks v2): Tap = filter the screen
                         // to that season. The binding update already
-                        // re-renders the feed via `activeFeed`; this
-                        // closure just animates the transition + tracks
-                        // analytics. The pre-Phase-70 behavior (push to
-                        // Calendar view) is replaced by the inline feed
-                        // — the Calendar destination still exists for
-                        // PropertyDetailView's property-scoped push.
+                        // re-renders the feed via `activeFeed`. Also
+                        // clears fullYearMode (post-screenshot fix) so
+                        // tapping a tile always means "scope to this
+                        // season" — never leaves the user in a confused
+                        // hybrid state.
                         withAnimation(HavenTheme.animationStandard) {
                             activeSeason = season
+                            fullYearMode = false
                         }
                         Haptics.selection()
                         Analytics.track(.tasksV2SeasonTapped, [
@@ -381,16 +387,20 @@ struct MaintenanceTabView: View {
 
     /// Cached feed for the active season. Computed once per body re-render.
     /// All Phase 70 sections read from this so the user can't see a count
-    /// (ribbon) that disagrees with the rows (sections).
+    /// (ribbon) that disagrees with the rows (sections). When
+    /// `fullYearMode` is true, returns the aggregated feed across all
+    /// four seasons instead.
     private var activeFeed: SeasonFeed {
-        viewModel.seasonFeed(activeSeason)
+        fullYearMode
+            ? viewModel.fullYearFeed()
+            : viewModel.seasonFeed(activeSeason)
     }
 
     /// SeasonScopeBanner — the 44pt pill below MiniHero that names the
     /// active scope + exposes search + show-full-year toggle.
     private var seasonScopeBannerSection: some View {
         SeasonScopeBanner(
-            season: activeSeason,
+            season: fullYearMode ? nil : activeSeason,
             totalItems: activeFeed.totalItems,
             actionItems: activeFeed.actionItems,
             onSearch: {
@@ -399,16 +409,16 @@ struct MaintenanceTabView: View {
                 Analytics.track(.tasksV2SearchTapped, [:])
             },
             onToggleScope: {
-                // 70.A1: "Show full year" is wired but defers behavior to
-                // a follow-up (no current single-state "full year" mode
-                // without changing the YearRibbon's binding shape). For
-                // now, tapping cycles to the next season as a placeholder
-                // so the affordance does SOMETHING. 70.A2 will replace
-                // this with a proper nil-season "all" mode.
+                // Phase 70.A1 (post-screenshot fix): proper full-year
+                // toggle. Tapping flips between season-scoped feed and
+                // a full-year aggregation. The YearRibbon tile tap
+                // resets fullYearMode to false so the user can re-focus.
                 withAnimation(HavenTheme.animationStandard) {
-                    activeSeason = activeSeason.next
+                    fullYearMode.toggle()
                 }
-                Analytics.track(.tasksV2ShowFullYearTapped, [:])
+                Analytics.track(.tasksV2ShowFullYearTapped, [
+                    "now_full_year": fullYearMode ? "true" : "false"
+                ])
             }
         )
         .padding(.horizontal, TasksV5.pageMargin)
@@ -925,14 +935,28 @@ struct SeasonFeed {
     /// without seeing every Wednesday-Blue-Fox row in the season feed.
     let routineVisitCount: Int
 
-    /// Convenience: ribbon tile counts. Excludes vehicle work (Vehicles
-    /// section owns its own count). Routine visits are NOT counted as
-    /// "items" — the Active Programs section count covers them.
+    /// Convenience: chip + ribbon tile counts. Counts decisions + tasks
+    /// the user actually scrolls through in the main feed. Programs are
+    /// EXCLUDED — they're autopilot, already surfaced via the Active
+    /// Programs section's "N visits this season · On autopilot" subtitle.
+    /// Including them in `totalItems` made the chip claim 26 items in
+    /// Spring while the user only saw ~9 task rows in the main feed
+    /// (the other 17 were either decisions hidden behind a 5-item cap
+    /// or programs in the collapsed bottom section). Now the count
+    /// maps directly to user mental model: "things I need to read or do
+    /// in this season's feed."
     var totalItems: Int {
-        decisions.count + monthSections.reduce(0) { $0 + $1.entries.count } + programs.count
+        decisions.count + monthSections.reduce(0) { $0 + $1.entries.count }
     }
 
     var actionItems: Int { decisions.count }
+
+    /// Total task entries in the main feed (excludes decisions and
+    /// programs). Used by the SeasonScopeBanner subtitle when it wants
+    /// to distinguish "to-do tasks" from "decisions to make."
+    var taskEntryCount: Int {
+        monthSections.reduce(0) { $0 + $1.entries.count }
+    }
 }
 
 /// One row in the "Needs your attention" section. Backed by either a
@@ -1335,6 +1359,71 @@ final class MaintenanceTabViewModel: ObservableObject {
             monthSections: monthSections,
             programs: mergedPrograms,
             routineVisitCount: routineVisitCountInSeason
+        )
+    }
+
+    /// Phase 70.A1 (post-screenshot fix): aggregates SeasonFeeds across
+    /// all four seasons so the "Show full year" toggle has a real,
+    /// unioned view of the whole calendar. Dedupes by entry id so a
+    /// dual-anchor ("Spring/Fall") task doesn't render twice. Month
+    /// sections come out in calendar order (Jan → Dec).
+    func fullYearFeed(propertyId: UUID? = nil) -> SeasonFeed {
+        let feeds = Season.allCases.map { seasonFeed($0, propertyId: propertyId) }
+
+        // Decisions: union, dedup by id (a task might satisfy more than
+        // one season's decision filter if it's seasonless / overdue).
+        var seenDecisionIds: Set<String> = []
+        var combinedDecisions: [DecisionEntry] = []
+        for feed in feeds {
+            for entry in feed.decisions where !seenDecisionIds.contains(entry.id) {
+                seenDecisionIds.insert(entry.id)
+                combinedDecisions.append(entry)
+            }
+        }
+
+        // Month sections: union per month, dedup entries within a month.
+        var monthMap: [Int: [SeasonEntry]] = [:]
+        var seenEntryIdsByMonth: [Int: Set<String>] = [:]
+        for feed in feeds {
+            for section in feed.monthSections {
+                var existingIds = seenEntryIdsByMonth[section.month] ?? []
+                var combined = monthMap[section.month] ?? []
+                for entry in section.entries where !existingIds.contains(entry.id) {
+                    existingIds.insert(entry.id)
+                    combined.append(entry)
+                }
+                monthMap[section.month] = combined
+                seenEntryIdsByMonth[section.month] = existingIds
+            }
+        }
+        let monthSections: [MonthSection] = (1...12).compactMap { month in
+            guard let entries = monthMap[month], !entries.isEmpty else { return nil }
+            return MonthSection(month: month, entries: entries)
+        }
+
+        // Programs: dedup by routine UUID.
+        var seenProgramIds: Set<UUID> = []
+        var combinedPrograms: [RoutineRow] = []
+        for feed in feeds {
+            for routine in feed.programs where !seenProgramIds.contains(routine.id) {
+                seenProgramIds.insert(routine.id)
+                combinedPrograms.append(routine)
+            }
+        }
+
+        // Routine visit count: sum across all seasons (each season's
+        // count is already deduped against that season's month window).
+        let totalVisits = feeds.reduce(0) { $0 + $1.routineVisitCount }
+
+        // Use `.spring` as the seed Season — callers that need the
+        // "full year" label check `fullYearMode` in the view, not
+        // SeasonFeed.season.
+        return SeasonFeed(
+            season: .spring,
+            decisions: combinedDecisions,
+            monthSections: monthSections,
+            programs: combinedPrograms,
+            routineVisitCount: totalVisits
         )
     }
 
