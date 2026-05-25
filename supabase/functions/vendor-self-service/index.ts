@@ -345,7 +345,7 @@ serve(async (req: Request) => {
                     } else {
                         const v = String(body.brand_color).trim();
                         if (!/^#[0-9A-Fa-f]{6}$/.test(v)) {
-                            errors.push("brand_color must be a 6-digit hex like #ED6955");
+                            errors.push("brand_color must be a 6-digit hex like #6938EF");
                         } else {
                             update.brand_color = v;
                         }

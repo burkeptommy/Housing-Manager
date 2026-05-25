@@ -269,14 +269,17 @@ function emailBody(args: {
   return `
 <!doctype html>
 <html lang="en">
-  <body style="margin:0;padding:24px;background:#F8F9FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#453A70;">
+  <body style="margin:0;padding:24px;background:#FAFAFC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0A0A0A;">
     <span style="display:none;">${escapeHtml(args.preview)}</span>
-    <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border-radius:14px;padding:28px;">
-      <h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 8px;">${escapeHtml(args.heading)}</h1>
-      <p style="font-size:14px;line-height:1.5;margin:0 0 16px;">${escapeHtml(args.intro)}</p>
-      <pre style="background:#F8F9FA;border:1px solid #EDEEF0;border-radius:10px;padding:12px;font-family:-apple-system,sans-serif;white-space:pre-wrap;font-size:13px;color:#524580;">${escapeHtml(args.bodyText)}</pre>
+    <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border-radius:14px;padding:28px;border:1px solid #EDEEF0;">
+      <div style="text-align:center;margin:0 0 20px;">
+        <img src="https://getchez.com/chez-icon-on-purple-180.png" alt="Chez" width="56" height="56" style="display:inline-block;border-radius:13px;" />
+      </div>
+      <h1 style="font-family:Georgia,'New York',serif;font-size:22px;margin:0 0 8px;color:#0A0A0A;font-weight:600;">${escapeHtml(args.heading)}</h1>
+      <p style="font-size:14px;line-height:1.5;margin:0 0 16px;color:#0A0A0A;">${escapeHtml(args.intro)}</p>
+      <pre style="background:#FAFAFC;border:1px solid #EDEEF0;border-radius:10px;padding:12px;font-family:-apple-system,sans-serif;white-space:pre-wrap;font-size:13px;color:#6B6B7B;margin:0;">${escapeHtml(args.bodyText)}</pre>
       <p style="margin:18px 0 0;">
-        <a href="${escapeHtml(args.ctaUrl)}" style="background:#ED6955;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;">${escapeHtml(args.ctaLabel)}</a>
+        <a href="${escapeHtml(args.ctaUrl)}" style="background:#6938EF;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;">${escapeHtml(args.ctaLabel)}</a>
       </p>
     </div>
   </body>

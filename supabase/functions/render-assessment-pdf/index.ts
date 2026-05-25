@@ -193,8 +193,8 @@ function renderReport(args: {
   const urgencyColors: Record<string, string> = {
     urgent: "#D32F2F",
     soon: "#F57C00",
-    next_season: "#ED6955",
-    opportunistic: "#787878",
+    next_season: "#6938EF",
+    opportunistic: "#6B6B7B",
   };
 
   const recsByUrgency = new Map<string, Array<Record<string, unknown>>>();
@@ -217,7 +217,7 @@ function renderReport(args: {
               ? ` · ~$${Math.round(Number(r.estimated_cost_cents) / 100)}`
               : "";
             return `<li><strong>${escapeHtml(r.title)}</strong>${cost}<br/>
-              <span style="color: #555; font-size: 13px;">${escapeHtml(r.homeowner_visible_notes || r.description || "")}</span></li>`;
+              <span style="color: #6B6B7B; font-size: 13px;">${escapeHtml(r.homeowner_visible_notes || r.description || "")}</span></li>`;
           }).join("")}
         </ul>
       `;
@@ -228,7 +228,7 @@ function renderReport(args: {
     ? "<p>No systems captured.</p>"
     : `<table style="width: 100%; border-collapse: collapse;">
         <thead>
-          <tr style="background: #F8F9FA;">
+          <tr style="background: #FAFAFC;">
             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">System</th>
             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Make/Model</th>
             <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Condition</th>
@@ -259,12 +259,12 @@ function renderReport(args: {
   <meta charset="utf-8">
   <title>Chez Home Assessment — ${householdName}</title>
   <style>
-    body { font-family: 'New York', Georgia, serif; color: #453A70; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.5; }
-    h1 { font-size: 32px; border-bottom: 2px solid #ED6955; padding-bottom: 12px; }
-    h2 { color: #453A70; margin-top: 40px; font-size: 22px; }
+    body { font-family: 'New York', Georgia, serif; color: #0A0A0A; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.5; }
+    h1 { font-size: 32px; border-bottom: 2px solid #6938EF; padding-bottom: 12px; color: #6938EF; }
+    h2 { color: #6938EF; margin-top: 40px; font-size: 22px; }
     h3 { font-size: 17px; }
-    .meta { color: #666; font-size: 14px; margin-bottom: 32px; }
-    .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #ddd; color: #888; font-size: 12px; text-align: center; }
+    .meta { color: #6B6B7B; font-size: 14px; margin-bottom: 32px; }
+    .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #EDEEF0; color: #A1A1AC; font-size: 12px; text-align: center; }
   </style>
 </head>
 <body>

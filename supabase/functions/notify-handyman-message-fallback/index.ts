@@ -176,11 +176,11 @@ serve(async (req: Request) => {
     const html = `
       <p>${handymanName ? `Hi ${escapeHtml(handymanName.split(" ")[0])},` : "Hi,"}</p>
       <p><strong>${escapeHtml(householdName)}</strong> sent you a message in Chez:</p>
-      <blockquote style="border-left:3px solid #ED6955;padding-left:12px;color:#453A70;">
+      <blockquote style="border-left:3px solid #6938EF;padding-left:12px;color:#0A0A0A;margin:0 0 16px;">
         ${escapeHtml(messageBody).replace(/\n/g, "<br/>")}
       </blockquote>
-      ${requestTitle ? `<p style="color:#71717A;">Request: ${escapeHtml(requestTitle)}</p>` : ""}
-      <p style="color:#71717A;">Reply to this email or open the Chez Field portal to respond.</p>
+      ${requestTitle ? `<p style="color:#6B6B7B;">Request: ${escapeHtml(requestTitle)}</p>` : ""}
+      <p style="color:#6B6B7B;">Reply to this email or open the Chez Field portal to respond.</p>
     `.trim();
 
     const sendgridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {

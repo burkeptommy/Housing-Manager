@@ -90,26 +90,26 @@ function buildHtml(ctx: ReminderContext, intro: string): string {
   const householdName = ctx.householdName?.trim() || "their household";
   const code = formatCode(ctx.inviteCode);
   const personalBlock = ctx.personalMessage
-    ? `<tr><td style="padding-top:24px;font-family:Georgia,serif;font-style:italic;font-size:15px;color:#1B2A4A;">"${escapeHtml(ctx.personalMessage)}"</td></tr>`
+    ? `<tr><td style="padding-top:24px;font-family:Georgia,serif;font-style:italic;font-size:15px;color:#0A0A0A;">"${escapeHtml(ctx.personalMessage)}"</td></tr>`
     : "";
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#F2EEE5;font-family:Georgia,serif;color:#1B2A4A;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EEE5;">
+  <body style="margin:0;padding:0;background:#FAF7F1;font-family:Georgia,serif;color:#0A0A0A;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F1;">
       <tr>
         <td align="center" style="padding:48px 16px;">
-          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#F8F6F1;border-radius:16px;border:1px solid #F0EBE1;">
-            <tr><td style="padding:32px 32px 8px 32px;text-align:center;"><div style="font-family:Georgia,serif;font-size:28px;font-weight:bold;color:#1B2A4A;letter-spacing:0.5px;">Chez</div></td></tr>
-            <tr><td style="padding:24px 32px 0 32px;font-family:Georgia,serif;font-size:18px;color:#1B2A4A;">Hi ${escapeHtml(inviteeName)},</td></tr>
-            <tr><td style="padding:16px 32px 0 32px;font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#1B2A4A;">${escapeHtml(intro)} ${escapeHtml(ctx.inviterName)} invited you to join <strong>${escapeHtml(householdName)}</strong> on Chez.</td></tr>
-            ${ctx.householdAddress ? `<tr><td style="padding:24px 32px 0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;border:1px solid #E3D9C6;border-radius:12px;"><tr><td style="padding:16px 20px;font-family:Georgia,serif;font-size:14px;color:#1B2A4A;">${escapeHtml(ctx.householdAddress)}</td></tr></table></td></tr>` : ""}
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;border:1px solid #EDEEF0;">
+            <tr><td style="padding:32px 32px 8px 32px;text-align:center;"><img src="https://getchez.com/chez-icon-on-purple-180.png" alt="" width="56" height="56" style="display:inline-block;border-radius:13px;margin-bottom:10px;" /><div style="font-family:Georgia,'New York',serif;font-size:28px;font-weight:bold;color:#6938EF;letter-spacing:0.5px;">Chez</div></td></tr>
+            <tr><td style="padding:24px 32px 0 32px;font-family:Georgia,serif;font-size:18px;color:#0A0A0A;">Hi ${escapeHtml(inviteeName)},</td></tr>
+            <tr><td style="padding:16px 32px 0 32px;font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#0A0A0A;">${escapeHtml(intro)} ${escapeHtml(ctx.inviterName)} invited you to join <strong>${escapeHtml(householdName)}</strong> on Chez.</td></tr>
+            ${ctx.householdAddress ? `<tr><td style="padding:24px 32px 0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F0FE;border:1px solid #EFEAFE;border-radius:12px;"><tr><td style="padding:16px 20px;font-family:Georgia,serif;font-size:14px;color:#0A0A0A;">${escapeHtml(ctx.householdAddress)}</td></tr></table></td></tr>` : ""}
             ${personalBlock ? `<tr><td style="padding:0 32px;">${personalBlock}</td></tr>` : ""}
-            <tr><td style="padding:32px 32px 0 32px;text-align:center;"><a href="${escapeHtml(ctx.inviteUrl)}" style="display:inline-block;padding:14px 28px;background:#1B2A4A;color:#F8F6F1;text-decoration:none;border-radius:14px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Chez</a></td></tr>
-            <tr><td style="padding:24px 32px 0 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:#1B2A4A;opacity:0.7;">Or enter this code in the app:</td></tr>
-            <tr><td style="padding:8px 32px 0 32px;text-align:center;font-family:'SF Mono',Menlo,Monaco,monospace;font-size:24px;font-weight:bold;letter-spacing:4px;color:#1B2A4A;">${escapeHtml(code)}</td></tr>
-            <tr><td style="padding:32px 32px 0 32px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#1B2A4A;opacity:0.6;text-align:center;">If you don't want to join, just ignore this email.</td></tr>
-            <tr><td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">Chez, getchez.com</td></tr>
+            <tr><td style="padding:32px 32px 0 32px;text-align:center;"><a href="${escapeHtml(ctx.inviteUrl)}" style="display:inline-block;padding:14px 28px;background:#6938EF;color:#FFFFFF;text-decoration:none;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Chez</a></td></tr>
+            <tr><td style="padding:24px 32px 0 32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:13px;color:#6B6B7B;">Or enter this code in the app:</td></tr>
+            <tr><td style="padding:8px 32px 0 32px;text-align:center;font-family:'SF Mono',Menlo,Monaco,monospace;font-size:24px;font-weight:bold;letter-spacing:4px;color:#6938EF;">${escapeHtml(code)}</td></tr>
+            <tr><td style="padding:32px 32px 0 32px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B6B7B;text-align:center;">If you don't want to join, just ignore this email.</td></tr>
+            <tr><td style="padding:24px 32px 32px 32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:11px;color:#A1A1AC;">Chez · getchez.com</td></tr>
           </table>
         </td>
       </tr>
