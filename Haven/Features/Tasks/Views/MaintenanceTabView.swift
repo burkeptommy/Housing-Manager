@@ -2671,15 +2671,17 @@ final class MaintenanceTabViewModel: ObservableObject {
     private func isTask(_ task: MaintenanceTaskDBRow, in season: Season) -> Bool {
         if task.parentRoutineId != nil { return false }
 
-        // Phase 70.A1 follow-on H1 — year-scope every task placement.
-        // A task whose nextDueDate rolled to next year (because this
-        // year's anchor already passed) shouldn't show under this
-        // year's tile. The user comes back to that work when next
-        // year's season arrives, not now.
-        let dateString = task.scheduledDate ?? task.nextDueDate
-        guard let date = TasksV2DateFormatting.parseRowDate(dateString) else { return false }
-        guard MaintenanceTabViewModel.dateBelongsTo(season: season, on: date) else { return false }
-
+        // Phase 70.A1 follow-on L1 (REVERSES H1): year-scope removed.
+        // H1 hid every Spring-tagged task rolled to next year, but in
+        // late May the 2026 Spring window has essentially no work left
+        // and all the recurring Spring items already advanced to their
+        // 2027 anchor. The result was a Spring tile showing 0 task
+        // rows — read as "the app is broken" even though it was
+        // technically correct. F2's year-aware date display ("Due Thu,
+        // Feb 4, 2027") already communicates which tasks are
+        // next-year, so an extra year filter on top over-corrects.
+        // Tasks now appear in any season tile whose seasonalTiming
+        // they match; users mentally bucket via the visible year.
         if let timing = task.seasonalTiming?.trimmingCharacters(in: .whitespacesAndNewlines),
            !timing.isEmpty {
             // Phase 70.A1.x: Flexible tasks never match a specific
@@ -2691,7 +2693,13 @@ final class MaintenanceTabViewModel: ObservableObject {
             return labels.contains(season.rawValue)
         }
 
-        return true
+        // No seasonalTiming → fall back to the month of the actual
+        // due/scheduled date. Custom user tasks and AI-generated
+        // follow-ups land here.
+        let dateString = task.scheduledDate ?? task.nextDueDate
+        guard let date = TasksV2DateFormatting.parseRowDate(dateString) else { return false }
+        let month = Calendar.current.component(.month, from: date)
+        return season.months.contains(month)
     }
 
     /// Phase 70.A1 follow-on H1 — single source of truth for "does this
