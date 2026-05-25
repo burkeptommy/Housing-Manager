@@ -377,7 +377,7 @@ function quotePreviewText(title: string, total: number, providerName: string) {
 function emailShell(args: { preview: string; heading: string; greeting: string; intro: string; bodyHtml: string; ctaLabel?: string; ctaUrl?: string; footer?: string }) {
   const cta = args.ctaLabel && args.ctaUrl
     ? `<tr><td style="padding:28px 32px 0 32px;text-align:center;">
-        <a href="${escapeHtml(args.ctaUrl)}" style="display:inline-block;padding:14px 28px;background:#ef6f5d;color:#fff;text-decoration:none;border-radius:14px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;">${escapeHtml(args.ctaLabel)}</a>
+        <a href="${escapeHtml(args.ctaUrl)}" style="display:inline-block;padding:14px 28px;background:#6938EF;color:#FFFFFF;text-decoration:none;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;">${escapeHtml(args.ctaLabel)}</a>
       </td></tr>`
     : "";
 
@@ -388,30 +388,30 @@ function emailShell(args: { preview: string; heading: string; greeting: string; 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(args.heading)}</title>
   </head>
-  <body style="margin:0;padding:0;background:#f3eee7;font-family:Georgia,serif;color:#2a2252;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3eee7;">
+  <body style="margin:0;padding:0;background:#FAFAFC;font-family:Georgia,serif;color:#0A0A0A;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAFAFC;">
       <tr>
         <td align="center" style="padding:40px 16px;">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fbf8f4;border-radius:22px;border:1px solid rgba(42,34,82,0.08);overflow:hidden;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#FFFFFF;border-radius:22px;border:1px solid #EDEEF0;overflow:hidden;">
             <tr>
-              <td style="padding:28px 32px 8px 32px;background:linear-gradient(160deg,#2a2252,#473985);color:#fff;">
-                <div style="font-size:13px;letter-spacing:0.16em;text-transform:uppercase;opacity:0.78;">Chez Field</div>
-                <div style="font-size:32px;line-height:1.08;font-weight:700;margin-top:10px;">${escapeHtml(args.heading)}</div>
-                <div style="font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:rgba(255,255,255,0.82);margin-top:12px;">${escapeHtml(args.preview)}</div>
+              <td style="padding:28px 32px;background:linear-gradient(160deg,#6938EF,#5025D1);color:#FFFFFF;">
+                <div style="font-size:13px;letter-spacing:0.16em;text-transform:uppercase;opacity:0.82;">Chez Field</div>
+                <div style="font-family:Georgia,'New York',serif;font-size:32px;line-height:1.08;font-weight:700;margin-top:10px;">${escapeHtml(args.heading)}</div>
+                <div style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:rgba(255,255,255,0.85);margin-top:12px;">${escapeHtml(args.preview)}</div>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px 32px 0 32px;font-size:18px;line-height:1.5;">${escapeHtml(args.greeting)}</td>
+              <td style="padding:28px 32px 0 32px;font-size:18px;line-height:1.5;color:#0A0A0A;">${escapeHtml(args.greeting)}</td>
             </tr>
             <tr>
-              <td style="padding:16px 32px 0 32px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#2a2252;">${escapeHtml(args.intro)}</td>
+              <td style="padding:16px 32px 0 32px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#0A0A0A;">${escapeHtml(args.intro)}</td>
             </tr>
             <tr>
               <td style="padding:24px 32px 0 32px;">${args.bodyHtml}</td>
             </tr>
             ${cta}
             <tr>
-              <td style="padding:28px 32px 32px 32px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:rgba(42,34,82,0.68);text-align:center;">${escapeHtml(args.footer || "Chez Field keeps the quote, client communication, and home context together so the next stop is easier than the last.")}</td>
+              <td style="padding:28px 32px 32px 32px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B6B7B;text-align:center;">${escapeHtml(args.footer || "Chez Field keeps the quote, client communication, and home context together so the next stop is easier than the last.")}</td>
             </tr>
           </table>
         </td>
@@ -423,9 +423,9 @@ function emailShell(args: { preview: string; heading: string; greeting: string; 
 
 function quoteLineItemsHtml(lineItems: Array<Record<string, unknown>>) {
   return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid rgba(42,34,82,0.09);border-radius:18px;overflow:hidden;background:#fff;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid rgba(10,10,10,0.09);border-radius:18px;overflow:hidden;background:#fff;">
       <tr>
-        <td colspan="3" style="padding:16px 18px;background:rgba(42,34,82,0.04);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(42,34,82,0.72);">Scope</td>
+        <td colspan="3" style="padding:16px 18px;background:rgba(10,10,10,0.04);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(10,10,10,0.72);">Scope</td>
       </tr>
       ${lineItems.map((item) => {
         const quantity = numberValue(item.quantity || 1);
@@ -433,12 +433,12 @@ function quoteLineItemsHtml(lineItems: Array<Record<string, unknown>>) {
         const lineTotal = quantity * unitPrice;
         return `
           <tr>
-            <td style="padding:16px 18px;border-top:1px solid rgba(42,34,82,0.08);vertical-align:top;">
-              <div style="font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#2a2252;">${escapeHtml(item.name)}</div>
-              ${compactString(item.description) ? `<div style="margin-top:6px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:rgba(42,34,82,0.74);">${escapeHtml(item.description)}</div>` : ""}
+            <td style="padding:16px 18px;border-top:1px solid rgba(10,10,10,0.08);vertical-align:top;">
+              <div style="font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#0A0A0A;">${escapeHtml(item.name)}</div>
+              ${compactString(item.description) ? `<div style="margin-top:6px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:rgba(10,10,10,0.74);">${escapeHtml(item.description)}</div>` : ""}
             </td>
-            <td style="padding:16px 18px;border-top:1px solid rgba(42,34,82,0.08);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;color:rgba(42,34,82,0.78);white-space:nowrap;vertical-align:top;">${escapeHtml(String(quantity))} ${escapeHtml(compactString(item.unit) || "ea")} × ${moneyLabel(unitPrice)}</td>
-            <td style="padding:16px 18px;border-top:1px solid rgba(42,34,82,0.08);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;color:#2a2252;white-space:nowrap;text-align:right;vertical-align:top;">${moneyLabel(lineTotal)}</td>
+            <td style="padding:16px 18px;border-top:1px solid rgba(10,10,10,0.08);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;color:rgba(10,10,10,0.78);white-space:nowrap;vertical-align:top;">${escapeHtml(String(quantity))} ${escapeHtml(compactString(item.unit) || "ea")} × ${moneyLabel(unitPrice)}</td>
+            <td style="padding:16px 18px;border-top:1px solid rgba(10,10,10,0.08);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;color:#0A0A0A;white-space:nowrap;text-align:right;vertical-align:top;">${moneyLabel(lineTotal)}</td>
           </tr>
         `;
       }).join("")}
@@ -1242,15 +1242,15 @@ async function sendQuoteEmail(
 
   const bodyHtml = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="display:grid;gap:16px;">
-      <tr><td style="padding:18px;border-radius:18px;background:#fff;border:1px solid rgba(42,34,82,0.09);">
-        <div style="font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(42,34,82,0.68);">Quote</div>
-        <div style="margin-top:10px;font-size:28px;font-weight:700;color:#2a2252;">${moneyLabel(params.total)}</div>
-        <div style="margin-top:8px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;color:rgba(42,34,82,0.74);">${escapeHtml(params.title)}${params.propertyName ? ` · ${escapeHtml(params.propertyName)}` : ""}</div>
-        ${params.propertyAddress ? `<div style="margin-top:6px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:rgba(42,34,82,0.62);">${escapeHtml(params.propertyAddress)}</div>` : ""}
+      <tr><td style="padding:18px;border-radius:18px;background:#fff;border:1px solid rgba(10,10,10,0.09);">
+        <div style="font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(10,10,10,0.68);">Quote</div>
+        <div style="margin-top:10px;font-size:28px;font-weight:700;color:#0A0A0A;">${moneyLabel(params.total)}</div>
+        <div style="margin-top:8px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;color:rgba(10,10,10,0.74);">${escapeHtml(params.title)}${params.propertyName ? ` · ${escapeHtml(params.propertyName)}` : ""}</div>
+        ${params.propertyAddress ? `<div style="margin-top:6px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:rgba(10,10,10,0.62);">${escapeHtml(params.propertyAddress)}</div>` : ""}
       </td></tr>
       <tr><td>${quoteLineItemsHtml(params.lineItems)}</td></tr>
-      ${note ? `<tr><td style="padding:18px;border-radius:18px;background:rgba(239,111,93,0.08);border:1px solid rgba(239,111,93,0.16);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#2a2252;"><strong style="display:block;margin-bottom:6px;">Note from ${escapeHtml(workspace.companyName)}</strong>${escapeHtml(note)}</td></tr>` : ""}
-      ${scopeNotes ? `<tr><td style="padding:18px;border-radius:18px;background:rgba(42,34,82,0.04);border:1px solid rgba(42,34,82,0.09);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#2a2252;"><strong style="display:block;margin-bottom:6px;">Scope notes</strong>${escapeHtml(scopeNotes)}</td></tr>` : ""}
+      ${note ? `<tr><td style="padding:18px;border-radius:18px;background:rgba(105,56,239,0.08);border:1px solid rgba(105,56,239,0.16);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#0A0A0A;"><strong style="display:block;margin-bottom:6px;">Note from ${escapeHtml(workspace.companyName)}</strong>${escapeHtml(note)}</td></tr>` : ""}
+      ${scopeNotes ? `<tr><td style="padding:18px;border-radius:18px;background:rgba(10,10,10,0.04);border:1px solid rgba(10,10,10,0.09);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;color:#0A0A0A;"><strong style="display:block;margin-bottom:6px;">Scope notes</strong>${escapeHtml(scopeNotes)}</td></tr>` : ""}
     </table>
   `;
   const text = [
@@ -1325,13 +1325,13 @@ async function sendRequestMessageEmail(
   const intro = `${workspace.companyName} sent an update${params.propertyName ? ` for ${params.propertyName}` : ""}.`;
   const bodyHtml = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="display:grid;gap:16px;">
-      <tr><td style="padding:18px;border-radius:18px;background:#fff;border:1px solid rgba(42,34,82,0.09);">
-        <div style="font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(42,34,82,0.68);">Home update</div>
-        <div style="margin-top:10px;font-size:24px;font-weight:700;color:#2a2252;">${escapeHtml(params.requestTitle)}</div>
-        <div style="margin-top:8px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;color:rgba(42,34,82,0.74);">${escapeHtml(params.requestStatusLabel)}${params.propertyName ? ` · ${escapeHtml(params.propertyName)}` : ""}</div>
-        ${params.propertyAddress ? `<div style="margin-top:6px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:rgba(42,34,82,0.62);">${escapeHtml(params.propertyAddress)}</div>` : ""}
+      <tr><td style="padding:18px;border-radius:18px;background:#fff;border:1px solid rgba(10,10,10,0.09);">
+        <div style="font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(10,10,10,0.68);">Home update</div>
+        <div style="margin-top:10px;font-size:24px;font-weight:700;color:#0A0A0A;">${escapeHtml(params.requestTitle)}</div>
+        <div style="margin-top:8px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:14px;color:rgba(10,10,10,0.74);">${escapeHtml(params.requestStatusLabel)}${params.propertyName ? ` · ${escapeHtml(params.propertyName)}` : ""}</div>
+        ${params.propertyAddress ? `<div style="margin-top:6px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:rgba(10,10,10,0.62);">${escapeHtml(params.propertyAddress)}</div>` : ""}
       </td></tr>
-      <tr><td style="padding:18px;border-radius:18px;background:rgba(42,34,82,0.04);border:1px solid rgba(42,34,82,0.09);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#2a2252;">${escapeHtml(params.messageBody)}</td></tr>
+      <tr><td style="padding:18px;border-radius:18px;background:rgba(10,10,10,0.04);border:1px solid rgba(10,10,10,0.09);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#0A0A0A;">${escapeHtml(params.messageBody)}</td></tr>
     </table>
   `;
   const text = [
@@ -1392,7 +1392,7 @@ async function sendProviderQuoteResponseEmail(
     heading: "Quote response received",
     greeting: `Hi ${firstName(workspace.companyName) || "team"},`,
     intro,
-    bodyHtml: `<div style="padding:18px;border-radius:18px;background:#fff;border:1px solid rgba(42,34,82,0.09);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#2a2252;"><strong style="display:block;margin-bottom:8px;">${escapeHtml(capitalize(params.quoteStatus) || "Response")}</strong>${escapeHtml(params.body)}</div>`,
+    bodyHtml: `<div style="padding:18px;border-radius:18px;background:#fff;border:1px solid rgba(10,10,10,0.09);font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:#0A0A0A;"><strong style="display:block;margin-bottom:8px;">${escapeHtml(capitalize(params.quoteStatus) || "Response")}</strong>${escapeHtml(params.body)}</div>`,
     ctaLabel: "Open quote",
     ctaUrl: shareUrl,
   });

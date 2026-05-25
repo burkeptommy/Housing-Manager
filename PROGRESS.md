@@ -8,6 +8,109 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 70.A1 — Tasks v2 unified view (the visibility fix) (2026-05-24)
+
+The follow-on session to Phase 70 Section B+C. Built the UI rewrite that solves the "30 tasks but I only see 5 rows" complaint. Five commits on `claude/tasks-v2` after the Section B+C work:
+
+- `d38c6996` — Foundation: `bundleChildren` helper + `SeasonFeed` types + view-model refactor
+- `c3f83689` — Bundle cornerstone: `BundleParentCard` + `BundleChildList` + `ChezOwnedPill`
+- `7becad2a` — Primitives: `SeasonScopeBanner` + `MonthSubheader` + `QuickSchedulingSheet`
+- `32e02ed8` — Integration: unified view body + deep-link contract + tap-to-filter ribbon
+- (this entry's commit) — CLAUDE.md / PROGRESS.md updates + final polish
+
+**Visibility fix architecture:** Single source of truth via `MaintenanceTabViewModel.seasonFeed(_:propertyId:)`. Every consumer — YearRibbon counts, MiniHero stats, Needs Your Attention section, This Season's Tasks feed, Active Programs — reads from one `SeasonFeed` instance. Ribbon count == row count by construction.
+
+**Bundle children visible inline.** `BundleParentCard` renders one bundle = one homeowner visit with `BundleChildList` showing "Includes 5 things" inline. Children resolve via `MaintenanceTemplates.bundleChildren(...)` at render time — Section C's expanded children surface on existing installs without migration. Vendor brand-color 3pt left edge (Apple Wallet pattern).
+
+**Deep-link contract — every task/routine notification deep-links to its row.** `Notification.Name.openMaintenanceTask` carries `task_id` / `routine_id` / `occurrence_date` / `property_id` / `season`. `MaintenanceTabView.handleDeepLink` applies scope + sets `highlightedTaskId` for a 1.5s salmon ring pulse. Push handlers (`task_assignment`, `chez_routine_visit_scheduled`) updated to post the new notification with their userInfo as payload.
+
+**Premier polish baked in:** vendor brand-color edge accents, concrete dates ("Tue, Sep 20" not "in 3 days"), homeowner-voice microcopy ("Book Tyler Heating · Fall Chimney Service" not "Schedule HVAC tune-up"), `QuickSchedulingSheet` for 1-tap booking (This week / Next week / Pick a date), animated season transitions, selection haptics throughout.
+
+**Chez merged inline.** Pre-Phase-70 the view had separate `programsSection` + `chezHandlingSection` — same routines surfaced twice. Phase 70 merges them via `ChezOwnedPill` rendered inline on routine cards. One row per routine, salmon pill says who owns it.
+
+**8 new components, ~1,500 lines of new code, ~12-16h of work over two sessions.** Build-verified clean via `xcodebuild Chez` after every meaningful change.
+
+**Backwards/forwards compat preserved:**
+- Pre-Phase-70 section helpers (`decisionsSection`, `programsSection`, `chezHandlingSection`) remain in the file unused. Easy rollback if a regression surfaces.
+- `SeasonFeed` and new methods purely additive; existing view-model methods preserved.
+- All sheets, navigation destinations, notifications preserved.
+- Bundle children read from current template library (forward compat — Section C additions show up immediately).
+- Resilient decoders on all new model types.
+
+**Deferred to follow-up phases:**
+- Full UnifiedTaskCard variant polish pass (70.A2) — current standalone rows are functional but minimal
+- Swipe actions on rows (70.A2) — pull-to-refresh preserved from existing view
+- Skeleton loaders + inline error states (70.A2)
+- "Show full year" mode beyond season-cycle placeholder (70.A2)
+- Up Next 14-day horizontal strip (70.A2)
+- Search overlay (70.A3)
+- Insurance/tax renewal templates (70.D-HNW)
+- Build-year-aware templates (70.D-HNW)
+- DashboardView `"maintenance_calendar"` route repoint to `"maintenance"`
+
+**What needs simulator-verification on real device (Tom):**
+- Open Tasks tab on a real household. Tap each season tile. Verify count == visible row count.
+- Find a bundle parent (Fall Chimney Service, Spring HVAC, etc.). Verify children render inline ("Includes 5 things") with `+ N more` chevron.
+- Tap a routine card. Verify it pushes to RoutineDetailView via the existing destination.
+- Tap "Book it" on a bundle parent. Verify QuickSchedulingSheet presents at half-detent.
+- Send yourself a task_assignment push. Verify it routes to Tasks tab + highlights the task row.
+
+---
+
+## Phase 70 (Tasks v2) — Section B + early Section C: seasonal timing + library expansion (2026-05-24)
+
+Tom flagged three structural problems on the Tasks tab: (1) Spring tile count says "30+" but only ~5 rows render, (2) Spring landscaping and Fall landscaping anchor to the same date so semi-annual work fires only once, (3) common Northeast HNW services (chimney sweeping, plumbing inspection) had thin or zero library coverage. Hint (Martha Stewart's home app, summer 2026) is also a direct competitive threat — proactive AI + "give us your address that's it" onboarding.
+
+This session shipped the data-layer fixes (Section B + early Section C of the Tasks v2 plan). The UI rewrite (Section A from the plan — unified Tasks view, bundle children rendered inline, "Up Next" strip, Active Programs collapsed below) lands in a follow-up session.
+
+Worked on a fresh `claude/tasks-v2` branch off the pre-WIP commit (6d6d30f8). Tom's in-flight vendor multi-category + VendorRoutineLinkSheet work was preserved as commit `c5d52559` on the original `claude/setup-monorepo-structure-...` branch.
+
+### Section B — seasonal timing fixes (commit `1655ed8a`)
+
+- **B.1.** Tagged 4 semi-annual templates as `"Spring/Fall"` (gutter cleaning, power wash siding, prune shrubs, power rake turf). Signals intent; bundle-side fix below makes it actually fire.
+- **B.2.** Refactored `MaintenanceTaskReconciler.initialDueDate` into a thin wrapper around new `plannedDueDates(for:today:seasonalTimingOverride:) -> [Date]`. Returns all planned surface dates per template (one per anchor for "Spring/Fall"). Existing callers preserved via `.first`.
+- **B.3.** Paired Fall bundles — the real user-facing fix:
+  - `Roofing:fall` — Clean gutters (fall) + Walk roofline for ice dam risk. Bundle title "Fall Roof and Gutter Service".
+  - `Siding/Exterior:fall` — Power wash siding (fall). Bundle title "Fall Exterior Wash".
+  - `Landscaping:synthetic_turf_fall` — Power rake and groom turf (fall). Bundle title "Synthetic Turf Fall Service".
+  - `Landscaping:fall` (existing) gained a Prune shrubs (fall) sibling.
+  - Fall siblings use a distinct `stableId` (e.g. `"Roofing:Clean gutters and downspouts (fall)"`) to keep templateKey lookup unambiguous while sharing the user-facing title.
+- **B.4.** Dethatch lawn moved Fall → Spring. Phase 97 had retagged it to Fall to match bundle membership, but the botany was wrong. Cool-season Northeast grasses recover better from early-spring dethatching.
+- **B.5.** Lead-time recalibration deferred. Existing `effectiveLeadTimeDays` defaults (42–56 days per category) already produce reasonable surfacing windows; the plan's 90-day targets were too aggressive (would surface tasks in May/July when homeowners aren't thinking about them).
+- **B.6.** New `MaintenanceTaskReconciler.reseedSeasonalTasksPhase70OnceIfNeeded` migration. Walks every active template-based task, re-dates any whose template moved between seasons (catches Dethatch's Fall → Spring move + any future template-level season changes). Skips user-touched rows. Gated on UserDefaults `hasReseededSeasonalTasksPhase70_v1`. Wired into `AppState.initialize` after the May 2026 dismissal-snooze backfill.
+
+### Section C — library expansion (commit `00a3f9fb`)
+
+- **C.1 — Chimney expansion.**
+  - `Chimney:fall` bundle expanded with explicit Check creosote level (wood) + Test damper operation child line items.
+  - NEW `Chimney:spring` bundle — Spring wood chimney inspection (post-burn-season creosote/animal/masonry check). Gas chimneys skip this — different winter wear pattern.
+  - Standalone `Chimney:Flue liner video scope` (every 3 years, opt-in, specialty camera tech).
+  - Standalone `Chimney:Re-mortar crown` (every 10 years, opt-in, masonry).
+- **C.2 — Plumbing + Water Heater.**
+  - NEW `Plumbing:annual` bundle. Children: Annual plumbing inspection · Water pressure regulator check · Main shutoff exercise · Fixture leak walkthrough. Pro-only items distinct from Handyman:spring DIY items. Restores the bundle Phase 58 dissolved.
+  - Existing `Water Heater:annual` bundle expanded with Inspect anode rod (tank subtype) + Verify temperature setting child line items.
+- **C.3 — Appliance bundle deferred.** Architecture mismatch — DIY appliance items route to `handyman_punch_items` via Phase 67E/F single-rail, not to bundle parents. The existing Appliance category already covers the most-asked items (dryer vent vendor, fridge filter DIY, built-in grill vendor). Skipped in favor of higher-impact work.
+
+### Bundle-architecture rules to remember
+
+- **Bundle children with `routingOverride: .diyDefault` route to `handyman_punch_items`, not into bundles.** Don't add DIY-default templates to vendor bundles — Phase 67E/F intercepts before bundle assembly.
+- **Fall siblings need a distinct `stableId`** to keep `templateKey` lookup unambiguous (`stableId ?? "category:title"`). Pattern: `"<Category>:<Title> (fall)"`. User-facing title can match the Spring sibling — bundle context disambiguates.
+- **Bundle member's `seasonalTiming` is informational only.** Bundles anchor to `seasonFromBundleId(bundleId)`, NOT child's `seasonalTiming`. To get a semi-annual visit firing twice, add a paired Fall bundle — don't try to make a single bundle dual-anchor.
+- **Bundle parent inherits `firstTemplate.frequency`.** When adding new bundles, order children so the most-representative cadence is first.
+
+### What's next
+
+Section A (UI rewrite) is the centerpiece — unified Tasks view replacing the calendar/list split, "Up Next" strip, bundle children rendered inline, Active Programs collapsed below with inline Chez pill. Plus Section D (snooze on every row, service history footer, search, HNW insurance/tax renewals, build-year-aware templates, empty-state voice, cost transparency, vendor-visit consolidation, multi-property handling). All design decisions locked in the plan file at `/Users/tomburke/.claude/plans/looking-at-our-tasks-vectorized-swan.md`.
+
+### Files touched
+
+- [Haven/Features/Property/Services/MaintenanceTemplates.swift](Haven/Features/Property/Services/MaintenanceTemplates.swift) — 4 seasonalTiming tag changes + 4 new bundles + 11 new templates (3 Roofing:fall, 1 Siding/Exterior:fall, 1 Landscaping:fall, 1 Landscaping:synthetic_turf_fall, 4 Plumbing:annual, 2 Water Heater:annual children, 2 Chimney:fall children, 1 Chimney:spring, 2 standalone Chimney) + Dethatch move.
+- [Haven/Features/Property/Services/MaintenanceTaskReconciler.swift](Haven/Features/Property/Services/MaintenanceTaskReconciler.swift) — `plannedDueDates` function + `reseedSeasonalTasksPhase70OnceIfNeeded` migration.
+- [Haven/App/AppState.swift](Haven/App/AppState.swift) — Phase 70 migration call site.
+- [CLAUDE.md](CLAUDE.md) — new "Tasks v2 — seasonal timing + library expansion (Phase 70)" top-level section.
+
+---
+
 ## Friend Feedback Rounds 1 + 2: 13 fixes from TestFlight walkthrough (2026-05-17)
 
 Tom's friend walked through the latest TestFlight build and sent two rounds of feedback (5 + 9 items). Items 1 + 2 from Round 1 were already shipped — the rest landed in this session.

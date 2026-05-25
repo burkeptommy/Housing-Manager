@@ -823,6 +823,80 @@ Match → insert into `handyman_punch_items` with `source = "auto_seed_handyman_
 - Do not re-introduce the Day1TaskCurator handyman branch — duplicate routing breaks the single-rail invariant.
 - Do not add a third visit parent template (e.g. "Summer handyman check") without a matching deletion path — the seasonal reminder card is the canonical coordination surface.
 
+## Tasks v2 — seasonal timing + library expansion (Phase 70)
+
+User feedback flagged three structural problems on the Tasks tab: (1) the YearRibbon Spring tile shows "30+ tasks" but only ~5 rows render, (2) semi-annual tasks fired only once per year (e.g. gutter cleaning showed in April but never October), and (3) common Northeast HNW services (chimney sweeping, plumbing inspection) had thin or no library coverage. Phase 70 addresses bullets 2 and 3 at the data layer; the UI rewrite (Section A from the plan) lands in a follow-up phase.
+
+**Spring/Fall dual-anchor model.** `MaintenanceTaskReconciler.plannedDueDates(for:today:seasonalTimingOverride:) -> [Date]` returns ALL planned surface dates for a template — one date per recognized seasonal anchor. "Spring/Fall"-tagged templates return two dates (April + October anchors); single-anchor templates return one. `initialDueDate(...)` is now a thin wrapper that returns `.first` to preserve the prior single-date signature for the bundle / opt-in / migration callsites. Standalone-template callers can iterate the array to create one task row per anchor.
+
+**Paired Fall bundles are how semi-annual work actually fires twice.** Bundle members anchor to the bundle id's parsed season (`seasonFromBundleId`), not the child template's `seasonalTiming`. So a child tagged "Spring/Fall" inside a `Roofing:spring` bundle still only fires in April. The fix is to ADD paired Fall bundles with sibling Fall templates, not to make a single bundle dual-anchor. Phase 70 ships these paired bundles:
+- `Roofing:fall` — Clean gutters (fall) + Walk roofline for ice dam risk. Bundle title: "Fall Roof and Gutter Service".
+- `Siding/Exterior:fall` — Power wash siding (fall). Bundle title: "Fall Exterior Wash".
+- `Landscaping:synthetic_turf_fall` — Power rake and groom turf (fall). Bundle title: "Synthetic Turf Fall Service".
+- `Chimney:spring` — Spring wood chimney inspection (wood subtype only). Bundle title: "Spring Chimney Inspection".
+- `Landscaping:fall` gained a Prune shrubs (fall) sibling (existing bundle).
+
+Fall siblings share user-facing titles with their Spring counterparts but carry a distinct `stableId` (e.g. `"Roofing:Clean gutters and downspouts (fall)"`) so the `templateKey` lookup (`stableId ?? "category:title"`) stays unambiguous. The bundle context tells the homeowner when.
+
+**Bundle expansions (visible scope, no new task rows).** Bundle children render as line items in the parent's "What's included" notes; they don't create their own task rows. So adding child template entries with an existing `bundleId` is purely additive — the bundle's user-facing task count doesn't change, but the visible scope grows.
+- `Chimney:fall` gained Check creosote level (wood) + Test damper operation as explicit line items.
+- `Water Heater:annual` gained Inspect anode rod (tank) + Verify temperature setting as explicit line items.
+
+**New Plumbing:annual bundle.** Phase 58 dissolved the prior Plumbing bundle, folding washing-machine-hose check + sump pump test + pressure check into Handyman:spring. Phase 70 restores a Plumbing bundle with PRO-only children (Annual plumbing inspection · Water pressure regulator check · Main shutoff exercise · Fixture leak walkthrough) that don't overlap with the Handyman:spring DIY items. The homeowner now finds plumbing under the Plumbing category instead of having every plumbing concern buried inside the handyman bundle.
+
+**Standalone specialty templates** for separate visits that need their own specialist:
+- `Chimney:Flue liner video scope` — every 3 years, opt-in, distinct camera-tech specialist.
+- `Chimney:Re-mortar crown` — every 10 years, opt-in, masonry visit.
+
+**Dethatch lawn moved Fall → Spring.** Phase 97 had retagged dethatch to Fall to match bundle membership, but the botany was wrong. Cool-season Northeast grasses recover better from early-spring dethatching; fall dethatching weakens the lawn going into dormancy. Template moved to `Landscaping:spring` with notes explaining the timing.
+
+**One-time migration: `MaintenanceTaskReconciler.reseedSeasonalTasksPhase70OnceIfNeeded`** runs once per install (gated on UserDefaults `hasReseededSeasonalTasksPhase70_v1`). Walks every active template-based task, re-dates any whose template moved between seasons (catches Dethatch's Fall → Spring move and any future season changes). Skips user-touched rows (completed once OR explicitly scheduled). Wired into `AppState.initialize()` after the May 2026 dismissal-snooze backfill. Pattern mirrors Phase 54A's `reseedSeasonalTasksOnceIfNeeded`.
+
+**Hard rules for new template work:**
+- **Bundle children with `routingOverride: .diyDefault` route to handyman_punch_items** (Phase 67E/F invariant), not into bundles. Don't add DIY-default templates to vendor bundles — they'll bypass the bundle entirely.
+- **Fall siblings of Spring bundle members need a distinct `stableId`** to keep templateKey lookup unambiguous. Pattern: `"<Category>:<Title> (fall)"`. The user-facing title can match the Spring sibling — the bundle context disambiguates.
+- **Standalone Spring/Fall templates** (no `bundleId`) consumers should iterate `plannedDueDates(...)` to create one task row per anchor. Bundle members are scheduled by the bundle's id-encoded season; tagging a bundle member "Spring/Fall" is informational only — to actually fire twice, add a paired Fall bundle.
+- **The bundle parent's frequency comes from `firstTemplate.frequency`** — when adding new bundles, order the children so the most-representative cadence (typically Annual or Semi-annual) is first.
+
+**Files touched:** [Haven/Features/Property/Services/MaintenanceTemplates.swift](Haven/Features/Property/Services/MaintenanceTemplates.swift) (template additions + seasonal tag changes), [Haven/Features/Property/Services/MaintenanceTaskReconciler.swift](Haven/Features/Property/Services/MaintenanceTaskReconciler.swift) (`plannedDueDates`, reseed migration), [Haven/App/AppState.swift](Haven/App/AppState.swift) (migration call site).
+
+### Phase 70.A1 — Unified Tasks view (the visibility fix)
+
+The Tasks tab's Maintenance mode is rebuilt around a single source of truth — `MaintenanceTabViewModel.seasonFeed(_:propertyId:)`. Pre-Phase-70 the YearRibbon claimed "30 items in Spring" but the screen rendered ~5 rows because the count math diverged from the rendered-section filters. Phase 70.A1 makes count == row count by construction.
+
+**New view layout** (replaces the prior `decisionsSection` / `programsSection` / `chezHandlingSection` trio in `MaintenanceTabView`):
+- `SeasonScopeBanner` — 44pt pill below MiniHero with the active scope summary, search affordance, and Show full year toggle.
+- `needsAttentionSection` — combines pending-vendor routines with standalone tasks needing a vendor pick. The standalone half was completely invisible pre-Phase-70.
+- `thisSeasonTasksSection` — primary feed, grouped by `MonthSubheader`. Three row types coexist visually distinct: `BundleParentCard` (tall, vendor logo, "Includes N things" inline children), `StandaloneTaskRow` (medium, no children), `TasksV2RoutineOccurrenceRow` (medium with ONGOING pill).
+- `combinedProgramsSection` — REPLACES the prior `programsSection` + `chezHandlingSection`. Chez-owned routines render inline with a salmon `ChezOwnedPill` instead of duplicating into a second section.
+
+**Bundle parent rendering** is the cornerstone. `BundleParentCard` renders one bundle = one homeowner visit, with `BundleChildList` showing what's covered ("Includes 5 things") inline. Children resolved via `MaintenanceTemplates.bundleChildren(forTemplateId:activeSubtypes:regionalPack:)` — reads from the current template library at render time, NOT from the frozen task notes, so Section C additions surface on existing installs without migration. Vendor brand-color 3pt left edge stripe (Apple Wallet pattern) when a contractor is linked.
+
+**YearRibbon tap = filter**, not push. Tapping a season tile applies the filter via `activeSeason` binding; `seasonFeed(_:)` re-computes and the feed swaps with `HavenTheme.animationStandard`. Pre-Phase-70 the tap pushed to `MaintenanceScheduleView` (Calendar layout); that destination still exists for `PropertyDetailView`'s property-scoped push but is no longer reachable from the Tasks tab.
+
+**Inline 1-tap scheduling** via `QuickSchedulingSheet`. Tapping "Book it" on a `BundleParentCard` presents a half-detent sheet with "This week" / "Next week" / "Pick a date" — replaces always-opening the full `MaintenanceTaskDetailSheet` for the common case. Writes `scheduled_date` via `commitQuickSchedule` and posts `.maintenanceTaskChanged`.
+
+**Deep-link contract — every task-related notification deep-links to the row.** `Notification.Name.openMaintenanceTask` carries `task_id` / `routine_id` / `occurrence_date` / `property_id` / `season` in userInfo. `MaintenanceTabView.handleDeepLink(_:)` applies the property scope, applies the season override, and sets `highlightedTaskId` for a ~1.5s salmon ring pulse on the matched row. `BundleParentCard` + `StandaloneTaskRow` accept `isHighlighted: Bool` and render the overlay. Push handlers (`HavenApp.userNotificationCenter`) updated for both `task_assignment` and `chez_routine_visit_scheduled` to post the new notification with the original push userInfo as the deep-link payload. Outbound Edge Functions sending task-related pushes only need to include `task_id` in userInfo — the iOS plumbing reads it.
+
+**Per-property scoping (state model lands now, switcher UI lands in D-HNW).** `MaintenanceTabViewModel.activePropertyId` (`@Published`) scopes `seasonFeed(_:)` to one property. Default nil = all properties in the household (single-property fallback). The multi-property switcher UI ships in 70.D-HNW; the state lands now so no migration when the switcher arrives.
+
+**Phase 70 telemetry** for post-ship verification: `tasksV2SeasonTapped`, `tasksV2BundleExpanded`, `tasksV2ShowFullYearTapped`, `tasksV2ProgramExpanded`, `tasksV2SearchTapped`, `tasksV2QuickScheduled`, `tasksV2DeepLinkOpened`, `tasksV2VisibilityRatio`. The last one is the post-launch metric — ribbon count vs visible row count, should converge to 1.0 with this phase.
+
+**Backwards compat:**
+- The pre-Phase-70 section helpers (`decisionsSection`, `programsSection`, `chezHandlingSection`) remain in the view file but are no longer called from the body. Easy rollback.
+- `SeasonFeed` types and methods are purely additive — `pendingDecisions(scopedTo:)`, `activePrograms(scopedTo:)`, `chezHandlingPrograms(scopedTo:)` still work and are composed by `seasonFeed(_:)`.
+- `seasonSummaries(activeSeason:)` was refactored to derive from `seasonFeed`; its signature is unchanged so external callers continue to compile.
+- All sheets, navigation destinations, and existing notifications preserved.
+- Bundle child resolution reads from the current template library at render time — old tasks with stale notes still render correctly because the UI doesn't read notes for the child list.
+
+**Hard rules for new Tasks tab code:**
+- **Don't recompute task / routine counts independently.** Every count + render derives from `seasonFeed(_:)`. Adding a section that ships its own filter logic re-introduces the "30 vs 5" bug class.
+- **Bundle parents render via `BundleParentCard`; standalone tasks via `StandaloneTaskRow`; routine occurrences via `TasksV2RoutineOccurrenceRow`.** Don't render bundle parents with `UnifiedTaskCard` — they need the inline children list and the visual distinction from regular tasks.
+- **Task-related push payloads MUST include `task_id` in userInfo.** The deep-link handler reads it; without it, the user lands on the Tasks tab but doesn't see which task the push was about.
+- **Bundle child `templateKey` collisions need a distinct `stableId`.** Fall siblings of Spring bundle members share their user-facing title; the distinct `stableId` keeps the lookup unambiguous.
+
+**Files touched:** [Haven/Features/Tasks/Views/MaintenanceTabView.swift](Haven/Features/Tasks/Views/MaintenanceTabView.swift) (large additive rewrite — new section helpers, deep-link handler, quick-schedule committer); [Haven/Features/Property/Services/MaintenanceTemplates.swift](Haven/Features/Property/Services/MaintenanceTemplates.swift) (`bundleChildren(...)` + `isBundleId(_:)` helpers); [Haven/App/MainTabView.swift](Haven/App/MainTabView.swift) (`.openMaintenanceTask` notification name); [Haven/App/HavenApp.swift](Haven/App/HavenApp.swift) (push handler integration); [Haven/Core/Services/AnalyticsService.swift](Haven/Core/Services/AnalyticsService.swift) (Phase 70 events). New components in [Haven/Features/Tasks/Views/Components/](Haven/Features/Tasks/Views/Components/): `BundleParentCard`, `BundleChildList`, `ChezOwnedPill`, `SeasonScopeBanner`, `MonthSubheader`, `QuickSchedulingSheet`, `StandaloneTaskRow`, `TasksV2RoutineOccurrenceRow`.
+
 ## Chez Handyman Operations Desk (Web — Phase 67)
 
 Eight-screen authenticated React + Vite SPA at `website/operations/`. Replaces the 9 embedded workspace tabs that `handyman.html` was inflating after auth. Lives at `/operations/*` routes; `handyman.html` keeps the auth pitch + sign-in/sign-up form and redirects to `/operations/` after a successful session, preserving `?next=` deep links from the SPA.

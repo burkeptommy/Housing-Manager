@@ -487,13 +487,129 @@ final class MaintenanceViewModel: ObservableObject {
         return contractors.first(where: { $0.id == prefId })?.companyName
     }
 
+    /// Phase 70.A1 follow-on I3 — reverse a just-archived swipe-left.
+    /// Clears `is_archived` / `archived_at` / `archived_reason` via the
+    /// existing `unarchiveMaintenanceTask` helper and re-fetches the
+    /// row into the in-memory `tasks` array so the season feed renders
+    /// it immediately. Used by the Tasks-tab undo toast.
+    func undoArchive(taskId: UUID) async {
+        do {
+            try await db.unarchiveMaintenanceTask(id: taskId)
+            if let restored = try? await db.fetchMaintenanceTaskById(id: taskId) {
+                if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                    tasks[idx] = restored
+                } else {
+                    tasks.append(restored)
+                }
+            }
+            Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        } catch {
+            print("[MaintenanceViewModel] undoArchive failed: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Phase 70.A1 follow-on I3 — reverse a just-completed swipe-right.
+    /// Single DB write clears the archive trio + `last_completed_date`
+    /// so the row reads as not-yet-completed when restored. The auto-
+    /// created next-instance row from G1 stays put — restoring leaves
+    /// a brief duplicate the user can manually clean up. Cheapest path
+    /// until we add a `replacement_of_task_id` cross-reference.
+    func undoCompletion(taskId: UUID) async {
+        do {
+            if let restored = try await db.restoreCompletedMaintenanceTask(id: taskId) {
+                if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                    tasks[idx] = restored
+                } else {
+                    tasks.append(restored)
+                }
+            }
+            Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        } catch {
+            print("[MaintenanceViewModel] undoCompletion failed: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Phase 70.A1 follow-on F5 — archive a task from a swipe-left
+    /// gesture (Apple-notification pattern). Soft-delete via
+    /// `is_archived = true / archived_at = NOW() / archived_reason`
+    /// per the Phase 17b schema. Reason stamped so future activity-log
+    /// surfaces can filter on origin.
+    func archiveTask(_ task: MaintenanceTaskDBRow) async {
+        Haptics.success()
+        do {
+            try await db.archiveMaintenanceTask(
+                id: task.id,
+                reason: "swiped_archive_from_tasks_tab"
+            )
+            // Drop the row locally so the user sees an immediate
+            // disappearance even before `.maintenanceTaskChanged`
+            // listeners refresh their lists.
+            tasks.removeAll { $0.id == task.id }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        } catch {
+            print("[MaintenanceViewModel] archiveTask failed: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Phase F2 — quick snooze. Bumps `nextDueDate` forward by `days`
+    /// from today (typical use: 7 from a leading-swipe gesture).
+    /// Phase 70.A1 follow-on F5: the leading-swipe entry point moved to
+    /// Archive; Snooze still reachable from MaintenanceTaskDetailSheet's
+    /// actions menu (where users who want "come back later" instead of
+    /// "out of view" can opt in).
+    /// Optimistic local update; no toast (the row simply slides into
+    /// the future). Vendor-managed and routine-parented tasks are
+    /// snoozable too — the date semantics are identical.
+    func snoozeTask(_ task: MaintenanceTaskDBRow, days: Int) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let newDate = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
+        Haptics.success()
+        do {
+            let updated = try await db.updateMaintenanceTask(
+                id: task.id,
+                MaintenanceTaskUpdate(nextDueDate: formatter.string(from: newDate))
+            )
+            if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[idx] = updated
+            }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        } catch {
+            print("[MaintenanceViewModel] snoozeTask failed: \(error)")
+            Haptics.error()
+        }
+    }
+
     func completeTask(_ task: MaintenanceTaskDBRow) async {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        let todayString = formatter.string(from: Date())
         let nextDate = calculateNextDueDate(frequency: task.frequency, from: .now)
+        let nextDateString = formatter.string(from: nextDate)
 
-        // Optimistic: hide task and show toast immediately
-        recentlyCompletedIds.insert(task.id)
+        // Phase 70.A1 follow-on G1 — "once" tasks never get a next
+        // instance; recurring tasks fan out into a new row so the
+        // completed instance becomes a permanent historical record
+        // accessible from the Completed view (G3).
+        let frequencyLower = task.frequency.lowercased().trimmingCharacters(in: .whitespaces)
+        let isRecurring = !frequencyLower.isEmpty &&
+            frequencyLower != "once" &&
+            frequencyLower != "one time" &&
+            frequencyLower != "one-time"
+
+        // Optimistic: drop the row from the visible list immediately.
+        // Archive is the permanent hide; if the write fails we re-insert
+        // on the error path.
+        let originalIndex = tasks.firstIndex(where: { $0.id == task.id })
+        if let idx = originalIndex {
+            tasks.remove(at: idx)
+        }
+
         let displayFormatter = DateFormatter()
         displayFormatter.dateStyle = .medium
         completionToast = CompletionToast(
@@ -503,15 +619,56 @@ final class MaintenanceViewModel: ObservableObject {
         Haptics.success()
 
         do {
-            let updated = try await db.updateMaintenanceTask(
-                id: task.id,
-                MaintenanceTaskUpdate(
-                    lastCompletedDate: formatter.string(from: .now),
-                    nextDueDate: formatter.string(from: nextDate)
+            // 1. Archive the completed instance. Single update writes
+            //    is_archived + archived_at + archived_reason + the final
+            //    last_completed_date so the row is a self-contained
+            //    historical record the Completed view can read.
+            var archiveUpdate = MaintenanceTaskUpdate()
+            archiveUpdate.isArchived = true
+            archiveUpdate.archivedAt = Date()
+            archiveUpdate.archivedReason = "completed"
+            archiveUpdate.lastCompletedDate = todayString
+            _ = try await db.updateMaintenanceTask(id: task.id, archiveUpdate)
+
+            // 2. For recurring tasks, create a new row for the next
+            //    instance carrying over everything that defines this
+            //    task's identity (template, system, assignee, vendor,
+            //    routing, bundle linkage). The new row starts fresh —
+            //    no lastCompletedDate, no archive state, no scheduled
+            //    date (the user hasn't booked it yet).
+            if isRecurring {
+                var insert = MaintenanceTaskInsert(
+                    householdId: task.householdId,
+                    title: task.title,
+                    frequency: task.frequency,
+                    nextDueDate: nextDateString
                 )
-            )
-            if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
-                tasks[idx] = updated
+                insert.propertyId = task.propertyId
+                insert.vehicleId = task.vehicleId
+                insert.systemId = task.systemId
+                insert.description = task.description
+                insert.estimatedCost = task.estimatedCost
+                insert.priority = task.priority
+                insert.assignedContractorId = task.assignedContractorId
+                insert.assignedToUserId = task.assignedToUserId
+                insert.notes = task.notes
+                insert.isTemplateBased = task.isTemplateBased
+                insert.templateId = task.templateId
+                insert.seasonalTiming = task.seasonalTiming
+                insert.isDiy = task.isDiy
+                insert.professionalRequired = task.professionalRequired
+                insert.costRange = task.costRange
+                insert.recurrenceRule = task.recurrenceRule
+                insert.assignmentType = task.assignmentType
+                insert.needsVendor = task.needsVendor
+                insert.standingAppointmentId = task.standingAppointmentId
+                insert.assignedRoute = task.assignedRoute
+                insert.parentRoutineId = task.parentRoutineId
+                insert.bundleParentTaskId = task.bundleParentTaskId
+                insert.serviceKey = task.serviceKey
+                if let created = try? await db.createMaintenanceTask(insert) {
+                    tasks.append(created)
+                }
             }
 
             // Update system's last_service_date and next_service_due
@@ -601,8 +758,15 @@ final class MaintenanceViewModel: ObservableObject {
                 )
             }
         } catch {
-            // Rollback: show the task again
-            recentlyCompletedIds.remove(task.id)
+            // Phase 70.A1 follow-on G1 — rollback the optimistic remove
+            // by re-inserting the task at its prior position. Failure
+            // is rare (network blip) but the row reappearing is the
+            // correct UX when the archive write didn't land.
+            if let idx = originalIndex {
+                tasks.insert(task, at: min(idx, tasks.count))
+            } else {
+                tasks.append(task)
+            }
             completionToast = nil
             self.error = error.localizedDescription
             Haptics.error()

@@ -8,6 +8,41 @@ extension Notification.Name {
 
     // Cross-tab data sync notifications
     static let maintenanceTaskChanged = Notification.Name("maintenanceTaskChanged")
+    /// Phase 70 (Tasks v2): Deep-link contract. Posted to navigate to a
+    /// specific task / routine / routine occurrence + briefly highlight
+    /// its row in the unified MaintenanceTabView feed.
+    ///
+    /// Caller responsibility: post `.switchToTab` (tab 2) first to make
+    /// sure the Tasks tab is foreground, then post this notification.
+    ///
+    /// `userInfo` schema (all keys optional but at least one must be set):
+    ///   - "task_id": String UUID of a `maintenance_tasks` row (bundle
+    ///     parent OR standalone task). When matched, scrolls the season
+    ///     feed to the row and renders the highlight overlay for ~1.5s.
+    ///   - "routine_id": String UUID of a `routines` row. Routes to the
+    ///     "Your active programs" section; expands the routine card.
+    ///   - "occurrence_date": ISO yyyy-MM-dd. Combined with routine_id,
+    ///     picks the specific routine occurrence in the season feed.
+    ///   - "property_id": String UUID. Sets `activePropertyId` so
+    ///     multi-property households jump to the right property.
+    ///   - "season": "Spring" | "Summer" | "Fall" | "Winter". Override
+    ///     the auto-detected season filter so the feed scrolls to where
+    ///     the linked item actually lives (e.g. a Fall task deep-linked
+    ///     in mid-July still routes to the Fall scope).
+    ///
+    /// Used by `HavenApp.userNotificationCenter` (push handler), the
+    /// inbox item detail action menu, the activity feed "view task"
+    /// link, and the email forwarding pipeline.
+    static let openMaintenanceTask = Notification.Name("openMaintenanceTask")
+    /// Phase H — opens the Tasks v2 TasksTimelineSheet (18-month linear
+    /// scrub) on the Maintenance tab. Used by Dashboard's "View full
+    /// schedule" link as a direct replacement for the retired
+    /// MaintenanceScheduleView Calendar destination.
+    ///
+    /// Caller responsibility: post `.switchToTab` (tab 2) first so the
+    /// Tasks tab is foreground; this notification asks MaintenanceTabView
+    /// to open the year overview sheet.
+    static let openTasksYearOverview = Notification.Name("openTasksYearOverview")
     static let homeSystemChanged = Notification.Name("homeSystemChanged")
     static let contractorChanged = Notification.Name("contractorChanged")
     /// Phase 19l: Posted when a NEW contractor is created (not edited).

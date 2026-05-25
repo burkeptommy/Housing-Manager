@@ -587,6 +587,51 @@ enum AnalyticsEvent: String {
     case chezDelegationToggled = "chez_delegation_toggled"
     case chezProposalDecided = "chez_proposal_decided"
 
+    // MARK: - Phase 70 (Tasks v2)
+    /// Tile tap on YearRibbon. Properties: season ("Spring|Summer|Fall|Winter"),
+    /// source ("ribbon" | "banner" | "deep_link").
+    case tasksV2SeasonTapped = "tasks_v2_season_tapped"
+    /// Bundle parent card expanded inline. Properties: bundle_id, child_count.
+    case tasksV2BundleExpanded = "tasks_v2_bundle_expanded"
+    /// "Show full year" toggle tap on SeasonScopeBanner.
+    case tasksV2ShowFullYearTapped = "tasks_v2_show_full_year_tapped"
+    /// Active program card expanded to show its season's child visits.
+    case tasksV2ProgramExpanded = "tasks_v2_program_expanded"
+    /// Search icon tap on SeasonScopeBanner.
+    case tasksV2SearchTapped = "tasks_v2_search_tapped"
+    /// Phase F1 — time-window stats-pill filter applied. Properties:
+    /// filter ("overdue|thisWeek|thisMonth|later"), season.
+    case tasksV2StatsFilterApplied = "tasks_v2_stats_filter_applied"
+    /// Phase G1 — Year-at-a-glance card tapped. Properties:
+    /// year_visits (Int), next_30_visits (Int).
+    case tasksV2YearGlanceTapped = "tasks_v2_year_glance_tapped"
+    /// Phase G2 — 18-month Timeline scrub opened from SeasonScopeBanner.
+    /// Properties: season (current active season at open).
+    case tasksV2YearOverviewOpened = "tasks_v2_year_overview_opened"
+    /// Inline scheduling sheet committed a date. Properties: source
+    /// ("this_week" | "next_week" | "custom"), days_out.
+    case tasksV2QuickScheduled = "tasks_v2_quick_scheduled"
+    /// .openMaintenanceTask deep link received + handled. Properties:
+    /// has_task_id, has_routine_id, has_season.
+    case tasksV2DeepLinkOpened = "tasks_v2_deep_link_opened"
+    /// Emitted once per Tasks-tab open: ribbon_count vs visible_row_count.
+    /// Pre-ship value should be the "30 vs 5" gap; post-ship should converge
+    /// to 1.0. This is the post-launch verification metric for the visibility fix.
+    case tasksV2VisibilityRatio = "tasks_v2_visibility_ratio"
+    /// Phase 70.A1 follow-on F3 — Up Next 14-day strip rendered on the
+    /// Tasks tab. Properties: entry_count (Int), days_window (Int).
+    case tasksV2UpNextRendered = "tasks_v2_up_next_rendered"
+    /// Up Next card tapped. Properties: entry_type ("task"|"routine_occurrence"),
+    /// days_out (Int 0..14).
+    case tasksV2UpNextRowTapped = "tasks_v2_up_next_row_tapped"
+    /// Phase 70.A1 follow-on F5 — swipe-left Archive committed on a task
+    /// row. Replaces the pre-follow-on swipe-snooze event. Properties:
+    /// source ("bundle_card"|"standalone_row"|"flexible_row").
+    case tasksV2SwipedArchive = "tasks_v2_swiped_archive"
+    /// Snooze invoked from MaintenanceTaskDetailSheet menu (after swipe
+    /// moved to Archive). Properties: source ("detail_sheet").
+    case tasksV2SnoozeFromDetailSheet = "tasks_v2_snooze_from_detail_sheet"
+
     // MARK: - Errors
     case errorOccurred = "error_occurred"
 }

@@ -180,6 +180,15 @@ struct RoutineEditSheet: View {
 
             Section {
                 ActiveMonthsPicker(selectedMonths: $activeMonths)
+                // Phase 70.A1.x: empty-set guard. Save is blocked
+                // server-side by the `routines_active_months_non_empty`
+                // CHECK constraint anyway; surface it inline before the
+                // user taps Save and hits a network error.
+                if activeMonths.isEmpty {
+                    Text("Pick at least one month.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.critical)
+                }
             } header: {
                 Text("Active months")
             }
@@ -355,7 +364,9 @@ struct RoutineEditSheet: View {
                     if isSaving { ProgressView() } else { Text("Save").fontWeight(.semibold) }
                 }
                 .foregroundStyle(HavenColors.textPrimary)
-                .disabled(isSaving)
+                // Phase 70.A1.x: block save when activeMonths is empty
+                // (matches the 55.1 CHECK constraint server-side).
+                .disabled(isSaving || activeMonths.isEmpty)
             }
         }
         .onAppear {

@@ -282,11 +282,25 @@ struct DashboardView: View {
             CoverageView()
                 .environmentObject(viewModel)
         } else if destination == "maintenance_calendar" {
-            // Phase 54A: "View full schedule" on the dashboard
-            // lands users in the Calendar layout of the canonical
-            // maintenance view — no more parallel ScheduleCalendarView.
-            // Phase 66: kept as the Timeline push destination.
-            MaintenanceScheduleView(initialLayout: .calendar)
+            // Phase H — "View full schedule" now routes to the Tasks v2
+            // TasksTimelineSheet (18-month linear scrub) instead of the
+            // retired MaintenanceScheduleView. Switch to Tasks tab and
+            // post the open notification; an EmptyView fires the chain
+            // on appear, then pops back so the navigation stack is clean.
+            EmptyView()
+                .onAppear {
+                    NotificationCenter.default.post(
+                        name: .switchToTab,
+                        object: nil,
+                        userInfo: ["tab": 2]
+                    )
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        NotificationCenter.default.post(
+                            name: .openTasksYearOverview,
+                            object: nil
+                        )
+                    }
+                }
         } else if destination == "recommended_services" {
             // Phase 54C.3: Dashboard "Discover more" link.
             if let property = viewModel.properties.first {
@@ -666,6 +680,11 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .chezDelegationChanged)) { _ in
                 Task { await viewModel.refresh() }
             }
+            // Phase 70.A1 follow-on F1 dropped in the merge — base's
+            // Round 3 friend-feedback pass took the same route via
+            // `activeChezVendorRequests` fed into the registry
+            // (loadVendorVisits handles the .chezRequestChanged sink
+            // server-side now).
             .sheet(isPresented: $showDashboardDelegationSheet) {
                 PostQuizVendorDelegationSheet(
                     candidates: dashboardDelegationCandidates,

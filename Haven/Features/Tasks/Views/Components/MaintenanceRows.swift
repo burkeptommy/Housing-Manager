@@ -11,6 +11,11 @@ struct DecisionRow: View {
     let title: String
     let meta: String
     var ctaTitle: String = "Choose vendor"
+    /// Phase 70.A1.x: surface the Chez ownership badge inline when the
+    /// underlying routine or task is `chez_owned`. Matches `ProgramRow`
+    /// — pill renders next to the title so the homeowner sees who's
+    /// driving even when the decision row itself is the surface.
+    var chezOwned: Bool = false
     var onTap: () -> Void = {}
 
     var body: some View {
@@ -21,11 +26,16 @@ struct DecisionRow: View {
             HStack(alignment: .top, spacing: 12) {
                 IconTile(symbol: icon, tone: .salmon)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(.system(size: 14.5, weight: .semibold))
-                        .foregroundStyle(HavenColors.navy900)
-                        .padding(.bottom, 3)
-                        .multilineTextAlignment(.leading)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(title)
+                            .font(.system(size: 14.5, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy900)
+                            .multilineTextAlignment(.leading)
+                        if chezOwned {
+                            ChezOwnedPill()
+                        }
+                    }
+                    .padding(.bottom, 3)
                     Text(meta)
                         .font(.system(size: 12.5))
                         .foregroundStyle(HavenColors.textSecondary)

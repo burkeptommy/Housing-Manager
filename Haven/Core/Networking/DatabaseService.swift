@@ -1587,6 +1587,50 @@ final class DatabaseService {
             .value
     }
 
+    /// Phase 70.A1 follow-on G3 — fetch the household's completed task
+    /// history for the Completed sheet. Reads archived rows where the
+    /// archive reason is "completed" (set by `MaintenanceViewModel.completeTask`
+    /// at archive time). Sorted by `last_completed_date` descending so
+    /// the most recent completion lands at the top. Limit defaults to
+    /// 200 to keep payload small; the sheet caps visible rows + the
+    /// homeowner reaches further via month grouping rather than a
+    /// "load more" affordance (rare access pattern).
+    func fetchCompletedMaintenanceTasks(
+        householdId: UUID,
+        limit: Int = 200
+    ) async throws -> [MaintenanceTaskDBRow] {
+        try await from("maintenance_tasks")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("is_archived", value: true)
+            .eq("archived_reason", value: "completed")
+            .order("last_completed_date", ascending: false)
+            .limit(limit)
+            .execute()
+            .value
+    }
+
+    /// Phase 70.A1 follow-on I2 — fetch archived (but NOT completed)
+    /// task rows for the Archived tab of the Activity sheet. Catches
+    /// swipe-dismissed work plus reconciler-pruned rows (e.g. orphans
+    /// from the library reshape migrations). Sorted by `archived_at`
+    /// descending so the most recent dismissal lands at the top.
+    /// Pairs with `unarchiveMaintenanceTask(id:)` for the Restore action.
+    func fetchArchivedMaintenanceTasks(
+        householdId: UUID,
+        limit: Int = 200
+    ) async throws -> [MaintenanceTaskDBRow] {
+        try await from("maintenance_tasks")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("is_archived", value: true)
+            .neq("archived_reason", value: "completed")
+            .order("archived_at", ascending: false)
+            .limit(limit)
+            .execute()
+            .value
+    }
+
     func createMaintenanceTask(_ task: MaintenanceTaskInsert) async throws -> MaintenanceTaskDBRow {
         var task = task
         if task.serviceKey == nil {
@@ -1730,6 +1774,52 @@ final class DatabaseService {
             .update(payload)
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    /// Phase 70.A1 follow-on I3 — reverse a G1 completion. Clears the
+    /// archive trio (is_archived / archived_at / archived_reason) AND
+    /// the last_completed_date stamp the G1 path wrote at completion
+    /// time. Returns the restored row so callers can swap it back into
+    /// their in-memory tasks array without a second fetch.
+    func restoreCompletedMaintenanceTask(id: UUID) async throws -> MaintenanceTaskDBRow? {
+        struct RestorePayload: Encodable {
+            let isArchived: Bool
+            let archivedAt: String?
+            let archivedReason: String?
+            let lastCompletedDate: String?
+            enum CodingKeys: String, CodingKey {
+                case isArchived = "is_archived"
+                case archivedAt = "archived_at"
+                case archivedReason = "archived_reason"
+                case lastCompletedDate = "last_completed_date"
+            }
+        }
+        let payload = RestorePayload(
+            isArchived: false,
+            archivedAt: nil,
+            archivedReason: nil,
+            lastCompletedDate: nil
+        )
+        let rows: [MaintenanceTaskDBRow] = try await from("maintenance_tasks")
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .select()
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Phase 70.A1 follow-on I3 — fetch a single task by id for the
+    /// undo path's local refresh. Bypasses the `is_archived=false`
+    /// filter the other fetch helpers apply.
+    func fetchMaintenanceTaskById(id: UUID) async throws -> MaintenanceTaskDBRow? {
+        let rows: [MaintenanceTaskDBRow] = try await from("maintenance_tasks")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
     }
 
     // MARK: - Handyman Punch Items (Phase 54B)

@@ -79,7 +79,7 @@ function buildHtml(payload: SendInviteRequest): string {
     : "";
 
   const personalBlock = personalMessage
-    ? `<tr><td style="padding-top:24px;font-family:Georgia,serif;font-style:italic;font-size:15px;color:#1B2A4A;">"${escapeHtml(personalMessage)}"</td></tr>`
+    ? `<tr><td style="padding-top:24px;font-family:Georgia,serif;font-style:italic;font-size:15px;color:#0A0A0A;">"${escapeHtml(personalMessage)}"</td></tr>`
     : "";
 
   return `<!doctype html>
@@ -89,53 +89,54 @@ function buildHtml(payload: SendInviteRequest): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>You're invited to Chez</title>
   </head>
-  <body style="margin:0;padding:0;background:#F2EEE5;font-family:Georgia,serif;color:#1B2A4A;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EEE5;">
+  <body style="margin:0;padding:0;background:#FAF7F1;font-family:Georgia,serif;color:#0A0A0A;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F1;">
       <tr>
         <td align="center" style="padding:48px 16px;">
-          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#F8F6F1;border-radius:16px;border:1px solid #F0EBE1;">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;border:1px solid #EDEEF0;">
             <tr>
               <td style="padding:32px 32px 8px 32px;text-align:center;">
-                <div style="font-family:Georgia,serif;font-size:28px;font-weight:bold;color:#1B2A4A;letter-spacing:0.5px;">Chez</div>
+                <img src="https://getchez.com/chez-icon-on-purple-180.png" alt="" width="56" height="56" style="display:inline-block;border-radius:13px;margin-bottom:10px;" />
+                <div style="font-family:Georgia,'New York',serif;font-size:28px;font-weight:bold;color:#6938EF;letter-spacing:0.5px;">Chez</div>
               </td>
             </tr>
             <tr>
-              <td style="padding:24px 32px 0 32px;font-family:Georgia,serif;font-size:18px;color:#1B2A4A;">
+              <td style="padding:24px 32px 0 32px;font-family:Georgia,serif;font-size:18px;color:#0A0A0A;">
                 Hi ${escapeHtml(inviteeName)},
               </td>
             </tr>
             <tr>
-              <td style="padding:16px 32px 0 32px;font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#1B2A4A;">
+              <td style="padding:16px 32px 0 32px;font-family:Georgia,serif;font-size:15px;line-height:1.55;color:#0A0A0A;">
                 ${escapeHtml(inviterName)} invited you to join ${householdName ? `<strong>${escapeHtml(householdName)}</strong>` : "their household"} on Chez, the app that helps families protect their home and everything in it.
               </td>
             </tr>
-            ${address ? `<tr><td style="padding:24px 32px 0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;border:1px solid #E3D9C6;border-radius:12px;"><tr><td style="padding:16px 20px;font-family:Georgia,serif;font-size:14px;color:#1B2A4A;">${escapeHtml(address)}</td></tr></table></td></tr>` : ""}
-            ${countsLine ? `<tr><td style="padding:16px 32px 0 32px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:#1B2A4A;opacity:0.8;">${countsLine}</td></tr>` : ""}
+            ${address ? `<tr><td style="padding:24px 32px 0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F0FE;border:1px solid #EFEAFE;border-radius:12px;"><tr><td style="padding:16px 20px;font-family:Georgia,serif;font-size:14px;color:#0A0A0A;">${escapeHtml(address)}</td></tr></table></td></tr>` : ""}
+            ${countsLine ? `<tr><td style="padding:16px 32px 0 32px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:13px;color:#6B6B7B;">${countsLine}</td></tr>` : ""}
             ${personalBlock ? `<tr><td style="padding:0 32px;">${personalBlock}</td></tr>` : ""}
             <tr>
               <td style="padding:32px 32px 0 32px;text-align:center;">
-                <a href="${escapeHtml(payload.invite_url)}" style="display:inline-block;padding:14px 28px;background:#1B2A4A;color:#F8F6F1;text-decoration:none;border-radius:14px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Chez</a>
+                <a href="${escapeHtml(payload.invite_url)}" style="display:inline-block;padding:14px 28px;background:#6938EF;color:#FFFFFF;text-decoration:none;border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;">Open in Chez</a>
               </td>
             </tr>
             <tr>
-              <td style="padding:24px 32px 0 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:13px;color:#1B2A4A;opacity:0.7;">
+              <td style="padding:24px 32px 0 32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:13px;color:#6B6B7B;">
                 Or enter this code in the app:
               </td>
             </tr>
             <tr>
-              <td style="padding:8px 32px 0 32px;text-align:center;font-family:'SF Mono',Menlo,Monaco,monospace;font-size:24px;font-weight:bold;letter-spacing:4px;color:#1B2A4A;">
+              <td style="padding:8px 32px 0 32px;text-align:center;font-family:'SF Mono',Menlo,Monaco,monospace;font-size:24px;font-weight:bold;letter-spacing:4px;color:#6938EF;">
                 ${escapeHtml(code)}
               </td>
             </tr>
             <tr>
-              <td style="padding:32px 32px 0 32px;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#1B2A4A;opacity:0.6;text-align:center;">
+              <td style="padding:32px 32px 0 32px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#6B6B7B;text-align:center;">
                 This invite expires in 30 days. If you don't want to join, just ignore this email.<br />
-                Need help? Reply to this message and Tom will get it.
+                Need help? Reply to this message and Chez will get it.
               </td>
             </tr>
             <tr>
-              <td style="padding:24px 32px 32px 32px;text-align:center;font-family:'SF Pro',-apple-system,Helvetica,Arial,sans-serif;font-size:11px;color:#1B2A4A;opacity:0.5;">
-                Chez, getchez.com
+              <td style="padding:24px 32px 32px 32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',Helvetica,Arial,sans-serif;font-size:11px;color:#A1A1AC;">
+                Chez · getchez.com
               </td>
             </tr>
           </table>

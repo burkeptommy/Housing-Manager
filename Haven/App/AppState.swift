@@ -397,6 +397,63 @@ final class AppState: ObservableObject {
                         // in-app Coverage view. Gated on UserDefaults
                         // hasConvertedQuizDismissalsToSnoozes_v1.
                         await Self.convertQuizDismissalsToSnoozesOnceIfNeeded()
+
+                        // Phase 70 (Tasks v2 / Section B.6): re-date
+                        // tasks whose templates moved between seasons.
+                        // Catches "Dethatch lawn" (Fall → Spring) and
+                        // any future template-level season change.
+                        // Skips user-touched rows.
+                        await MaintenanceTaskReconciler.reseedSeasonalTasksPhase70OnceIfNeeded()
+
+                        // Phase 70.A1 follow-on G2 — climate-aware reseed.
+                        // Moves Winterize Irrigation from Oct 1 → Oct 25
+                        // for NE properties (and analogous shifts in
+                        // every other region). Skips user-touched rows.
+                        // Idempotent + UserDefaults-gated.
+                        await MaintenanceTaskReconciler.reseedClimateAwareAnchorsP70G2OnceIfNeeded()
+
+                        // Phase 70.A1 follow-on I1 — per-template anchor
+                        // offset + 30-day lead cap. Moves NE Fall gutter
+                        // cleaning from Aug 30 surface to ~Oct 2 surface
+                        // (Nov 1 execution). Skips user-touched rows.
+                        await MaintenanceTaskReconciler.reseedSeasonalTasksI1OnceIfNeeded()
+
+                        // Phase 70.A1.x: Library reshape migration.
+                        // Archives orphan tasks from the 6 deleted DIY
+                        // templates, re-dates untouched rows whose
+                        // template seasonalTiming changed (Water Heater
+                        // Fall, Septic Spring, Well Spring, Garage Door
+                        // Fall, Security Spring, Solar Spring, Crawl
+                        // Space Spring, smoke detectors Fall, radon
+                        // Winter, flue scope Fall, geothermal Fall,
+                        // air-duct + ductwork Fall), then runs
+                        // reconcileAll so new Well:annual + Solar:annual
+                        // bundle parents seed for eligible households.
+                        // Skips user-touched rows.
+                        await MaintenanceTaskReconciler.reshapeLibraryPhase70A1xOnceIfNeeded()
+
+                        // Phase 70.A1 (Summer/Winter library expansion):
+                        // re-run reconcileAllForHousehold so the 8 new
+                        // templates added in this phase materialize as
+                        // task rows on existing TestFlight households.
+                        // Idempotent — reconciler skips templates that
+                        // already have a templateId match in the DB.
+                        //
+                        // _v2: the first attempt landed when the new DIY
+                        // templates carried `routingOverride: .diyDefault`,
+                        // which routed them to handyman_punch_items via
+                        // Phase 67E/F's single-rail check instead of to
+                        // maintenance_tasks. Dropping the override on
+                        // those templates was the fix; bumping the gate
+                        // version so the reconciler runs again and
+                        // creates the maintenance_tasks rows the user
+                        // actually sees on the Maintenance tab.
+                        if let householdId = primaryProperty?.householdId,
+                           !UserDefaults.standard.bool(forKey: "hasSeededPhase70A1LibraryExpansion_v2") {
+                            _ = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
+                            UserDefaults.standard.set(true, forKey: "hasSeededPhase70A1LibraryExpansion_v2")
+                            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        }
                     }
                     Task { await Self.archivePreQuizChoreTasksOnce() }
                     Task { await Self.backfillUniversalSystemsOnce() }
@@ -757,12 +814,17 @@ final class AppState: ObservableObject {
     /// key so it only runs once per install.
     @MainActor
     static func backfillMissingSystemsOnceIfNeeded() async {
-        // Phase 54E.3: bumped to _v2 so TestFlight users whose v1 pass
-        // already completed re-run the auto-create rules and pick up
-        // the new "Trash & Recycling" universal system. The underlying
+        // Phase 70.A1 follow-on H4: bumped to _v3 so existing TestFlight
+        // users pick up the expanded auto-create rules — Siding/Exterior,
+        // Chimney (now unconditional), Window Cleaning, Tree Service,
+        // Deck/Outdoor, Driveway Sealcoating, Painting, Gutter Cleaning.
+        // Tom flagged "where are power washing + chimney cleaning?" —
+        // those templates lived under Siding/Exterior + Chimney but
+        // never seeded because the categories weren't auto-created.
         // ensureAutoCreatedSystems is idempotent (dedups by category)
-        // so re-running on fully-set-up users is a no-op.
-        let key = "hasRunMissingSystemBackfillP54A_v2"
+        // so re-running on fully-set-up users is a no-op except for the
+        // categories that newly qualify.
+        let key = "hasRunMissingSystemBackfillP70H4_v3"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         let db = DatabaseService.shared
         let properties: [PropertyRow]
