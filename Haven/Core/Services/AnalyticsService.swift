@@ -602,6 +602,9 @@ enum AnalyticsEvent: String {
     /// Phase F1 — time-window stats-pill filter applied. Properties:
     /// filter ("overdue|thisWeek|thisMonth|later"), season.
     case tasksV2StatsFilterApplied = "tasks_v2_stats_filter_applied"
+    /// Phase G1 — Year-at-a-glance card tapped. Properties:
+    /// year_visits (Int), next_30_visits (Int).
+    case tasksV2YearGlanceTapped = "tasks_v2_year_glance_tapped"
     /// Inline scheduling sheet committed a date. Properties: source
     /// ("this_week" | "next_week" | "custom"), days_out.
     case tasksV2QuickScheduled = "tasks_v2_quick_scheduled"

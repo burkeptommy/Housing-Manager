@@ -49,6 +49,11 @@ struct MaintenanceTabView: View {
     @State private var selectionMode: Bool = false
     @State private var selectedTaskIds: Set<UUID> = []
     @State private var bulkBusy: Bool = false
+    /// Phase G1: source data for the Year-at-a-glance card. Loaded
+    /// once on appear + refreshed on .maintenanceTaskChanged. Empty by
+    /// default — the card hides itself until data arrives.
+    @State private var vendorDocumentsForYear: [DocumentRow] = []
+    @State private var serviceRecordsForYear: [ServiceRecordRow] = []
 
     /// Phase 70 (Tasks v2): Task id whose row should pulse a salmon
     /// highlight ring after a deep-link arrival (`.openMaintenanceTask`).
@@ -133,6 +138,8 @@ struct MaintenanceTabView: View {
                 // helpers are kept below for safety + rollback.
                 duplicateBannerSection
 
+                yearAtAGlanceSection
+
                 seasonScopeBannerSection
 
                 statsFilterStripSection
@@ -170,6 +177,7 @@ struct MaintenanceTabView: View {
             }
             await maintenanceVM.loadTasks()
             await loadDuplicates()
+            await loadYearStats()
 
             // Phase 70.A1 (Summer/Winter library expansion v3): seed
             // the 8 new templates onto existing households once. The
@@ -205,6 +213,7 @@ struct MaintenanceTabView: View {
             Task {
                 await maintenanceVM.loadTasks()
                 await loadDuplicates()
+                await loadYearStats()
             }
         }
         // Phase 70 (Tasks v2) — deep-link contract. Push handlers, inbox
@@ -510,6 +519,33 @@ struct MaintenanceTabView: View {
 
     /// SeasonScopeBanner — the 44pt pill below MiniHero that names the
     /// active scope + exposes search. Full-year toggle removed in 70.A1.x.
+    /// Phase G1: annual coordination rollup card between the duplicate
+    /// banner and the season scope banner. Auto-hides on a fresh
+    /// install where there's nothing tracked yet (no service records,
+    /// no upcoming visits) so Day-0 doesn't read as an empty "0
+    /// visits" card.
+    @ViewBuilder
+    private var yearAtAGlanceSection: some View {
+        let summary = yearSummary
+        TasksV2YearSummaryCard(
+            yearVisitCount: summary.yearVisitCount,
+            yearSpendDollars: summary.yearSpend,
+            next30VisitCount: summary.next30VisitCount,
+            next30EstimateDollars: summary.next30Estimate,
+            onTap: {
+                // Future: open a focused breakdown sheet. Defer until
+                // there's enough data to make the breakdown valuable —
+                // for now the tap is a discoverability hint.
+                Analytics.track(.tasksV2YearGlanceTapped, [
+                    "year_visits": summary.yearVisitCount,
+                    "next_30_visits": summary.next30VisitCount
+                ])
+            }
+        )
+        .padding(.horizontal, TasksV5.pageMargin)
+        .padding(.bottom, TasksV5.sectionGap)
+    }
+
     /// Phase F3: surfaces detected duplicates (same vendor + category
     /// family + similar title) at the top of Tasks v2. Apple Contacts
     /// "Duplicates Found" pattern. Banner is session-dismissible — the
@@ -1251,6 +1287,128 @@ struct MaintenanceTabView: View {
         }
         NotificationCenter.default.post(name: .routineChanged, object: nil)
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+    }
+
+    // MARK: - Phase G1 year-at-a-glance
+
+    private struct YearSummary {
+        let yearVisitCount: Int
+        let yearSpend: Double
+        let next30VisitCount: Int
+        let next30Estimate: Double
+    }
+
+    private var yearSummary: YearSummary {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+        let now = Date()
+        let yearStart = cal.date(from: cal.dateComponents([.year], from: now)) ?? Date.distantPast
+        let yearEnd = cal.date(byAdding: .year, value: 1, to: yearStart) ?? now
+        let next30End = cal.date(byAdding: .day, value: 30, to: now) ?? now
+        let yearStartStr = fmt.string(from: yearStart)
+        let yearEndStr = fmt.string(from: yearEnd)
+        let nowStr = fmt.string(from: now)
+        let next30EndStr = fmt.string(from: next30End)
+
+        // Completed visits this year = service_records this year +
+        // completed tasks this year (dedup via invoice_document_id when
+        // present; matches MaintenanceScheduleView's yearSummary).
+        var completedVisits = serviceRecordsForYear.count
+        for task in maintenanceVM.tasks {
+            guard let last = task.lastCompletedDate, !last.isEmpty, last >= yearStartStr else { continue }
+            completedVisits += 1
+        }
+
+        // Upcoming visits = scheduled-or-due tasks (not archived, not
+        // routine-parented) in the remainder of the year, plus routine
+        // occurrences from the expander.
+        var upcomingVisits = 0
+        for task in maintenanceVM.tasks where task.isArchived != true {
+            let target = task.scheduledDate ?? task.nextDueDate
+            guard target >= nowStr, target <= yearEndStr else { continue }
+            upcomingVisits += 1
+        }
+        let routineOccsThisYear = RoutineOccurrenceExpander.occurrences(
+            routines: viewModel.routines,
+            from: now,
+            through: yearEnd
+        )
+        upcomingVisits += routineOccsThisYear.count
+
+        // Spend YTD: sum vendor invoice_amount on documents this year,
+        // plus service_record.cost when not double-counted via the doc
+        // link.
+        var spend: Double = 0
+        var docIdsWithInvoiceAmount: Set<UUID> = []
+        for doc in vendorDocumentsForYear {
+            if let amount = doc.invoiceAmount, amount > 0 {
+                spend += amount
+                docIdsWithInvoiceAmount.insert(doc.id)
+            }
+        }
+        for record in serviceRecordsForYear {
+            if let linkedId = record.invoiceDocumentId,
+               docIdsWithInvoiceAmount.contains(linkedId) { continue }
+            if let cost = record.cost, cost > 0 { spend += cost }
+        }
+
+        // Next-30 horizon: vendor tasks in the window + their estimated
+        // cost (parsed from the `estimated_cost` column when set).
+        var next30Visits = 0
+        var next30Estimate: Double = 0
+        for task in maintenanceVM.tasks where task.isArchived != true {
+            let target = task.scheduledDate ?? task.nextDueDate
+            guard target >= nowStr, target <= next30EndStr else { continue }
+            next30Visits += 1
+            if let cost = task.estimatedCost, cost > 0 {
+                next30Estimate += cost
+            }
+        }
+        let next30RoutineOccs = RoutineOccurrenceExpander.occurrences(
+            routines: viewModel.routines,
+            from: now,
+            through: next30End
+        )
+        next30Visits += next30RoutineOccs.count
+
+        return YearSummary(
+            yearVisitCount: completedVisits + upcomingVisits,
+            yearSpend: spend,
+            next30VisitCount: next30Visits,
+            next30Estimate: next30Estimate
+        )
+    }
+
+    /// One-shot fetch of documents + service_records in the current
+    /// year so the YearAtAGlanceCard has data to render. Parallel
+    /// fetches; runs in `.task` block and refreshes on
+    /// .maintenanceTaskChanged.
+    @MainActor
+    private func loadYearStats() async {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+        let yearStart = cal.date(from: cal.dateComponents([.year], from: Date())) ?? Date.distantPast
+        let yearStartStr = fmt.string(from: yearStart)
+
+        async let docs: [DocumentRow] = {
+            (try? await DatabaseService.shared.fetchDocuments()) ?? []
+        }()
+        async let records: [ServiceRecordRow] = {
+            (try? await DatabaseService.shared.fetchServiceRecords()) ?? []
+        }()
+
+        let allDocs = await docs
+        let allRecords = await records
+
+        vendorDocumentsForYear = allDocs.filter {
+            guard let dateStr = $0.invoiceDate else { return false }
+            return dateStr >= yearStartStr
+        }
+        serviceRecordsForYear = allRecords.filter {
+            $0.serviceDate >= yearStartStr
+        }
     }
 
     private func archiveDuplicateEntity(kind: DuplicateDetector.EntityKind, id: UUID) async throws {
