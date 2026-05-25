@@ -1472,6 +1472,13 @@ enum MaintenanceTaskReconciler {
             case "fall", "autumn":    return [10]
             case "winter":            return [1]
             case "spring/fall":       return [4, 10]
+            // Phase 70.A1.x: Flexible tasks intentionally fall through
+            // to today+interval — they have no seasonal anchor by
+            // design (e.g. EV charger inspection, drain cleaning,
+            // sensor batteries). The view layer routes them into the
+            // dedicated Flexible section by checking seasonalTiming
+            // == "Flexible", regardless of date.
+            case "flexible":          return []
             default:                  return []
             }
         }()

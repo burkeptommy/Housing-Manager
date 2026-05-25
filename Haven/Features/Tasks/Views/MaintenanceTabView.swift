@@ -108,6 +108,8 @@ struct MaintenanceTabView: View {
 
                 needsAttentionSection
 
+                flexibleTasksSection
+
                 thisSeasonTasksSection
 
                 combinedProgramsSection
@@ -499,6 +501,33 @@ struct MaintenanceTabView: View {
             ) {
                 pushTarget = .scheduleView
             }
+        }
+    }
+
+    /// Phase 70.A1.x: Flexible-task section. Renders between "Needs
+    /// your attention" and "This Season's Tasks" — Flexible items have
+    /// no seasonal anchor by design (EV charger inspection, drain
+    /// cleaning, electrical panel check), so they belong in their own
+    /// list regardless of which season tile is active. Tap → opens
+    /// QuickSchedulingSheet, then the task drops into the picked
+    /// month's bucket on save.
+    @ViewBuilder
+    private var flexibleTasksSection: some View {
+        let flexible = viewModel.flexibleTasks()
+        if !flexible.isEmpty {
+            FlexibleTasksSection(
+                tasks: flexible,
+                contractor: { task in
+                    guard let id = task.assignedContractorId else { return nil }
+                    return maintenanceVM.contractors.first { $0.id == id }
+                },
+                onTap: { task in
+                    quickScheduleTask = task
+                },
+                onSeeAll: { pushTarget = .scheduleView }
+            )
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
         }
     }
 
@@ -1505,6 +1534,10 @@ final class MaintenanceTabViewModel: ObservableObject {
 
         if let timing = task.seasonalTiming?.trimmingCharacters(in: .whitespacesAndNewlines),
            !timing.isEmpty {
+            // Phase 70.A1.x: Flexible tasks never match a specific
+            // season — they render in the dedicated Flexible section
+            // instead via `flexibleTasks(propertyId:)`.
+            if timing.lowercased() == "flexible" { return false }
             let labels = timing.split(whereSeparator: { $0 == "/" || $0 == "," })
                 .map { $0.trimmingCharacters(in: .whitespaces) }
             return labels.contains(season.rawValue)
@@ -1516,6 +1549,53 @@ final class MaintenanceTabViewModel: ObservableObject {
         guard let date = formatter.date(from: dateString) else { return false }
         let month = Calendar.current.component(.month, from: date)
         return season.months.contains(month)
+    }
+
+    /// Phase 70.A1.x: Flexible tasks are season-independent. They render
+    /// in a dedicated section between "Needs your attention" and "This
+    /// Season's Tasks", regardless of which season tile is active.
+    /// Tapping a Flexible row opens QuickSchedulingSheet; once the user
+    /// picks a date the row drops out of Flexible and into its picked
+    /// month's bucket of the season feed (via the existing seasonalTiming-
+    /// vs-scheduledDate filtering in `seasonFeed`).
+    ///
+    /// Tasks qualify when:
+    ///   - `seasonalTiming` equals "Flexible" (case-insensitive)
+    ///   - `scheduledDate` is nil (user hasn't placed it yet)
+    ///   - `lastCompletedDate` is nil + not archived + not vehicle-scoped
+    ///   - not a child of a routine
+    ///   - not a bundle child (matches the same template.bundleId !=
+    ///     nil check `seasonFeed` uses).
+    func flexibleTasks(propertyId: UUID? = nil) -> [MaintenanceTaskDBRow] {
+        let propScope = propertyId ?? self.activePropertyId
+        return MaintenanceViewModel.shared.tasks.filter { task in
+            if let scope = propScope, task.propertyId != scope { return false }
+            guard task.vehicleId == nil else { return false }
+            if let last = task.lastCompletedDate, !last.isEmpty { return false }
+            if (task.isArchived ?? false) == true { return false }
+            if task.parentRoutineId != nil { return false }
+            if task.scheduledDate != nil { return false }
+            // Bundle children are hidden — they live inline under the
+            // parent card, not as their own rows. Same predicate the
+            // season feed uses for consistency.
+            if let templateKey = task.templateId,
+               let template = MaintenanceTemplates.template(forKey: templateKey),
+               template.bundleId != nil {
+                return false
+            }
+            guard let timing = task.seasonalTiming?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased(),
+                  timing == "flexible" else { return false }
+            return true
+        }
+        .sorted { lhs, rhs in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let lhsDate = formatter.date(from: lhs.nextDueDate) ?? .distantFuture
+            let rhsDate = formatter.date(from: rhs.nextDueDate) ?? .distantFuture
+            return lhsDate < rhsDate
+        }
     }
 }
 
