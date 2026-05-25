@@ -20,6 +20,12 @@ struct HeaderSwitcher: View {
     var selectionMode: Bool = false
     var selectionCount: Int = 0
     var onDoneSelection: () -> Void = {}
+    /// Phase 70.A1 follow-on G3 — optional secondary action that opens
+    /// the Completed view sheet. Renders as a small clock-counterclockwise
+    /// icon to the LEFT of the "+" button. Nil hides the icon so
+    /// HandymanTabView (which has its own punch-list completion UI) stays
+    /// clean. Hidden during bulk-select mode for the same reason "+" is.
+    var onShowCompleted: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
@@ -31,12 +37,43 @@ struct HeaderSwitcher: View {
             centerLabel
                 .frame(maxWidth: .infinity)
 
-            // Right side: "+" when idle, "Done" when in selection mode.
-            rightButton
+            // Right cluster: Completed icon (optional) + "+" / "Done".
+            HStack(spacing: 6) {
+                if !selectionMode, let onShowCompleted {
+                    completedButton(action: onShowCompleted)
+                }
+                rightButton
+            }
         }
         .padding(.horizontal, TasksV5.pageMargin)
         .padding(.top, TasksV5.headerTopInset)
         .padding(.bottom, 14)
+    }
+
+    private func completedButton(action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(HavenColors.navy800)
+                .frame(width: 40, height: 40)
+                .background(
+                    Circle().fill(HavenColors.surface)
+                )
+                .overlay(
+                    Circle().stroke(HavenColors.beige200, lineWidth: 1)
+                )
+                .shadow(
+                    color: TasksV5.headerPlusShadowColor,
+                    radius: TasksV5.headerPlusShadowRadius,
+                    x: 0,
+                    y: TasksV5.headerPlusShadowY
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("View completed tasks")
     }
 
     @ViewBuilder

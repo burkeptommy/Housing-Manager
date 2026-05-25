@@ -618,6 +618,19 @@ enum AnalyticsEvent: String {
     /// Pre-ship value should be the "30 vs 5" gap; post-ship should converge
     /// to 1.0. This is the post-launch verification metric for the visibility fix.
     case tasksV2VisibilityRatio = "tasks_v2_visibility_ratio"
+    /// Phase 70.A1 follow-on F3 — Up Next 14-day strip rendered on the
+    /// Tasks tab. Properties: entry_count (Int), days_window (Int).
+    case tasksV2UpNextRendered = "tasks_v2_up_next_rendered"
+    /// Up Next card tapped. Properties: entry_type ("task"|"routine_occurrence"),
+    /// days_out (Int 0..14).
+    case tasksV2UpNextRowTapped = "tasks_v2_up_next_row_tapped"
+    /// Phase 70.A1 follow-on F5 — swipe-left Archive committed on a task
+    /// row. Replaces the pre-follow-on swipe-snooze event. Properties:
+    /// source ("bundle_card"|"standalone_row"|"flexible_row").
+    case tasksV2SwipedArchive = "tasks_v2_swiped_archive"
+    /// Snooze invoked from MaintenanceTaskDetailSheet menu (after swipe
+    /// moved to Archive). Properties: source ("detail_sheet").
+    case tasksV2SnoozeFromDetailSheet = "tasks_v2_snooze_from_detail_sheet"
 
     // MARK: - Errors
     case errorOccurred = "error_occurred"

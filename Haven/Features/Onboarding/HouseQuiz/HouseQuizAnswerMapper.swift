@@ -2334,8 +2334,30 @@ final class HouseQuizAnswerMapper {
         // `RoutineSeeder.ensureSystemlessRoutines` below. Chimney
         // STAYS in this loop because a chimney is a real structural
         // system with install date / type / sweep history.
+        //
+        // Phase 70.A1 follow-on H4 — Tom's "where are power
+        // washing + chimney cleaning" feedback. Most TestFlight
+        // households are NE HNW homes with siding, chimneys
+        // (boiler/fireplace flue), windows, trees, decks, and
+        // driveways needing seasonal care. The pre-H4 gating left
+        // these categories invisible — templates lived under
+        // `Siding/Exterior` / `Chimney` / etc. but those system
+        // rows never auto-created. We now over-populate by default;
+        // homeowners can dismiss "Not applicable" on Vendor Coverage
+        // for any that don't apply. Chimney is no longer gated on
+        // `hasChimney` — even sewer-and-electric homes with no
+        // fireplace usually have a furnace flue worth inspecting.
+        // Categories below have actual templates anchored to them.
+        // We deliberately skip Deck/Outdoor, Painting, and Gutter
+        // Cleaning — their work items live under Siding/Exterior +
+        // Roofing bundles, so auto-creating empty system rows would
+        // be noise without any seeded tasks.
         let rules: [Rule] = [
-            .init(category: "Chimney", subtype: chimneySubtype, shouldCreate: hasChimney),
+            .init(category: "Chimney", subtype: chimneySubtype, shouldCreate: true),
+            .init(category: "Siding/Exterior", subtype: nil, shouldCreate: true),
+            .init(category: "Window Cleaning", subtype: nil, shouldCreate: true),
+            .init(category: "Tree Service", subtype: nil, shouldCreate: true),
+            .init(category: "Driveway Sealcoating", subtype: nil, shouldCreate: true),
             // Phase 67 fix: Air Quality removed — see prior comment.
         ]
 

@@ -680,6 +680,14 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .chezDelegationChanged)) { _ in
                 Task { await viewModel.refresh() }
             }
+            // Phase 70.A1 follow-on F1 — refresh the open-find_vendor map
+            // so VendorCoverageSheet rows flip from "Find a pro / I have
+            // one / Have Chez handle it" into the navy "Chez is finding
+            // you a Handyman" state the moment the submit succeeds.
+            // Cheap fetch — pulls already-RLS-scoped chez_requests.
+            .onReceive(NotificationCenter.default.publisher(for: .chezRequestChanged)) { _ in
+                Task { await viewModel.loadOpenChezVendorRequests() }
+            }
             .sheet(isPresented: $showDashboardDelegationSheet) {
                 PostQuizVendorDelegationSheet(
                     candidates: dashboardDelegationCandidates,
@@ -1990,6 +1998,7 @@ struct DashboardView: View {
         return VendorCoverageSheet(
             uncoveredItems: uncovered,
             totalSystemCount: total,
+            chezRequests: viewModel.openChezVendorRequests,
             onFindVendor: { systemName in
                 showVendorCoverage = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {

@@ -147,6 +147,16 @@ struct MaintenanceTemplate: Identifiable {
     /// universal before Phase 57, so the default of nil preserves behavior.
     var regionalPack: RegionalPack? = nil
 
+    /// Phase 70.A1 follow-on I1 — per-template offset applied to the
+    /// regional seasonal anchor. Positive shifts execution LATER (e.g.
+    /// gutter cleaning waits for leaves to drop: NE Fall = Oct 25 + 7 =
+    /// Nov 1). Negative shifts earlier. nil = use the regional anchor
+    /// verbatim. Same "Fall" timing serves HVAC tune-up (needs Oct
+    /// execution before peak heating demand) AND gutter cleaning (needs
+    /// Nov execution after leaf drop); this field lets each template
+    /// nudge its own anchor without rewriting the regional table.
+    var seasonalAnchorOffsetDays: Int? = nil
+
     /// Phase 67C: How many days BEFORE the seasonal execution anchor the
     /// task should appear in the homeowner's task list. Lets us be
     /// PROACTIVE — surface "Spring AC tune-up" in late February so the
@@ -178,23 +188,34 @@ struct MaintenanceTemplate: Identifiable {
     /// template. The reconciler subtracts this from the seasonal anchor
     /// to compute the surface date — so a Spring task with 42 days lead
     /// surfaces in late February instead of April.
+    ///
+    /// Phase 70.A1 follow-on I1: capped at 30 days unless a template
+    /// explicitly opts back in via `proactiveLeadTimeDays`. The pre-I1
+    /// 56-day default produced August surface dates for October work,
+    /// which homeowners read as "the work happens in August" instead of
+    /// "start planning in August." 30 days reads as "schedule this in
+    /// the next month" — closer to how homeowners think about booking.
     var effectiveLeadTimeDays: Int {
         if let explicit = proactiveLeadTimeDays { return explicit }
+        // Cap at 30 days for every default-computed lead time. Templates
+        // that genuinely need long lead (custom millwork, scheduled-
+        // valuables appraisal) can opt back in via proactiveLeadTimeDays.
+        let cap = 30
         // Safety floor + pre-winter rush categories (gas, roof, septic,
         // chimney, generator) — book early because vendors get slammed
         // in fall and spring.
-        if safetyFloor { return 56 }
+        if safetyFloor { return cap }
         let preWinterVendor: Set<String> = [
             "Chimney", "Septic System", "Roofing", "Generator"
         ]
-        if assignmentType == .vendor && preWinterVendor.contains(systemCategory) { return 56 }
+        if assignmentType == .vendor && preWinterVendor.contains(systemCategory) { return cap }
         // Peak-season vendors: HVAC techs in May, pool services in April,
         // landscapers in March. 6 weeks gives time to compare quotes.
         let peakVendor: Set<String> = [
             "HVAC", "Pool/Spa", "Hot Tub", "Landscaping",
             "Snow Removal", "Pest Control", "Mosquito & Tick"
         ]
-        if assignmentType == .vendor && peakVendor.contains(systemCategory) { return 42 }
+        if assignmentType == .vendor && peakVendor.contains(systemCategory) { return cap }
         // Tree service — arborists book a month out routinely.
         if systemCategory == "Tree Service" { return 28 }
         // Generic vendor — 4 weeks.
@@ -884,7 +905,12 @@ enum MaintenanceTemplates {
                 stableId: "Roofing:Clean gutters and downspouts (fall)",
                 bundleId: "Roofing:fall",
                 bundleTitle: "Fall Roof and Gutter Service",
-                safetyFloor: true
+                safetyFloor: true,
+                // Phase 70.A1 follow-on I1 — gutter cleaning waits for leaf drop.
+                // NE Fall anchor (Oct 25) + 7 = Nov 1 execution, well past
+                // peak leaf drop in CT / NY / MA. Other Fall templates
+                // (HVAC tune-up, chimney sweep) keep their Oct 25 anchor.
+                seasonalAnchorOffsetDays: 7
             ),
             MaintenanceTemplate(
                 systemCategory: "Roofing",
@@ -899,7 +925,10 @@ enum MaintenanceTemplates {
                 notes: "Most gutter services will do this walk-through at no extra charge as part of the fall clean. Worth asking when you book.",
                 assignmentType: .vendor,
                 stableId: "Roofing:Ice dam risk walk",
-                bundleId: "Roofing:fall"
+                bundleId: "Roofing:fall",
+                // Phase 70.A1 follow-on I1 — paired with the gutter clean
+                // above (same Nov 1 visit), so it inherits the same +7 offset.
+                seasonalAnchorOffsetDays: 7
             ),
             // Phase 70.A1.x deleted "Pre-storm gutter and downspout walk"
             // and "Ice dam ground check" — both are already covered by

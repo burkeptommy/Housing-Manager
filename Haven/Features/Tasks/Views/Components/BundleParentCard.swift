@@ -309,17 +309,14 @@ struct BundleParentCard: View {
 
     /// Concrete date — "Tue, Sept 20" — never relative ("in 3 days").
     /// Phase 70 Calendar.app discipline. Overdue tasks get a leading
-    /// "Overdue · " prefix in critical red.
+    /// "Overdue · " prefix in critical red. Phase 70.A1 follow-on F2:
+    /// year-aware so 2027-anchored rows show "Thu, Feb 4, 2027".
     private var dueDateText: String? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
         let dateString = task.scheduledDate ?? task.nextDueDate
-        guard !dateString.isEmpty, let date = formatter.date(from: dateString) else {
+        guard let date = TasksV2DateFormatting.parseRowDate(dateString) else {
             return nil
         }
-        let display = DateFormatter()
-        display.dateFormat = "EEE, MMM d"
-        let label = display.string(from: date)
+        let label = TasksV2DateFormatting.longDay(date)
         if isOverdue(date) {
             return "Overdue · " + label
         }

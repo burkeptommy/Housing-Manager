@@ -17,6 +17,12 @@ struct VendorCoverageSheet: View {
     /// header count. Covered items are no longer listed inside the
     /// sheet; they live on Contacts.
     let totalSystemCount: Int
+    /// Phase 70.A1 follow-on F1: open `find_vendor` chez_requests keyed
+    /// by canonical system category. When a gap has an entry here, its
+    /// card switches from the "Find a pro / I have one / Have Chez
+    /// handle it" stack to a single "Chez is finding you a {category}"
+    /// status card. Tapping deep-links into the request thread.
+    var chezRequests: [String: ChezRequestRow] = [:]
     /// Tap on a gap card's "Find a pro" button. Parent presents
     /// FindLocalVendorSheet with the gap's system category.
     let onFindVendor: (String) -> Void
@@ -60,7 +66,11 @@ struct VendorCoverageSheet: View {
                         allCoveredCelebration
                     } else {
                         ForEach(visibleUncovered) { item in
-                            gapCard(for: item)
+                            if let request = chezRequests[item.id] {
+                                chezHandlingCard(for: item, request: request)
+                            } else {
+                                gapCard(for: item)
+                            }
                         }
                     }
                 }
@@ -125,6 +135,79 @@ struct VendorCoverageSheet: View {
                 .foregroundStyle(HavenColors.textPrimary)
                 .padding(.bottom, 4)
         }
+    }
+
+    // MARK: - Chez Handling Card (Phase 70.A1 follow-on F1)
+
+    /// Renders when an open `find_vendor` chez_request exists for this
+    /// gap's category. Navy-tinted (signals "we're on it" vs. the
+    /// attention-flavored salmon of an unresolved gap), single tap-row,
+    /// no action buttons. Chevron deep-links into the existing thread
+    /// via `.openChezRequest`, the same notification the push handler
+    /// uses, so the InboxView listener routes to the Chez sub-tab and
+    /// pushes ChezRequestDetailView for that id.
+    private func chezHandlingCard(
+        for item: VendorCoverageItem,
+        request: ChezRequestRow
+    ) -> some View {
+        Button {
+            Haptics.selection()
+            NotificationCenter.default.post(
+                name: .openChezRequest,
+                object: nil,
+                userInfo: ["request_id": request.id.uuidString]
+            )
+            dismiss()
+        } label: {
+            HStack(alignment: .top, spacing: HavenTheme.spacing12) {
+                ZStack {
+                    Circle()
+                        .fill(HavenColors.navy.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "person.fill.checkmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Chez is finding you a \(item.systemName)")
+                        .font(HavenTypography.title3)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+
+                    Text(chezHandlingCaption(for: request))
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .padding(.top, 6)
+            }
+            .padding(HavenTheme.spacing16)
+            .background(HavenColors.navy.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                    .stroke(HavenColors.navy.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Chez is finding you a \(item.systemName). \(chezHandlingCaption(for: request))")
+        .accessibilityHint("Open the conversation with Chez.")
+    }
+
+    private func chezHandlingCaption(for request: ChezRequestRow) -> String {
+        // Lean on the resilient SLA copy already on ChezRequestRow —
+        // it handles open / waiting-on-you / resolved + today / tomorrow
+        // / specific-date branches.
+        request.homeownerSlaCaption
     }
 
     // MARK: - Gap Card

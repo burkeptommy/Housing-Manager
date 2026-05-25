@@ -96,13 +96,9 @@ struct TasksV2RoutineOccurrenceRow: View {
     }
 
     private var dateLine: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d"
-        let dateLabel = formatter.string(from: occurrence.date)
-        if let cadence = routine?.activeMonthsSummary, !cadence.isEmpty {
-            return dateLabel
-        }
-        return dateLabel
+        // Phase 70.A1 follow-on F2 — year-aware caption so far-future
+        // occurrences (e.g. next-year seasonal routines) read as such.
+        TasksV2DateFormatting.longDay(occurrence.date)
     }
 
     private var accessibilityLabel: String {

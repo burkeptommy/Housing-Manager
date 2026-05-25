@@ -1,13 +1,20 @@
 import SwiftUI
 
-/// Phase F2 (MaintenanceScheduleView parity): leading + trailing swipe
-/// actions for cards rendered outside of a `List`. SwiftUI's native
+/// Phase F2 + Phase 70.A1 follow-on F5: leading + trailing swipe actions
+/// for cards rendered outside of a `List`. SwiftUI's native
 /// `.swipeActions` only works inside `List`; Tasks v2 uses
 /// `LazyVStack` of cards so we need a custom gesture.
 ///
+/// Phase 70.A1 follow-on F5 swapped the trailing action from "Snooze"
+/// (amber moon) to "Archive" (neutral gray archivebox) to match the
+/// Apple-notification swipe-left mental model the homeowner asked for.
+/// Snooze still exists — it just lives in the MaintenanceTaskDetailSheet
+/// actions menu now, where the small minority of users who want
+/// "come back later" instead of "out of view" can reach it.
+///
 /// Behavior matches Apple Mail / Things 3:
 ///   - Drag right past threshold → leading action (Complete, green)
-///   - Drag left past threshold → trailing action (Snooze, amber)
+///   - Drag left past threshold → trailing action (Archive, gray)
 ///   - Below threshold on release → spring back to 0
 ///   - Past threshold on release → snap to fully-revealed action +
 ///     fire callback
@@ -18,9 +25,9 @@ import SwiftUI
 /// `minimumDistance` is non-zero.
 struct SwipeActionRow<Content: View>: View {
     let onComplete: () -> Void
-    let onSnooze: () -> Void
+    let onArchive: () -> Void
     let completeLabel: String
-    let snoozeLabel: String
+    let archiveLabel: String
     @ViewBuilder let content: () -> Content
 
     @State private var offset: CGFloat = 0
@@ -39,7 +46,7 @@ struct SwipeActionRow<Content: View>: View {
     private let pastThresholdResistance: CGFloat = 0.35
 
     private enum HapticDirection { case none, leading, trailing }
-    private enum CommittedAction { case none, complete, snooze }
+    private enum CommittedAction { case none, complete, archive }
 
     var body: some View {
         ZStack {
@@ -65,9 +72,12 @@ struct SwipeActionRow<Content: View>: View {
             Spacer(minLength: 0)
 
             // Trailing (revealed by left-swipe → drag offset < 0)
+            // Phase 70.A1 follow-on F5: neutral gray archive, not amber
+            // snooze. Apple Mail / Notifications pattern — Archive is a
+            // neutral "out of view" action, not destructive.
             ZStack {
-                Rectangle().fill(HavenColors.warning)
-                actionLabel(symbol: "moon.zzz.fill", text: snoozeLabel)
+                Rectangle().fill(Color.gray)
+                actionLabel(symbol: "archivebox.fill", text: archiveLabel)
             }
             .frame(width: max(0, -offset))
             .opacity(offset < 0 ? 1 : 0)
@@ -119,7 +129,7 @@ struct SwipeActionRow<Content: View>: View {
                 if final >= actionThreshold {
                     commit(.complete)
                 } else if final <= -actionThreshold {
-                    commit(.snooze)
+                    commit(.archive)
                 } else {
                     springBack()
                 }
@@ -132,7 +142,7 @@ struct SwipeActionRow<Content: View>: View {
         isAnimating = true
         // Snap the row off-screen in the direction of commit, then
         // fire the callback. The parent list re-renders without this
-        // row (mark complete archives; snooze advances the date) so
+        // row (mark complete archives; archive removes from view) so
         // the slide-out feels native.
         withAnimation(.easeInOut(duration: 0.22)) {
             offset = action == .complete ? actionRevealWidth * 6 : -actionRevealWidth * 6
@@ -140,7 +150,7 @@ struct SwipeActionRow<Content: View>: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             switch action {
             case .complete: onComplete()
-            case .snooze: onSnooze()
+            case .archive:  onArchive()
             case .none: break
             }
             // Reset so the row can be re-used if the action didn't
@@ -163,19 +173,22 @@ struct SwipeActionRow<Content: View>: View {
 }
 
 extension View {
-    /// Apply leading (Complete) + trailing (Snooze) swipe actions to a
+    /// Apply leading (Complete) + trailing (Archive) swipe actions to a
     /// row rendered outside a List. See `SwipeActionRow` for behavior.
+    /// Phase 70.A1 follow-on F5: trailing swipe renamed Snooze→Archive
+    /// to match the Apple-notification mental model. Snooze relocated
+    /// to the task detail sheet's actions menu.
     func swipeRowActions(
         completeLabel: String = "Complete",
-        snoozeLabel: String = "Snooze",
+        archiveLabel: String = "Archive",
         onComplete: @escaping () -> Void,
-        onSnooze: @escaping () -> Void
+        onArchive: @escaping () -> Void
     ) -> some View {
         SwipeActionRow(
             onComplete: onComplete,
-            onSnooze: onSnooze,
+            onArchive: onArchive,
             completeLabel: completeLabel,
-            snoozeLabel: snoozeLabel
+            archiveLabel: archiveLabel
         ) {
             self
         }

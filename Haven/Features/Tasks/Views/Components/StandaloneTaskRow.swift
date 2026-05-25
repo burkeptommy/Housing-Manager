@@ -100,15 +100,12 @@ struct StandaloneTaskRow: View {
     }
 
     private var dueDateText: String? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        // Phase 70.A1 follow-on F2 — year-aware caption.
         let dateString = task.scheduledDate ?? task.nextDueDate
-        guard !dateString.isEmpty, let date = formatter.date(from: dateString) else {
+        guard let date = TasksV2DateFormatting.parseRowDate(dateString) else {
             return nil
         }
-        let display = DateFormatter()
-        display.dateFormat = "EEE, MMM d"
-        let label = display.string(from: date)
+        let label = TasksV2DateFormatting.longDay(date)
         return isOverdue(date) ? "Overdue · " + label : label
     }
 

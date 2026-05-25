@@ -84,9 +84,12 @@ struct QuickSchedulingSheet: View {
                 preview: dateDisplay(nextWeekDate),
                 action: { schedule(nextWeekDate) }
             )
+            // Phase 70.A1 follow-on F4: subtitle clarifies that the row
+            // OPENS a picker (it doesn't commit on its own — Schedule
+            // commits inside the picker).
             presetRow(
-                label: "Pick a date",
-                preview: nil,
+                label: "Choose a specific date",
+                preview: "Opens calendar",
                 isCustom: true,
                 action: {
                     Haptics.selection()
@@ -149,6 +152,26 @@ struct QuickSchedulingSheet: View {
             .datePickerStyle(.graphical)
             .tint(HavenColors.action)
 
+            // Phase 70.A1 follow-on F4: live preview so the homeowner
+            // sees the date they're about to commit AND knows the
+            // Schedule button is the commit step (not the date tap).
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.forward.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(HavenColors.action)
+                Text("Schedule for ")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundColor(HavenColors.textSecondary)
+                + Text(TasksV2DateFormatting.longDay(customDate))
+                    .font(HavenTypography.bodySmall.weight(.semibold))
+                    .foregroundColor(HavenColors.textPrimary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(HavenColors.action.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+
             HStack(spacing: 12) {
                 Button {
                     Haptics.selection()
@@ -160,7 +183,7 @@ struct QuickSchedulingSheet: View {
                         .font(HavenTypography.uiButton)
                         .foregroundColor(HavenColors.navy800)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
                                 .stroke(HavenColors.border, lineWidth: 1)
@@ -168,20 +191,31 @@ struct QuickSchedulingSheet: View {
                 }
                 .buttonStyle(.plain)
 
+                // Phase 70.A1 follow-on F4: bumped to .weight(.bold) +
+                // shadow so the commit affordance reads as the primary
+                // action. Pre-follow-on it looked like a peer of Back
+                // and users were tapping the date thinking it would
+                // commit on its own.
                 Button {
                     schedule(customDate)
                 } label: {
-                    Text("Schedule")
-                        .font(HavenTypography.uiButton)
-                        .foregroundColor(HavenColors.textOnAction)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
-                                .fill(HavenColors.action)
-                        )
+                    HStack(spacing: 6) {
+                        Text("Schedule")
+                            .font(HavenTypography.uiButton.weight(.bold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundColor(HavenColors.textOnAction)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                            .fill(HavenColors.action)
+                    )
+                    .havenShadow(HavenTheme.shadowElevated)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Schedule for \(TasksV2DateFormatting.longDay(customDate))")
             }
         }
     }
@@ -218,9 +252,11 @@ struct QuickSchedulingSheet: View {
     }
 
     /// "Fri, Oct 17" — concrete date format matching the Phase 70 voice.
+    /// Phase 70.A1 follow-on F2: shares the same year-aware formatter as
+    /// the row captions so a Jun preview matches the Jun row label byte-
+    /// for-byte (no "today shows year but the row didn't" mismatch when
+    /// the user crosses into next year via the picker).
     private func dateDisplay(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d"
-        return formatter.string(from: date)
+        TasksV2DateFormatting.longDay(date)
     }
 }

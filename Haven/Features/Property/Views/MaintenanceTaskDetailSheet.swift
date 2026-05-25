@@ -2724,6 +2724,10 @@ struct MaintenanceTaskDetailSheet: View {
             Button {
                 Haptics.light()
                 Analytics.track(.maintenanceTaskSnoozed, ["task_id": task.id.uuidString])
+                // Phase 70.A1 follow-on F5 — Snooze's only entry point
+                // is now this detail-sheet button (was leading-swipe pre-
+                // follow-on; the swipe slot was repurposed for Archive).
+                Analytics.track(.tasksV2SnoozeFromDetailSheet, ["source": "detail_sheet"])
                 showSnooze = true
             } label: {
                 HStack {

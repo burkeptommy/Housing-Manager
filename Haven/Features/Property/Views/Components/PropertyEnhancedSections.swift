@@ -188,6 +188,10 @@ struct PropertySystemsCategoryTile: View {
     let icon: String
     let title: String
     let systemCount: Int
+    /// Phase 70.A1 follow-on G4: retained for callsite compatibility but
+    /// no longer renders a visual dot — the "N need profile" sub-line on
+    /// the Browse header already communicates the same signal without
+    /// the ambiguous tile-level indicator the homeowner couldn't parse.
     var needsAttention: Bool = false
     var onTap: () -> Void
 
@@ -197,28 +201,14 @@ struct PropertySystemsCategoryTile: View {
             onTap()
         }) {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(HavenColors.navy)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(HavenColors.indigo50)
-                        )
-
-                    if needsAttention {
-                        // Phase 95.1 fix: was HavenColors.action (salmon).
-                        // Salmon is reserved for primary CTAs, not
-                        // attention-indicator dots. Semantic warning
-                        // (amber) preserves the visual signal without
-                        // the rule violation.
-                        Circle()
-                            .fill(HavenColors.warning)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 8, y: -4)
-                    }
-                }
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(HavenColors.navy)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(HavenColors.indigo50)
+                    )
 
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))

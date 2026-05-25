@@ -22,8 +22,9 @@ struct FlexibleTasksSection: View {
     let onSeeAll: () -> Void
     // Phase F2: leading + trailing swipe callbacks. Defaults are no-op
     // so callers that don't wire them keep the existing tap-only flow.
+    // Phase 70.A1 follow-on F5: trailing renamed Snooze→Archive.
     var onComplete: (MaintenanceTaskDBRow) -> Void = { _ in }
-    var onSnooze: (MaintenanceTaskDBRow) -> Void = { _ in }
+    var onArchive: (MaintenanceTaskDBRow) -> Void = { _ in }
 
     private static let visibleCap = 5
 
@@ -38,9 +39,9 @@ struct FlexibleTasksSection: View {
                         onTap: { onTap(task) }
                     )
                     .swipeRowActions(
-                        snoozeLabel: "Snooze 1wk",
+                        archiveLabel: "Archive",
                         onComplete: { onComplete(task) },
-                        onSnooze: { onSnooze(task) }
+                        onArchive: { onArchive(task) }
                     )
                 }
                 if tasks.count > Self.visibleCap {

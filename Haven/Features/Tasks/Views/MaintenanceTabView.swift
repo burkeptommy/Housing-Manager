@@ -68,6 +68,23 @@ struct MaintenanceTabView: View {
     /// Cleared automatically ~1.5s later by `handleDeepLink`.
     @State private var highlightedTaskId: UUID?
 
+    /// Phase 70.A1 follow-on F4: in-view confirmation pill that appears
+    /// at the top of the screen ~3s after a QuickSchedulingSheet commit.
+    /// Independent of layout so it works whether the just-scheduled task
+    /// stays in the season feed or jumps to a different month/season.
+    /// Tap routes through `detailTask` so the user can verify the write
+    /// landed where they expect.
+    @State private var lastScheduledToast: ScheduledToast?
+
+    /// Phase 70.A1 follow-on G3: presents the Completed view sheet.
+    /// Reached from the new clock-counterclockwise icon in HeaderSwitcher.
+    @State private var showCompletedSheet: Bool = false
+
+    /// Phase 70.A1 follow-on I3: undo toast for accidental swipe gestures.
+    /// Auto-dismisses after 5s. Tap "Undo" calls the matching undo method
+    /// on MaintenanceViewModel to reverse the archive / completion.
+    @State private var lastSwipeToast: SwipeToast?
+
     // Phase 70.A1.x removed the full-year mode state — the season feed
     // is always scoped to one season tile, and the new "Active Routines
     // This Season" card surfaces the routine density that the old
@@ -109,6 +126,12 @@ struct MaintenanceTabView: View {
                             selectionMode = false
                             selectedTaskIds.removeAll()
                         }
+                    },
+                    // Phase 70.A1 follow-on G3 — Completed view entry.
+                    // Only on Maintenance mode; HandymanTabView has its
+                    // own visit-history surface.
+                    onShowCompleted: {
+                        showCompletedSheet = true
                     }
                 )
 
@@ -136,6 +159,13 @@ struct MaintenanceTabView: View {
                 )
 
                 miniHeroSection
+
+                // Phase 70.A1 follow-on F3 — Up Next 14-day strip.
+                // Ignores season scope so scheduled work that crosses
+                // a season boundary (book "Next week" from Spring → row
+                // lands in June → Summer tile, but UP NEXT still shows
+                // it) never disappears.
+                upNextSection
 
                 // Phase 70 (Tasks v2): unified view sections.
                 //
@@ -179,6 +209,25 @@ struct MaintenanceTabView: View {
         .safeAreaInset(edge: .bottom) {
             bulkActionBar
         }
+        // Phase 70.A1 follow-on F4 — toast pill anchored to the top safe
+        // area. Auto-dismisses after 3s; tapping routes through detailTask
+        // so the homeowner can verify the write landed.
+        .overlay(alignment: .top) {
+            VStack(spacing: 8) {
+                if let toast = lastScheduledToast {
+                    scheduledConfirmationToast(toast)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                if let toast = lastSwipeToast {
+                    swipeUndoToast(toast)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.top, 8)
+        }
+        .animation(HavenTheme.animationStandard, value: lastScheduledToast)
+        .animation(HavenTheme.animationStandard, value: lastSwipeToast)
         .task {
             if let householdId {
                 await viewModel.load(householdId: householdId)
@@ -338,6 +387,12 @@ struct MaintenanceTabView: View {
                         detailTask = nil
                     }
                 )
+            }
+        }
+        // Phase 70.A1 follow-on G3 — Completed sheet.
+        .sheet(isPresented: $showCompletedSheet) {
+            if let householdId {
+                CompletedTasksSheet(householdId: householdId)
             }
         }
         .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
@@ -758,6 +813,50 @@ struct MaintenanceTabView: View {
         }
     }
 
+    /// Phase 70.A1 follow-on F3 — Up Next 14-day horizontal strip. Sits
+    /// directly under MiniHero so it's the first thing the homeowner
+    /// sees after the season ribbon. Empty when the next 14 days have
+    /// nothing in them (newly-onboarded households / DIY-only flows).
+    @ViewBuilder
+    private var upNextSection: some View {
+        let entries = viewModel.upNext()
+        if !entries.isEmpty {
+            UpNextStripSection(
+                entries: entries,
+                contractor: { entry in
+                    guard let id = entry.assignedContractorId else { return nil }
+                    return maintenanceVM.contractors.first { $0.id == id }
+                },
+                onTap: { entry in
+                    let daysOut = Calendar.current.dateComponents(
+                        [.day],
+                        from: Calendar.current.startOfDay(for: Date()),
+                        to: entry.date
+                    ).day ?? 0
+                    Analytics.track(.tasksV2UpNextRowTapped, [
+                        "entry_type": entry.analyticsType,
+                        "days_out": String(daysOut)
+                    ])
+                    if let task = entry.taskRow {
+                        detailTask = task
+                    } else if let occ = entry.occurrence,
+                              let householdId {
+                        pushTarget = .routineDetail(occ.routine, householdId)
+                    }
+                },
+                onSeeAll: {
+                    showYearOverview = true
+                }
+            )
+            .onAppear {
+                Analytics.track(.tasksV2UpNextRendered, [
+                    "entry_count": String(entries.count),
+                    "days_window": "14"
+                ])
+            }
+        }
+    }
+
     /// Phase 70.A1.x: Flexible-task section. Renders between "Needs
     /// your attention" and "This Season's Tasks" — Flexible items have
     /// no seasonal anchor by design (EV charger inspection, drain
@@ -780,7 +879,10 @@ struct MaintenanceTabView: View {
                 },
                 onSeeAll: { showYearOverview = true },
                 onComplete: { task in Task { await maintenanceVM.completeTask(task) } },
-                onSnooze: { task in Task { await maintenanceVM.snoozeTask(task, days: 7) } }
+                onArchive: { task in
+                    Analytics.track(.tasksV2SwipedArchive, ["source": "flexible_row"])
+                    Task { await maintenanceVM.archiveTask(task) }
+                }
             )
             .padding(.horizontal, TasksV5.pageMargin)
             .padding(.bottom, TasksV5.sectionGap)
@@ -844,11 +946,26 @@ struct MaintenanceTabView: View {
                         quickScheduleTask = task
                     }
                 )
-                // Phase F2: leading swipe = complete, trailing = snooze 1wk.
+                // Phase F2 + 70.A1 follow-on F5: leading swipe = complete,
+                // trailing = archive (was snooze pre-follow-on; snooze
+                // relocated to MaintenanceTaskDetailSheet menu).
+                // Phase 70.A1 follow-on I3: each commit lands an
+                // undo toast so accidental swipes are recoverable.
                 .swipeRowActions(
-                    snoozeLabel: "Snooze 1wk",
-                    onComplete: { Task { await maintenanceVM.completeTask(task) } },
-                    onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
+                    archiveLabel: "Archive",
+                    onComplete: {
+                        Task {
+                            await maintenanceVM.completeTask(task)
+                            lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                        }
+                    },
+                    onArchive: {
+                        Analytics.track(.tasksV2SwipedArchive, ["source": "bundle_card"])
+                        Task {
+                            await maintenanceVM.archiveTask(task)
+                            lastSwipeToast = SwipeToast(taskId: task.id, action: .archived, taskTitle: task.title)
+                        }
+                    }
                 )
             }
 
@@ -870,9 +987,20 @@ struct MaintenanceTabView: View {
                     }
                 )
                 .swipeRowActions(
-                    snoozeLabel: "Snooze 1wk",
-                    onComplete: { Task { await maintenanceVM.completeTask(task) } },
-                    onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
+                    archiveLabel: "Archive",
+                    onComplete: {
+                        Task {
+                            await maintenanceVM.completeTask(task)
+                            lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                        }
+                    },
+                    onArchive: {
+                        Analytics.track(.tasksV2SwipedArchive, ["source": "standalone_row"])
+                        Task {
+                            await maintenanceVM.archiveTask(task)
+                            lastSwipeToast = SwipeToast(taskId: task.id, action: .archived, taskTitle: task.title)
+                        }
+                    }
                 )
             }
 
@@ -933,13 +1061,49 @@ struct MaintenanceTabView: View {
         } else {
             content()
                 .contextMenu {
+                    // Phase 70.A1 follow-on J1 — long-press actions match
+                    // the swipe gestures (Done = right-swipe, Archive =
+                    // left-swipe) so power users have a discoverable
+                    // alternative when the swipe is awkward (small touch
+                    // targets, accessibility settings, etc.). All three
+                    // committal actions land an Undo toast via I3 so
+                    // accidents recover the same way.
+                    Button {
+                        Task {
+                            await maintenanceVM.completeTask(task)
+                            lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                        }
+                    } label: {
+                        Label("Mark done", systemImage: "checkmark.circle")
+                    }
+
+                    Button {
+                        quickScheduleTask = task
+                    } label: {
+                        Label("Reschedule", systemImage: "calendar")
+                    }
+
+                    Divider()
+
                     Button {
                         withAnimation(HavenTheme.animationStandard) {
                             selectionMode = true
                             selectedTaskIds = [task.id]
                         }
                     } label: {
-                        Label("Select", systemImage: "checkmark.circle")
+                        Label("Select", systemImage: "checkmark.circle.dashed")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        Analytics.track(.tasksV2SwipedArchive, ["source": "context_menu"])
+                        Task {
+                            await maintenanceVM.archiveTask(task)
+                            lastSwipeToast = SwipeToast(taskId: task.id, action: .archived, taskTitle: task.title)
+                        }
+                    } label: {
+                        Label("Archive", systemImage: "archivebox")
                     }
                 }
         }
@@ -1132,17 +1296,158 @@ struct MaintenanceTabView: View {
     }
 
     /// Concrete-date meta for a standalone task in the Needs Attention
-    /// section. "Due Tue, Sept 20" — homeowner voice.
+    /// section. "Due Tue, Sept 20" — homeowner voice. Year-aware per
+    /// Phase 70.A1 follow-on F2 so a 2027-anchored Spring task reads as
+    /// "Due Thu, Feb 4, 2027" instead of looking past-dated next to a
+    /// 2026 May row.
     private func standaloneDecisionMeta(for task: MaintenanceTaskDBRow) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
         let dateString = task.scheduledDate ?? task.nextDueDate
-        if !dateString.isEmpty, let date = formatter.date(from: dateString) {
-            let display = DateFormatter()
-            display.dateFormat = "EEE, MMM d"
-            return "Due \(display.string(from: date)) · Pick a vendor."
+        if let date = TasksV2DateFormatting.parseRowDate(dateString) {
+            return "Due \(TasksV2DateFormatting.longDay(date)) · Pick a vendor."
         }
         return "Pick a vendor."
+    }
+
+    // MARK: - Phase 70.A1 follow-on F4 — scheduling-confirmation toast
+
+    @ViewBuilder
+    private func scheduledConfirmationToast(_ toast: ScheduledToast) -> some View {
+        Button {
+            // Open the task detail inline so the user can verify where
+            // the row landed. Tasks-tab patterns elsewhere route through
+            // detailTask for the same reason.
+            if let task = maintenanceVM.tasks.first(where: { $0.id == toast.taskId }) {
+                detailTask = task
+            }
+            lastScheduledToast = nil
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(HavenColors.success.opacity(0.18))
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(HavenColors.success)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Scheduled for \(TasksV2DateFormatting.longDay(toast.scheduledFor))")
+                        .font(HavenTypography.uiLabel.weight(.semibold))
+                        .foregroundColor(HavenColors.textPrimary)
+                        .lineLimit(1)
+                    Text("Tap to view")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundColor(HavenColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(HavenColors.textTertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                    .stroke(HavenColors.success.opacity(0.3), lineWidth: 1)
+            )
+            .havenShadow(HavenTheme.shadowElevated)
+        }
+        .buttonStyle(.plain)
+        .task(id: toast.id) {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            // Only clear if this toast is still the live one (avoids
+            // racing a newer toast that just replaced this one).
+            if lastScheduledToast?.id == toast.id {
+                lastScheduledToast = nil
+            }
+        }
+        .accessibilityLabel("Scheduled for \(TasksV2DateFormatting.longDay(toast.scheduledFor)). Tap to view.")
+    }
+
+    // MARK: - Phase 70.A1 follow-on I3 — swipe undo toast
+
+    @ViewBuilder
+    private func swipeUndoToast(_ toast: SwipeToast) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(toastTint(toast).opacity(0.18))
+                    .frame(width: 28, height: 28)
+                Image(systemName: toastIcon(toast))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(toastTint(toast))
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(toast.headline)
+                    .font(HavenTypography.uiLabel.weight(.semibold))
+                    .foregroundColor(HavenColors.textPrimary)
+                    .lineLimit(1)
+                Text(toast.taskTitle)
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundColor(HavenColors.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Button {
+                Task { await undoSwipe(toast) }
+            } label: {
+                Text("Undo")
+                    .font(HavenTypography.uiLabel.weight(.bold))
+                    .foregroundColor(HavenColors.action)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .overlay(
+                        Capsule().stroke(HavenColors.action.opacity(0.4), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .overlay(
+            RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                .stroke(toastTint(toast).opacity(0.3), lineWidth: 1)
+        )
+        .havenShadow(HavenTheme.shadowElevated)
+        .task(id: toast.id) {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            if lastSwipeToast?.id == toast.id {
+                lastSwipeToast = nil
+            }
+        }
+        .accessibilityLabel("\(toast.headline) \(toast.taskTitle). Tap Undo to restore.")
+    }
+
+    private func toastTint(_ toast: SwipeToast) -> Color {
+        switch toast.action {
+        case .completed: return HavenColors.success
+        case .archived:  return HavenColors.textSecondary
+        }
+    }
+
+    private func toastIcon(_ toast: SwipeToast) -> String {
+        switch toast.action {
+        case .completed: return "checkmark"
+        case .archived:  return "archivebox.fill"
+        }
+    }
+
+    @MainActor
+    private func undoSwipe(_ toast: SwipeToast) async {
+        // Reverse the archive write either way — completed and archived
+        // both flip `is_archived=true`. Completion additionally clears
+        // the `last_completed_date` stamp the G1 path wrote.
+        switch toast.action {
+        case .completed:
+            await maintenanceVM.undoCompletion(taskId: toast.taskId)
+        case .archived:
+            await maintenanceVM.undoArchive(taskId: toast.taskId)
+        }
+        lastSwipeToast = nil
     }
 
     // MARK: - Phase 70 inline scheduling
@@ -1162,6 +1467,11 @@ struct MaintenanceTabView: View {
         do {
             _ = try await DatabaseService.shared.updateMaintenanceTask(id: task.id, update)
             Haptics.success()
+            // Phase 70.A1 follow-on F4 — confirmation toast. Independent
+            // of where the row lands after the write (same-month "this
+            // week" → stays put; cross-season "next week" → moves to a
+            // different bucket but the toast is still visible).
+            lastScheduledToast = ScheduledToast(taskId: task.id, taskTitle: task.title, scheduledFor: date)
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
             await maintenanceVM.loadTasks()
 
@@ -1533,6 +1843,41 @@ struct MaintenanceTabView: View {
         ])
     }
 
+    // MARK: - Phase 70.A1 follow-on F4 — ScheduledToast model
+
+    /// Backs the in-view confirmation pill. Identifiable so SwiftUI's
+    /// diffing replaces the toast cleanly when a second schedule lands
+    /// before the first toast auto-dismisses.
+    struct ScheduledToast: Identifiable, Equatable {
+        let id = UUID()
+        let taskId: UUID
+        let taskTitle: String
+        let scheduledFor: Date
+    }
+
+    // MARK: - Phase 70.A1 follow-on I3 — SwipeToast model
+
+    /// Tom flagged accidental swipe-complete losing tasks. SwipeToast
+    /// surfaces a 5-second "Undo" affordance right after a swipe so
+    /// the user can recover before having to hunt through Archived.
+    /// Mirrors Apple Mail / Notes — post-action undo, not pre-action
+    /// confirmation.
+    struct SwipeToast: Identifiable, Equatable {
+        enum Action: Equatable { case completed, archived }
+
+        let id = UUID()
+        let taskId: UUID
+        let action: Action
+        let taskTitle: String
+
+        var headline: String {
+            switch action {
+            case .completed: return "Marked done"
+            case .archived:  return "Archived"
+            }
+        }
+    }
+
     // MARK: - Navigation destinations
 
     enum MaintenancePush: Hashable, Identifiable {
@@ -1773,6 +2118,99 @@ enum SeasonEntry: Identifiable {
     }
 }
 
+/// Phase 70.A1 follow-on F3 — single entry in the Up Next 14-day strip.
+/// The strip ignores season scope so users never lose track of a
+/// scheduled task that crossed a season boundary.
+enum UpNextEntry: Identifiable {
+    case task(MaintenanceTaskDBRow)
+    case routineOccurrence(RoutineOccurrence)
+
+    var id: String {
+        switch self {
+        case .task(let t): return "upnext:task:\(t.id.uuidString)"
+        case .routineOccurrence(let o): return "upnext:occurrence:\(o.id)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .task(let t): return t.title
+        case .routineOccurrence(let o):
+            return o.routine.presentationLabel.isEmpty ? o.routine.label : o.routine.presentationLabel
+        }
+    }
+
+    var date: Date {
+        switch self {
+        case .task(let t):
+            let s = t.scheduledDate ?? t.nextDueDate
+            return TasksV2DateFormatting.parseRowDate(s) ?? Date.distantFuture
+        case .routineOccurrence(let o):
+            return o.date
+        }
+    }
+
+    /// Drives the badge tint + label on the card. Scheduled-tomorrow
+    /// reads softer than scheduled-3-weeks-out, overdue reads loudest.
+    var status: UpNextCard.Status {
+        let cal = Calendar.current
+        let now = Date()
+        switch self {
+        case .task(let t):
+            let isScheduled = !(t.scheduledDate ?? "").isEmpty
+            if date < cal.startOfDay(for: now) { return .overdue }
+            if cal.isDateInToday(date)    { return .today }
+            if cal.isDateInTomorrow(date) { return .tomorrow }
+            return isScheduled ? .scheduled : .due
+        case .routineOccurrence:
+            if cal.isDateInToday(date)    { return .today }
+            if cal.isDateInTomorrow(date) { return .tomorrow }
+            return .scheduled
+        }
+    }
+
+    var taskRow: MaintenanceTaskDBRow? {
+        if case .task(let t) = self { return t }
+        return nil
+    }
+
+    var occurrence: RoutineOccurrence? {
+        if case .routineOccurrence(let o) = self { return o }
+        return nil
+    }
+
+    /// SF Symbol used in the "no vendor on file" fallback avatar.
+    var categoryIcon: String {
+        switch self {
+        case .task(let t):
+            if let templateId = t.templateId,
+               let colonRange = templateId.range(of: ":") {
+                let category = String(templateId[..<colonRange.lowerBound])
+                return SystemCategoryRegistry.metaForCategory(category)?.icon
+                    ?? "wrench.and.screwdriver"
+            }
+            return "wrench.and.screwdriver"
+        case .routineOccurrence(let o):
+            return o.routine.resolvedIcon
+        }
+    }
+
+    var assignedContractorId: UUID? {
+        switch self {
+        case .task(let t): return t.assignedContractorId
+        case .routineOccurrence(let o): return o.routine.vendorId
+        }
+    }
+
+    /// Analytics property — task or routine_occurrence, no PII.
+    var analyticsType: String {
+        switch self {
+        case .task: return "task"
+        case .routineOccurrence: return "routine_occurrence"
+        }
+    }
+}
+
 @MainActor
 final class MaintenanceTabViewModel: ObservableObject {
     @Published private(set) var routines: [RoutineRow] = []
@@ -1865,37 +2303,89 @@ final class MaintenanceTabViewModel: ObservableObject {
         }
     }
 
+    /// Phase 70.A1 follow-on F3 — Up Next 14-day strip data source.
+    /// Surfaces tasks and routine occurrences in the next N days
+    /// (default 14) regardless of which season tile the user has
+    /// active. Solves the "scheduled into next season → invisible"
+    /// problem because the window crosses season boundaries.
+    ///
+    /// Includes:
+    ///  - Maintenance tasks where `scheduled_date OR next_due_date`
+    ///    falls in [now, now+windowDays], `parent_routine_id == nil`
+    ///    (routine-parented tasks render under their routine card),
+    ///    not archived, not completed, not vehicle-scoped (the vehicle
+    ///    program section owns vehicle visits).
+    ///  - Routine occurrences from RoutineOccurrenceExpander over the
+    ///    same window. Paused / archived routines short-circuit there.
+    ///
+    /// Sorted ascending by date. No filtering by activeStatsFilter —
+    /// the whole point is a season-agnostic "what's coming up" surface.
+    func upNext(
+        now: Date = Date(),
+        windowDays: Int = 14
+    ) -> [UpNextEntry] {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: now)
+        guard let end = calendar.date(byAdding: .day, value: windowDays, to: startOfToday) else { return [] }
+        let propScope = self.activePropertyId
+
+        // Tasks in the window
+        let allTasks = MaintenanceViewModel.shared.tasks.filter { task in
+            if let scope = propScope, task.propertyId != scope { return false }
+            guard task.vehicleId == nil else { return false }
+            if task.parentRoutineId != nil { return false }
+            if let last = task.lastCompletedDate, !last.isEmpty { return false }
+            if (task.isArchived ?? false) == true { return false }
+            // Bundle children are inline line items in the parent card,
+            // never standalone — same exclusion as `seasonFeed`.
+            if let templateKey = task.templateId,
+               let template = MaintenanceTemplates.template(forKey: templateKey),
+               template.bundleId != nil {
+                return false
+            }
+            let s = task.scheduledDate ?? task.nextDueDate
+            guard let date = TasksV2DateFormatting.parseRowDate(s) else { return false }
+            return date >= startOfToday && date <= end
+        }
+        let taskEntries: [UpNextEntry] = allTasks.map { .task($0) }
+
+        // Routine occurrences in the window
+        let occurrences = RoutineOccurrenceExpander.occurrences(
+            routines: routines.filter { propScope == nil || $0.propertyId == propScope },
+            from: startOfToday,
+            through: end,
+            calendar: calendar
+        )
+        let occurrenceEntries: [UpNextEntry] = occurrences.map { .routineOccurrence($0) }
+
+        return (taskEntries + occurrenceEntries).sorted { $0.date < $1.date }
+    }
+
     func dueLabel() -> String? {
         // Pick the earliest due date across pending decisions; fall back to nil.
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dates = pendingDecisions().compactMap { formatter.date(from: $0.nextExpectedDate) }
+        // Phase 70.A1 follow-on F2: year-aware so cross-year dates read
+        // unambiguously in the section subheader.
+        let dates = pendingDecisions().compactMap {
+            TasksV2DateFormatting.parseRowDate($0.nextExpectedDate)
+        }
         guard let soonest = dates.min() else { return nil }
-        let display = DateFormatter()
-        display.dateFormat = "MMM d"
-        return "Due \(display.string(from: soonest))"
+        return "Due \(TasksV2DateFormatting.shortDay(soonest))"
     }
 
     func decisionMeta(for routine: RoutineRow) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        if let date = formatter.date(from: routine.nextExpectedDate) {
-            let display = DateFormatter()
-            display.dateFormat = "MMM d"
-            return "Due \(display.string(from: date)) · Pick a vendor before service can start."
+        // Phase 70.A1 follow-on F2 — year-aware caption.
+        if let date = TasksV2DateFormatting.parseRowDate(routine.nextExpectedDate) {
+            return "Due \(TasksV2DateFormatting.shortDay(date)) · Pick a vendor before service can start."
         }
         return "Pick a vendor before service can start."
     }
 
     func nextEventLabel(for routine: RoutineRow) -> String? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: routine.nextExpectedDate) else {
+        // Phase 70.A1 follow-on F2 — year-aware caption.
+        guard let date = TasksV2DateFormatting.parseRowDate(routine.nextExpectedDate) else {
             return routine.activeMonthsSummary
         }
-        let display = DateFormatter()
-        display.dateFormat = "MMM d"
-        return display.string(from: date)
+        return TasksV2DateFormatting.shortDay(date)
     }
 
     // MARK: Vehicle helpers
@@ -2181,6 +2671,15 @@ final class MaintenanceTabViewModel: ObservableObject {
     private func isTask(_ task: MaintenanceTaskDBRow, in season: Season) -> Bool {
         if task.parentRoutineId != nil { return false }
 
+        // Phase 70.A1 follow-on H1 — year-scope every task placement.
+        // A task whose nextDueDate rolled to next year (because this
+        // year's anchor already passed) shouldn't show under this
+        // year's tile. The user comes back to that work when next
+        // year's season arrives, not now.
+        let dateString = task.scheduledDate ?? task.nextDueDate
+        guard let date = TasksV2DateFormatting.parseRowDate(dateString) else { return false }
+        guard MaintenanceTabViewModel.dateBelongsTo(season: season, on: date) else { return false }
+
         if let timing = task.seasonalTiming?.trimmingCharacters(in: .whitespacesAndNewlines),
            !timing.isEmpty {
             // Phase 70.A1.x: Flexible tasks never match a specific
@@ -2192,12 +2691,43 @@ final class MaintenanceTabViewModel: ObservableObject {
             return labels.contains(season.rawValue)
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateString = task.scheduledDate ?? task.nextDueDate
-        guard let date = formatter.date(from: dateString) else { return false }
-        let month = Calendar.current.component(.month, from: date)
-        return season.months.contains(month)
+        return true
+    }
+
+    /// Phase 70.A1 follow-on H1 — single source of truth for "does this
+    /// date belong to THIS year's instance of `season`?" Winter spans
+    /// year boundaries (Dec[currentYear] + Jan/Feb[currentYear+1]), so
+    /// we treat the Dec→Feb stretch as one continuous Winter window.
+    /// Spring/Summer/Fall stay within one calendar year.
+    static func dateBelongsTo(
+        season: Season,
+        on date: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        let currentYear = calendar.component(.year, from: now)
+        let dateYear = calendar.component(.year, from: date)
+        let dateMonth = calendar.component(.month, from: date)
+        let isWinterSeason = season.months.sorted() == [1, 2, 12]
+        if isWinterSeason {
+            // This winter = Dec of currentYear + Jan/Feb of currentYear+1.
+            // Pre-Dec we look back at Jan/Feb of currentYear (winter has
+            // half-arrived); from Dec onward we look forward.
+            let currentMonth = calendar.component(.month, from: now)
+            if currentMonth >= 12 {
+                // Dec of current → Feb of next
+                if dateMonth == 12 { return dateYear == currentYear }
+                if dateMonth == 1 || dateMonth == 2 { return dateYear == currentYear + 1 }
+                return false
+            } else {
+                // Jan-Nov current → "this winter" = the upcoming Dec[currentYear] + Jan/Feb[currentYear+1]
+                if dateMonth == 12 { return dateYear == currentYear }
+                if dateMonth == 1 || dateMonth == 2 { return dateYear == currentYear + 1 }
+                return false
+            }
+        }
+        guard dateYear == currentYear else { return false }
+        return season.months.contains(dateMonth)
     }
 
     /// Phase 70.A1.x: Flexible tasks are season-independent. They render
