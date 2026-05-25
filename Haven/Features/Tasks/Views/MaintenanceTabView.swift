@@ -58,6 +58,10 @@ struct MaintenanceTabView: View {
     /// fullScreenCover so the 18-month linear list reads as a
     /// "different mode" without losing scroll context in the parent.
     @State private var showYearOverview: Bool = false
+    /// Phase H: AddMaintenanceTaskSheet presented inline from the Add
+    /// menu. Replaces the old "punt to MaintenanceScheduleView and
+    /// open from its toolbar" path.
+    @State private var showAddTaskSheet: Bool = false
 
     /// Phase 70 (Tasks v2): Task id whose row should pulse a salmon
     /// highlight ring after a deep-link arrival (`.openMaintenanceTask`).
@@ -227,6 +231,13 @@ struct MaintenanceTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openMaintenanceTask)) { notification in
             handleDeepLink(notification)
         }
+        // Phase H — Dashboard's "View full schedule" posts this after
+        // switching to the Tasks tab. Auto-opens the Year overview /
+        // Timeline scrub fullScreenCover, replacing the old route into
+        // MaintenanceScheduleView's Calendar layout.
+        .onReceive(NotificationCenter.default.publisher(for: .openTasksYearOverview)) { _ in
+            showYearOverview = true
+        }
         // Phase 70 (Tasks v2) — inline 1-tap scheduler. Presented when
         // the homeowner taps the "Book it" CTA on a bundle parent card.
         // Half-detent so the user keeps scroll context behind it.
@@ -246,6 +257,20 @@ struct MaintenanceTabView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        // Phase H — "Add a one-off task" presents AddMaintenanceTaskSheet
+        // inline. Replaces the old route through MaintenanceScheduleView's
+        // toolbar; same props pulled from maintenanceVM directly.
+        .sheet(isPresented: $showAddTaskSheet) {
+            AddMaintenanceTaskSheet(
+                properties: maintenanceVM.properties,
+                systems: maintenanceVM.systems,
+                vehicles: maintenanceVM.vehicles,
+                contractors: maintenanceVM.contractors,
+                householdUsers: maintenanceVM.users,
+                householdFamilyMembers: maintenanceVM.familyMembers,
+                viewModel: maintenanceVM
+            )
         }
         // Phase G2 — Year overview / Timeline scrub. fullScreenCover
         // so the 18-month list reads as a distinct mode. Tap any row
@@ -317,7 +342,7 @@ struct MaintenanceTabView: View {
         }
         .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
             Button("Add a routine") { pushTarget = .routinesList }
-            Button("Add a one-off task") { pushTarget = .scheduleView }
+            Button("Add a one-off task") { showAddTaskSheet = true }
             Button("Browse all services") { pushTarget = .recommendedServices }
             // Phase F4: bulk-select entry. Tapping enters selection mode
             // with no rows selected. User taps rows to select then chooses
@@ -365,7 +390,7 @@ struct MaintenanceTabView: View {
                 eyebrow: "Needs your decision",
                 sub: viewModel.dueLabel(),
                 action: decisions.count > 3 ? .init(title: "See all", perform: {
-                    pushTarget = .scheduleView
+                    showYearOverview = true
                 }) : nil
             )
             .padding(.bottom, TasksV5.sectionLabelGap)
@@ -671,7 +696,7 @@ struct MaintenanceTabView: View {
                 eyebrow: "Needs your attention",
                 sub: viewModel.dueLabel(),
                 action: decisions.count > 5 ? .init(title: "See all", perform: {
-                    pushTarget = .scheduleView
+                    showYearOverview = true
                 }) : nil
             )
             .padding(.bottom, TasksV5.sectionLabelGap)
@@ -722,7 +747,13 @@ struct MaintenanceTabView: View {
                 // homeowner sees the delegation status at a glance.
                 chezOwned: task.isChezOwned
             ) {
-                pushTarget = .scheduleView
+                // Phase H: open the task detail sheet inline so the
+                // homeowner picks a vendor from the existing path
+                // (FindLocalVendorSheet / ContractorDirectoryView).
+                // Previously this pushed MaintenanceScheduleView which
+                // dumped them into a full-tab list — confusing for a
+                // single-task action.
+                detailTask = task
             }
         }
     }
@@ -747,7 +778,7 @@ struct MaintenanceTabView: View {
                 onTap: { task in
                     quickScheduleTask = task
                 },
-                onSeeAll: { pushTarget = .scheduleView },
+                onSeeAll: { showYearOverview = true },
                 onComplete: { task in Task { await maintenanceVM.completeTask(task) } },
                 onSnooze: { task in Task { await maintenanceVM.snoozeTask(task, days: 7) } }
             )

@@ -34,6 +34,15 @@ extension Notification.Name {
     /// inbox item detail action menu, the activity feed "view task"
     /// link, and the email forwarding pipeline.
     static let openMaintenanceTask = Notification.Name("openMaintenanceTask")
+    /// Phase H — opens the Tasks v2 TasksTimelineSheet (18-month linear
+    /// scrub) on the Maintenance tab. Used by Dashboard's "View full
+    /// schedule" link as a direct replacement for the retired
+    /// MaintenanceScheduleView Calendar destination.
+    ///
+    /// Caller responsibility: post `.switchToTab` (tab 2) first so the
+    /// Tasks tab is foreground; this notification asks MaintenanceTabView
+    /// to open the year overview sheet.
+    static let openTasksYearOverview = Notification.Name("openTasksYearOverview")
     static let homeSystemChanged = Notification.Name("homeSystemChanged")
     static let contractorChanged = Notification.Name("contractorChanged")
     /// Phase 19l: Posted when a NEW contractor is created (not edited).
