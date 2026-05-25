@@ -18554,6 +18554,7 @@ function countForView(view) {
     // shouldn't push the badge up since they're "done".
     const apps = state.vendorApplications?.items || [];
     return apps.filter((a) => a.status === "pending_email_confirm" || a.status === "live_unverified").length;
+  }
   // Phase 86E.5 — fix nav counts for the customer-service views.
   // These read from live state caches (chezRequests, upcoming.items,
   // vendorApps.applications, today.* counters), NOT from state.adminItems
