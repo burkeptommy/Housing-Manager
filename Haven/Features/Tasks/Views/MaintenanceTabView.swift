@@ -34,6 +34,14 @@ struct MaintenanceTabView: View {
     /// heavy Phase 56.4 timeline) just to re-tap the same row from
     /// inside that view.
     @State private var detailTask: MaintenanceTaskDBRow?
+    /// Phase F3: MaintenanceScheduleView parity — duplicate banner.
+    /// `DuplicateDetector` scans routines + tasks for high-confidence
+    /// match pairs (same vendor + category family + title similarity);
+    /// dismissed pairs are filtered for 30 days. Banner renders above
+    /// the season banner; tap presents the queue review sheet.
+    @State private var detectedDuplicates: [DuplicateDetector.Match] = []
+    @State private var duplicateBannerDismissedThisSession: Bool = false
+    @State private var reviewingMatch: DuplicateDetector.Match?
 
     /// Phase 70 (Tasks v2): Task id whose row should pulse a salmon
     /// highlight ring after a deep-link arrival (`.openMaintenanceTask`).
@@ -108,6 +116,8 @@ struct MaintenanceTabView: View {
                 // `viewModel.seasonFeed(activeSeason)` so the YearRibbon
                 // count == the rendered row count. The old section
                 // helpers are kept below for safety + rollback.
+                duplicateBannerSection
+
                 seasonScopeBannerSection
 
                 statsFilterStripSection
@@ -141,6 +151,7 @@ struct MaintenanceTabView: View {
                 await viewModel.load(householdId: householdId)
             }
             await maintenanceVM.loadTasks()
+            await loadDuplicates()
 
             // Phase 70.A1 (Summer/Winter library expansion v3): seed
             // the 8 new templates onto existing households once. The
@@ -167,10 +178,16 @@ struct MaintenanceTabView: View {
             await maintenanceVM.loadTasks()
         }
         .onReceive(NotificationCenter.default.publisher(for: .routineChanged)) { _ in
-            Task { if let householdId { await viewModel.load(householdId: householdId) } }
+            Task {
+                if let householdId { await viewModel.load(householdId: householdId) }
+                await loadDuplicates()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
-            Task { await maintenanceVM.loadTasks() }
+            Task {
+                await maintenanceVM.loadTasks()
+                await loadDuplicates()
+            }
         }
         // Phase 70 (Tasks v2) — deep-link contract. Push handlers, inbox
         // action menus, and activity-feed "view task" links all post this
@@ -198,6 +215,23 @@ struct MaintenanceTabView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        // Phase F3: duplicate-resolution sheet. Parent-driven lifecycle
+        // (see MaintenanceDuplicateSheet docs): after each `onResolve`
+        // we swap to the next match in the queue, or set nil to
+        // dismiss. Matches Apple Photos' Review Duplicates pagination.
+        .sheet(item: $reviewingMatch) { match in
+            MaintenanceDuplicateSheet(
+                match: match,
+                currentIndex: detectedDuplicates.firstIndex(where: { $0.id == match.id }) ?? 0,
+                totalCount: detectedDuplicates.count,
+                onResolve: { resolution in
+                    await handleDuplicateResolution(match: match, resolution: resolution)
+                },
+                onCancel: {
+                    reviewingMatch = nil
+                }
+            )
         }
         // Phase 70.A1.x: full bundle/task detail sheet. Replaces the
         // earlier "punt to MaintenanceScheduleView and re-tap" path,
@@ -450,6 +484,30 @@ struct MaintenanceTabView: View {
 
     /// SeasonScopeBanner — the 44pt pill below MiniHero that names the
     /// active scope + exposes search. Full-year toggle removed in 70.A1.x.
+    /// Phase F3: surfaces detected duplicates (same vendor + category
+    /// family + similar title) at the top of Tasks v2. Apple Contacts
+    /// "Duplicates Found" pattern. Banner is session-dismissible — the
+    /// underlying data persists for 30 days via DuplicateDismissalStore
+    /// when the user explicitly chose "Keep both" on a match.
+    @ViewBuilder
+    private var duplicateBannerSection: some View {
+        if !detectedDuplicates.isEmpty, !duplicateBannerDismissedThisSession {
+            DuplicateReviewBanner(
+                duplicateCount: detectedDuplicates.count,
+                onReview: {
+                    reviewingMatch = detectedDuplicates.first
+                },
+                onDismiss: {
+                    withAnimation(HavenTheme.animationStandard) {
+                        duplicateBannerDismissedThisSession = true
+                    }
+                }
+            )
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
     private var seasonScopeBannerSection: some View {
         SeasonScopeBanner(
             season: activeSeason,
@@ -926,6 +984,74 @@ struct MaintenanceTabView: View {
             ])
         } catch {
             print("[MaintenanceTabView] commitQuickSchedule failed: \(error)")
+        }
+    }
+
+    // MARK: - Phase F3 duplicate detection
+
+    /// Scan routines + tasks for high-confidence duplicate pairs. Uses
+    /// the already-loaded viewModel state so zero additional DB hits.
+    /// Filters out pairs the user explicitly dismissed (keep-both) in
+    /// the last 30 days via DuplicateDismissalStore.
+    @MainActor
+    private func loadDuplicates() async {
+        let matches = DuplicateDetector.scan(
+            routines: viewModel.routines,
+            tasks: maintenanceVM.tasks,
+            systems: maintenanceVM.systems,
+            contractors: maintenanceVM.contractors
+        )
+        let dismissed = DuplicateDismissalStore.recentlyDismissedPairs()
+        detectedDuplicates = matches.filter { match in
+            !dismissed.contains(PairKey(match: match))
+        }
+    }
+
+    /// Apply the homeowner's resolution to a match. Mirrors
+    /// MaintenanceScheduleView's `handleDuplicateResolution` so behavior
+    /// is consistent: keep-both records a 30-day dismissal, keep-X
+    /// archives the loser. After write, refresh + auto-open the next
+    /// queued match so the user can resolve the whole queue without
+    /// closing + reopening the sheet.
+    @MainActor
+    private func handleDuplicateResolution(
+        match: DuplicateDetector.Match,
+        resolution: MaintenanceDuplicateSheet.Resolution
+    ) async {
+        do {
+            switch resolution {
+            case .keepBoth:
+                DuplicateDismissalStore.recordDismissal(PairKey(match: match))
+            case .keepPrimary:
+                try await archiveDuplicateEntity(kind: match.secondaryKind, id: match.secondary.id)
+            case .keepSecondary:
+                try await archiveDuplicateEntity(kind: match.primaryKind, id: match.primary.id)
+            }
+        } catch {
+            print("[MaintenanceTabView] duplicate resolution failed: \(error)")
+            Haptics.error()
+            reviewingMatch = nil
+            return
+        }
+        // Pull a fresh scan to drop the resolved match from the queue.
+        await loadDuplicates()
+        // Auto-advance: if more matches remain, swap to the next one
+        // (Apple Photos Review Duplicates pattern). Otherwise dismiss.
+        if let next = detectedDuplicates.first {
+            reviewingMatch = next
+        } else {
+            reviewingMatch = nil
+        }
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+    }
+
+    private func archiveDuplicateEntity(kind: DuplicateDetector.EntityKind, id: UUID) async throws {
+        switch kind {
+        case .routine:
+            try await DatabaseService.shared.archiveRoutine(id: id)
+        case .task:
+            try await DatabaseService.shared.deleteMaintenanceTask(id: id)
         }
     }
 
