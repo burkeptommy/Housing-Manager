@@ -113,13 +113,9 @@ final class DashboardViewModel: ObservableObject {
     /// Refreshes on `.chezRequestChanged`.
     @Published var activeChezVendorRequests: [ChezRequestRow] = []
 
-    /// Phase 70.A1 follow-on K2 — all in-flight Chez requests (open +
-    /// waiting on customer) regardless of category. Powers the
-    /// "Chez is working on" Dashboard card so the homeowner has a
-    /// one-tap path into any active conversation. Refreshes on
-    /// `.chezRequestChanged`. Limited to 5 visible — overflow routes
-    /// to the Inbox → Chez sub-tab via the card's "View all" link.
-    @Published var openChezRequests: [ChezRequestRow] = []
+    // Phase 70.A1 follow-on L2 — K2's openChezRequests + ChezInFlightCard
+    // were removed. Inbox → Chez sub-tab is the canonical chat surface,
+    // and the auto-route after submit lands users there directly.
 
     // Phase 50: Recent activity events for the dashboard feed
     @Published var recentActivityEvents: [RecentActivityEvent] = []
@@ -975,10 +971,6 @@ final class DashboardViewModel: ObservableObject {
                 // (or nil when not in handyman mode). Drives the
                 // HomeAssessmentPendingCard + HomeAssessmentPrepCard.
                 loadHomeAssessment,
-                // Phase 70.A1 follow-on K2 — open + waiting Chez
-                // requests for the new "Chez is working on" dashboard
-                // card.
-                loadOpenChezRequests,
             ]
             for method in phase2 {
                 group.addTask { @MainActor in
@@ -1157,28 +1149,6 @@ final class DashboardViewModel: ObservableObject {
             chezDelegatedItemCount = routineDel + contractorDel + taskDel
         } catch {
             print("[Dashboard] loadChezOwnershipCounts failed: \(error)")
-        }
-    }
-
-    /// Phase 70.A1 follow-on K2 — load open + waiting Chez requests
-    /// for the "Chez is working on" dashboard card. Filters client-side
-    /// because the household-scoped fetch is already small (single-digit
-    /// requests for most homes). Refreshed on `.chezRequestChanged`.
-    func loadOpenChezRequests() async {
-        guard let householdId = primaryHouseholdId else {
-            openChezRequests = []
-            return
-        }
-        do {
-            let all = try await DatabaseService.shared.fetchChezRequests(householdId: householdId)
-            let openStatus = ChezStatus.open.rawValue
-            let waitingStatus = ChezStatus.waitingCustomer.rawValue
-            openChezRequests = all.filter { req in
-                req.status == openStatus || req.status == waitingStatus
-            }
-        } catch {
-            print("[Dashboard] loadOpenChezRequests failed: \(error)")
-            openChezRequests = []
         }
     }
 
