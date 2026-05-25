@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-100 -100 200 200" role="img" aria-label="Chez">
-  <g fill="#6938EF">
+  <g fill="#FFFFFF">
     <path d="M -10 -16 L -10 -56 L 22 -72 L 54 -56 L 54 -16 Z"></path>
     <path transform="rotate(90)" d="M -10 -16 L -10 -56 L 22 -72 L 54 -56 L 54 -16 Z"></path>
     <path transform="rotate(180)" d="M -10 -16 L -10 -56 L 22 -72 L 54 -56 L 54 -16 Z"></path>
