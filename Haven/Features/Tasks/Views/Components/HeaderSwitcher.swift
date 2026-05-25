@@ -13,13 +13,41 @@ struct HeaderSwitcher: View {
     let title: String
     var onSwitchMode: () -> Void = {}
     var onAdd: () -> Void = {}
+    /// Phase F4: bulk-select mode toggle. When `true`, the right
+    /// "+" button is replaced with a "Done" text button and the center
+    /// title-switcher renders the selection count instead of the mode
+    /// title. Selection count is the second optional arg.
+    var selectionMode: Bool = false
+    var selectionCount: Int = 0
+    var onDoneSelection: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             // Left spacer
             Color.clear.frame(width: 40, height: 40)
 
-            // Center title-switcher
+            // Center title — title-switcher when idle, selection count
+            // when in bulk-select mode.
+            centerLabel
+                .frame(maxWidth: .infinity)
+
+            // Right side: "+" when idle, "Done" when in selection mode.
+            rightButton
+        }
+        .padding(.horizontal, TasksV5.pageMargin)
+        .padding(.top, TasksV5.headerTopInset)
+        .padding(.bottom, 14)
+    }
+
+    @ViewBuilder
+    private var centerLabel: some View {
+        if selectionMode {
+            Text(selectionCount == 0 ? "Select tasks" : "\(selectionCount) selected")
+                .font(HavenTypography.fraunces(size: 20, weight: 600))
+                .tracking(-0.3)
+                .foregroundStyle(HavenColors.navy800)
+                .accessibilityLabel(selectionCount == 0 ? "Select tasks" : "\(selectionCount) selected")
+        } else {
             Button {
                 Haptics.selection()
                 onSwitchMode()
@@ -27,7 +55,7 @@ struct HeaderSwitcher: View {
                 HStack(spacing: 6) {
                     Text(title)
                         .font(HavenTypography.fraunces(size: 20, weight: 600))
-                        .tracking(-0.3)             // ~ -0.015em on 20pt
+                        .tracking(-0.3)
                         .foregroundStyle(HavenColors.navy800)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 13, weight: .bold))
@@ -35,11 +63,26 @@ struct HeaderSwitcher: View {
                 }
             }
             .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
             .accessibilityLabel("\(title), switch mode")
             .accessibilityHint("Opens action sheet to switch between Maintenance and Handyman")
+        }
+    }
 
-            // Right "+" button
+    @ViewBuilder
+    private var rightButton: some View {
+        if selectionMode {
+            Button {
+                Haptics.light()
+                onDoneSelection()
+            } label: {
+                Text("Done")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(HavenColors.action)
+                    .frame(width: 60, height: 40, alignment: .trailing)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Done selecting")
+        } else {
             Button {
                 Haptics.light()
                 onAdd()
@@ -64,9 +107,6 @@ struct HeaderSwitcher: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Add")
         }
-        .padding(.horizontal, TasksV5.pageMargin)
-        .padding(.top, TasksV5.headerTopInset)
-        .padding(.bottom, 14)
     }
 }
 

@@ -42,6 +42,13 @@ struct MaintenanceTabView: View {
     @State private var detectedDuplicates: [DuplicateDetector.Match] = []
     @State private var duplicateBannerDismissedThisSession: Bool = false
     @State private var reviewingMatch: DuplicateDetector.Match?
+    /// Phase F4: bulk-select mode. Toggled via the Add menu "Select
+    /// tasks" action or via long-press on any row. While selectionMode
+    /// is true, row taps toggle selection instead of opening detail.
+    /// Session-only (not persisted) matching MaintenanceScheduleView.
+    @State private var selectionMode: Bool = false
+    @State private var selectedTaskIds: Set<UUID> = []
+    @State private var bulkBusy: Bool = false
 
     /// Phase 70 (Tasks v2): Task id whose row should pulse a salmon
     /// highlight ring after a deep-link arrival (`.openMaintenanceTask`).
@@ -81,7 +88,15 @@ struct MaintenanceTabView: View {
                 HeaderSwitcher(
                     title: "Maintenance",
                     onSwitchMode: onSwitchMode,
-                    onAdd: { showAddMenu = true }
+                    onAdd: { showAddMenu = true },
+                    selectionMode: selectionMode,
+                    selectionCount: selectedTaskIds.count,
+                    onDoneSelection: {
+                        withAnimation(HavenTheme.animationStandard) {
+                            selectionMode = false
+                            selectedTaskIds.removeAll()
+                        }
+                    }
                 )
 
                 YearRibbon(
@@ -146,6 +161,9 @@ struct MaintenanceTabView: View {
         }
         .background(HavenColors.background)
         .scrollContentBackground(.hidden)
+        .safeAreaInset(edge: .bottom) {
+            bulkActionBar
+        }
         .task {
             if let householdId {
                 await viewModel.load(householdId: householdId)
@@ -257,6 +275,14 @@ struct MaintenanceTabView: View {
             Button("Add a routine") { pushTarget = .routinesList }
             Button("Add a one-off task") { pushTarget = .scheduleView }
             Button("Browse all services") { pushTarget = .recommendedServices }
+            // Phase F4: bulk-select entry. Tapping enters selection mode
+            // with no rows selected. User taps rows to select then chooses
+            // a bulk action from the bottom action bar.
+            Button("Select tasks") {
+                withAnimation(HavenTheme.animationStandard) {
+                    selectionMode = true
+                }
+            }
             Button("Cancel", role: .cancel) {}
         }
         .navigationDestination(item: $pushTarget) { target in
@@ -686,74 +712,128 @@ struct MaintenanceTabView: View {
     private func seasonEntryRow(for entry: SeasonEntry) -> some View {
         switch entry {
         case .bundle(let task):
-            BundleParentCard(
-                task: task,
-                contractor: contractorFor(task: task),
-                children: childrenFor(task: task),
-                isChezOwned: task.isChezOwned,
-                isHighlighted: highlightedTaskId == task.id,
-                onTap: {
-                    Analytics.track(.tasksV2BundleExpanded, [
-                        "bundle_id": task.templateId ?? "",
-                        "child_count": String(childrenFor(task: task).count)
-                    ])
-                    // Phase 70.A1.x: open the bundle's full coordination
-                    // surface inline — vendor reframing, child line
-                    // items, scheduling, snooze, Chez delegation. The
-                    // earlier "punt to MaintenanceScheduleView" pattern
-                    // was slow + confusing (re-render the old timeline
-                    // just to re-tap the same row).
-                    detailTask = task
-                },
-                onBookIt: {
-                    quickScheduleTask = task
-                }
-            )
-            // Phase F2: leading swipe = complete, trailing = snooze 1wk.
-            .swipeRowActions(
-                snoozeLabel: "Snooze 1wk",
-                onComplete: { Task { await maintenanceVM.completeTask(task) } },
-                onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
-            )
+            selectionWrap(task: task) {
+                BundleParentCard(
+                    task: task,
+                    contractor: contractorFor(task: task),
+                    children: childrenFor(task: task),
+                    isChezOwned: task.isChezOwned,
+                    isHighlighted: highlightedTaskId == task.id,
+                    onTap: {
+                        Analytics.track(.tasksV2BundleExpanded, [
+                            "bundle_id": task.templateId ?? "",
+                            "child_count": String(childrenFor(task: task).count)
+                        ])
+                        // Phase 70.A1.x: open the bundle's full coordination
+                        // surface inline — vendor reframing, child line
+                        // items, scheduling, snooze, Chez delegation. The
+                        // earlier "punt to MaintenanceScheduleView" pattern
+                        // was slow + confusing (re-render the old timeline
+                        // just to re-tap the same row).
+                        detailTask = task
+                    },
+                    onBookIt: {
+                        quickScheduleTask = task
+                    }
+                )
+                // Phase F2: leading swipe = complete, trailing = snooze 1wk.
+                .swipeRowActions(
+                    snoozeLabel: "Snooze 1wk",
+                    onComplete: { Task { await maintenanceVM.completeTask(task) } },
+                    onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
+                )
+            }
 
         case .standaloneTask(let task):
             // Reuse the existing UnifiedTaskCard via a row helper. Task
             // 70.A1.9 polishes the variants; for 70.A1's visibility ship
             // a basic row is enough to surface the row as VISIBLE.
-            StandaloneTaskRow(
-                task: task,
-                contractor: contractorFor(task: task),
-                isHighlighted: highlightedTaskId == task.id,
-                onTap: {
-                    // Phase 70.A1.x: standalone task tap opens
-                    // MaintenanceTaskDetailSheet inline. Same fix as
-                    // the bundle parent above — no more deferring to
-                    // MaintenanceScheduleView.
-                    detailTask = task
-                }
-            )
-            .swipeRowActions(
-                snoozeLabel: "Snooze 1wk",
-                onComplete: { Task { await maintenanceVM.completeTask(task) } },
-                onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
-            )
+            selectionWrap(task: task) {
+                StandaloneTaskRow(
+                    task: task,
+                    contractor: contractorFor(task: task),
+                    isHighlighted: highlightedTaskId == task.id,
+                    onTap: {
+                        // Phase 70.A1.x: standalone task tap opens
+                        // MaintenanceTaskDetailSheet inline. Same fix as
+                        // the bundle parent above — no more deferring to
+                        // MaintenanceScheduleView.
+                        detailTask = task
+                    }
+                )
+                .swipeRowActions(
+                    snoozeLabel: "Snooze 1wk",
+                    onComplete: { Task { await maintenanceVM.completeTask(task) } },
+                    onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
+                )
+            }
 
         case .routineOccurrence(let occurrence):
+            // Routine occurrences don't carry an underlying maintenance_task
+            // row so they can't be selected for bulk actions OR swipe-
+            // completed. They still tap into RoutineDetailView.
             TasksV2RoutineOccurrenceRow(
                 occurrence: occurrence,
                 routine: routineFor(occurrence: occurrence),
                 contractor: contractorForOccurrence(occurrence),
                 onTap: {
-                    if let routine = routineFor(occurrence: occurrence),
+                    if !selectionMode,
+                       let routine = routineFor(occurrence: occurrence),
                        let householdId {
                         pushTarget = .routineDetail(routine, householdId)
                     }
                 }
             )
-            // Routine occurrences don't carry an underlying maintenance_task
-            // row so they can't be "marked complete" or snoozed via the
-            // tasks API. Leave them sans swipe — taps still push into
-            // RoutineDetailView for skip/reschedule.
+            .opacity(selectionMode ? 0.5 : 1.0)
+        }
+    }
+
+    /// Phase F4: wrap a row in the selection-mode overlay when
+    /// `selectionMode == true`. Disables the underlying card's hit
+    /// testing so taps don't open detail sheets / scheduling sheets,
+    /// renders a leading 22pt circle / checkmark, and routes whole-row
+    /// taps to toggle membership in `selectedTaskIds`.
+    @ViewBuilder
+    private func selectionWrap<Content: View>(
+        task: MaintenanceTaskDBRow,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if selectionMode {
+            HStack(spacing: 10) {
+                Image(systemName: selectedTaskIds.contains(task.id)
+                      ? "checkmark.circle.fill"
+                      : "circle")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(selectedTaskIds.contains(task.id)
+                                     ? HavenColors.action
+                                     : HavenColors.beige300)
+                    .frame(width: 24)
+                content()
+                    .allowsHitTesting(false)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                Haptics.selection()
+                withAnimation(HavenTheme.animationStandard) {
+                    if selectedTaskIds.contains(task.id) {
+                        selectedTaskIds.remove(task.id)
+                    } else {
+                        selectedTaskIds.insert(task.id)
+                    }
+                }
+            }
+        } else {
+            content()
+                .contextMenu {
+                    Button {
+                        withAnimation(HavenTheme.animationStandard) {
+                            selectionMode = true
+                            selectedTaskIds = [task.id]
+                        }
+                    } label: {
+                        Label("Select", systemImage: "checkmark.circle")
+                    }
+                }
         }
     }
 
@@ -984,6 +1064,133 @@ struct MaintenanceTabView: View {
             ])
         } catch {
             print("[MaintenanceTabView] commitQuickSchedule failed: \(error)")
+        }
+    }
+
+    // MARK: - Phase F4 bulk-select
+
+    /// Bottom action bar shown via safeAreaInset when selectionMode is
+    /// on. Apple Mail pattern — surfaces "N selected" + a single Menu
+    /// of bulk actions (Snooze 7d / Snooze 30d / Mark complete). When
+    /// idle, renders an empty view so the safe-area inset is zero.
+    @ViewBuilder
+    private var bulkActionBar: some View {
+        if selectionMode {
+            HStack(spacing: HavenTheme.spacing12) {
+                Text("\(selectedTaskIds.count) selected")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Menu {
+                    Button {
+                        Task { await bulkSnooze(days: 7) }
+                    } label: {
+                        Label("Snooze 7 days", systemImage: "moon.zzz")
+                    }
+                    Button {
+                        Task { await bulkSnooze(days: 30) }
+                    } label: {
+                        Label("Snooze 30 days", systemImage: "moon.zzz.fill")
+                    }
+                    Divider()
+                    Button {
+                        Task { await bulkComplete() }
+                    } label: {
+                        Label("Mark complete", systemImage: "checkmark.circle.fill")
+                    }
+                } label: {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        if bulkBusy {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        Text("Actions")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .padding(.horizontal, HavenTheme.spacing20)
+                    .padding(.vertical, HavenTheme.spacing12)
+                    .frame(minHeight: 44)
+                    .background(selectedTaskIds.isEmpty ? HavenColors.beige200 : HavenColors.action)
+                    .foregroundStyle(selectedTaskIds.isEmpty ? HavenColors.textTertiary : HavenColors.textOnAction)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton, style: .continuous))
+                }
+                .disabled(selectedTaskIds.isEmpty || bulkBusy)
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.vertical, HavenTheme.spacing12)
+            .background(HavenColors.surface)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(HavenColors.beige200)
+                    .frame(height: 0.5)
+            }
+            .transition(.move(edge: .bottom))
+        }
+    }
+
+    @MainActor
+    private func bulkSnooze(days: Int) async {
+        guard !selectedTaskIds.isEmpty else { return }
+        bulkBusy = true
+        defer { bulkBusy = false }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        let calendar = Calendar(identifier: .gregorian)
+
+        let taskMap = Dictionary(uniqueKeysWithValues: maintenanceVM.tasks.map { ($0.id, $0) })
+        var changed = 0
+        for id in selectedTaskIds {
+            guard let task = taskMap[id] else { continue }
+            // Anchor against the existing nextDueDate so chained snoozes
+            // accumulate rather than collapsing to today + N. Matches
+            // MaintenanceScheduleView semantics.
+            let anchor = formatter.date(from: task.nextDueDate) ?? Date()
+            let pushed = calendar.date(byAdding: .day, value: days, to: anchor) ?? anchor
+            do {
+                _ = try await DatabaseService.shared.updateMaintenanceTask(
+                    id: id,
+                    MaintenanceTaskUpdate(nextDueDate: formatter.string(from: pushed))
+                )
+                changed += 1
+            } catch { continue }
+        }
+
+        Analytics.track(.bulkTasksSnoozed, [
+            "count": changed,
+            "days": days
+        ])
+        Haptics.success()
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        withAnimation(HavenTheme.animationStandard) {
+            selectionMode = false
+            selectedTaskIds.removeAll()
+        }
+        await maintenanceVM.loadTasks()
+    }
+
+    @MainActor
+    private func bulkComplete() async {
+        guard !selectedTaskIds.isEmpty else { return }
+        bulkBusy = true
+        defer { bulkBusy = false }
+
+        let taskMap = Dictionary(uniqueKeysWithValues: maintenanceVM.tasks.map { ($0.id, $0) })
+        var changed = 0
+        for id in selectedTaskIds {
+            guard let task = taskMap[id] else { continue }
+            await maintenanceVM.completeTask(task)
+            changed += 1
+        }
+        Analytics.track(.bulkTasksCompleted, ["count": changed])
+        Haptics.success()
+        withAnimation(HavenTheme.animationStandard) {
+            selectionMode = false
+            selectedTaskIds.removeAll()
         }
     }
 
