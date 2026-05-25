@@ -325,6 +325,33 @@ enum SystemCategoryRegistry {
         "Waterproofing": ["Crawl Space"],
     ]
 
+    /// May 2026 friend feedback Round 3: canonical category keys whose
+    /// vendors don't bind to a specific physical `home_systems` row.
+    /// A cleaning service cleans the whole house. A trash hauler picks
+    /// up bins at the curb. A snow-plow vendor clears the driveway.
+    /// Saving one of these contractors shouldn't pop the
+    /// "Assign to Home Systems" sheet asking which systems they
+    /// service — they don't.
+    ///
+    /// `vendorCoverageItems` already picks these up via the
+    /// contractor's canonical `category` field (path 3 in the matcher),
+    /// so skipping the per-system assignment is harmless. Vendors with
+    /// system-anchored trades (Roofing, HVAC, Plumbing, Electrical,
+    /// Generator, etc.) still see the sheet so the homeowner can
+    /// pre-stamp `preferred_contractor_id` on the matching rows.
+    static let serviceOnlyCategoryKeys: Set<String> = [
+        "Cleaning Service",
+        "Trash & Recycling",
+        "Snow Removal",
+        "Mosquito & Tick",
+        "Pet Waste",
+        "Handyman",
+        "Tree Service",
+        "Window Cleaning",
+        "Pressure Washing",
+        "Painting",
+    ]
+
     /// The set of canonical category keys a contractor with the given
     /// canonical category implicitly covers — i.e. `{category} ∪
     /// categoryRelations[category]`. Returns `[category]` when the input
@@ -591,10 +618,18 @@ enum SystemCategoryRegistry {
     /// 1. Tier 1 systems that SHOULD exist (even if no DB row yet)
     /// 2. Existing systems from the DB that qualify for coverage
     /// Excludes sub-systems and child systems.
+    ///
+    /// May 2026 friend feedback Round 3: pass `activeChezVendorRequests`
+    /// to suppress categories the homeowner has already delegated to
+    /// Chez (find_vendor / find_handyman requests in status open or
+    /// waiting_customer). The dashboard's Chez hero card already
+    /// communicates state for those categories — duplicating them as
+    /// uncovered gaps confuses the user.
     static func vendorCoverageItems(
         existingSystems: [HomeSystemRow],
         contractors: [ContractorRow],
-        vendorTasks: [MaintenanceTaskDBRow]
+        vendorTasks: [MaintenanceTaskDBRow],
+        activeChezVendorRequests: [ChezRequestRow] = []
     ) -> (uncovered: [VendorCoverageItem], covered: [VendorCoverageItem]) {
         let contractorById = Dictionary(uniqueKeysWithValues: contractors.map { ($0.id, $0) })
 
@@ -811,10 +846,25 @@ enum SystemCategoryRegistry {
             )
         }
 
+        // May 2026 friend feedback Round 3: build the set of canonical
+        // category keys with an active Chez request so we can hide them
+        // from the uncovered list. The "Have Chez handle it" gap-card
+        // entry point (VendorCoverageSheet) stamps the canonical
+        // `system_category` into the request's context payload, so
+        // matching on the canonicalized value lines up with the
+        // VendorCoverageItem.id (also a canonical key).
+        let chezHandledCategoryKeys: Set<String> = Set(
+            activeChezVendorRequests.compactMap { req in
+                guard let sysCat = req.context?["system_category"] else { return nil }
+                return SystemCategoryRegistry.canonical(category: sysCat)
+            }
+        )
+
         // Step 3: Split and sort
         let items = Array(categoryCoverage.values)
         let uncovered = items
             .filter { !$0.isCovered }
+            .filter { !chezHandledCategoryKeys.contains($0.id) }
             .sorted { ($0.tier, $0.displayPriority) < ($1.tier, $1.displayPriority) }
         let covered = items
             .filter { $0.isCovered }

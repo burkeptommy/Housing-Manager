@@ -105,11 +105,13 @@ final class DashboardViewModel: ObservableObject {
     @Published var uncoveredCoverageItems: [VendorCoverageItem] = []
     @Published var coveredCoverageItems: [VendorCoverageItem] = []
 
-    /// Phase 70.A1 follow-on F1: open `find_vendor` chez_requests keyed
-    /// by canonical system category (e.g. "Handyman"). When a row exists,
-    /// VendorCoverageSheet renders a "Chez is finding you a {category}"
-    /// state on the matching gap card instead of the action buttons.
-    @Published var openChezVendorRequests: [String: ChezRequestRow] = [:]
+    /// May 2026 friend feedback Round 3: active find_vendor /
+    /// find_handyman Chez requests. Loaded inside `loadVendorVisits`
+    /// alongside the other coverage inputs and fed into
+    /// `SystemCategoryRegistry.vendorCoverageItems` so categories the
+    /// homeowner already delegated to Chez drop out of the gap list.
+    /// Refreshes on `.chezRequestChanged`.
+    @Published var activeChezVendorRequests: [ChezRequestRow] = []
 
     // Phase 50: Recent activity events for the dashboard feed
     @Published var recentActivityEvents: [RecentActivityEvent] = []
@@ -867,9 +869,14 @@ final class DashboardViewModel: ObservableObject {
 
     func subscribeToChanges() {
         guard cancellables.isEmpty else { return }
+        // May 2026 friend feedback Round 3: include `.chezRequestChanged`
+        // so submitting a "Have Chez handle it" request from
+        // VendorCoverageSheet immediately refreshes the gap list and
+        // the just-delegated category disappears.
         let names: [Notification.Name] = [
             .maintenanceTaskChanged, .homeSystemChanged, .contractorChanged,
-            .documentChanged, .propertyChanged, .projectChanged
+            .documentChanged, .propertyChanged, .projectChanged,
+            .chezRequestChanged
         ]
         for name in names {
             NotificationCenter.default.publisher(for: name)
@@ -960,11 +967,6 @@ final class DashboardViewModel: ObservableObject {
                 // (or nil when not in handyman mode). Drives the
                 // HomeAssessmentPendingCard + HomeAssessmentPrepCard.
                 loadHomeAssessment,
-                // Phase 70.A1 follow-on F1: open find_vendor chez_requests
-                // by canonical category so VendorCoverageSheet renders
-                // "Chez is finding you a Handyman" instead of the
-                // action buttons when one's already in flight.
-                loadOpenChezVendorRequests,
             ]
             for method in phase2 {
                 group.addTask { @MainActor in
@@ -1176,65 +1178,6 @@ final class DashboardViewModel: ObservableObject {
             chezActivityWeeklyTally = .empty
             recentChezActivity = []
             unviewedMonthlySummary = nil
-        }
-    }
-
-    /// Phase 70.A1 follow-on F1: load every open `find_vendor` chez_request
-    /// whose `context.system_category` identifies the gap it was raised
-    /// against. Indexed by canonical category key so VendorCoverageSheet
-    /// can branch its row on `openChezVendorRequests[item.id]`.
-    ///
-    /// Client-side filtered today — the existing `fetchChezRequests`
-    /// pulls the full household-scoped list and counts are small. If
-    /// perf bites later we move the filter server-side (`WHERE
-    /// context->>'system_category' IS NOT NULL`).
-    func loadOpenChezVendorRequests() async {
-        guard let householdId = primaryHouseholdId else {
-            openChezVendorRequests = [:]
-            return
-        }
-        do {
-            let all = try await DatabaseService.shared.fetchChezRequests(householdId: householdId)
-            var byCategory: [String: ChezRequestRow] = [:]
-            for req in all {
-                guard req.status == ChezStatus.open.rawValue ||
-                      req.status == ChezStatus.waitingCustomer.rawValue else { continue }
-                guard req.category == ChezCategory.findVendor.rawValue else { continue }
-                guard let rawCategory = req.context?["system_category"],
-                      let canonical = SystemCategoryRegistry.canonical(category: rawCategory)
-                else { continue }
-                if let existing = byCategory[canonical],
-                   existing.lastMessageAt >= req.lastMessageAt {
-                    continue
-                }
-                byCategory[canonical] = req
-            }
-            let prior = openChezVendorRequests
-            openChezVendorRequests = byCategory
-            // Phase 70.A1 follow-on H3 — re-bucket coverage so any newly
-            // delegated (or revoked) category moves between uncovered ↔
-            // covered. Two reasons we may need to recompute:
-            //   1. The chez category set changed (user just submitted a
-            //      request, or one resolved server-side).
-            //   2. Phase 1 computeCoverage raced loadEnrichmentData and
-            //      ran before `propertyAttributes` populated — Handyman
-            //      stayed as a gap for assessment_mode='handyman' users.
-            //      Detect this by looking for any chez-handled category
-            //      still parked in `uncoveredCoverageItems`.
-            var chezHandledIds = Set(byCategory.keys)
-            if propertyAttributes["assessment_mode"]?.stringValue == "handyman" {
-                chezHandledIds.insert("Handyman")
-            }
-            let categoriesChanged = Set(prior.keys) != Set(byCategory.keys)
-            let leftoverInUncovered = uncoveredCoverageItems.contains {
-                chezHandledIds.contains($0.id)
-            }
-            if categoriesChanged || leftoverInUncovered {
-                await loadVendorVisits()
-            }
-        } catch {
-            print("[Dashboard] loadOpenChezVendorRequests failed: \(error)")
-            openChezVendorRequests = [:]
         }
     }
 
@@ -1542,6 +1485,16 @@ final class DashboardViewModel: ObservableObject {
             .filter { $0.parentSystemId == nil }
             .filter { !SystemCategoryRegistry.showInVendorCoverage(category: $0.category, parentSystemId: nil) }
             .sorted { $0.category < $1.category }
+
+        // May 2026 friend feedback Round 3: active Chez vendor requests
+        // suppress matching gaps in the coverage list. Fetched alongside
+        // the other inputs so the strip and the Vendor Coverage sheet
+        // see a consistent view.
+        if let householdId = primaryHouseholdId {
+            activeChezVendorRequests = (try? await DatabaseService.shared.fetchActiveChezVendorRequests(householdId: householdId)) ?? []
+        } else {
+            activeChezVendorRequests = []
+        }
 
         computeCoverage(allTasks: allTasks, contractors: contractors, systems: systems)
     }
@@ -1889,37 +1842,20 @@ final class DashboardViewModel: ObservableObject {
         // Build 91: filter out categories the user has previously swiped
         // "Hide" on (persisted in `dismissed_categories`) so the row
         // doesn't reappear on every refresh.
+        // May 2026 friend feedback Round 3: pass active Chez vendor
+        // requests so categories the homeowner already delegated to
+        // Chez drop out of the gap list. `activeChezVendorRequests`
+        // is loaded inside `loadVendorVisits` before this call.
         let registryCoverage = SystemCategoryRegistry.vendorCoverageItems(
             existingSystems: systems,
             contractors: contractors,
-            vendorTasks: vendorTasks
+            vendorTasks: vendorTasks,
+            activeChezVendorRequests: activeChezVendorRequests
         )
-
-        // Phase 70.A1 follow-on H3 — categories Chez is actively handling
-        // should READ as covered, not as gaps. Two paths qualify:
-        //   1. An open `find_vendor` Chez request exists with this
-        //      category in its `context.system_category`. F1 already
-        //      computes that map; we hide the row from the gap surface
-        //      entirely and surface it as covered instead.
-        //   2. The user picked "Have Chez handle it" at signup, stamping
-        //      `properties.attributes.assessment_mode = 'handyman'`. In
-        //      handyman mode Chez sources the handyman directly, so
-        //      Handyman should not surface as a gap the homeowner has
-        //      to fill themselves.
-        var chezHandledCategoryIds = Set(openChezVendorRequests.keys)
-        if propertyAttributes["assessment_mode"]?.stringValue == "handyman" {
-            chezHandledCategoryIds.insert("Handyman")
+        uncoveredCoverageItems = registryCoverage.uncovered.filter {
+            !dismissedCoverageCategories.contains($0.id)
         }
-
-        let rawUncovered = registryCoverage.uncovered
-        let stillUncovered = rawUncovered.filter { item in
-            !dismissedCoverageCategories.contains(item.id) &&
-            !chezHandledCategoryIds.contains(item.id)
-        }
-        let chezHandled = rawUncovered.filter { chezHandledCategoryIds.contains($0.id) }
-
-        uncoveredCoverageItems = stillUncovered
-        coveredCoverageItems = registryCoverage.covered + chezHandled
+        coveredCoverageItems = registryCoverage.covered
 
         // Next scheduled service — check both vendor tasks AND standing
         // appointment visits (pre-loaded in loadVendorVisits), use the earlier.

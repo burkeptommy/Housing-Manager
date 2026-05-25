@@ -182,7 +182,10 @@ p.lead {
 }
 
 .eyebrow-on-indigo {
-  color: var(--salmon-light);
+  /* --salmon-light resolves to #B49BFA (light lavender) — barely legible
+     on the brighter brand purple #6938EF. Use pure white for AA contrast. */
+  color: var(--white);
+  opacity: 0.92;
 }
 
 /* ============ LAYOUT ============ */

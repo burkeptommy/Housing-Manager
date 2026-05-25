@@ -93,7 +93,8 @@ final class NotificationScheduler {
                                 title: "Maintenance Due. \(propertyName)",
                                 body: "\(task.title) is due \(daysText).\(task.isDiy == true ? " This is a DIY task." : "")",
                                 date: alertDate,
-                                category: "maintenance_due"
+                                category: "maintenance_due",
+                                extraUserInfo: ["task_id": task.id.uuidString]
                             )
                         }
 
@@ -106,7 +107,8 @@ final class NotificationScheduler {
                             title: "Maintenance Due. \(propertyName)",
                             body: "\(task.title) is due today.",
                             dateComponents: dayOfComponents,
-                            category: "maintenance_due"
+                            category: "maintenance_due",
+                            extraUserInfo: ["task_id": task.id.uuidString]
                         )
                     }
 
@@ -122,7 +124,8 @@ final class NotificationScheduler {
                             title: "Overdue. \(propertyName)",
                             body: "\(task.title) is overdue. Mark complete or reschedule.",
                             dateComponents: tomorrow,
-                            category: "maintenance_overdue"
+                            category: "maintenance_overdue",
+                            extraUserInfo: ["task_id": task.id.uuidString]
                         )
                     }
                 }
@@ -209,7 +212,8 @@ final class NotificationScheduler {
                     title: "Visit next week",
                     body: "\(visitLabel) is scheduled for \(formatVisitDate(scheduledDate)).",
                     date: alert,
-                    category: "visit_reminder"
+                    category: "visit_reminder",
+                    extraUserInfo: ["task_id": task.id.uuidString]
                 )
             }
 
@@ -222,7 +226,8 @@ final class NotificationScheduler {
                     title: "Visit tomorrow",
                     body: "Reminder: \(visitLabel) tomorrow. Be ready to greet them.",
                     date: alert,
-                    category: "visit_reminder"
+                    category: "visit_reminder",
+                    extraUserInfo: ["task_id": task.id.uuidString]
                 )
             }
 
@@ -234,7 +239,8 @@ final class NotificationScheduler {
                     title: "Visit today",
                     body: "\(visitLabel) is on the calendar for today.",
                     date: alert,
-                    category: "visit_reminder"
+                    category: "visit_reminder",
+                    extraUserInfo: ["task_id": task.id.uuidString]
                 )
             }
         }
@@ -275,7 +281,8 @@ final class NotificationScheduler {
                 title: "Maintenance Due. \(propertyName)",
                 body: "\(task.title) is due \(daysText).",
                 date: alertDate,
-                category: "maintenance_due"
+                category: "maintenance_due",
+                extraUserInfo: ["task_id": task.id.uuidString]
             )
         }
     }
@@ -488,17 +495,48 @@ final class NotificationScheduler {
 
     // MARK: - Private
 
-    private func scheduleNotification(id: String, title: String, body: String, date: Date, category: String) {
+    /// Round 5 routing audit: the helper now stamps `type: category` on
+    /// userInfo by default so AppDelegate's tap router can route each
+    /// notification to the right surface. Callers can pass `extraUserInfo`
+    /// (e.g. `["task_id": task.id.uuidString]`) so the focused-view
+    /// listeners (`.openTask`, `.navigateToInboxItem`) can deep-link.
+    /// Without this stamping, every scheduler-fired tap fell through to
+    /// `default → tab: 2 (Tasks)` with no entity context.
+    private func scheduleNotification(
+        id: String,
+        title: String,
+        body: String,
+        date: Date,
+        category: String,
+        extraUserInfo: [String: Any] = [:]
+    ) {
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
-        scheduleNotification(id: id, title: title, body: body, dateComponents: components, category: category)
+        scheduleNotification(
+            id: id,
+            title: title,
+            body: body,
+            dateComponents: components,
+            category: category,
+            extraUserInfo: extraUserInfo
+        )
     }
 
-    private func scheduleNotification(id: String, title: String, body: String, dateComponents: DateComponents, category: String) {
+    private func scheduleNotification(
+        id: String,
+        title: String,
+        body: String,
+        dateComponents: DateComponents,
+        category: String,
+        extraUserInfo: [String: Any] = [:]
+    ) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
         content.categoryIdentifier = category
+        var info: [String: Any] = ["type": category]
+        for (k, v) in extraUserInfo { info[k] = v }
+        content.userInfo = info
 
         let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
         let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)

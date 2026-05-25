@@ -182,17 +182,17 @@ struct PropertyTimelineDivider: View {
 // MARK: - Systems Browse grid tile
 
 /// Category tile for the Systems "Browse" 2-column grid. Renders a
-/// 36pt indigo-50 icon tile, the category name, system count, and an
-/// optional salmon attention dot in the top-right corner.
+/// 36pt indigo-50 icon tile, the category name, and the system count.
+///
+/// May 2026 friend feedback Round 3: the optional per-tile attention
+/// dot was removed. The verification banner above the grid and the
+/// "X need profile" caption already communicate per-property state;
+/// the dot rule ("any system lacks a preferred contractor") didn't
+/// match either signal and read as visual noise.
 struct PropertySystemsCategoryTile: View {
     let icon: String
     let title: String
     let systemCount: Int
-    /// Phase 70.A1 follow-on G4: retained for callsite compatibility but
-    /// no longer renders a visual dot — the "N need profile" sub-line on
-    /// the Browse header already communicates the same signal without
-    /// the ambiguous tile-level indicator the homeowner couldn't parse.
-    var needsAttention: Bool = false
     var onTap: () -> Void
 
     var body: some View {

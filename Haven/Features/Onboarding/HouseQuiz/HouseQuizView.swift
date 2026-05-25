@@ -5790,16 +5790,22 @@ struct HouseQuizView: View {
             async let systemsTask = db.fetchHomeSystems(propertyId: viewModel.property.id)
             async let contractorsTask = db.fetchContractors()
             async let tasksTask = db.fetchMaintenanceTasks(propertyId: viewModel.property.id)
+            // May 2026 friend feedback Round 3: include Chez requests so
+            // the post-quiz coverage sweep agrees with the dashboard
+            // about which categories are "covered" via delegation.
+            async let chezRequestsTask: [ChezRequestRow] = db.fetchActiveChezVendorRequests(householdId: viewModel.property.householdId)
 
             let systems = try await systemsTask
             let contractors = try await contractorsTask
             let tasks = try await tasksTask
+            let chezRequests = (try? await chezRequestsTask) ?? []
             let vendorTasks = tasks.filter { $0.assignmentType?.lowercased() == "vendor" }
 
             let result = SystemCategoryRegistry.vendorCoverageItems(
                 existingSystems: systems,
                 contractors: contractors,
-                vendorTasks: vendorTasks
+                vendorTasks: vendorTasks,
+                activeChezVendorRequests: chezRequests
             )
             await MainActor.run {
                 coverageUncovered = result.uncovered

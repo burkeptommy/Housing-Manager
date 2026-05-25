@@ -224,18 +224,30 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let userInfo = response.notification.request.content.userInfo
         if let type = userInfo["type"] as? String {
             switch type {
-            case "task_assignment":
-                // Phase 70 (Tasks v2): route to the Tasks tab (index 2)
-                // and post .openMaintenanceTask so MaintenanceTabView
-                // scrolls + highlights the matching row. userInfo
-                // carries `task_id` / `property_id` / `season` per the
-                // deep-link contract on `Notification.Name.openMaintenanceTask`.
-                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
-                NotificationCenter.default.post(
-                    name: .openMaintenanceTask,
-                    object: nil,
-                    userInfo: userInfo
-                )
+            // Round 5 routing audit: every task-related push now lands on
+            // the specific task's detail sheet via `.openTask`, regardless
+            // of which tab is active. Previously `task_assignment` just
+            // switched to Property tab without focus, and `task_completed`
+            // / `maintenance_due` / `maintenance_overdue` / `visit_reminder`
+            // fell through to `default → tab: 2` with no entity context.
+            case "task_assignment",
+                 "task_completed",
+                 "task_reminder",
+                 "maintenance_due",
+                 "maintenance_overdue",
+                 "visit_reminder":
+                if let taskId = userInfo["task_id"] as? String, !taskId.isEmpty {
+                    NotificationCenter.default.post(
+                        name: .openTask,
+                        object: nil,
+                        userInfo: ["task_id": taskId]
+                    )
+                } else {
+                    // Fallback when the server / scheduler didn't stamp a
+                    // task_id (legacy notifications). Land on Tasks tab so
+                    // at least the user is in the right area.
+                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                }
             case "vehicle_recall":
                 // Navigate to Property tab where vehicles are shown
                 NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
@@ -262,9 +274,16 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                 NotificationCenter.default.post(name: .handymanModeRequested, object: nil)
                 let requestId = userInfo["request_id"] as? String
                 let quoteId = userInfo["quote_id"] as? String
-                let presentation: String = (t == "handyman_quote_sent" || t == "handyman_quote_revised")
-                    ? "quote"
-                    : "visit"
+                // Round 5 routing audit: include `handyman_quote_bundle_sent`
+                // in the quote-presentation set so a bundle push lands on
+                // the quote review (which is where the user is supposed to
+                // make a decision), not the generic visit detail. Same
+                // intent as the existing single-quote variants.
+                let presentation: String = (
+                    t == "handyman_quote_sent"
+                    || t == "handyman_quote_revised"
+                    || t == "handyman_quote_bundle_sent"
+                ) ? "quote" : "visit"
                 var payload: [String: String] = [
                     "request_id": requestId ?? "",
                     "presentation": presentation,
@@ -313,23 +332,64 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             // carry a chez_request id (the schedule is workbench-side,
             // not request-side) so it must NOT fall through to the
             // catch-all chez_ branch below, which would post
-            // .openChezRequest with an empty request_id. Routes to the
-            // Tasks tab where routines surface; no further fan-out
-            // because the routine_id is already on userInfo for any
-            // future deep-link surface to read.
+            // .openChezRequest with an empty request_id.
+            //
+            // Round 5 routing audit: if the push carries `routine_id`,
+            // present the specific routine via `.openRoutine` instead
+            // of dropping the user on a generalized Tasks list. The
+            // openRoutine listener owns the async fetch + sheet
+            // presentation in MainTabView.
             case "chez_routine_visit_scheduled":
-                // Phase 70 (Tasks v2): the push payload already carries
-                // `routine_id` + (optionally) `occurrence_date` —
-                // forward those to MaintenanceTabView so it can
-                // expand the matching routine card and pulse the
-                // highlight overlay. Pre-Phase-70 the routine_id sat
-                // on userInfo unused.
-                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
-                NotificationCenter.default.post(
-                    name: .openMaintenanceTask,
-                    object: nil,
-                    userInfo: userInfo
-                )
+                if let routineId = userInfo["routine_id"] as? String, !routineId.isEmpty {
+                    NotificationCenter.default.post(
+                        name: .openRoutine,
+                        object: nil,
+                        userInfo: ["routine_id": routineId]
+                    )
+                } else {
+                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                }
+
+            // Round 5 routing audit: assessment booking confirmation was
+            // implicitly hitting the chez_ catch-all below and posting
+            // `.openChezRequest` with an empty request_id. Route it
+            // explicitly to Dashboard + refresh the assessment card —
+            // same shape as the other chez_assessment_* lifecycle cases.
+            case "chez_assessment_booking_confirmation":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+                NotificationCenter.default.post(name: .chezHomeAssessmentChanged, object: nil)
+
+            // Round 5 routing audit: admin-only notification. Homeowner
+            // devices may receive it incidentally if the user is also a
+            // workspace admin — silent no-op rather than misrouting.
+            case "chez_admin_request":
+                break
+
+            // Round 5 routing audit: scenario completion / error pushes
+            // fired by `ScenarioRunnerService`. Previously fell through
+            // to default → tab: 2 (Tasks) because no case matched.
+            // Open the Scenario Studio on Alfred tab so the user lands
+            // on the result surface where their scenario runs live.
+            case "scenario_complete", "scenario_error":
+                NotificationCenter.default.post(name: .openScenarioStudio, object: nil)
+
+            // Round 5 routing audit: standing appointment resumed push
+            // fired from `auto-resume-standing-appointments` edge
+            // function. Phase 55.3 retired standing appointments in
+            // favor of routines; the `appointment_id` payload now maps
+            // 1:1 to a routine row, so route through `.openRoutine`.
+            case "standing_appointment_resumed":
+                let routineId = (userInfo["routine_id"] as? String)
+                    ?? (userInfo["appointment_id"] as? String)
+                if let routineId, !routineId.isEmpty {
+                    NotificationCenter.default.post(
+                        name: .openRoutine,
+                        object: nil,
+                        userInfo: ["routine_id": routineId]
+                    )
+                } else {
+                    NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                }
 
             // Phase 80 — Chez Concierge pushes. Server sends
             // `type: "chez_request_reply"` (Tom replied), `"chez_status_change"`
@@ -346,6 +406,33 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                     object: nil,
                     userInfo: ["request_id": requestId]
                 )
+
+            // Round 4 friend feedback: documents uploaded in-app fire a
+            // local UNNotificationRequest from
+            // `DocumentUploadManager.sendCompletionNotification()`. Without
+            // this case the tap fell through to `default → tab: 2 (Tasks)`
+            // and the user landed on Maintenance wondering where their
+            // documents went. Route to Dashboard tab so the inbox is
+            // reachable, then defer a `.navigateToInboxItem` post so
+            // `MainTabView` has a moment to switch tabs and DashboardView
+            // is mounted to receive.
+            // Round 5 routing audit: extended to share the same deep-link
+            // payload shape (`first_document_id`) with `document_flag_reminder`
+            // — the 7-day "Remind Me in 7 Days" notification fired from
+            // DocumentDetailView's expiration flag. Both land on the
+            // Dashboard's inbox-item review for the specific document.
+            case "documents_processed", "document_flag_reminder":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 0])
+                if let docIdString = userInfo["first_document_id"] as? String,
+                   let docId = UUID(uuidString: docIdString) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        NotificationCenter.default.post(
+                            name: .navigateToInboxItem,
+                            object: nil,
+                            userInfo: ["documentId": docId]
+                        )
+                    }
+                }
 
             default:
                 NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])

@@ -70,6 +70,15 @@ struct RoutineEditSheet: View {
     @State private var showDeleteConfirm: Bool = false
     @State private var isDeleting: Bool = false
     @State private var isPaused: Bool = false
+
+    /// May 2026 friend feedback Round 3: Find-a-pro discovery from
+    /// inside the vendor picker. `ContractorPickerSheet` calls the new
+    /// `onFindLocalVendors` callback when the user taps the new
+    /// footer button; we own the `FindLocalVendorSheet` presentation
+    /// here so the routine's property town/state are passed through.
+    @State private var showFindLocalVendor: Bool = false
+    @State private var propertyTown: String = ""
+    @State private var propertyState: String = ""
     /// Phase 80.1 — Local mirror of `existing.chezOwned`. Bound to the
     /// ChezOwnsToggle so the user sees an immediate flip; the toggle
     /// itself talks to the chez-concierge edge function.
@@ -363,6 +372,10 @@ struct RoutineEditSheet: View {
         .onAppear {
             loadExisting()
             Task { await loadDuplicateContext() }
+            // May 2026 friend feedback Round 3: hydrate the property's
+            // town/state so the picker's "Find vetted local pros" route
+            // can hand them to FindLocalVendorSheet.
+            Task { await loadPropertyLocation() }
         }
         .onChange(of: selectedVendor?.id) { _, _ in checkForDuplicates() }
         .onChange(of: routineKind) { _, _ in checkForDuplicates() }
@@ -375,6 +388,32 @@ struct RoutineEditSheet: View {
                 onSelect: { contractor in
                     selectedVendor = contractor
                     Haptics.light()
+                },
+                // May 2026 friend feedback Round 3: route the picker's
+                // "Find vetted local pros" footer button back here so
+                // the routine's property town/state flow into
+                // FindLocalVendorSheet. The picker dismisses itself
+                // before firing the callback.
+                onFindLocalVendors: {
+                    showFindLocalVendor = true
+                }
+            )
+        }
+        .sheet(isPresented: $showFindLocalVendor) {
+            FindLocalVendorSheet(
+                task: nil,
+                householdId: householdId,
+                town: propertyTown,
+                state: propertyState,
+                systemCategory: findVendorCategory,
+                categoryDisplayName: routineKind.displayLabel,
+                onComplete: nil,
+                onAdoptedVendor: { contractor in
+                    // Link the just-adopted vendor onto this routine so
+                    // the homeowner doesn't have to re-open the picker
+                    // after the FindLocalVendor flow saves.
+                    selectedVendor = contractor
+                    Haptics.success()
                 }
             )
         }
@@ -490,6 +529,21 @@ struct RoutineEditSheet: View {
         }
     }
 
+    /// May 2026 friend feedback Round 3: canonical category passed
+    /// to `FindLocalVendorSheet` when the user taps "Find vetted
+    /// local pros" from inside the contractor picker. Canonicalizes
+    /// the snake_case picker token to the registry's display key
+    /// ("snow_removal" → "Snow Removal") so the local-vendor search
+    /// hits the right Google Places filter.
+    private var findVendorCategory: String {
+        let token = vendorPickerCategory(for: routineKind)
+        let displayReady = token
+            .replacingOccurrences(of: "_", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return SystemCategoryRegistry.canonical(category: displayReady)
+            ?? routineKind.displayLabel
+    }
+
     // MARK: - Load + save
 
     private func loadExisting() {
@@ -553,6 +607,20 @@ struct RoutineEditSheet: View {
         let contractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
         if let match = contractors.first(where: { $0.id == id }) {
             await MainActor.run { selectedVendor = match }
+        }
+    }
+
+    /// May 2026 friend feedback Round 3: load the routine's property
+    /// town/state so the "Find vetted local pros" flow opens with
+    /// the right Google Places region. Silent failure — without
+    /// town/state the FindLocalVendor sheet's own guard renders a
+    /// "set city/state on this property first" empty state.
+    private func loadPropertyLocation() async {
+        guard let propertyId else { return }
+        guard let property = try? await DatabaseService.shared.fetchProperty(id: propertyId) else { return }
+        await MainActor.run {
+            propertyTown = property.city ?? ""
+            propertyState = property.state ?? ""
         }
     }
 
