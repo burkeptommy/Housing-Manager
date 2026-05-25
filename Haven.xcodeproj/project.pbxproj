@@ -289,6 +289,7 @@
 		4A67D195FB30C8FC75BCD0AF /* HavenColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9AA43272E274ADD62E2592 /* HavenColors.swift */; };
 		4A69C6EB06F4487D7BF2443C /* IntroExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA84C3892EACD5DC6B221B8B /* IntroExplainerView.swift */; };
 		4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */; };
+		4ADA90466B01EA77534BBB8C /* StatsFilterStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE11C96C96A2FCE511EB0BFF /* StatsFilterStrip.swift */; };
 		4BAE970B4D55FAE7B1CA6858 /* HookContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D01DDF4F64847EE3ACA4603 /* HookContent.swift */; };
 		4BB95A13981626E740A08AB1 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DF354058556E442328CA13C /* AuthService.swift */; };
 		4BCF7D44E08CD47DC286A24C /* Bundle+Version.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3135C2D3680384C7C3589245 /* Bundle+Version.swift */; };
@@ -407,6 +408,7 @@
 		6C6735A3744FC18F9B9FBF20 /* PostQuizVendorDelegationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D14107FB62C5DAF2C386909 /* PostQuizVendorDelegationSheet.swift */; };
 		6C8CF067A4A28BE2B40FDF7C /* PersonalQuizViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E2E87609ADFBC441E34B179 /* PersonalQuizViewModel.swift */; };
 		6CB14A10DD299E021578F8CE /* FamilyReferenceBinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF2B9B2B3198D8B628F2951 /* FamilyReferenceBinder.swift */; };
+		6D1FD237735642E3B87E8549 /* StatsFilterStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE11C96C96A2FCE511EB0BFF /* StatsFilterStrip.swift */; };
 		6D50A7014DD8B536A8C0A88D /* DuplicateDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449C50A49E65B3D830136ADC /* DuplicateDetector.swift */; };
 		6DE22D4504E69E49588A446F /* QuizFinaleTotals.swift in Sources */ = {isa = PBXBuildFile; fileRef = E124BAA7A405ECE94C1745F2 /* QuizFinaleTotals.swift */; };
 		6DF341AC2369AAE024F17AA0 /* ChezRequestDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B0859BC2304D638726648EE /* ChezRequestDetailViewModel.swift */; };
@@ -1289,6 +1291,7 @@
 		ADA51D001CCECE0998970343 /* BrowseSpecialtySystemsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseSpecialtySystemsSheet.swift; sourceTree = "<group>"; };
 		ADA558B3CCF8FD03A1DB1B36 /* SecurityDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityDashboardView.swift; sourceTree = "<group>"; };
 		ADB9AB1A050BE0EC660905BA /* PropertyListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyListViewModel.swift; sourceTree = "<group>"; };
+		AE11C96C96A2FCE511EB0BFF /* StatsFilterStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsFilterStrip.swift; sourceTree = "<group>"; };
 		AEBD3CEF411D5B294A285315 /* QuizCompletionSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCompletionSummary.swift; sourceTree = "<group>"; };
 		AEF4A58ECADEA5FBCC6466D2 /* EditInsuranceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditInsuranceSheet.swift; sourceTree = "<group>"; };
 		AF47343974F44B306A4C18DE /* MaintenanceTaskRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceTaskRow.swift; sourceTree = "<group>"; };
@@ -2170,6 +2173,7 @@
 				2F46C404DDF9C3E7AAD11601 /* SeasonScopeBanner.swift */,
 				17B1BB4C90A506E3389C3CA8 /* SectionLabel.swift */,
 				E7E9C9D439169BA07CDAB851 /* StandaloneTaskRow.swift */,
+				AE11C96C96A2FCE511EB0BFF /* StatsFilterStrip.swift */,
 				FF82284A2F4F724BB5EF025A /* TasksV2RoutineOccurrenceRow.swift */,
 				CCA360ED13A11F5410214A5D /* TasksV5Tokens.swift */,
 				84EBCC1E36E5ADE525CE044D /* YearRibbon.swift */,
@@ -3109,6 +3113,7 @@
 				5A1C3093C03B8AFED6788CA1 /* SpecialtySuggestionCard.swift in Sources */,
 				3ED3882D1B2C9AE773A3C7D8 /* StandaloneTaskRow.swift in Sources */,
 				2C0D368F7BC8413BA2E46C82 /* StandingAppointmentViewModel.swift in Sources */,
+				4ADA90466B01EA77534BBB8C /* StatsFilterStrip.swift in Sources */,
 				7AB52FBD973A44821424BCD2 /* String+Extensions.swift in Sources */,
 				C54E9E86A2E66ED38F6AB3C9 /* SubscriptionView.swift in Sources */,
 				00A0340E512F43534C4C8B56 /* SupabaseClient.swift in Sources */,
@@ -3593,6 +3598,7 @@
 				6F20FB822DB9FEDCF9C7B57F /* SpecialtySuggestionCard.swift in Sources */,
 				8FBAFE246BE54D26FB6DF5BB /* StandaloneTaskRow.swift in Sources */,
 				F4095A55172FA4167A6A4E29 /* StandingAppointmentViewModel.swift in Sources */,
+				6D1FD237735642E3B87E8549 /* StatsFilterStrip.swift in Sources */,
 				6C51B919596AE2D672258D80 /* String+Extensions.swift in Sources */,
 				61DB2DCA3310F9F000B1E821 /* SubscriptionView.swift in Sources */,
 				FAF13705A6AA4E4A400398C8 /* SupabaseClient.swift in Sources */,

@@ -599,6 +599,9 @@ enum AnalyticsEvent: String {
     case tasksV2ProgramExpanded = "tasks_v2_program_expanded"
     /// Search icon tap on SeasonScopeBanner.
     case tasksV2SearchTapped = "tasks_v2_search_tapped"
+    /// Phase F1 — time-window stats-pill filter applied. Properties:
+    /// filter ("overdue|thisWeek|thisMonth|later"), season.
+    case tasksV2StatsFilterApplied = "tasks_v2_stats_filter_applied"
     /// Inline scheduling sheet committed a date. Properties: source
     /// ("this_week" | "next_week" | "custom"), days_out.
     case tasksV2QuickScheduled = "tasks_v2_quick_scheduled"

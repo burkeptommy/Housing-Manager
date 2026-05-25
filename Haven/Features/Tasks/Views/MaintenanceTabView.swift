@@ -84,8 +84,12 @@ struct MaintenanceTabView: View {
                         // Phase 70 (Tasks v2): Tap = filter the screen
                         // to that season. The binding update already
                         // re-renders the feed via `activeFeed`.
+                        // Phase F1: clear stats filter on season swap
+                        // so the user isn't trapped in "Overdue" when
+                        // jumping forward to a different season.
                         withAnimation(HavenTheme.animationStandard) {
                             activeSeason = season
+                            viewModel.activeStatsFilter = nil
                         }
                         Haptics.selection()
                         Analytics.track(.tasksV2SeasonTapped, [
@@ -105,6 +109,8 @@ struct MaintenanceTabView: View {
                 // count == the rendered row count. The old section
                 // helpers are kept below for safety + rollback.
                 seasonScopeBannerSection
+
+                statsFilterStripSection
 
                 needsAttentionSection
 
@@ -457,6 +463,38 @@ struct MaintenanceTabView: View {
         )
         .padding(.horizontal, TasksV5.pageMargin)
         .padding(.bottom, TasksV5.sectionGap)
+    }
+
+    /// Phase F1: time-window filter chips between the banner and the
+    /// decisions section. Tap a pill (Overdue / This Week / This Month /
+    /// Later) to scope the feed to that window. Tap an active pill or
+    /// the Clear chip to reset. Always rendered so the affordance is
+    /// discoverable. Counts come from `viewModel.statsFilterCounts(...)`
+    /// against the active season + Flexible bucket.
+    @ViewBuilder
+    private var statsFilterStripSection: some View {
+        let counts = viewModel.statsFilterCounts(for: activeSeason)
+        let totalAvailable = counts.values.reduce(0, +)
+        if totalAvailable > 0 || viewModel.activeStatsFilter != nil {
+            StatsFilterStrip(
+                active: Binding(
+                    get: { viewModel.activeStatsFilter },
+                    set: { newValue in
+                        withAnimation(HavenTheme.animationStandard) {
+                            viewModel.activeStatsFilter = newValue
+                        }
+                        if let value = newValue {
+                            Analytics.track(.tasksV2StatsFilterApplied, [
+                                "filter": value.rawValue,
+                                "season": activeSeason.rawValue
+                            ])
+                        }
+                    }
+                ),
+                counts: counts
+            )
+            .padding(.bottom, TasksV5.sectionGap)
+        }
     }
 
     /// Phase 70 "Needs your attention" — combined section that surfaces
@@ -1180,6 +1218,14 @@ final class MaintenanceTabViewModel: ObservableObject {
     /// don't migrate stored values when the switcher ships.
     @Published var activePropertyId: UUID?
 
+    /// Phase F1 (MaintenanceScheduleView parity): active time-window
+    /// filter. Nil = "show everything." When set, `seasonFeed(_:)` +
+    /// `flexibleTasks(propertyId:)` apply the predicate so only tasks
+    /// matching the window render. Carried from MaintenanceScheduleView's
+    /// Phase 56.4 stats-pill filter — same enum semantics, owned by
+    /// Tasks v2 now. Not persisted; resets each session.
+    @Published var activeStatsFilter: TasksStatsFilter?
+
     /// Catalog count for the BrowseBand subtitle. Computed from
     /// `RecommendedServicesView`'s underlying templates list — but we don't
     /// want to hard-couple to that surface, so we ship a static "15 seasonal
@@ -1384,7 +1430,8 @@ final class MaintenanceTabViewModel: ObservableObject {
                 task.parentRoutineId == nil &&
                 task.assignmentType == "vendor" &&
                 task.assignedContractorId == nil &&
-                isTask(task, in: season)
+                isTask(task, in: season) &&
+                taskMatchesActiveStatsFilter(task)
             }
             .map { DecisionEntry.taskNeedsVendor($0) }
         let combinedDecisions = (routineDecisions + taskDecisions)
@@ -1408,8 +1455,12 @@ final class MaintenanceTabViewModel: ObservableObject {
         }()
 
         // ── This Season's Tasks feed (grouped by month) ─────────────
+        // Phase F1: also gate on the active time-window filter so the
+        // monthly buckets honor "show only overdue / this week / …"
         let seasonStandaloneTasks = allTasks.filter { task in
-            task.parentRoutineId == nil && isTask(task, in: season)
+            task.parentRoutineId == nil &&
+                isTask(task, in: season) &&
+                taskMatchesActiveStatsFilter(task)
         }
         // Routine occurrences inside the season's month range.
         let now = Date()
@@ -1617,6 +1668,8 @@ final class MaintenanceTabViewModel: ObservableObject {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased(),
                   timing == "flexible" else { return false }
+            // Phase F1: respect the active time-window filter.
+            guard taskMatchesActiveStatsFilter(task) else { return false }
             return true
         }
         .sorted { lhs, rhs in
@@ -1626,6 +1679,53 @@ final class MaintenanceTabViewModel: ObservableObject {
             let rhsDate = formatter.date(from: rhs.nextDueDate) ?? .distantFuture
             return lhsDate < rhsDate
         }
+    }
+
+    /// Phase F1: time-window filter predicate. When no filter is
+    /// active, every task passes. When a filter is set, the task's
+    /// scheduledDate (preferred) or nextDueDate must fall in the
+    /// filter's window. Applied inside `seasonFeed(_:)` (decisions +
+    /// monthly buckets) and `flexibleTasks(propertyId:)`.
+    func taskMatchesActiveStatsFilter(_ task: MaintenanceTaskDBRow) -> Bool {
+        guard let filter = activeStatsFilter else { return true }
+        let dateString = task.scheduledDate ?? task.nextDueDate
+        return filter.matches(taskDateString: dateString)
+    }
+
+    /// Phase F1: per-pill count for the StatsFilterStrip. Counts every
+    /// in-season, non-bundle-child, non-vehicle, active task whose
+    /// scheduledDate/nextDueDate falls in the pill's window, plus the
+    /// Flexible section's tasks. Computed against the active season
+    /// scope so the pills move when the user changes seasons.
+    func statsFilterCounts(for season: Season, propertyId: UUID? = nil) -> [TasksStatsFilter: Int] {
+        let propScope = propertyId ?? self.activePropertyId
+        let candidates = MaintenanceViewModel.shared.tasks.filter { task in
+            if let scope = propScope, task.propertyId != scope { return false }
+            guard task.vehicleId == nil else { return false }
+            if let last = task.lastCompletedDate, !last.isEmpty { return false }
+            if (task.isArchived ?? false) == true { return false }
+            if task.parentRoutineId != nil { return false }
+            if let templateKey = task.templateId,
+               let template = MaintenanceTemplates.template(forKey: templateKey),
+               template.bundleId != nil {
+                return false
+            }
+            // Either a season-anchored task or a Flexible task — both
+            // surface in the Tasks v2 feed.
+            let timing = task.seasonalTiming?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased() ?? ""
+            if timing == "flexible" { return true }
+            return isTask(task, in: season)
+        }
+
+        var counts: [TasksStatsFilter: Int] = [:]
+        for filter in TasksStatsFilter.allCases {
+            counts[filter] = candidates.filter { task in
+                filter.matches(taskDateString: task.scheduledDate ?? task.nextDueDate)
+            }.count
+        }
+        return counts
     }
 }
 
