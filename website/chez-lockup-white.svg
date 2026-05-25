@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 220" role="img" aria-label="Chez">
+  <g fill="#FFFFFF">
+    <g transform="translate(110 110)">
+      <path d="M -10 -16 L -10 -56 L 22 -72 L 54 -56 L 54 -16 Z"></path>
+      <path transform="rotate(90)" d="M -10 -16 L -10 -56 L 22 -72 L 54 -56 L 54 -16 Z"></path>
+      <path transform="rotate(180)" d="M -10 -16 L -10 -56 L 22 -72 L 54 -56 L 54 -16 Z"></path>
+      <path transform="rotate(270)" d="M -10 -16 L -10 -56 L 22 -72 L 54 -56 L 54 -16 Z"></path>
+      <circle r="10"></circle>
+    </g>
+    <text x="240" y="148" font-family="ui-serif, &#39;New York&#39;, Georgia, &#39;Times New Roman&#39;, serif" font-size="160" font-weight="500" letter-spacing="-4">Chez</text>
+  </g>
+</svg>
