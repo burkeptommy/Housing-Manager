@@ -104,6 +104,9 @@ struct AddMaintenanceTaskSheet: View {
     @State private var notes = ""
     @State private var followUpReason = ""
     @State private var isSaving = false
+    // Phase 70.A1.x: seasonal-timing picker. Default "Not sure" preserves
+    // pre-Phase-D behavior (no seasonalTiming stamped → date-bucketed).
+    @State private var seasonalTimingChoice: SeasonalTimingChoice = .notSure
     /// Phase 60: optional confirmed visit date. When the user ticks
     /// "Visit already scheduled" we stamp `scheduled_date` on the task
     /// so it lands in the Maintenance tab's "Scheduled" bucket instead
@@ -128,6 +131,46 @@ struct AddMaintenanceTaskSheet: View {
     ]
 
     private let priorities = ["low", "medium", "high", "urgent"]
+
+    /// Phase 70.A1.x: seasonal-timing options surfaced on the new
+    /// "When should this appear?" picker. Maps to the `seasonal_timing`
+    /// column on `maintenance_tasks` — same set the template library
+    /// uses (Spring / Summer / Fall / Winter / Spring/Fall / Flexible)
+    /// plus a "Not sure" default that writes nil (same as today).
+    enum SeasonalTimingChoice: String, CaseIterable, Identifiable {
+        case notSure = "Not sure"
+        case spring = "Spring"
+        case summer = "Summer"
+        case fall = "Fall"
+        case winter = "Winter"
+        case springFall = "Spring & Fall"
+        case flexible = "Flexible"
+
+        var id: String { rawValue }
+
+        /// Stored value for the DB column. `notSure` writes nil so
+        /// the existing date-bucketed flow stays the default.
+        var storedValue: String? {
+            switch self {
+            case .notSure: return nil
+            case .springFall: return "Spring/Fall"
+            default: return rawValue
+            }
+        }
+
+        var subtitle: String {
+            switch self {
+            case .notSure:
+                return "Will appear in the month of the date you picked."
+            case .spring, .summer, .fall, .winter:
+                return "Will appear in \(rawValue) tasks."
+            case .springFall:
+                return "Will appear in both Spring and Fall tasks."
+            case .flexible:
+                return "Available year-round until you schedule it."
+            }
+        }
+    }
 
     private var availableSystems: [HomeSystemRow] {
         guard let propId = selectedPropertyId else { return [] }
@@ -291,6 +334,24 @@ struct AddMaintenanceTaskSheet: View {
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textSecondary)
                         ActiveMonthsPicker(selectedMonths: $activeMonths)
+                    }
+                }
+
+                // Phase 70.A1.x: seasonal-timing picker. Only surfaces
+                // for non-routine tasks (routines have ActiveMonthsPicker
+                // for the same purpose) and not for one-off vendor
+                // appointments or follow-ups whose date is the anchor.
+                if entryMode != .routineProgram && taskKind == .maintenance {
+                    Section("When should this appear?") {
+                        Picker("When", selection: $seasonalTimingChoice) {
+                            ForEach(SeasonalTimingChoice.allCases) { choice in
+                                Text(choice.rawValue).tag(choice)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        Text(seasonalTimingChoice.subtitle)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
 
@@ -541,6 +602,12 @@ struct AddMaintenanceTaskSheet: View {
             insert.assignedToUserId = assignedUserId
             insert.assignedContractorId = selectedContractorId
             insert.serviceKey = "custom_seasonal_service"
+
+            // Phase 70.A1.x: stamp seasonalTiming from the picker when
+            // the user explicitly chose one. "Not sure" writes nil so
+            // the date-bucketed fallback in MaintenanceTabView.isTask
+            // continues to apply for users who skip the picker.
+            insert.seasonalTiming = seasonalTimingChoice.storedValue
 
             if hasScheduledVisit {
                 insert.scheduledDate = formatter.string(from: scheduledVisitDate)
