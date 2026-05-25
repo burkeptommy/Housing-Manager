@@ -586,7 +586,9 @@ struct MaintenanceTabView: View {
                 onTap: { task in
                     quickScheduleTask = task
                 },
-                onSeeAll: { pushTarget = .scheduleView }
+                onSeeAll: { pushTarget = .scheduleView },
+                onComplete: { task in Task { await maintenanceVM.completeTask(task) } },
+                onSnooze: { task in Task { await maintenanceVM.snoozeTask(task, days: 7) } }
             )
             .padding(.horizontal, TasksV5.pageMargin)
             .padding(.bottom, TasksV5.sectionGap)
@@ -649,6 +651,12 @@ struct MaintenanceTabView: View {
                     quickScheduleTask = task
                 }
             )
+            // Phase F2: leading swipe = complete, trailing = snooze 1wk.
+            .swipeRowActions(
+                snoozeLabel: "Snooze 1wk",
+                onComplete: { Task { await maintenanceVM.completeTask(task) } },
+                onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
+            )
 
         case .standaloneTask(let task):
             // Reuse the existing UnifiedTaskCard via a row helper. Task
@@ -666,6 +674,11 @@ struct MaintenanceTabView: View {
                     detailTask = task
                 }
             )
+            .swipeRowActions(
+                snoozeLabel: "Snooze 1wk",
+                onComplete: { Task { await maintenanceVM.completeTask(task) } },
+                onSnooze: { Task { await maintenanceVM.snoozeTask(task, days: 7) } }
+            )
 
         case .routineOccurrence(let occurrence):
             TasksV2RoutineOccurrenceRow(
@@ -679,6 +692,10 @@ struct MaintenanceTabView: View {
                     }
                 }
             )
+            // Routine occurrences don't carry an underlying maintenance_task
+            // row so they can't be "marked complete" or snoozed via the
+            // tasks API. Leave them sans swipe — taps still push into
+            // RoutineDetailView for skip/reschedule.
         }
     }
 

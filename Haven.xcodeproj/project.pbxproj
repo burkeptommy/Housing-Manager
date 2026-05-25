@@ -288,6 +288,7 @@
 		498E44D67AF08229E111591E /* ChezQuizRequestSubmitter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BDB844E8104520CAA856B45 /* ChezQuizRequestSubmitter.swift */; };
 		4A67D195FB30C8FC75BCD0AF /* HavenColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9AA43272E274ADD62E2592 /* HavenColors.swift */; };
 		4A69C6EB06F4487D7BF2443C /* IntroExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA84C3892EACD5DC6B221B8B /* IntroExplainerView.swift */; };
+		4A69F644AB08A7767C2625BB /* SwipeActionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3527028C9CA7CB7DF94C2BAE /* SwipeActionRow.swift */; };
 		4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */; };
 		4ADA90466B01EA77534BBB8C /* StatsFilterStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE11C96C96A2FCE511EB0BFF /* StatsFilterStrip.swift */; };
 		4BAE970B4D55FAE7B1CA6858 /* HookContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D01DDF4F64847EE3ACA4603 /* HookContent.swift */; };
@@ -929,6 +930,7 @@
 		F8491988F15E8ABEB2A5067C /* WalkthroughView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD63DFF1EBA550D92D607441 /* WalkthroughView.swift */; };
 		F966EFB968FD8BC13DE6D91E /* ScenarioStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */; };
 		F9800BA6DCDBD4C5310F88F9 /* ChapterIntroCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6D2F3658561ADE37395D63 /* ChapterIntroCard.swift */; };
+		F98AC16056DACF5860014FDF /* SwipeActionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3527028C9CA7CB7DF94C2BAE /* SwipeActionRow.swift */; };
 		F9D933AAB68D62A25F73244F /* Q37RoutinesGridBody.swift in Sources */ = {isa = PBXBuildFile; fileRef = 531E5B9D8A8F05E15BD6A50F /* Q37RoutinesGridBody.swift */; };
 		FA3CFECBA7290E8DF058E112 /* HouseQuizPersonalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A591974F2C6B9ADE8AFE54CF /* HouseQuizPersonalization.swift */; };
 		FA43E1224FC4C151E2FB7F66 /* VendorLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F404802C9E338E592601FED /* VendorLogoView.swift */; };
@@ -1070,6 +1072,7 @@
 		32699B80B8FD02163046904B /* IconTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconTile.swift; sourceTree = "<group>"; };
 		3270221BA2EADDC793D458F8 /* CoveredDriverPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoveredDriverPickerSheet.swift; sourceTree = "<group>"; };
 		33118261443612A48EF3D105 /* RoutineOccurrenceRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineOccurrenceRow.swift; sourceTree = "<group>"; };
+		3527028C9CA7CB7DF94C2BAE /* SwipeActionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeActionRow.swift; sourceTree = "<group>"; };
 		369C161B6C44E4A1318499AB /* ChezRequestRowCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezRequestRowCard.swift; sourceTree = "<group>"; };
 		379FFAF6339B329B4272E557 /* NotificationPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPreferences.swift; sourceTree = "<group>"; };
 		38EA105F497B2061972F5F70 /* HavenField.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HavenField.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2174,6 +2177,7 @@
 				17B1BB4C90A506E3389C3CA8 /* SectionLabel.swift */,
 				E7E9C9D439169BA07CDAB851 /* StandaloneTaskRow.swift */,
 				AE11C96C96A2FCE511EB0BFF /* StatsFilterStrip.swift */,
+				3527028C9CA7CB7DF94C2BAE /* SwipeActionRow.swift */,
 				FF82284A2F4F724BB5EF025A /* TasksV2RoutineOccurrenceRow.swift */,
 				CCA360ED13A11F5410214A5D /* TasksV5Tokens.swift */,
 				84EBCC1E36E5ADE525CE044D /* YearRibbon.swift */,
@@ -3117,6 +3121,7 @@
 				7AB52FBD973A44821424BCD2 /* String+Extensions.swift in Sources */,
 				C54E9E86A2E66ED38F6AB3C9 /* SubscriptionView.swift in Sources */,
 				00A0340E512F43534C4C8B56 /* SupabaseClient.swift in Sources */,
+				4A69F644AB08A7767C2625BB /* SwipeActionRow.swift in Sources */,
 				BD3059567DE63FC6E2D8A238 /* SystemCategoryRegistry.swift in Sources */,
 				12BCB04CC7BD9BB8D44C37C7 /* SystemCoverageCard.swift in Sources */,
 				2C9DABF25ADC307973041BED /* SystemCoverageFlow.swift in Sources */,
@@ -3602,6 +3607,7 @@
 				6C51B919596AE2D672258D80 /* String+Extensions.swift in Sources */,
 				61DB2DCA3310F9F000B1E821 /* SubscriptionView.swift in Sources */,
 				FAF13705A6AA4E4A400398C8 /* SupabaseClient.swift in Sources */,
+				F98AC16056DACF5860014FDF /* SwipeActionRow.swift in Sources */,
 				2369D7D1B078885DA65402D1 /* SystemCategoryRegistry.swift in Sources */,
 				D0D5E8C667C3C56837C5FBF2 /* SystemCoverageCard.swift in Sources */,
 				61691985649B26150DCB5932 /* SystemCoverageFlow.swift in Sources */,

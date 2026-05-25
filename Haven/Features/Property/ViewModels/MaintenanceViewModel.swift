@@ -487,6 +487,31 @@ final class MaintenanceViewModel: ObservableObject {
         return contractors.first(where: { $0.id == prefId })?.companyName
     }
 
+    /// Phase F2 — quick snooze. Bumps `nextDueDate` forward by `days`
+    /// from today (typical use: 7 from a leading-swipe gesture).
+    /// Optimistic local update; no toast (the row simply slides into
+    /// the future). Vendor-managed and routine-parented tasks are
+    /// snoozable too — the date semantics are identical.
+    func snoozeTask(_ task: MaintenanceTaskDBRow, days: Int) async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let newDate = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
+        Haptics.success()
+        do {
+            let updated = try await db.updateMaintenanceTask(
+                id: task.id,
+                MaintenanceTaskUpdate(nextDueDate: formatter.string(from: newDate))
+            )
+            if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
+                tasks[idx] = updated
+            }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        } catch {
+            print("[MaintenanceViewModel] snoozeTask failed: \(error)")
+            Haptics.error()
+        }
+    }
+
     func completeTask(_ task: MaintenanceTaskDBRow) async {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"

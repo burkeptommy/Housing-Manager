@@ -20,6 +20,10 @@ struct FlexibleTasksSection: View {
     let contractor: (MaintenanceTaskDBRow) -> ContractorRow?
     let onTap: (MaintenanceTaskDBRow) -> Void
     let onSeeAll: () -> Void
+    // Phase F2: leading + trailing swipe callbacks. Defaults are no-op
+    // so callers that don't wire them keep the existing tap-only flow.
+    var onComplete: (MaintenanceTaskDBRow) -> Void = { _ in }
+    var onSnooze: (MaintenanceTaskDBRow) -> Void = { _ in }
 
     private static let visibleCap = 5
 
@@ -32,6 +36,11 @@ struct FlexibleTasksSection: View {
                         task: task,
                         contractor: contractor(task),
                         onTap: { onTap(task) }
+                    )
+                    .swipeRowActions(
+                        snoozeLabel: "Snooze 1wk",
+                        onComplete: { onComplete(task) },
+                        onSnooze: { onSnooze(task) }
                     )
                 }
                 if tasks.count > Self.visibleCap {
