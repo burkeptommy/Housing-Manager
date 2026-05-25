@@ -651,6 +651,7 @@
 		AA58581E0E9938C8B57E2FE4 /* Double+Currency.swift in Sources */ = {isa = PBXBuildFile; fileRef = C312D5AA48C650B2453392CC /* Double+Currency.swift */; };
 		AA701760B0A4817BCF97DFC2 /* SystemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBAFED62E0CAC6F191166BA /* SystemDetailView.swift */; };
 		AA7E4946711B924E273C56F0 /* InvestmentSummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CC363C4F7144C666BF14C2 /* InvestmentSummaryCard.swift */; };
+		AAC187118A6FFF32ECFDE76A /* ChezInFlightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5F18389A838F4FDE69619B /* ChezInFlightCard.swift */; };
 		AAFE1A36424D4F995FC1D09B /* ChezRequestDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EF6A66BC91FF4036AF43285 /* ChezRequestDetailView.swift */; };
 		AB8530A95540ACA88EAC5D68 /* HavenButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */; };
 		AC341A65010B095FB9CB7425 /* FamilyMemberFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C30DF79412FDA919D65837 /* FamilyMemberFormView.swift */; };
@@ -668,6 +669,7 @@
 		AFE6F1D79C403411616481ED /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A9B2A9169E8DF0AF4A26342 /* DatabaseService.swift */; };
 		B0175AFD507FB8072EBD9702 /* InlineInsightPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0938C9921AE566F16F6CE67 /* InlineInsightPill.swift */; };
 		B0419988F9A5CF0AD7188A0C /* BundleCustomSubitem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F17EC3D832149D4CC09D7 /* BundleCustomSubitem.swift */; };
+		B0EDF79A8A7243A9CD5BF13E /* ChezInFlightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5F18389A838F4FDE69619B /* ChezInFlightCard.swift */; };
 		B1522CC5BD3C91CAA61C3BEB /* ChezActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE7A6C1B272FC927DC070565 /* ChezActivityCard.swift */; };
 		B1C696A52BA96E7920BCFA7A /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211F8CBA26112C97F2C08529 /* ChatViewModel.swift */; };
 		B1F191421491371ED29A49F1 /* ContractorLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6B830964C31D665D3E5876 /* ContractorLogoView.swift */; };
@@ -1039,6 +1041,7 @@
 		1A66B9EE954A529D243341EF /* VendorVisitCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorVisitCard.swift; sourceTree = "<group>"; };
 		1AD5377254AFED79D10F0B50 /* EquipmentSearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentSearchResult.swift; sourceTree = "<group>"; };
 		1B5627AB5E97358EFC5C1A0B /* ProjectEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectEmailView.swift; sourceTree = "<group>"; };
+		1B5F18389A838F4FDE69619B /* ChezInFlightCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezInFlightCard.swift; sourceTree = "<group>"; };
 		1BD17A1F78FA47CF93E12C47 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		1C672B6C7481ED4AF2D5B384 /* PropertyEnhancedSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyEnhancedSections.swift; sourceTree = "<group>"; };
 		1CBD1C9343A32403E54998C1 /* MaintenanceRealtimeSubscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceRealtimeSubscription.swift; sourceTree = "<group>"; };
@@ -2383,6 +2386,7 @@
 				ADA51D001CCECE0998970343 /* BrowseSpecialtySystemsSheet.swift */,
 				96D1F12E86441667044EB0CA /* CadenceSuggestionCard.swift */,
 				BE7A6C1B272FC927DC070565 /* ChezActivityCard.swift */,
+				1B5F18389A838F4FDE69619B /* ChezInFlightCard.swift */,
 				93EC1DA8C3DA0964D619E71D /* ChezOwnershipHeroCard.swift */,
 				6566BC39CB24D7E6052661B3 /* EnrichmentCardView.swift */,
 				D34E3E4F70C0BF8881E1E23B /* HandymanSeasonalReminderCard.swift */,
@@ -2803,6 +2807,7 @@
 				D94934C28197EA526838B81A /* ChezEntryButton.swift in Sources */,
 				9DF30C5BE1F70AECA342366C /* ChezFieldProviderCard.swift in Sources */,
 				569C2B4CB037202E32A40075 /* ChezHandleButton.swift in Sources */,
+				AAC187118A6FFF32ECFDE76A /* ChezInFlightCard.swift in Sources */,
 				CE4066D7F55578F5831178C1 /* ChezMessage.swift in Sources */,
 				C4907CA1636270582A6FCD37 /* ChezMessageBubble.swift in Sources */,
 				40D9CAEC3129AFD7F718EFAC /* ChezOwnedPill.swift in Sources */,
@@ -3295,6 +3300,7 @@
 				1140EEC337F59EA050203A59 /* ChezEntryButton.swift in Sources */,
 				CF07E886E7979D8A5616A987 /* ChezFieldProviderCard.swift in Sources */,
 				B88C430A67193C65AE2AEEA8 /* ChezHandleButton.swift in Sources */,
+				B0EDF79A8A7243A9CD5BF13E /* ChezInFlightCard.swift in Sources */,
 				F1998D7D1520E34BAD1CF68F /* ChezMessage.swift in Sources */,
 				57A2CD7C708CB9C9E89056D7 /* ChezMessageBubble.swift in Sources */,
 				E1FA1C354A92C86AC32D6B59 /* ChezOwnedPill.swift in Sources */,

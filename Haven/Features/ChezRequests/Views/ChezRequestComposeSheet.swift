@@ -101,7 +101,24 @@ struct ChezRequestComposeSheet: View {
                 if succeeded {
                     Haptics.success()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        // K1: capture the new request id BEFORE dismissing
+                        // so it survives the sheet teardown. Post the
+                        // .openChezRequest deep-link a beat after dismiss
+                        // so InboxView's listener fires after the sheet
+                        // is fully gone — otherwise the tab switch races
+                        // the dismiss animation and the user sees a flash
+                        // of the underlying surface.
+                        let newRequestId = viewModel.submittedRequestId
                         dismiss()
+                        if let newRequestId {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                NotificationCenter.default.post(
+                                    name: .openChezRequest,
+                                    object: nil,
+                                    userInfo: ["request_id": newRequestId.uuidString]
+                                )
+                            }
+                        }
                     }
                 }
             }

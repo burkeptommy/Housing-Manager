@@ -20,6 +20,13 @@ final class ChezRequestComposeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var didSucceed: Bool = false
 
+    /// Phase 70.A1 follow-on K1 — the new request's id after a
+    /// successful submit. ChezRequestComposeSheet reads this on the
+    /// `didSucceed` change to post `.openChezRequest`, which lands the
+    /// homeowner directly inside the conversation thread instead of
+    /// dropping them back at whatever screen they came from.
+    @Published var submittedRequestId: UUID?
+
     /// Set by the entry-point. When non-empty the composer skips the
     /// category picker (treats the prefilled category as fixed).
     let isCategoryFixed: Bool
@@ -135,13 +142,16 @@ final class ChezRequestComposeViewModel: ObservableObject {
         isSubmitting = true
         defer { isSubmitting = false }
         do {
-            _ = try await HavenSupabase.submitChezRequest(
+            let request = try await HavenSupabase.submitChezRequest(
                 category: category,
                 summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
                 description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 context: contextHints.isEmpty ? nil : contextHints,
                 attachments: pendingAttachments.isEmpty ? nil : pendingAttachments
             )
+            // K1: capture the id BEFORE flipping didSucceed so the sheet's
+            // onChange handler has it available when posting .openChezRequest.
+            submittedRequestId = request.id
             didSucceed = true
             NotificationCenter.default.post(name: .chezRequestChanged, object: nil)
             Haptics.success()
