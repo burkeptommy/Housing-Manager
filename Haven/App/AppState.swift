@@ -405,6 +405,20 @@ final class AppState: ObservableObject {
                         // Skips user-touched rows.
                         await MaintenanceTaskReconciler.reseedSeasonalTasksPhase70OnceIfNeeded()
 
+                        // Phase 70.A1.x: Library reshape migration.
+                        // Archives orphan tasks from the 6 deleted DIY
+                        // templates, re-dates untouched rows whose
+                        // template seasonalTiming changed (Water Heater
+                        // Fall, Septic Spring, Well Spring, Garage Door
+                        // Fall, Security Spring, Solar Spring, Crawl
+                        // Space Spring, smoke detectors Fall, radon
+                        // Winter, flue scope Fall, geothermal Fall,
+                        // air-duct + ductwork Fall), then runs
+                        // reconcileAll so new Well:annual + Solar:annual
+                        // bundle parents seed for eligible households.
+                        // Skips user-touched rows.
+                        await MaintenanceTaskReconciler.reshapeLibraryPhase70A1xOnceIfNeeded()
+
                         // Phase 70.A1 (Summer/Winter library expansion):
                         // re-run reconcileAllForHousehold so the 8 new
                         // templates added in this phase materialize as

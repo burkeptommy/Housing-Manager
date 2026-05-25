@@ -1654,6 +1654,104 @@ enum MaintenanceTaskReconciler {
         }
     }
 
+    /// Phase 70.A1.x: Library reshape migration. Three jobs in one pass:
+    /// 1) Archives orphan tasks whose templateId matches one of the six
+    ///    deleted DIY templates (Pre-storm gutter walk, Ice dam ground
+    ///    check, Rinse outdoor AC condenser, Outdoor faucet walk, Winter
+    ///    generator status check, Winter indoor humidity check). User-
+    ///    touched tasks are preserved (lastCompletedDate != nil OR
+    ///    scheduledDate != nil) so history stays intact.
+    /// 2) Re-dates untouched tasks whose template's seasonalTiming
+    ///    changed (Water Heater Fall, Septic Spring, Well Spring,
+    ///    Garage Door Fall, Security Spring, Solar Spring, Crawl Space
+    ///    Spring, smoke detectors Fall, radon Winter, flue scope Fall,
+    ///    geothermal Fall, air-duct cleaning Fall, ductwork Fall).
+    /// 3) Calls reconcileAll so new bundle parents (Solar:annual,
+    ///    Well System:annual) seed for households whose home_systems
+    ///    already satisfy the gates.
+    @MainActor
+    static func reshapeLibraryPhase70A1xOnceIfNeeded() async {
+        let migrationKey = "hasReshapedLibraryPhase70A1x_v1"
+        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
+
+        let deletedTemplateKeys: Set<String> = [
+            "Roofing:Pre-storm gutter and downspout walk",
+            "Roofing:Ice dam ground check",
+            "HVAC:Rinse outdoor AC condenser",
+            "Plumbing:Outdoor faucet and hose-bib walk",
+            "Generator:Winter generator status check",
+            "Air Quality:Winter indoor humidity check",
+        ]
+
+        let db = DatabaseService.shared
+        guard let tasks = try? await db.fetchAllMaintenanceTasks() else { return }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        var archived = 0
+        var redated = 0
+
+        for task in tasks {
+            if task.isArchived == true { continue }
+            if task.vehicleId != nil { continue }
+
+            guard let templateKey = task.templateId else { continue }
+
+            // Job 1: orphan archive — deleted-template rows.
+            if deletedTemplateKeys.contains(templateKey) {
+                if let last = task.lastCompletedDate, !last.isEmpty { continue }
+                if task.scheduledDate != nil { continue }
+                if (try? await db.archiveMaintenanceTask(
+                    id: task.id,
+                    reason: "phase_70a1x_template_deleted"
+                )) != nil {
+                    archived += 1
+                }
+                continue
+            }
+
+            // Job 2: re-date untouched rows whose template moved season.
+            if let last = task.lastCompletedDate, !last.isEmpty { continue }
+            if task.scheduledDate != nil { continue }
+
+            guard let template = MaintenanceTemplates.template(forKey: templateKey),
+                  let timing = template.seasonalTiming,
+                  !timing.isEmpty else { continue }
+
+            let newDue = initialDueDate(for: template)
+            let newDueString = formatter.string(from: newDue)
+            if let currentDue = formatter.date(from: task.nextDueDate),
+               abs(newDue.timeIntervalSince(currentDue)) < 30 * 86400 {
+                continue
+            }
+
+            var update = MaintenanceTaskUpdate()
+            update.nextDueDate = newDueString
+            if (try? await db.updateMaintenanceTask(id: task.id, update)) != nil {
+                redated += 1
+            }
+        }
+
+        // Job 3: reconcile so new bundle parents (Solar:annual, Well
+        // System:annual) seed for households whose home_systems already
+        // satisfy the gates.
+        if let properties = try? await db.fetchProperties() {
+            for property in properties {
+                _ = await MaintenanceTaskReconciler.reconcileAll(
+                    propertyId: property.id,
+                    householdId: property.householdId
+                )
+            }
+        }
+
+        print("[Phase70A1x] Archived \(archived) orphaned tasks; re-dated \(redated) seasonal tasks")
+        UserDefaults.standard.set(true, forKey: migrationKey)
+        if archived > 0 || redated > 0 {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+    }
+
     /// Phase 54A: One-time backfill that consolidates pre-Phase-52
     /// individual tasks into the new bundle parents. Without this,
     /// existing TestFlight users see the old chore list forever because

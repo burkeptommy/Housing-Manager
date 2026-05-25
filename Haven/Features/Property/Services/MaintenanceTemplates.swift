@@ -890,48 +890,12 @@ enum MaintenanceTemplates {
                 stableId: "Roofing:Ice dam risk walk",
                 bundleId: "Roofing:fall"
             ),
-            // Phase 70.A1 (Summer fill): pre-thunderstorm-season walk.
-            // Northeast summer convective storms hit hardest mid-Jun
-            // through mid-Aug. A 15-minute DIY ground walk before the
-            // first big system catches sagging downspouts, early-season
-            // debris piles, and bird-nest blockages that cause overflow
-            // and foundation pooling. Routes to handyman punch list via
-            // Phase 67E/F single-rail (diyDefault + ≤60 min effort).
-            MaintenanceTemplate(
-                systemCategory: "Roofing",
-                title: "Pre-storm gutter and downspout walk",
-                description: "Walk the perimeter looking up: are gutters sagging? Any visible debris piles, bird nests, or sections separating from the fascia? Are downspouts intact and aimed away from the foundation? Five months of spring pollen + leaf-out drop usually leaves something — better to catch it before the first July thunderstorm pushes it into a clog.",
-                frequency: "Annually",
-                priority: "Medium",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Summer",
-                professionalRequired: false,
-                notes: "Late June or early July is the sweet spot — pollen and leaf-out debris is settled, you're ahead of the storm season. About 15 minutes from the ground. Bring binoculars if you have them.",
-                assignmentType: .either,
-                diyEffortMinutes: 15
-            ),
-            // Phase 70.A1 (Winter fill): ice-dam ground walk. Different
-            // from the Fall walk-roofline visit (which is professional)
-            // — this is a DIY between-storms check during active winter.
-            // Spotting an ice dam early lets the homeowner roof-rake or
-            // call a vendor before water gets behind the underlayment.
-            // Northeast regional pack.
-            MaintenanceTemplate(
-                systemCategory: "Roofing",
-                title: "Ice dam ground check",
-                description: "After any snowfall of 6\"+, walk the perimeter and look for ice icicles forming along the eaves or below valleys. Icicles are the visible symptom; the dam itself is the trapped water on the roof behind them. If you spot one, get it addressed — roof rake from the ground, or call a vendor for steam removal.",
-                frequency: "Annually",
-                priority: "High",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Winter",
-                professionalRequired: false,
-                notes: "Cosmetic icicles ≠ ice dam. The dam is what forms above them when warm roof melts snow that re-freezes at the cold eave. Persistent icicles in the same spot year after year usually mean an attic-insulation or ventilation issue worth fixing in the off-season.",
-                assignmentType: .either,
-                diyEffortMinutes: 10,
-                regionalPack: .northeast
-            ),
+            // Phase 70.A1.x deleted "Pre-storm gutter and downspout walk"
+            // and "Ice dam ground check" — both are already covered by
+            // existing vendor bundles (Roofing:fall gutter cleaning and
+            // ice-dam-risk walk-through respectively). Single-rail
+            // discipline: tier-4 DIY perimeter walks belong as bundle
+            // children of the existing pro visit, not standalone rows.
         ]),
 
         // ──────────────────────────────────────────────
@@ -1043,11 +1007,11 @@ enum MaintenanceTemplates {
             // the outdoor unit inspection too.
             MaintenanceTemplate(systemCategory: "HVAC", title: "HVAC tune-up (cooling)", description: "HVAC tech inspects and services the air conditioning system before summer. Includes refrigerant level check, condenser coil cleaning, capacitor and contactor inspection, blower motor lubrication, condensate drain flush, and a full system performance test under load. Catches small issues before they become a hot-day breakdown.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Book in February or early March. Most HVAC vendors are fully booked by April once the first warm week hits, and you don't want to be calling around the day your AC stops working in July. Most manufacturer warranties require documented annual service to stay valid.", requiredSubtypes: ["has_ac"], assignmentType: .vendor, stableId: "HVAC:Professional HVAC tune-up (cooling)", bundleId: "HVAC:spring", bundleTitle: "Spring HVAC Service", maxIntervalDays: 420, warrantyLinked: true),
             MaintenanceTemplate(systemCategory: "HVAC", title: "HVAC tune-up (heating)", description: "HVAC tech inspects and services the heating system before winter. Includes burner inspection and cleaning, heat exchanger check for cracks (carbon monoxide risk), gas valve and pilot test, blower motor service, thermostat calibration, and a full ignition cycle test. Critical safety check for gas-fired systems.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Book in August or early September. The first cold snap floods every HVAC vendor's voicemail and turns a routine $200 tune-up into a 2-week wait. Annual service is required to maintain most manufacturer warranties.", requiredSubtypes: ["has_furnace"], assignmentType: .vendor, stableId: "HVAC:Professional HVAC tune-up (heating)", bundleId: "HVAC:fall", bundleTitle: "Fall HVAC Service", maxIntervalDays: 420, warrantyLinked: true),
-            MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect ductwork for leaks", description: "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization test or a manual smoke-pencil walkthrough) to find air loss in the supply and return ducts. Most homes lose 20–30% of conditioned air to duct leaks. Sealing them recovers that money on every energy bill for the rest of the system's life.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Older homes (pre-2000) and homes with ductwork running through unconditioned spaces (attic, crawl) benefit most. If your second floor is always 5–10°F off the first floor, leaky ducts are the #1 suspect.", requiredSubtypes: ["ducted"], isEssential: false, assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect ductwork for leaks", description: "HVAC tech runs a duct-leakage test (typically a Duct Blaster pressurization test or a manual smoke-pencil walkthrough) to find air loss in the supply and return ducts. Most homes lose 20–30% of conditioned air to duct leaks. Sealing them recovers that money on every energy bill for the rest of the system's life.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Older homes (pre-2000) and homes with ductwork running through unconditioned spaces (attic, crawl) benefit most. If your second floor is always 5–10°F off the first floor, leaky ducts are the #1 suspect.", requiredSubtypes: ["ducted"], isEssential: false, assignmentType: .vendor, bundleId: "HVAC:fall"),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect mini-split outdoor unit", description: "HVAC tech clears leaves and debris from the outdoor condenser, checks refrigerant line insulation for cracks, washes the coil, verifies the disconnect switch and surge protector, and confirms the unit is level on its pad. Mini-splits can lose 10-20% efficiency to a dirty coil alone.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Often bundled into the spring AC tune-up if your HVAC vendor handles both ducted and ductless. Confirm before booking separately.", requiredSubtypes: ["mini_split"], assignmentType: .vendor, bundleId: "HVAC:spring"),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Bleed radiators", description: "Boiler tech opens each radiator's bleed valve in turn to release trapped air, then tops off boiler pressure to spec. Trapped air at the top of a radiator means the bottom half can heat fine while the top stays cold. The room never gets warm even though the system runs constantly.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$50–$150", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Most boiler owners include this in the annual boiler service visit instead of a separate appointment. No point paying two trip charges. If you've noticed any radiator running cold or only warming halfway, it's worth flagging to the tech.", requiredSubtypes: ["boiler"], assignmentType: .vendor, bundleId: "HVAC:fall"),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Annual boiler service", description: "Boiler tech runs a full combustion analysis, cleans the burners and combustion chamber, inspects the heat exchanger for cracks (carbon monoxide risk), tests the pressure relief valve, verifies exhaust draft and flue integrity, and checks the expansion tank charge. The most consequential heating-system service in the house. A cracked heat exchanger can leak CO into living spaces.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Required for warranty on most boilers. The manufacturer pulls service records when a claim is filed. Schedule in August or early September. Once the first cold snap hits, every boiler tech is booked solid for 2–3 weeks and a routine service turns into an emergency call.", requiredSubtypes: ["boiler"], assignmentType: .vendor, bundleId: "HVAC:fall", safetyFloor: true, maxIntervalDays: 420, warrantyLinked: true),
-            MaintenanceTemplate(systemCategory: "HVAC", title: "Geothermal loop pressure check", description: "Geothermal installer verifies ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak. Could be a pinhole in the ground loop, fittings at the manifold, or the heat pump's internal pressure switch. Catching this early prevents a full system shutdown.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Use the original installer if possible. Geothermal is specialized. Most general HVAC techs don't have the loop testing equipment or the training to diagnose ground-side issues.", requiredSubtypes: ["geothermal"], assignmentType: .vendor, safetyFloor: true),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Geothermal loop pressure check", description: "Geothermal installer verifies ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak. Could be a pinhole in the ground loop, fittings at the manifold, or the heat pump's internal pressure switch. Catching this early prevents a full system shutdown.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Use the original installer if possible. Geothermal is specialized. Most general HVAC techs don't have the loop testing equipment or the training to diagnose ground-side issues.", requiredSubtypes: ["geothermal"], assignmentType: .vendor, bundleId: "HVAC:fall", safetyFloor: true),
             // Phase 57: Air duct cleaning. Long-cycle (every 3-5 years)
             // indoor-air-quality service, distinct from the annual HVAC
             // tune-up. Gated on `ducted` — ductless and window-unit homes
@@ -1060,12 +1024,13 @@ enum MaintenanceTemplates {
                 priority: "Medium",
                 estimatedCostRange: "$400-800",
                 isDIY: false,
-                seasonalTiming: nil,
+                seasonalTiming: "Fall",
                 professionalRequired: true,
                 notes: "HNW indoor air quality priority. Best done when HVAC is not in heavy use.",
                 requiredSubtypes: ["ducted"],
                 isEssential: false,
-                assignmentType: .vendor
+                assignmentType: .vendor,
+                bundleId: "HVAC:fall"
             ),
             // Phase 57: Whole-home humidifier service. NE-only because
             // dry winters without humidity damage hardwoods, art, and
@@ -1094,29 +1059,11 @@ enum MaintenanceTemplates {
                 bundleId: "HVAC:spring",
                 routingOverride: .diyCapable
             ),
-            // Phase 70.A1 (Summer fill): mid-summer condenser coil rinse.
-            // The outdoor condenser pulls in cottonwood seed, pollen,
-            // and grass clippings all spring + early summer. By mid-
-            // July the coil is matted, the unit works ~15% harder for
-            // the same cooling, and the homeowner doesn't notice until
-            // the system trips on a 95°F day. 5-minute DIY rinse with
-            // a garden hose (no chemicals, no soap — just water) gets
-            // efficiency back. Routes to handyman punch list.
-            MaintenanceTemplate(
-                systemCategory: "HVAC",
-                title: "Rinse outdoor AC condenser",
-                description: "Shut off power at the disconnect, clear leaves and grass clippings from the cabinet, gently rinse the condenser fins from inside-out with a garden hose. Don't use a pressure washer — bent fins are a service call. About 5 minutes once a year keeps the unit running 10-15% more efficiently through the heat wave.",
-                frequency: "Annually",
-                priority: "Medium",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Summer",
-                professionalRequired: false,
-                notes: "Mid-July is the sweet spot — past pollen + cottonwood season, ahead of August heat. Power-off is critical (the fan blade is right there). If fins are visibly bent, a fin comb is $8 on Amazon; flagging it for the spring tune-up is also fine.",
-                requiredSubtypes: ["has_ac"],
-                assignmentType: .either,
-                diyEffortMinutes: 10
-            ),
+            // Phase 70.A1.x deleted "Rinse outdoor AC condenser" — the
+            // HVAC tech rinses the condenser as part of the spring
+            // cooling tune-up. Folding the DIY duplicate eliminates an
+            // orphan row that asked the homeowner to schedule what the
+            // pro already does.
         ]),
 
         // ──────────────────────────────────────────────
@@ -1218,26 +1165,11 @@ enum MaintenanceTemplates {
                 diyEffortMinutes: 10,
                 routingOverride: .diyDefault
             ),
-            // Phase 70.A1 (Summer fill): outdoor faucet + hose-bib walk.
-            // The annual plumbing inspection in Spring catches major
-            // hose-bib issues, but the summer walkthrough catches the
-            // drip you didn't notice (or the connection that loosened
-            // after the first heavy use of the season). 10 min DIY,
-            // universal, routes to handyman punch list.
-            MaintenanceTemplate(
-                systemCategory: "Plumbing",
-                title: "Outdoor faucet and hose-bib walk",
-                description: "Walk every outdoor faucet, hose bib, and irrigation valve. Turn each on briefly and look for active drips at the spigot, slow seepage from the wall connection, or hissing inside the wall (frost-free hose bibs can leak inside the house if the seal degrades — you only notice it as wet drywall a month later).",
-                frequency: "Annually",
-                priority: "Medium",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Summer",
-                professionalRequired: false,
-                notes: "Mid-July after a few months of summer use is when problems surface. Soft drip = washer; persistent drip when shut tight = stem cartridge; wet drywall behind the bib = call a plumber today.",
-                assignmentType: .either,
-                diyEffortMinutes: 10
-            ),
+            // Phase 70.A1.x deleted "Outdoor faucet and hose-bib walk"
+            // — the plumber checks hose bibs as part of the annual
+            // plumbing inspection (Plumbing:annual). Folding the DIY
+            // duplicate avoids asking the homeowner to do what the pro
+            // already does.
             // Phase 70.A1 (Winter fill): frozen pipe risk walk during
             // active cold snaps. Northeast regional. Different from
             // the Fall winterization (which is preventive, vendor-side)
@@ -1263,7 +1195,7 @@ enum MaintenanceTemplates {
         // WATER HEATER
         // ──────────────────────────────────────────────
         ("Water Heater", [
-            MaintenanceTemplate(systemCategory: "Water Heater", title: "Flush water heater", description: "Plumber drains and flushes sediment from the tank, tests the T&P relief valve, and inspects the sacrificial anode rod (replace if more than 50% depleted). Standard package keeps the tank free of buildup that drives up gas/electric usage and shortens lifespan.", frequency: "Annually", priority: "High", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Anode rod inspection is part of the standard flush. Pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16\" socket and breaker bar, both of which the plumber already has on the truck.", requiredSubtypes: ["tank"], equipmentKeywords: ["water heater"], assignmentType: .vendor, bundleId: "Water Heater:annual", bundleTitle: "Annual Water Heater Service"),
+            MaintenanceTemplate(systemCategory: "Water Heater", title: "Flush water heater", description: "Plumber drains and flushes sediment from the tank, tests the T&P relief valve, and inspects the sacrificial anode rod (replace if more than 50% depleted). Standard package keeps the tank free of buildup that drives up gas/electric usage and shortens lifespan.", frequency: "Annually", priority: "High", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Anode rod inspection is part of the standard flush. Pros pull and inspect every visit and replace when depleted past ~50%. The replacement requires a partial drain plus a 1-1/16\" socket and breaker bar, both of which the plumber already has on the truck.", requiredSubtypes: ["tank"], equipmentKeywords: ["water heater"], assignmentType: .vendor, bundleId: "Water Heater:annual", bundleTitle: "Annual Water Heater Service"),
             MaintenanceTemplate(systemCategory: "Water Heater", title: "Test T&P relief valve", description: "Plumber tests the temperature and pressure relief valve for proper operation. Typically bundled with the annual water heater flush.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (part of flush)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Safety-critical valve check", equipmentKeywords: ["water heater"], assignmentType: .vendor, bundleId: "Water Heater:annual"),
             // Phase 70 (Tasks v2 / Section C.2): expand the bundle's
             // "What's included" line items so the homeowner sees what
@@ -1313,7 +1245,7 @@ enum MaintenanceTemplates {
         // Phase 52: Septic consolidated from 3 tasks to 2 (1 triennial
         // bundle + 1 quarterly DIY drain field check).
         ("Septic System", [
-            MaintenanceTemplate(systemCategory: "Septic System", title: "Septic tank pumping", description: "Pumping of septic tank to remove accumulated solids.", frequency: "Every 2 years", priority: "High", estimatedCostRange: "$300–$600", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Two-year default for a typical 4-person household with a 1,000-gallon tank. Larger households (6+) should pump annually; small households (1-2 people) with larger tanks can stretch to 3 years. Inspector will tell you the actual sludge level on each visit and recalibrate.", assignmentType: .vendor, bundleId: "Septic System:triennial", bundleTitle: "Septic Service Visit", safetyFloor: true, maxIntervalDays: 1825),
+            MaintenanceTemplate(systemCategory: "Septic System", title: "Septic tank pumping", description: "Pumping of septic tank to remove accumulated solids.", frequency: "Every 2 years", priority: "High", estimatedCostRange: "$300–$600", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Two-year default for a typical 4-person household with a 1,000-gallon tank. Larger households (6+) should pump annually; small households (1-2 people) with larger tanks can stretch to 3 years. Inspector will tell you the actual sludge level on each visit and recalibrate.", assignmentType: .vendor, bundleId: "Septic System:triennial", bundleTitle: "Septic Service Visit", safetyFloor: true, maxIntervalDays: 1825),
             MaintenanceTemplate(systemCategory: "Septic System", title: "Inspect septic baffles", description: "Septic service inspects baffles during pumping to ensure they're intact.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "Included with pumping", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Done during pumping", assignmentType: .vendor, bundleId: "Septic System:triennial"),
         ]),
 
@@ -1325,7 +1257,7 @@ enum MaintenanceTemplates {
             // tank visual checks fold into Handyman:spring defaults for well
             // homes. Two standalone vendor tasks remain.
             MaintenanceTemplate(systemCategory: "Well System", title: "Test water quality", description: "Certified lab tests a sample for total coliform bacteria, E. coli, nitrates, nitrites, lead, and pH. Iron, manganese, hardness, and arsenic add-on panels are recommended in the Northeast and parts of the Midwest where geology drives elevated levels. Results take 5–10 business days.", frequency: "Annually", priority: "High", estimatedCostRange: "$50–$200", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Test in spring after the snowmelt and seasonal water-table shifts have moved through. Test sooner if you notice taste, odor, or color changes. Those are the canary signs of a contamination event. State health departments often offer free or subsidized testing for private wells.", assignmentType: .vendor, safetyFloor: true),
-            MaintenanceTemplate(systemCategory: "Well System", title: "Well system inspection", description: "Well service comprehensively inspects the submersible pump, well casing integrity, pressure tank pre-charge and bladder, pressure switch and gauge, electrical connections at the well head, and total water output (gallons per minute). Catches a failing pump before it dies on a Saturday night.", frequency: "Every 3-5 years", priority: "High", estimatedCostRange: "$300–$500", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Pump replacement is $1,500–$3,500. Annual inspection catches the early warning signs (cycling more often, lower flow, casing seal issues) and lets you plan the replacement on your schedule rather than during an emergency.", assignmentType: .vendor, stableId: "Well System:Professional well inspection"),
+            MaintenanceTemplate(systemCategory: "Well System", title: "Well system inspection", description: "Well service comprehensively inspects the submersible pump, well casing integrity, pressure tank pre-charge and bladder, pressure switch and gauge, electrical connections at the well head, and total water output (gallons per minute). Catches a failing pump before it dies on a Saturday night.", frequency: "Every 3-5 years", priority: "High", estimatedCostRange: "$300–$500", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Pump replacement is $1,500–$3,500. Annual inspection catches the early warning signs (cycling more often, lower flow, casing seal issues) and lets you plan the replacement on your schedule rather than during an emergency.", assignmentType: .vendor, stableId: "Well System:Professional well inspection", bundleId: "Well System:annual", bundleTitle: "Annual Well System Service"),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1345,7 +1277,7 @@ enum MaintenanceTemplates {
             // actual due years (or whenever the user opts in via
             // Recommended for your home). All four are
             // `isEssential: false` — the bundle stays opt-in.
-            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detectors", description: "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply. This is one of the few maintenance items where the timing isn't optional.", frequency: "Every 10 years", priority: "High", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "If you have hardwired/interconnected detectors, replace them all at once with the same model. Mixing brands or sensor types in an interconnected system can cause false alarms. Check the manufacture date on every detector while up there; some homes have a mix of newer and older units.", isEssential: false, assignmentType: .vendor, bundleId: "Electrical:fall"),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detectors", description: "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply. This is one of the few maintenance items where the timing isn't optional.", frequency: "Every 10 years", priority: "High", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "DST anchor — pair the swap with the Fall daylight-saving clock change so the detector cycle stays predictable. If you have hardwired/interconnected detectors, replace them all at once with the same model. Mixing brands or sensor types in an interconnected system can cause false alarms.", isEssential: false, assignmentType: .vendor),
             MaintenanceTemplate(systemCategory: "Electrical", title: "Inspect electrical panel", description: "Electrician opens the main breaker panel to check for signs of wear: burned or discolored bus bars, loose terminations, corrosion, water staining, and breakers that feel warm to the touch under load. Catches the early warning signs of a panel that's nearing end-of-life or has a high-current connection slowly arcing.", frequency: "Every 3 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire risks. If you have one and haven't replaced it, inspection is critical and a panel swap ($2K–$4K) should be on the radar. Most insurance companies will discount your premium after a panel upgrade.", isEssential: false, assignmentType: .vendor, bundleId: "Electrical:fall", safetyFloor: true),
             // Phase 57: EV charger inspection — annual electrical check of
             // the Level 2 charger, dedicated circuit, and connections.
@@ -1609,9 +1541,9 @@ enum MaintenanceTemplates {
                 priority: "Medium",
                 estimatedCostRange: "$300–$500",
                 isDIY: false,
-                seasonalTiming: nil,
+                seasonalTiming: "Fall",
                 professionalRequired: true,
-                notes: "Different specialist than your annual sweep. Book separately. Required by some insurance carriers after a chimney fire or major repair.",
+                notes: "Pre-burn-season anchor — book early Fall before the chimney sweep schedule fills. Different specialist than your annual sweep. Required by some insurance carriers after a chimney fire or major repair.",
                 isEssential: false,
                 assignmentType: .vendor,
                 stableId: "Chimney:Flue liner video scope",
@@ -1677,7 +1609,7 @@ enum MaintenanceTemplates {
         // ──────────────────────────────────────────────
         // Phase 52: Garage Door consolidated from 3 tasks to 1 annual bundle.
         ("Garage Door", [
-            MaintenanceTemplate(systemCategory: "Garage Door", title: "Test garage door auto-reverse", description: "Tech confirms the auto-reverse safety feature works by placing an object in the door path. Bundled with the annual tune-up.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (part of tune-up)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Modern openers self-monitor between visits.", assignmentType: .vendor, bundleId: "Garage Door:annual", bundleTitle: "Annual Garage Door Tune-up"),
+            MaintenanceTemplate(systemCategory: "Garage Door", title: "Test garage door auto-reverse", description: "Tech confirms the auto-reverse safety feature works by placing an object in the door path. Bundled with the annual tune-up.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (part of tune-up)", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Modern openers self-monitor between visits.", assignmentType: .vendor, bundleId: "Garage Door:annual", bundleTitle: "Annual Garage Door Tune-up"),
             MaintenanceTemplate(systemCategory: "Garage Door", title: "Lubricate garage door tracks and hardware", description: "Tech applies silicone lubricant to tracks, rollers, hinges, and springs. Part of the annual tune-up.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (part of tune-up)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Garage Door:annual"),
             MaintenanceTemplate(systemCategory: "Garage Door", title: "Annual garage door tune-up", description: "Inspection of springs, cables, rollers, and opener.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Never attempt spring repair yourself", assignmentType: .vendor, stableId: "Garage Door:Professional garage door tune-up", bundleId: "Garage Door:annual"),
         ]),
@@ -2109,29 +2041,10 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(systemCategory: "Generator", title: "Replace spark plugs", description: "Replace spark plugs per manufacturer recommendations. Usually done as part of annual service.", frequency: "Annually", priority: "Low", estimatedCostRange: "$50–$100", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Generator:annual"),
             MaintenanceTemplate(systemCategory: "Generator", title: "Annual generator service", description: "Full service including all fluids, filters, and electrical check.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Before winter storm season", assignmentType: .vendor, stableId: "Generator:Professional generator service", bundleId: "Generator:annual", safetyFloor: true, maxIntervalDays: 420, warrantyLinked: true),
             MaintenanceTemplate(systemCategory: "Generator", title: "Test automatic transfer switch", description: "Test of transfer switch operation during annual service.", frequency: "Annually", priority: "High", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Generator:annual"),
-            // Phase 70.A1 (Winter fill): pre-storm dry run. Standby
-            // generators self-exercise weekly, but the homeowner check
-            // is "did the test cycle run cleanly?" — read the panel
-            // status, confirm no fault codes, verify the fuel level
-            // (propane gauge or natural gas pressure if your unit has
-            // a service interruption alarm). 5 minutes DIY, NE
-            // regional. Catches the silent failure ("I thought it ran
-            // last week...") that you only discover during an outage.
-            MaintenanceTemplate(
-                systemCategory: "Generator",
-                title: "Winter generator status check",
-                description: "Walk to the generator, read the panel, confirm the most recent self-test ran without fault. Check the fuel gauge (propane) or that the gas valve is open and uninterrupted (natural gas). Listen for the next scheduled exercise cycle — if it's been more than 7 days since the last run, something's wrong.",
-                frequency: "Annually",
-                priority: "Medium",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Winter",
-                professionalRequired: false,
-                notes: "Most NE winters have at least one multi-day outage; the generator gets used hard for 24-72 hours straight. This check is what makes sure it actually starts when you need it.",
-                assignmentType: .either,
-                diyEffortMinutes: 10,
-                regionalPack: .northeast
-            ),
+            // Phase 70.A1.x deleted "Winter generator status check" —
+            // the Generator:annual Fall visit already covers panel
+            // readout + fault-code review + fuel verification. Standby
+            // generators self-test weekly without homeowner input.
         ]),
 
         // ──────────────────────────────────────────────
@@ -2141,7 +2054,7 @@ enum MaintenanceTemplates {
             // Phase 58: camera clarity check folded into the fall handyman
             // walk-past. Bundle stays simplified to alarm walk-test +
             // sensor batteries.
-            MaintenanceTemplate(systemCategory: "Security System", title: "Annual security system check", description: "Alarm company walk-tests each sensor, confirms panel connectivity, and replaces sensor batteries. Monitored systems self-test between visits. This is the annual confirmation that everything is still registering.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$75–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, stableId: "Security System:Verify alarm system", bundleId: "Security System:annual", bundleTitle: "Annual Security System Check"),
+            MaintenanceTemplate(systemCategory: "Security System", title: "Annual security system check", description: "Alarm company walk-tests each sensor, confirms panel connectivity, and replaces sensor batteries. Monitored systems self-test between visits. This is the annual confirmation that everything is still registering.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$75–$200", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, stableId: "Security System:Verify alarm system", bundleId: "Security System:annual", bundleTitle: "Annual Security System Check"),
             MaintenanceTemplate(systemCategory: "Security System", title: "Replace sensor batteries", description: "Alarm tech replaces batteries in door/window sensors and motion detectors. Bundled with the annual walk-test.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (part of walk-test)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Security System:annual"),
         ]),
 
@@ -2149,8 +2062,8 @@ enum MaintenanceTemplates {
         // SOLAR PANELS
         // ──────────────────────────────────────────────
         ("Solar", [
-            MaintenanceTemplate(systemCategory: "Solar", title: "Solar panel cleaning", description: "Roof-trained crew cleans accumulated pollen, dust, bird droppings, and pine sap off the array using deionized water and soft brushes. Avoids harsh detergents and pressure-washing that can strip the anti-reflective coating. Output gain after a thorough cleaning is typically 5–15% on heavily soiled panels.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Output drops gradually so it's hard to notice from monthly bills alone. But a year of accumulated soiling can cost $200–$500 in lost generation depending on system size. Spring is ideal (after pollen settles, before peak production months).", assignmentType: .vendor, stableId: "Solar:Professional panel cleaning", safetyFloor: true),
-            MaintenanceTemplate(systemCategory: "Solar", title: "Solar system inspection", description: "Solar tech checks panel integrity (microcracks, hot spots, junction box issues), DC and AC wiring at the combiner box and inverter, mounting hardware torque on the rails and roof attachments, and inverter performance against expected output curves. Catches degraded panels before they take down a string and tank production.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Most production warranties require inspection records to honor a claim. If your inverter is approaching 8–10 years old, ask the inspector to flag whether it's nearing replacement age. Inverter failure is the #1 cause of unexpected solar downtime.", assignmentType: .vendor, stableId: "Solar:Professional inspection", safetyFloor: true),
+            MaintenanceTemplate(systemCategory: "Solar", title: "Solar panel cleaning", description: "Roof-trained crew cleans accumulated pollen, dust, bird droppings, and pine sap off the array using deionized water and soft brushes. Avoids harsh detergents and pressure-washing that can strip the anti-reflective coating. Output gain after a thorough cleaning is typically 5–15% on heavily soiled panels.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Output drops gradually so it's hard to notice from monthly bills alone. But a year of accumulated soiling can cost $200–$500 in lost generation depending on system size. Spring is ideal (after pollen settles, before peak production months).", assignmentType: .vendor, stableId: "Solar:Professional panel cleaning", bundleId: "Solar:annual", bundleTitle: "Annual Solar Service", safetyFloor: true),
+            MaintenanceTemplate(systemCategory: "Solar", title: "Solar system inspection", description: "Solar tech checks panel integrity (microcracks, hot spots, junction box issues), DC and AC wiring at the combiner box and inverter, mounting hardware torque on the rails and roof attachments, and inverter performance against expected output curves. Catches degraded panels before they take down a string and tank production.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Most production warranties require inspection records to honor a claim. If your inverter is approaching 8–10 years old, ask the inspector to flag whether it's nearing replacement age. Inverter failure is the #1 cause of unexpected solar downtime.", assignmentType: .vendor, stableId: "Solar:Professional inspection", bundleId: "Solar:annual", safetyFloor: true),
         ]),
 
         // ──────────────────────────────────────────────
@@ -2161,7 +2074,7 @@ enum MaintenanceTemplates {
             // and dehumidifier test fold into Handyman:spring defaults for
             // crawl-space homes. Annual bundle stays as the dedicated
             // crawl-space pro visit.
-            MaintenanceTemplate(systemCategory: "Crawl Space", title: "Check vapor barrier condition", description: "Crawl-space or waterproofing pro inspects the plastic vapor barrier for tears, displacement, or gaps.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (part of annual visit)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Crawl Space:annual", bundleTitle: "Annual Crawl Space Inspection"),
+            MaintenanceTemplate(systemCategory: "Crawl Space", title: "Check vapor barrier condition", description: "Crawl-space or waterproofing pro inspects the plastic vapor barrier for tears, displacement, or gaps.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (part of annual visit)", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Crawl Space:annual", bundleTitle: "Annual Crawl Space Inspection"),
             MaintenanceTemplate(systemCategory: "Crawl Space", title: "Inspect for mold or mildew", description: "Pro visually inspects joists, insulation, and walls for mold growth.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (part of annual visit)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Professional remediation if found", assignmentType: .vendor, bundleId: "Crawl Space:annual"),
             MaintenanceTemplate(systemCategory: "Crawl Space", title: "Check foundation for cracks", description: "Pro inspects foundation walls for new or expanding cracks and marks any findings.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (part of annual visit)", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, bundleId: "Crawl Space:annual"),
         ]),
@@ -3100,9 +3013,9 @@ enum MaintenanceTemplates {
                 priority: "Medium",
                 estimatedCostRange: "$30-80 (DIY kit) or $150-300 (tester)",
                 isDIY: true,
-                seasonalTiming: nil,
+                seasonalTiming: "Winter",
                 professionalRequired: false,
-                notes: "NH, CT, and much of the surrounding Northeast are in the granite belt, one of the highest radon zones in the country.",
+                notes: "Heating-on detection — running the furnace plus closed windows pulls more radon from the soil into the home, so winter readings expose the worst-case level. NH, CT, and much of the surrounding Northeast are in the granite belt, one of the highest radon zones in the country.",
                 isEssential: false,
                 assignmentType: .either,
                 diyEffortMinutes: 20,
@@ -3128,28 +3041,11 @@ enum MaintenanceTemplates {
                 diyEffortMinutes: 30,
                 routingOverride: .diyCapable
             ),
-            // Phase 70.A1 (Winter fill): indoor humidity check. Dry
-            // NE winters drop indoor RH below 30%, which dries out
-            // hardwoods, art, instruments, and skin/sinuses. The fix
-            // is the existing humidifier — but the homeowner has to
-            // verify it's running + calibrated, not just installed.
-            // Universal (helpful even without a whole-home humidifier
-            // — informs whether to add portable units).
-            MaintenanceTemplate(
-                systemCategory: "Air Quality",
-                title: "Winter indoor humidity check",
-                description: "Read a hygrometer in two rooms (typically the main living area and a bedroom). Target 30–50% RH in winter. Below 30% means hardwoods will gap, art will craze, and everyone gets dry sinuses; above 50% means condensation on windows + mold risk. Adjust the whole-home humidifier setting or move a portable into rooms that drift.",
-                frequency: "Annually",
-                priority: "Low",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Winter",
-                professionalRequired: false,
-                notes: "A $15 digital hygrometer is plenty accurate. HNW homes with fine furniture, art, or instruments should target 40-45% specifically.",
-                assignmentType: .either,
-                diyEffortMinutes: 10,
-                regionalPack: .northeast
-            ),
+            // Phase 70.A1.x deleted "Winter indoor humidity check" —
+            // the HVAC tech verifies humidifier function during the
+            // Fall heating tune-up (HVAC:fall). Homeowner hygrometer
+            // readings between pro visits aren't a scheduled task —
+            // they're an ambient awareness.
         ]),
     ]
 
