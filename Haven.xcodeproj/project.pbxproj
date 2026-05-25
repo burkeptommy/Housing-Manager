@@ -10,7 +10,6 @@
 		0077B95065F55144B5A57F83 /* ChezProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72099A773FF58C359B24FE2 /* ChezProfile.swift */; };
 		00A0340E512F43534C4C8B56 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26631A2D75332163B5BFE02 /* SupabaseClient.swift */; };
 		00BC4D74081CF73A03358B39 /* UnifiedAttentionList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64DDA1DC7F83423F9AE6361 /* UnifiedAttentionList.swift */; };
-		00FF37BE764C46D33B3A5678 /* MaintenanceScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */; };
 		01D4E57F0AA741467D0C350D /* HandymanSoftInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */; };
 		01E25C479437E1B85C451E5D /* OnboardingAddressStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8844F6AE85F1C8882770D5C5 /* OnboardingAddressStep.swift */; };
 		02013B6C18B57EAE2AEEBB6C /* ChezConciergeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C3E85C92E536C944040AD6 /* ChezConciergeService.swift */; };
@@ -786,7 +785,6 @@
 		D4C367F578C66AB771CE8828 /* TasksHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8A006D8F0C0ADE1B32F948 /* TasksHubView.swift */; };
 		D5711621B588C7695CA4E7A2 /* ContractorDirectoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */; };
 		D5D4315942EDA973A2572D78 /* InboxItemFromDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB84F8671B68B8326A1A52D /* InboxItemFromDocument.swift */; };
-		D5D4F4C2E8971CE24F4BAEE0 /* MaintenanceScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */; };
 		D61AFFB150A29F92AD001144 /* EquipmentIdentifySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FE9A44DDCE5AAD3CD1A46F /* EquipmentIdentifySheet.swift */; };
 		D621EE40E1C053B1504AD852 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4EFE16C22592FE1D0F76B1 /* Endpoints.swift */; };
 		D6343234A3E4CFB2317F5211 /* ContractorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEEF7014024523EB1E9CB7E /* ContractorViewModel.swift */; };
@@ -976,7 +974,6 @@
 
 /* Begin PBXFileReference section */
 		012A4D8E967F9F73E579FAB8 /* ContactPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactPickerView.swift; sourceTree = "<group>"; };
-		01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceScheduleView.swift; sourceTree = "<group>"; };
 		023E3D28374E39856E2661A0 /* NewProjectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProjectView.swift; sourceTree = "<group>"; };
 		03A24F3C7936018D3191CFF4 /* ServiceOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceOrchestrator.swift; sourceTree = "<group>"; };
 		03BFF144BC77F27E46ABFFFB /* FeatureValueLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureValueLibrary.swift; sourceTree = "<group>"; };
@@ -2291,7 +2288,6 @@
 				8D23A1E29045F54B58096BB6 /* LogHistoricalProjectView.swift */,
 				9A46A1590730B5E301E1EA8B /* MaintenanceDuplicateSheet.swift */,
 				600602D6660D13F45C20FE70 /* MaintenanceHubView.swift */,
-				01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */,
 				8ECABA5A62CDCC5C4011D813 /* MaintenanceTaskDetailSheet.swift */,
 				778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */,
 				310D7138F2DC79554232A4C5 /* NegotiationEmailSheet.swift */,
@@ -2981,7 +2977,6 @@
 				CC8A7B11E68267B7EC878445 /* MaintenanceRealtimeSubscription.swift in Sources */,
 				2519B7E75B4C754E45470BAF /* MaintenanceReorganizedCard.swift in Sources */,
 				52B086690593B8D152A3C761 /* MaintenanceRows.swift in Sources */,
-				00FF37BE764C46D33B3A5678 /* MaintenanceScheduleView.swift in Sources */,
 				BB98C6E4725361B3AA0D0BC0 /* MaintenanceTabView.swift in Sources */,
 				955995EC1C69BA5FA32F53DB /* MaintenanceTask.swift in Sources */,
 				026702FC665EE46F861C2F1B /* MaintenanceTaskDetailSheet.swift in Sources */,
@@ -3469,7 +3464,6 @@
 				144ADA5AB7D36604989FE796 /* MaintenanceRealtimeSubscription.swift in Sources */,
 				EB0D9D62BD25E3BEC300C9D6 /* MaintenanceReorganizedCard.swift in Sources */,
 				AD8F0028260931D51E443052 /* MaintenanceRows.swift in Sources */,
-				D5D4F4C2E8971CE24F4BAEE0 /* MaintenanceScheduleView.swift in Sources */,
 				C1F1924D6BE3B9C2D0F35097 /* MaintenanceTabView.swift in Sources */,
 				0FCD1AF3037EF9AE6C3814E5 /* MaintenanceTask.swift in Sources */,
 				214B642959530CC744996C1B /* MaintenanceTaskDetailSheet.swift in Sources */,

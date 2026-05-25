@@ -1537,8 +1537,6 @@ struct MaintenanceTabView: View {
 
     enum MaintenancePush: Hashable, Identifiable {
         case routinesList
-        case scheduleView
-        case scheduleViewForSeason(Season)
         case recommendedServices
         case vehicle(UUID)
         case routineDetail(RoutineRow, UUID)
@@ -1546,8 +1544,6 @@ struct MaintenanceTabView: View {
         var id: String {
             switch self {
             case .routinesList: return "routines"
-            case .scheduleView: return "schedule"
-            case .scheduleViewForSeason(let season): return "schedule-\(season.rawValue)"
             case .recommendedServices: return "recommended"
             case .vehicle(let id): return "vehicle-\(id.uuidString)"
             case .routineDetail(let r, _): return "routine-\(r.id.uuidString)"
@@ -1568,14 +1564,6 @@ struct MaintenanceTabView: View {
             if let householdId {
                 RoutinesListView(householdId: householdId, propertyId: propertyId)
             }
-        case .scheduleView:
-            MaintenanceScheduleView(filterPropertyId: propertyId)
-        case .scheduleViewForSeason(let season):
-            MaintenanceScheduleView(
-                filterPropertyId: propertyId,
-                initialLayout: .calendar,
-                scrollToSeason: season
-            )
         case .recommendedServices:
             if let householdId, let propertyId {
                 RecommendedServicesView(householdId: householdId, propertyId: propertyId)
