@@ -680,6 +680,13 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .chezDelegationChanged)) { _ in
                 Task { await viewModel.refresh() }
             }
+            // Phase 70.A1 follow-on K2 — keep the "Chez is working on"
+            // dashboard card in sync the moment a request is submitted,
+            // status-flipped, or resolved. Cheaper than a full refresh
+            // since it only re-fetches chez_requests.
+            .onReceive(NotificationCenter.default.publisher(for: .chezRequestChanged)) { _ in
+                Task { await viewModel.loadOpenChezRequests() }
+            }
             // Phase 70.A1 follow-on F1 dropped in the merge — base's
             // Round 3 friend-feedback pass took the same route via
             // `activeChezVendorRequests` fed into the registry
@@ -1066,6 +1073,36 @@ struct DashboardView: View {
                     Task { await viewModel.dismissMonthlySummary() }
                 }
             )
+        }
+
+        // Phase 70.A1 follow-on K2 — "Chez is working on" in-flight
+        // card. Forward-looking complement to the backward-looking
+        // ChezActivityCard digest below. Hidden when no open/waiting
+        // requests; surfaces above the digest so the active
+        // conversations are the first Chez touchpoint after delegation.
+        if !viewModel.openChezRequests.isEmpty {
+            ChezInFlightCard(
+                requests: viewModel.openChezRequests,
+                onTapRequest: { request in
+                    NotificationCenter.default.post(
+                        name: .openChezRequest,
+                        object: nil,
+                        userInfo: ["request_id": request.id.uuidString]
+                    )
+                },
+                onViewAll: {
+                    Haptics.selection()
+                    // Switch to Inbox tab (index 3) — InboxView opens
+                    // the Chez sub-tab by default when there's an active
+                    // request notification. We just need the tab swap.
+                    NotificationCenter.default.post(
+                        name: .switchToTab,
+                        object: nil,
+                        userInfo: ["tab": 3]
+                    )
+                }
+            )
+            .padding(.horizontal, HavenTheme.pageMargin)
         }
 
         // Phase 85 — "This week with Chez" digest. Renders
