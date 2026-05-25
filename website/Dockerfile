@@ -21,11 +21,9 @@ COPY handyman.js /usr/share/nginx/html/
 COPY handyman-quote.html /usr/share/nginx/html/
 COPY handyman-quote.css /usr/share/nginx/html/
 COPY handyman-quote.js /usr/share/nginx/html/
-COPY handyman-visit.html /usr/share/nginx/html/
-COPY handyman-visit.css /usr/share/nginx/html/
-COPY handyman-visit.js /usr/share/nginx/html/
-COPY handyman-visit-sw.js /usr/share/nginx/html/
-COPY handyman-visit.webmanifest /usr/share/nginx/html/
+# Note: the legacy /handyman-visit PWA was retired 2026-05-08 — every
+# field-tech surface is now the native HavenField iOS app, so the
+# handyman-visit.{html,css,js,webmanifest} + sw.js COPYs are gone.
 COPY styles.css /usr/share/nginx/html/
 COPY og-image.png /usr/share/nginx/html/
 
@@ -33,7 +31,17 @@ COPY og-image.png /usr/share/nginx/html/
 # Operations Desk SPA (`<link rel="stylesheet" href="/chez.css" />` in
 # operations/index.html). MUST be present for /operations/ to render.
 COPY chez.css /usr/share/nginx/html/
+
+# Chez brand assets — every Chez-branded page references these in its
+# <head>. Missing any of them = 404s in the browser's network tab.
 COPY favicon.svg /usr/share/nginx/html/
+COPY favicon.ico /usr/share/nginx/html/
+COPY favicon-16.png /usr/share/nginx/html/
+COPY favicon-32.png /usr/share/nginx/html/
+COPY favicon-192.png /usr/share/nginx/html/
+COPY favicon-512.png /usr/share/nginx/html/
+COPY apple-touch-icon.png /usr/share/nginx/html/
+COPY manifest.webmanifest /usr/share/nginx/html/
 
 # Operations Desk SPA — produced by stage 1.
 COPY --from=ops-build /app/dist /usr/share/nginx/html/operations
