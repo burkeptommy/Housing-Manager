@@ -54,6 +54,10 @@ struct MaintenanceTabView: View {
     /// default — the card hides itself until data arrives.
     @State private var vendorDocumentsForYear: [DocumentRow] = []
     @State private var serviceRecordsForYear: [ServiceRecordRow] = []
+    /// Phase G2: Year overview / Timeline scrub. Opens as a
+    /// fullScreenCover so the 18-month linear list reads as a
+    /// "different mode" without losing scroll context in the parent.
+    @State private var showYearOverview: Bool = false
 
     /// Phase 70 (Tasks v2): Task id whose row should pulse a salmon
     /// highlight ring after a deep-link arrival (`.openMaintenanceTask`).
@@ -242,6 +246,37 @@ struct MaintenanceTabView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        // Phase G2 — Year overview / Timeline scrub. fullScreenCover
+        // so the 18-month list reads as a distinct mode. Tap any row
+        // → swap to detailTask sheet (existing path); tap a routine
+        // occurrence → push RoutineDetailView via pushTarget. Done
+        // button + drag indicator dismisses.
+        .fullScreenCover(isPresented: $showYearOverview) {
+            TasksTimelineSheet(
+                tasks: maintenanceVM.tasks,
+                routines: viewModel.routines,
+                contractor: { id in
+                    guard let id else { return nil }
+                    return maintenanceVM.contractors.first { $0.id == id }
+                },
+                childrenFor: { task in childrenFor(task: task) },
+                isChezOwned: { $0.isChezOwned },
+                onTapTask: { task in
+                    showYearOverview = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        detailTask = task
+                    }
+                },
+                onTapRoutine: { routine in
+                    showYearOverview = false
+                    if let householdId {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            pushTarget = .routineDetail(routine, householdId)
+                        }
+                    }
+                }
+            )
         }
         // Phase F3: duplicate-resolution sheet. Parent-driven lifecycle
         // (see MaintenanceDuplicateSheet docs): after each `onResolve`
@@ -579,6 +614,12 @@ struct MaintenanceTabView: View {
                 // Search overlay ships in 70.A1.10; for now no-op so the
                 // affordance is present and discoverable but inert.
                 Analytics.track(.tasksV2SearchTapped, [:])
+            },
+            onYearOverview: {
+                showYearOverview = true
+                Analytics.track(.tasksV2YearOverviewOpened, [
+                    "season": activeSeason.rawValue
+                ])
             }
         )
         .padding(.horizontal, TasksV5.pageMargin)

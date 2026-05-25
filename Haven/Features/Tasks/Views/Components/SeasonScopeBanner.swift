@@ -27,6 +27,9 @@ struct SeasonScopeBanner: View {
 
     /// Tap on the search icon. Opens a full-screen overlay (task 70.A1.10).
     var onSearch: () -> Void = {}
+    /// Phase G2 — opens the 18-month linear timeline scrub.
+    /// fullScreenCover, dismisses to return to the season feed.
+    var onYearOverview: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -52,6 +55,19 @@ struct SeasonScopeBanner: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Search tasks, routines, and bundle items")
+
+            // Phase G2 — Year overview (Timeline scrub).
+            Button {
+                Haptics.selection()
+                onYearOverview()
+            } label: {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(HavenColors.navy800)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open year overview — 18-month timeline")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

@@ -605,6 +605,9 @@ enum AnalyticsEvent: String {
     /// Phase G1 — Year-at-a-glance card tapped. Properties:
     /// year_visits (Int), next_30_visits (Int).
     case tasksV2YearGlanceTapped = "tasks_v2_year_glance_tapped"
+    /// Phase G2 — 18-month Timeline scrub opened from SeasonScopeBanner.
+    /// Properties: season (current active season at open).
+    case tasksV2YearOverviewOpened = "tasks_v2_year_overview_opened"
     /// Inline scheduling sheet committed a date. Properties: source
     /// ("this_week" | "next_week" | "custom"), days_out.
     case tasksV2QuickScheduled = "tasks_v2_quick_scheduled"
