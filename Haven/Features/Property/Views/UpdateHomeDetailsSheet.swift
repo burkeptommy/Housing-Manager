@@ -39,6 +39,9 @@ struct UpdateHomeDetailsSheet: View {
     @State private var hasScheduledValuables = false
     @State private var hasHeatCables = false
     @State private var hasDehumidifier = false
+    // Phase 70.A1.x: gravel driveway. Drives Regravel (every 3y, Summer)
+    // and Top up gravel (annual, Spring) templates.
+    @State private var hasGravelDriveway = false
 
     /// Snapshot of every flag at load time. Used to compute the diff on save
     /// so the confirmation sheet only shows what actually changed.
@@ -189,6 +192,10 @@ struct UpdateHomeDetailsSheet: View {
                     toggleRow(title: "Whole-home dehumidifier",
                               subtitle: "Adds an annual dehumidifier service visit in spring.",
                               isOn: $hasDehumidifier)
+                    Divider()
+                    toggleRow(title: "Gravel driveway",
+                              subtitle: "Adds a 3-year regravel task and an annual spring top-up.",
+                              isOn: $hasGravelDriveway)
                 }
             }
         }
@@ -332,6 +339,7 @@ struct UpdateHomeDetailsSheet: View {
         hasScheduledValuables = readFlag("has_scheduled_valuables")
         hasHeatCables = readFlag("has_heat_cables")
         hasDehumidifier = readFlag("has_dehumidifier")
+        hasGravelDriveway = readFlag("has_gravel_driveway")
 
         initialFlags = [
             "has_humidifier": hasHumidifier,
@@ -345,7 +353,8 @@ struct UpdateHomeDetailsSheet: View {
             "has_pool_safety_fence": hasPoolSafetyFence,
             "has_scheduled_valuables": hasScheduledValuables,
             "has_heat_cables": hasHeatCables,
-            "has_dehumidifier": hasDehumidifier
+            "has_dehumidifier": hasDehumidifier,
+            "has_gravel_driveway": hasGravelDriveway
         ]
     }
 
@@ -382,7 +391,8 @@ struct UpdateHomeDetailsSheet: View {
             "has_pool_safety_fence": hasPoolSafetyFence,
             "has_scheduled_valuables": hasScheduledValuables,
             "has_heat_cables": hasHeatCables,
-            "has_dehumidifier": hasDehumidifier
+            "has_dehumidifier": hasDehumidifier,
+            "has_gravel_driveway": hasGravelDriveway
         ]
     }
 
@@ -484,7 +494,8 @@ struct SubtypeReviewDiffSheet: View {
         "has_pool_safety_fence": "Pool safety fence",
         "has_scheduled_valuables": "Scheduled valuables rider",
         "has_heat_cables": "Heat cables on roof or gutters",
-        "has_dehumidifier": "Whole-home dehumidifier"
+        "has_dehumidifier": "Whole-home dehumidifier",
+        "has_gravel_driveway": "Gravel driveway"
     ]
 
     private static let previewByKey: [String: String] = [
@@ -499,7 +510,8 @@ struct SubtypeReviewDiffSheet: View {
         "has_pool_safety_fence": "Adds the annual safety fence inspection.",
         "has_scheduled_valuables": "Surfaces the appraisal recommendation in the Life tab.",
         "has_heat_cables": "Adds a fall inspection so cables are ready before freeze-up.",
-        "has_dehumidifier": "Adds an annual dehumidifier service in spring."
+        "has_dehumidifier": "Adds an annual dehumidifier service in spring.",
+        "has_gravel_driveway": "Adds a 3-year regravel task and an annual top-up."
     ]
 
     var body: some View {

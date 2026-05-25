@@ -641,6 +641,17 @@ enum MaintenanceTemplates {
             if flags["has_pool_safety_fence"] == true { s.insert("has_pool_safety_fence") }
         case "siding/exterior", "siding":
             if flags["driveway_asphalt"] == true { s.insert("driveway_asphalt") }
+        // Phase 70.A1.x: Driveway material gating. Property flags
+        // `has_gravel_driveway` / `has_asphalt_driveway` /
+        // `has_concrete_driveway` / `has_paver_driveway` propagate to
+        // the active set so Regravel + Top up gravel templates only
+        // surface for gravel households, and the existing asphalt
+        // sealcoat template stays gated to asphalt households.
+        case "driveway", "driveway sealcoating":
+            if flags["has_gravel_driveway"] == true { s.insert("driveway_gravel") }
+            if flags["has_asphalt_driveway"] == true { s.insert("driveway_asphalt") }
+            if flags["has_concrete_driveway"] == true { s.insert("driveway_concrete") }
+            if flags["has_paver_driveway"] == true { s.insert("driveway_paver") }
         default:
             break
         }
@@ -903,7 +914,7 @@ enum MaintenanceTemplates {
         // ──────────────────────────────────────────────
         ("Siding/Exterior", [
             MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pressure washer soft-washes siding to remove dirt, mildew, and algae buildup.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Semi-annual is right for vinyl in our region. Wood, brick, and fiber-cement homes can stretch this to once a year. Spring wash catches winter grime (salt, sand, tree drip); fall wash clears summer pollen and algae before winter rain amplifies mildew. Mixed-material homes follow the more frequent cadence wherever vinyl is present.", assignmentType: .vendor, bundleId: "Siding/Exterior:annual", bundleTitle: "Annual Exterior Maintenance"),
-            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Deck and patio annual service", description: "Handyman or deck pro inspects deck boards, railings, and stairs for rot or loose fasteners; spot-seals as needed. Full stain or seal every 2-3 years.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Seal or stain every 2-3 years", isEssential: false, assignmentType: .vendor, bundleId: "Siding/Exterior:annual"),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Deck and patio annual service", description: "Handyman or deck pro inspects deck boards, railings, and stairs for rot or loose fasteners; spot-seals as needed. Full stain or seal every 2-3 years.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Summer", professionalRequired: true, notes: "Seal or stain every 2-3 years. Best done in dry warm conditions — mid-summer outperforms spring because wood is bone-dry after a stretch of low humidity, so the seal grabs and lasts.", isEssential: false, assignmentType: .vendor, bundleId: "Siding/Exterior:annual"),
             // Phase 70 (Tasks v2 / Section B.3): Fall sibling bundle.
             // The "annual" bundle covers Spring (deck inspect, spring
             // wash); this new fall bundle covers the second wash before
@@ -923,9 +934,9 @@ enum MaintenanceTemplates {
                 priority: "Low",
                 estimatedCostRange: "$200-800",
                 isDIY: false,
-                seasonalTiming: "Spring",
+                seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Best done in late spring after the wood has dried out from winter and before summer heat. Match the existing finish carefully. Eggshell on a satin wall reads as a patch even after a few weeks of weathering. Most painters keep your color formulation on file once you've used them.",
+                notes: "Best done in a stretch of dry warm weather — paint cures best at 60-85°F with low humidity. Most painters keep your color formulation on file once you've used them.",
                 isEssential: false,
                 assignmentType: .vendor
             ),
@@ -2941,9 +2952,44 @@ enum MaintenanceTemplates {
                 priority: "Medium",
                 estimatedCostRange: "$300-800",
                 isDIY: false,
-                seasonalTiming: "Fall",
+                seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Apply in early fall while temps are still warm enough for the sealer to cure properly.",
+                notes: "Sealer needs 80°F+ surface temps to cure properly. Mid-summer is the sweet spot in the Northeast — warm enough for the cure, ahead of the early-fall rains that can pit fresh sealer.",
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            // Phase 70.A1.x: gravel driveway regravel. HNW Westchester /
+            // Hamptons / Connecticut gravel drives need a full top-up
+            // every 3 years (snow plow displacement + traffic compaction
+            // grinds gravel into the underlying soil). Top-up annually
+            // catches the spots that wear fastest.
+            MaintenanceTemplate(
+                systemCategory: "Driveway Sealcoating",
+                title: "Regravel driveway",
+                description: "Gravel installer or landscape contractor delivers and grades fresh gravel to bring the driveway back to depth. Includes leveling washboarded sections and re-establishing the crown so water sheds to the edges.",
+                frequency: "Every 3 years",
+                priority: "Medium",
+                estimatedCostRange: "$800-2500",
+                isDIY: false,
+                seasonalTiming: "Summer",
+                professionalRequired: true,
+                notes: "Best done in dry warm weather — gravel beds compact and lock in cleanly when the underlying soil isn't saturated.",
+                requiredSubtypes: ["driveway_gravel"],
+                isEssential: false,
+                assignmentType: .vendor
+            ),
+            MaintenanceTemplate(
+                systemCategory: "Driveway Sealcoating",
+                title: "Top up gravel driveway",
+                description: "Light top-up of fresh gravel into the spots that wore through during the year (high-traffic sections, drainage swales, the area in front of the garage where vehicles stop and turn). Bridges between full regravel cycles.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$300-700",
+                isDIY: false,
+                seasonalTiming: "Spring",
+                professionalRequired: true,
+                notes: "After the snow plow season has shoved gravel into the lawn edges, spring is the moment to rake what's recoverable back in and add fresh where needed.",
+                requiredSubtypes: ["driveway_gravel"],
                 isEssential: false,
                 assignmentType: .vendor
             ),
