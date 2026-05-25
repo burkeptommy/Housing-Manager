@@ -2,27 +2,24 @@ import SwiftUI
 
 /// Phase 70 (Tasks v2): The 44pt scope banner that sits between the
 /// YearRibbon and the season feed. Communicates the active scope at a
-/// glance + exposes two affordances on the trailing edge:
+/// glance + exposes a search affordance on the trailing edge.
 ///
-/// - Search icon → opens `TasksSearchOverlay` (task 70.A1.10)
-/// - "Show full year" / "Filter to season" toggle → clears or applies the
-///   season filter
+/// Phase 70.A1.x dropped the "Full year" toggle — the "Active Routines
+/// This Season" card replaces its discoverability function, and the
+/// full-year aggregator added more noise than signal (routines spanning
+/// the year flooded into one combined feed).
 ///
-/// Example states:
-///
-///   ┌─────────────────────────────────────────────────────────┐
-///   │ Spring · 27 items · 4 need a decision      ⌕  Full year │
-///   └─────────────────────────────────────────────────────────┘
+/// Example state:
 ///
 ///   ┌─────────────────────────────────────────────────────────┐
-///   │ All seasons · 84 items · 11 need attention   ⌕  Filter  │
+///   │ Spring · 27 items · 4 need a decision                ⌕  │
 ///   └─────────────────────────────────────────────────────────┘
 struct SeasonScopeBanner: View {
-    /// Active season scope. Nil means "Show full year" (all seasons).
-    let season: Season?
+    /// Active season scope. Always non-nil post-70.A1.x — full-year
+    /// aggregation was removed (see file-level comment).
+    let season: Season
 
-    /// Total items shown under the active scope (from `SeasonFeed.totalItems`,
-    /// summed across all seasons when scope is full-year).
+    /// Total items shown under the active scope (from `SeasonFeed.totalItems`).
     let totalItems: Int
 
     /// Items needing user action (from `SeasonFeed.actionItems`).
@@ -30,9 +27,6 @@ struct SeasonScopeBanner: View {
 
     /// Tap on the search icon. Opens a full-screen overlay (task 70.A1.10).
     var onSearch: () -> Void = {}
-
-    /// Tap on the trailing "Full year" / "Filter" link. Toggles scope.
-    var onToggleScope: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -58,23 +52,6 @@ struct SeasonScopeBanner: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Search tasks, routines, and bundle items")
-
-            // Scope toggle link.
-            Button {
-                Haptics.selection()
-                onToggleScope()
-            } label: {
-                HStack(spacing: 4) {
-                    Text(toggleLabel)
-                        .font(HavenTypography.uiLabel)
-                        .foregroundColor(HavenColors.action)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(HavenColors.action)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(toggleAccessibilityLabel)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -89,7 +66,7 @@ struct SeasonScopeBanner: View {
     /// Scope summary in homeowner voice. "Spring · 27 items · 4 need a decision"
     /// (singular pluralization handled below).
     private var scopeSummary: String {
-        let head: String = season?.displayName ?? "All seasons"
+        let head: String = season.displayName
         let totalPart = "\(totalItems) item\(totalItems == 1 ? "" : "s")"
         if actionItems > 0 {
             let actionPart = actionItems == 1
@@ -98,15 +75,5 @@ struct SeasonScopeBanner: View {
             return "\(head) · \(totalPart) · \(actionPart)"
         }
         return "\(head) · \(totalPart)"
-    }
-
-    private var toggleLabel: String {
-        season == nil ? "Filter" : "Full year"
-    }
-
-    private var toggleAccessibilityLabel: String {
-        season == nil
-            ? "Filter back to the current season"
-            : "Show items from the full year"
     }
 }

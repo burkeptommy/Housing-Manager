@@ -34,11 +34,10 @@ struct MaintenanceTabView: View {
     /// Cleared automatically ~1.5s later by `handleDeepLink`.
     @State private var highlightedTaskId: UUID?
 
-    /// Phase 70.A1 (post-screenshot fix): full-year scope toggle. When
-    /// true, the screen shows every month across all 4 seasons; when
-    /// false, scopes to the active season (default). Tapping any
-    /// YearRibbon tile sets this back to false so the user can re-focus.
-    @State private var fullYearMode: Bool = false
+    // Phase 70.A1.x removed the full-year mode state — the season feed
+    // is always scoped to one season tile, and the new "Active Routines
+    // This Season" card surfaces the routine density that the old
+    // full-year toggle was used to discover.
 
     /// Caller passes a closure so the title-switcher can swap modes
     /// without owning navigation state.
@@ -78,14 +77,9 @@ struct MaintenanceTabView: View {
                     onTap: { season in
                         // Phase 70 (Tasks v2): Tap = filter the screen
                         // to that season. The binding update already
-                        // re-renders the feed via `activeFeed`. Also
-                        // clears fullYearMode (post-screenshot fix) so
-                        // tapping a tile always means "scope to this
-                        // season" — never leaves the user in a confused
-                        // hybrid state.
+                        // re-renders the feed via `activeFeed`.
                         withAnimation(HavenTheme.animationStandard) {
                             activeSeason = season
-                            fullYearMode = false
                         }
                         Haptics.selection()
                         Analytics.track(.tasksV2SeasonTapped, [
@@ -111,6 +105,8 @@ struct MaintenanceTabView: View {
                 flexibleTasksSection
 
                 thisSeasonTasksSection
+
+                activeRoutinesSeasonCard
 
                 combinedProgramsSection
 
@@ -408,39 +404,29 @@ struct MaintenanceTabView: View {
     // MARK: - Phase 70 (Tasks v2) — new section helpers
 
     /// Cached feed for the active season. Computed once per body re-render.
+    /// Phase 70 single source of truth for everything below MiniHero.
     /// All Phase 70 sections read from this so the user can't see a count
-    /// (ribbon) that disagrees with the rows (sections). When
-    /// `fullYearMode` is true, returns the aggregated feed across all
-    /// four seasons instead.
+    /// (ribbon) that disagrees with the rows (sections).
+    ///
+    /// Phase 70.A1.x: full-year aggregation removed — the season feed is
+    /// always scoped to one season tile. "Active Routines This Season"
+    /// card surfaces the routine density that the old full-year toggle
+    /// was used to discover.
     private var activeFeed: SeasonFeed {
-        fullYearMode
-            ? viewModel.fullYearFeed()
-            : viewModel.seasonFeed(activeSeason)
+        viewModel.seasonFeed(activeSeason)
     }
 
     /// SeasonScopeBanner — the 44pt pill below MiniHero that names the
-    /// active scope + exposes search + show-full-year toggle.
+    /// active scope + exposes search. Full-year toggle removed in 70.A1.x.
     private var seasonScopeBannerSection: some View {
         SeasonScopeBanner(
-            season: fullYearMode ? nil : activeSeason,
+            season: activeSeason,
             totalItems: activeFeed.totalItems,
             actionItems: activeFeed.actionItems,
             onSearch: {
                 // Search overlay ships in 70.A1.10; for now no-op so the
                 // affordance is present and discoverable but inert.
                 Analytics.track(.tasksV2SearchTapped, [:])
-            },
-            onToggleScope: {
-                // Phase 70.A1 (post-screenshot fix): proper full-year
-                // toggle. Tapping flips between season-scoped feed and
-                // a full-year aggregation. The YearRibbon tile tap
-                // resets fullYearMode to false so the user can re-focus.
-                withAnimation(HavenTheme.animationStandard) {
-                    fullYearMode.toggle()
-                }
-                Analytics.track(.tasksV2ShowFullYearTapped, [
-                    "now_full_year": fullYearMode ? "true" : "false"
-                ])
             }
         )
         .padding(.horizontal, TasksV5.pageMargin)
@@ -483,7 +469,14 @@ struct MaintenanceTabView: View {
                 icon: routine.resolvedIcon,
                 title: routine.presentationLabel,
                 meta: viewModel.decisionMeta(for: routine),
-                ctaTitle: "Choose vendor"
+                ctaTitle: "Choose vendor",
+                // Phase 70.A1.x: Chez pill renders when the underlying
+                // routine is `chez_owned`. Today this never fires —
+                // pendingDecisions() filters chez_owned routines out
+                // ("Chez is making the call, not the homeowner") — but
+                // wiring stays in place so future Chez-pending flows
+                // surface the badge consistently.
+                chezOwned: routine.chezOwned
             ) {
                 pickerForRoutine = routine
             }
@@ -497,7 +490,12 @@ struct MaintenanceTabView: View {
                 icon: decisionIconFor(task: task),
                 title: task.title,
                 meta: standaloneDecisionMeta(for: task),
-                ctaTitle: "Find a pro"
+                ctaTitle: "Find a pro",
+                // Phase 70.A1.x: tasks delegated to Chez via the
+                // ChezOwnsToggle expose isChezOwned even before a
+                // vendor is assigned. Surface the pill so the
+                // homeowner sees the delegation status at a glance.
+                chezOwned: task.isChezOwned
             ) {
                 pushTarget = .scheduleView
             }
@@ -616,6 +614,64 @@ struct MaintenanceTabView: View {
     /// Phase 70 "Your active programs" — REPLACES the prior pair of
     /// `programsSection` + `chezHandlingSection`. Chez-owned routines
     /// render inline with a salmon CHEZ pill via `ChezOwnedPill` instead
+    /// Phase 70.A1.x: "Active Routines This Season" card. Sits above
+    /// the Active Programs section header. Surfaces season-scoped
+    /// routine density (count + visit count) and routes to the full
+    /// RoutinesListView for management. Replaces the Full Year toggle's
+    /// discoverability role — instead of dumping every season's work
+    /// into one flat feed, the user clicks through to see all routines
+    /// in one focused list.
+    @ViewBuilder
+    private var activeRoutinesSeasonCard: some View {
+        let programs = activeFeed.programs
+        let visits = activeFeed.routineVisitCount
+        if !programs.isEmpty {
+            Button {
+                Haptics.selection()
+                pushTarget = .routinesList
+            } label: {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy800)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            Circle().fill(HavenColors.navy800.opacity(0.08))
+                        )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Active routines this \(activeSeason.displayName.lowercased())")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(1)
+                        Text(activeRoutinesCardSubtitle(programCount: programs.count, visitCount: visits))
+                            .font(.system(size: 12))
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(14)
+                .background(HavenColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+                .havenShadow()
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionLabelGap)
+        }
+    }
+
+    private func activeRoutinesCardSubtitle(programCount: Int, visitCount: Int) -> String {
+        let progPart = "\(programCount) routine\(programCount == 1 ? "" : "s")"
+        if visitCount > 0 {
+            return "\(progPart) · \(visitCount) visit\(visitCount == 1 ? "" : "s") expected"
+        }
+        return "\(progPart) on autopilot"
+    }
+
     /// of being split into a second section. Single source of truth per
     /// routine; no duplicate rows.
     @ViewBuilder
@@ -1411,70 +1467,11 @@ final class MaintenanceTabViewModel: ObservableObject {
         )
     }
 
-    /// Phase 70.A1 (post-screenshot fix): aggregates SeasonFeeds across
-    /// all four seasons so the "Show full year" toggle has a real,
-    /// unioned view of the whole calendar. Dedupes by entry id so a
-    /// dual-anchor ("Spring/Fall") task doesn't render twice. Month
-    /// sections come out in calendar order (Jan → Dec).
-    func fullYearFeed(propertyId: UUID? = nil) -> SeasonFeed {
-        let feeds = Season.allCases.map { seasonFeed($0, propertyId: propertyId) }
-
-        // Decisions: union, dedup by id (a task might satisfy more than
-        // one season's decision filter if it's seasonless / overdue).
-        var seenDecisionIds: Set<String> = []
-        var combinedDecisions: [DecisionEntry] = []
-        for feed in feeds {
-            for entry in feed.decisions where !seenDecisionIds.contains(entry.id) {
-                seenDecisionIds.insert(entry.id)
-                combinedDecisions.append(entry)
-            }
-        }
-
-        // Month sections: union per month, dedup entries within a month.
-        var monthMap: [Int: [SeasonEntry]] = [:]
-        var seenEntryIdsByMonth: [Int: Set<String>] = [:]
-        for feed in feeds {
-            for section in feed.monthSections {
-                var existingIds = seenEntryIdsByMonth[section.month] ?? []
-                var combined = monthMap[section.month] ?? []
-                for entry in section.entries where !existingIds.contains(entry.id) {
-                    existingIds.insert(entry.id)
-                    combined.append(entry)
-                }
-                monthMap[section.month] = combined
-                seenEntryIdsByMonth[section.month] = existingIds
-            }
-        }
-        let monthSections: [MonthSection] = (1...12).compactMap { month in
-            guard let entries = monthMap[month], !entries.isEmpty else { return nil }
-            return MonthSection(month: month, entries: entries)
-        }
-
-        // Programs: dedup by routine UUID.
-        var seenProgramIds: Set<UUID> = []
-        var combinedPrograms: [RoutineRow] = []
-        for feed in feeds {
-            for routine in feed.programs where !seenProgramIds.contains(routine.id) {
-                seenProgramIds.insert(routine.id)
-                combinedPrograms.append(routine)
-            }
-        }
-
-        // Routine visit count: sum across all seasons (each season's
-        // count is already deduped against that season's month window).
-        let totalVisits = feeds.reduce(0) { $0 + $1.routineVisitCount }
-
-        // Use `.spring` as the seed Season — callers that need the
-        // "full year" label check `fullYearMode` in the view, not
-        // SeasonFeed.season.
-        return SeasonFeed(
-            season: .spring,
-            decisions: combinedDecisions,
-            monthSections: monthSections,
-            programs: combinedPrograms,
-            routineVisitCount: totalVisits
-        )
-    }
+    // Phase 70.A1.x dropped the `fullYearFeed()` aggregator. The "Show
+    // full year" toggle proved noisy in practice — year-round routines
+    // dominated the combined view and the user couldn't tell what was
+    // truly upcoming vs. ambient. The "Active Routines This Season"
+    // card surfaces routine density without flooding the season feed.
 
     // MARK: Season summaries (for YearRibbon)
 
