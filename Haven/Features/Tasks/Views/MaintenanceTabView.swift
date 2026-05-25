@@ -28,6 +28,12 @@ struct MaintenanceTabView: View {
     /// inline QuickSchedulingSheet. Non-nil while the half-detent sheet
     /// is open; set back to nil after the user picks a date or cancels.
     @State private var quickScheduleTask: MaintenanceTaskDBRow?
+    /// Phase 70.A1.x: full bundle / task detail sheet. Tapping a bundle
+    /// parent card body or a standalone task row presents this sheet
+    /// inline — no more deferring to `MaintenanceScheduleView` (the
+    /// heavy Phase 56.4 timeline) just to re-tap the same row from
+    /// inside that view.
+    @State private var detailTask: MaintenanceTaskDBRow?
 
     /// Phase 70 (Tasks v2): Task id whose row should pulse a salmon
     /// highlight ring after a deep-link arrival (`.openMaintenanceTask`).
@@ -186,6 +192,26 @@ struct MaintenanceTabView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        // Phase 70.A1.x: full bundle/task detail sheet. Replaces the
+        // earlier "punt to MaintenanceScheduleView and re-tap" path,
+        // which was slow (full timeline + duplicate-detection on
+        // appear) AND awful UX (two taps to see the bundle's coord
+        // surface). MaintenanceTaskDetailSheet already handles bundle
+        // parents (custom subitems / vendor reframing / scheduling /
+        // snooze / complete / Chez delegation).
+        .sheet(item: $detailTask) { task in
+            NavigationStack {
+                MaintenanceTaskDetailSheet(
+                    task: task,
+                    onTaskCompleted: {
+                        detailTask = nil
+                    },
+                    onDeleteTask: {
+                        detailTask = nil
+                    }
+                )
+            }
         }
         .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
             Button("Add a routine") { pushTarget = .routinesList }
@@ -573,10 +599,13 @@ struct MaintenanceTabView: View {
                         "bundle_id": task.templateId ?? "",
                         "child_count": String(childrenFor(task: task).count)
                     ])
-                    // Bundle detail sheet — defer to the existing
-                    // MaintenanceTaskDetailSheet pushed from the schedule
-                    // view path until task 70.A1.10 wires it inline here.
-                    pushTarget = .scheduleView
+                    // Phase 70.A1.x: open the bundle's full coordination
+                    // surface inline — vendor reframing, child line
+                    // items, scheduling, snooze, Chez delegation. The
+                    // earlier "punt to MaintenanceScheduleView" pattern
+                    // was slow + confusing (re-render the old timeline
+                    // just to re-tap the same row).
+                    detailTask = task
                 },
                 onBookIt: {
                     quickScheduleTask = task
@@ -592,7 +621,11 @@ struct MaintenanceTabView: View {
                 contractor: contractorFor(task: task),
                 isHighlighted: highlightedTaskId == task.id,
                 onTap: {
-                    pushTarget = .scheduleView
+                    // Phase 70.A1.x: standalone task tap opens
+                    // MaintenanceTaskDetailSheet inline. Same fix as
+                    // the bundle parent above — no more deferring to
+                    // MaintenanceScheduleView.
+                    detailTask = task
                 }
             )
 
