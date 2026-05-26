@@ -26,13 +26,13 @@ targets:
         excludes:
           - "Config/Info.plist"
           - "Config/Haven.entitlements"
-          - "Config/HavenField-Info.plist"
           - "Resources/SplashScreen.storyboard"
-          # Chez v1: HavenFieldApp.swift declares its own @main and is intended
-          # for a separate Field-app target. Excluded here so the homeowner
-          # Haven target builds cleanly. HavenFieldView.swift (model types
-          # consumed by AppState/ContentView) stays in the target.
-          - "App/HavenFieldApp.swift"
+          # HavenFieldView.swift (model types consumed by AppState/ContentView)
+          # stays in the target even after the standalone Chez Field iOS
+          # app target was removed in May 2026. The .field branches in
+          # the homeowner code path are dormant since the field bundle
+          # ID is no longer shipped, but the AppExperience enum and
+          # related types still compile cleanly.
     resources:
       - path: Haven/Resources/Assets.xcassets
       - path: Haven/Resources/Fonts
@@ -95,43 +95,6 @@ targets:
         # #if targetEnvironment(simulator). Device + TestFlight + App Store
         # builds keep using the secure Keychain path unchanged.
 
-  HavenField:
-    type: application
-    platform: iOS
-    sources:
-      - path: Haven
-        excludes:
-          - "Config/Info.plist"
-          - "Config/Haven.entitlements"
-          - "Config/HavenField-Info.plist"
-          - "Resources/SplashScreen.storyboard"
-          # Separate field app target: include HavenFieldApp.swift and exclude
-          # the homeowner @main so the standalone technician app owns launch.
-          - "App/HavenApp.swift"
-    resources:
-      - path: Haven/Resources/Assets.xcassets
-      - path: Haven/Resources/Fonts
-      # Phase 67I.4: bundled remote-config JSON snapshots (same as
-      # the homeowner Haven target — field app reads the same config).
-      - path: Haven/Resources/RemoteConfig
-        type: group
-    dependencies:
-      - package: Supabase
-        product: Supabase
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.havenhome.field
-        INFOPLIST_FILE: Haven/Config/HavenField-Info.plist
-        CODE_SIGN_ENTITLEMENTS: Haven/Config/Haven.entitlements
-        MARKETING_VERSION: "1.0.2"
-        CURRENT_PROJECT_VERSION: "86"
-        CODE_SIGN_STYLE: Automatic
-        PRODUCT_NAME: ChezField
-        ASSETCATALOG_COMPILER_APPICON_NAME: HavenFieldAppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        GENERATE_INFOPLIST_FILE: false
-        TARGETED_DEVICE_FAMILY: "1,2"
-
   HavenTests:
     type: bundle.unit-test
     platform: iOS
@@ -150,18 +113,6 @@ schemes:
     build:
       targets:
         Haven: all
-    run:
-      config: Debug
-    archive:
-      config: Release
-    profile:
-      config: Release
-    analyze:
-      config: Debug
-  Chez Field:
-    build:
-      targets:
-        HavenField: all
     run:
       config: Debug
     archive:

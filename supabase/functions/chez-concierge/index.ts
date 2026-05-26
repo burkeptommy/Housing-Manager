@@ -5990,12 +5990,16 @@ async function handleAssignHandymanToAssessment(
   }
 
   // 5. Notify the assigned member (push + email).
+  // Note: as of May 2026 the handyman Operations Desk is decommissioned —
+  // visit confirmation now happens via direct reply to this email. The
+  // dispatch flow itself is dormant until the new offline visit surface
+  // ships; this branch only fires if an admin manually assigns a member.
   const memberUserId = compactString(member?.user_id) || null;
   if (memberUserId) {
     await sendPush(
       serviceUrl, serviceRoleKey, [memberUserId],
       "New home assessment assigned",
-      "You've been assigned a Chez free home assessment visit. Open the Chez Operations Desk to confirm.",
+      "You've been assigned a Chez free home assessment visit. Tom will be in touch to confirm.",
       { type: "home_assessment_assigned", assessment_id: assessmentId, visit_assignment_id: visitId }
     );
   }
@@ -6004,14 +6008,12 @@ async function handleAssignHandymanToAssessment(
     await sendAdminEmail(
       [memberEmail],
       "New Chez home assessment assigned to you",
-      `You've been assigned a Chez free home assessment visit.\n\nOpen the Chez Operations Desk: https://www.getchez.com/operations/\n\nChez`,
+      `You've been assigned a Chez free home assessment visit.${routeDate ? `\n\nScheduled for: ${routeDate}.` : ""}\n\nReply to this email to confirm or reschedule.\n\nChez`,
       emailBody({
         preview: "You've been assigned a new Chez home assessment visit.",
         heading: "New home assessment assigned",
-        intro: "Chez has dispatched a free home assessment to your workspace. Confirm the visit in the Operations Desk to lock in the date and notify the homeowner.",
+        intro: "Chez has dispatched a free home assessment to your workspace. Reply to this email to confirm or reschedule the visit.",
         bodyText: `Visit type: free home assessment.${routeDate ? `\nScheduled for: ${routeDate}.` : ""}`,
-        ctaLabel: "Open Operations Desk",
-        ctaUrl: "https://www.getchez.com/operations/",
       })
     );
   }
