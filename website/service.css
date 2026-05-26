@@ -3,25 +3,31 @@
  *
  * The service desk shares admin.html's layout (sidebar + topbar + main),
  * the Phase 83 4-pane concierge cockpit, and every JS surface in
- * admin.js. The only visual deltas live here:
- *   1. The sidebar brand says "chez service" instead of "chez admin"
- *      (handled in service.html markup).
- *   2. A slight accent on the topbar so operators know which surface
- *      they're on at a glance.
- *   3. Subdued "back of house" affordances (catalog buttons hidden via
- *      .is-hidden + hidden attributes in service.html).
+ * admin.js. Both portals share the brand purple + white + black token
+ * system in chez.css. This file adds the service-portal flourishes:
  *
- * Keep this file small. Anything reusable across both portals belongs
- * in admin.css.
+ *   1. The sidebar brand says "chez service" instead of "chez admin"
+ *      (markup lives in service.html).
+ *   2. The sidebar wordmark and topbar eyebrow use brand purple so the
+ *      operator's eye lands on the title bar slightly faster than on
+ *      admin lab.
+ *   3. New queue card affordances for delegations and "just in" cases
+ *      (the data flows from chez_requests rows; CSS lives here so the
+ *      admin portal renders the same cards in its existing neutral
+ *      treatment without inheriting the priority highlights).
+ *
+ * Keep cross-portal styling in admin.css. This file is service-only.
  */
 
-/* Service-mode topbar accent: a thin salmon underline below the eyebrow
-   so the operator's eye lands on the title bar slightly faster than on
-   the admin lab. Same accent the iOS app uses for primary CTAs. */
+/* ============================================================
+ * TOPBAR + SIDEBAR — brand accent
+ * ============================================================ */
+
 body[data-portal-mode="service"] .admin-topbar > div > .admin-eyebrow {
   position: relative;
   display: inline-block;
   padding-bottom: 2px;
+  color: var(--salmon, #6938EF);
 }
 body[data-portal-mode="service"] .admin-topbar > div > .admin-eyebrow::after {
   content: "";
@@ -30,17 +36,337 @@ body[data-portal-mode="service"] .admin-topbar > div > .admin-eyebrow::after {
   bottom: -1px;
   width: 24px;
   height: 2px;
-  background: var(--chez-action, #ed6955);
+  background: var(--salmon, #6938EF);
   border-radius: 1px;
 }
 
-/* Brand subtitle: "service" reads in salmon to distinguish from admin's
-   indigo "admin" label. Same approach the iOS app uses for action vs ink. */
+/* Brand subtitle: "service" reads in brand purple to distinguish from
+   admin's neutral "admin" label. */
 body[data-portal-mode="service"] .admin-sidebar__brand span {
-  color: var(--chez-action, #ed6955);
+  color: var(--salmon, #6938EF);
   font-weight: 600;
   letter-spacing: 0.02em;
+  text-transform: lowercase;
 }
 
-/* Login card copy already differs (markup in service.html). No extra
-   styling needed — the admin-login__card already centers nicely. */
+/* ============================================================
+ * QUEUE CARD — delegation badge + "just in" pill
+ * ============================================================
+ *
+ * The cockpit queue card markup (rendered by renderConciergeQueueCard
+ * in admin.js) emits two optional spans we light up here:
+ *
+ *   .cockpit-queue__case-tag--standing  — homeowner toggled
+ *      "Have Chez own this" on a routine / contractor / system /
+ *      project / vehicle / document / utility. Surfaces as a solid
+ *      purple pill so the operator sees standing engagements at a
+ *      glance vs one-off questions.
+ *
+ *   .cockpit-queue__case-tag--just-in  — request landed in the last
+ *      2 hours and the operator hasn't read it yet. Surfaces as a
+ *      black pill with a soft pulse so genuinely new submissions
+ *      don't get buried behind older unread threads.
+ *
+ * Both pills are subordinate to the existing SLA pill on the right
+ * edge of each card — they communicate ownership/freshness, not
+ * SLA risk.
+ */
+
+body[data-portal-mode="service"] .cockpit-queue__case-tag--standing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: var(--purple, #6938EF);
+  color: #fff;
+  white-space: nowrap;
+}
+body[data-portal-mode="service"] .cockpit-queue__case-tag--standing::before {
+  content: "•";
+  font-size: 12px;
+  line-height: 0;
+  position: relative;
+  top: 1px;
+}
+
+body[data-portal-mode="service"] .cockpit-queue__case-tag--just-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: #0A0A0A;
+  color: #fff;
+  white-space: nowrap;
+  animation: justInPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes justInPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(10, 10, 10, 0); }
+  50%      { box-shadow: 0 0 0 4px rgba(10, 10, 10, 0.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-portal-mode="service"] .cockpit-queue__case-tag--just-in {
+    animation: none;
+  }
+}
+
+/* ============================================================
+ * QUEUE FILTER CHIP — "Standing engagements"
+ * ============================================================
+ *
+ * Sits inside the queue rail's filter row alongside All / Mine /
+ * Urgent. Active state uses solid purple to mirror the standing
+ * pill on each card.
+ */
+
+body[data-portal-mode="service"] .cockpit-queue__filter--standing.is-active {
+  background: var(--purple, #6938EF);
+  color: #fff;
+  border-color: var(--purple, #6938EF);
+}
+body[data-portal-mode="service"] .cockpit-queue__filter--standing.is-active:hover {
+  background: var(--purple-pressed, #5025D1);
+  border-color: var(--purple-pressed, #5025D1);
+}
+
+/* ============================================================
+ * VENDOR PIPELINE BOARD — case workspace kanban
+ * ============================================================
+ *
+ * Renders inside the case workspace ABOVE the existing vendor
+ * sheet. Surfaces chez_vendor_outreach + chez_visits rows as
+ * stage-grouped cards so the operator can see at a glance which
+ * candidates are in which step of the coordination loop.
+ *
+ * Stages (5 columns):
+ *   1. Researching        — operator considering this vendor
+ *   2. Contacted          — outreach sent (email/call/text)
+ *   3. Awaiting dates     — vendor needs homeowner availability
+ *   4. Homeowner picked   — homeowner chose dates; back to vendor
+ *   5. Locked             — visit confirmed
+ *
+ * Each card shows vendor name + last action + next action +
+ * one-tap shortcuts (Log call · Ask homeowner for dates · Send
+ * to homeowner · Mark locked).
+ */
+
+body[data-portal-mode="service"] .vendor-pipeline {
+  margin: 0 0 24px 0;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15, 10, 40, 0.04);
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__title {
+  font-family: var(--serif, Georgia);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text, #0A0A0A);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__sub {
+  font-size: 12px;
+  color: var(--text-muted, #6B6B7B);
+  margin-top: 2px;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 1280px) {
+  body[data-portal-mode="service"] .vendor-pipeline__board {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  body[data-portal-mode="service"] .vendor-pipeline__board {
+    grid-template-columns: 1fr;
+  }
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__col {
+  background: var(--pearl, #FAFAFC);
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: 12px;
+  padding: 10px;
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted, #6B6B7B);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--neutral-200, #EDEEF0);
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__col-count {
+  background: var(--neutral-200, #EDEEF0);
+  color: var(--text, #0A0A0A);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Active column (the next-action stage) gets a purple accent so the
+   operator knows which column to look at first. JS computes this by
+   stage priority: Awaiting dates > Researching > Contacted > Picked > Locked. */
+body[data-portal-mode="service"] .vendor-pipeline__col--active {
+  border-color: var(--purple, #6938EF);
+  background: rgba(105, 56, 239, 0.04);
+}
+body[data-portal-mode="service"] .vendor-pipeline__col--active .vendor-pipeline__col-count {
+  background: var(--purple, #6938EF);
+  color: #fff;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__card {
+  background: #fff;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: 10px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+body[data-portal-mode="service"] .vendor-pipeline__card:hover {
+  border-color: var(--purple, #6938EF);
+  box-shadow: 0 2px 6px rgba(105, 56, 239, 0.10);
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #0A0A0A);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__card-meta {
+  font-size: 11px;
+  color: var(--text-muted, #6B6B7B);
+  line-height: 1.4;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__card-next {
+  font-size: 11px;
+  color: var(--purple, #6938EF);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__btn {
+  flex: 1 0 auto;
+  min-height: 26px;
+  padding: 4px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: 7px;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  background: #fff;
+  color: var(--text, #0A0A0A);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+body[data-portal-mode="service"] .vendor-pipeline__btn:hover {
+  background: var(--purple-pale, #EFEAFE);
+  border-color: var(--purple, #6938EF);
+  color: var(--purple, #6938EF);
+}
+body[data-portal-mode="service"] .vendor-pipeline__btn--primary {
+  background: var(--purple, #6938EF);
+  border-color: var(--purple, #6938EF);
+  color: #fff;
+}
+body[data-portal-mode="service"] .vendor-pipeline__btn--primary:hover {
+  background: var(--purple-pressed, #5025D1);
+  border-color: var(--purple-pressed, #5025D1);
+  color: #fff;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__empty {
+  font-size: 11px;
+  color: var(--text-soft, #A1A1AC);
+  font-style: italic;
+  padding: 6px 4px;
+  text-align: center;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__intro-cta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+body[data-portal-mode="service"] .vendor-pipeline__intro-btn {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--purple, #6938EF);
+  background: var(--purple, #6938EF);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+body[data-portal-mode="service"] .vendor-pipeline__intro-btn:hover {
+  background: var(--purple-pressed, #5025D1);
+}
+body[data-portal-mode="service"] .vendor-pipeline__intro-btn--ghost {
+  background: #fff;
+  color: var(--purple, #6938EF);
+}
+body[data-portal-mode="service"] .vendor-pipeline__intro-btn--ghost:hover {
+  background: var(--purple-pale, #EFEAFE);
+}

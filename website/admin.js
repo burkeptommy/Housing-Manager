@@ -5361,10 +5361,18 @@ function renderConciergeCockpit() {
   // automatically when the loads complete.
   ensureCrmReferenceData();
 
-  // Sort + filter the case list. Reuses the legacy logic so the queue
-  // ordering Tom is used to (overdue first, then unread, then most recent)
-  // stays consistent.
+  // Sort + filter the case list. Priority order (Phase 9c — tuned for the
+  // homeowner's "newest needs answer first" mental model):
+  //   1. Just in            — unread + landed in last 2h. Newest delegations
+  //                           and questions bubble to the very top so the
+  //                           operator never misses a fresh inbound.
+  //   2. SLA overdue        — anything past its 24-business-hour clock.
+  //   3. Unread             — homeowner sent something we haven't read.
+  //   4. Most recent activity — fall back to last_message_at desc.
   const requests = (state.chezRequests ?? []).slice().sort((a, b) => {
+    const aJust = isJustIn(a) ? 1 : 0;
+    const bJust = isJustIn(b) ? 1 : 0;
+    if (aJust !== bJust) return bJust - aJust;
     const aSla = chezSlaPill(a);
     const bSla = chezSlaPill(b);
     const aOver = aSla?.overdue ? 1 : 0;
@@ -5427,6 +5435,14 @@ function renderConciergeCockpit() {
         if (r.status !== "resolved") return false;
         const t = r.resolved_at || r.last_message_at;
         if (!t || new Date(t).getTime() < sevenDaysAgo) return false;
+        break;
+      }
+      case "standing": {
+        // Phase 9c — recurring delegations only. Resolved standing
+        // engagements still surface elsewhere ("all"/"resolved_recent");
+        // here we focus the operator on active ones requiring attention.
+        if (r.status === "resolved") return false;
+        if (!isStandingEngagement(r)) return false;
         break;
       }
       // "all" (default) — no status filter applied.
@@ -5556,6 +5572,11 @@ function renderConciergeQueueRailHtml(filtered, allRequests, activeReq) {
         const s = chezSlaPill(r);
         return s && (s.tone === "red" || s.tone === "amber");
       }).length },
+    // Phase 9c — narrows the queue to recurring delegations (homeowner
+    // used ChezOwnsToggle on a routine/contractor/task/system/etc.).
+    // These are ongoing engagements, not one-off questions, and the
+    // operator triages them differently (proactive outreach, not reply).
+    { id: "standing", label: "Standing", count: allRequests.filter((r) => isStandingEngagement(r) && r.status !== "resolved").length },
   ];
 
   // Stat tiles.
@@ -5758,6 +5779,38 @@ function renderConciergeStatTile(label, value, tone) {
   `;
 }
 
+// Phase 9c — surface "Have Chez own this" delegations distinctly from
+// one-off questions. Homeowners create these via ChezOwnsToggle on a
+// routine/contractor/task/system/project/vehicle/document/utility — each
+// path lands a chez_request with a delegate_* source in context, a
+// "Standing engagement" summary prefix, or an entity-specific FK in
+// context. We check all three so legacy rows pre-Phase-80.1 still light up.
+function isStandingEngagement(req) {
+  if (!req) return false;
+  const ctx = req.context || {};
+  const src = String(ctx.source || "").toLowerCase();
+  if (src.startsWith("delegate_") || src === "chez_owned" || src === "standing_engagement") return true;
+  const summary = String(req.summary || "").toLowerCase();
+  if (summary.startsWith("standing engagement")) return true;
+  // Entity-FK signal: ChezOwnsToggle passes the entity id under a
+  // type-specific key + a chez_owns flag. We treat the chez_owns flag
+  // as authoritative; entity id alone could be a one-shot reference.
+  if (ctx.chez_owns === true || ctx.chez_owned === true) return true;
+  return false;
+}
+
+// "Just in" — a request landed in the last 2 hours and the operator
+// hasn't acknowledged it yet. Surfaces above the SLA overdue tier so
+// genuinely new submissions don't get buried behind older unread threads.
+function isJustIn(req) {
+  if (!req) return false;
+  if (req.status === "resolved") return false;
+  if (req.unread_for_admin !== true) return false;
+  const createdAt = req.created_at ? new Date(req.created_at).getTime() : 0;
+  if (!createdAt) return false;
+  return Date.now() - createdAt < 2 * 3600 * 1000;
+}
+
 function renderConciergeQueueCaseHtml(req, isActive) {
   const sla = chezSlaPill(req);
   const slaTone = sla ? (sla.tone === "red" ? "critical" : sla.tone === "amber" ? "warning" : sla.tone === "green" ? "success" : "neutral") : "neutral";
@@ -5790,6 +5843,17 @@ function renderConciergeQueueCaseHtml(req, isActive) {
     ? `<span class="cockpit-pill cockpit-pill--xs cockpit-pill--quiz" title="Sourced from House Quiz">Quiz</span>`
     : "";
 
+  // Phase 9c — delegation + just-in markers.
+  //   Standing: homeowner used ChezOwnsToggle (recurring delegation).
+  //   Just in:  unread + <2h old, so brand-new submissions float above
+  //             older unread threads.
+  const standingPill = isStandingEngagement(req)
+    ? `<span class="cockpit-queue__case-tag cockpit-queue__case-tag--standing" title="Standing engagement — Chez owns this">Standing</span>`
+    : "";
+  const justInPill = isJustIn(req)
+    ? `<span class="cockpit-queue__case-tag cockpit-queue__case-tag--just-in" title="Landed in the last 2 hours">Just in</span>`
+    : "";
+
   return `
     <button type="button" class="cockpit-queue__case ${isActive ? "is-active" : ""}" data-cockpit-case-id="${escapeHtml(req.id)}">
       ${isActive ? `<span class="cockpit-queue__case-accent"></span>` : ""}
@@ -5800,6 +5864,8 @@ function renderConciergeQueueCaseHtml(req, isActive) {
         <span class="cockpit-queue__case-icon">${CHEZ_CATEGORY_ICONS[cat] || "💬"}</span>
         <span class="cockpit-queue__case-type">${escapeHtml(catLabel)}</span>
         ${quizPill}
+        ${standingPill}
+        ${justInPill}
         <span class="cockpit-queue__case-id">${escapeHtml(req.id.slice(0, 8))}</span>
       </div>
       <div class="cockpit-queue__case-title">${escapeHtml(req.summary || "(no summary)")}</div>
@@ -6189,10 +6255,17 @@ function renderConciergeCaseWorkspaceHtml(req) {
   // that aren't full vendor sourcing, so the operator gets a per-archetype
   // brief next to the AI brief.
   const showNonVendorBody = archetype.id !== "find_vendor";
+  // Phase 9c — vendor pipeline board. Shown for find_vendor and quote
+  // archetypes (the cases where the operator is coordinating multiple
+  // candidates). Surfaces every vendor in the case + which stage of the
+  // coordination loop they're in, so multi-vendor scenarios stop
+  // requiring mental bookkeeping.
+  const showPipeline = archetype.id === "find_vendor" || archetype.id === "quote";
 
   const headerHtml = renderConciergeCaseHeaderHtml(req);
   const overviewHtml = renderConciergeCaseOverviewHtml(req, dossier, archetype);
   const briefHtml = renderConciergeAIBriefHtml(req);
+  const pipelineHtml = showPipeline ? renderConciergeVendorPipelineHtml(req, visits, messages) : "";
   const vendorSheetHtml = showVendorSheet ? renderConciergeVendorSheetHtml(req) : "";
   const nonVendorBodyHtml = showNonVendorBody ? renderConciergeNonVendorBodyHtml(req, archetype) : "";
   const stageTrackerHtml = renderStageTrackerHtml(req, messages, visits);
@@ -6209,11 +6282,287 @@ function renderConciergeCaseWorkspaceHtml(req) {
         ${stageTrackerHtml}
         ${overviewHtml}
         ${briefHtml}
+        ${pipelineHtml}
         ${nonVendorBodyHtml}
         ${visitsHtml}
         ${vendorSheetHtml}
         ${conversationHtml}
       </div>
+    </div>
+  `;
+}
+
+// =============================================================================
+// VENDOR PIPELINE BOARD (Phase 9c)
+// =============================================================================
+//
+// 5-column kanban for multi-vendor coordination. Surfaces every candidate
+// in the case + which stage of the coordination loop they're in, so the
+// operator's "3 vendors → 2 want home visits → ask homeowner for dates
+// → confirm back with vendors" scenario stops requiring mental bookkeeping.
+//
+// Stage assignment per candidate (keyed by vendor name):
+//   1. Researching       — in analysis cache, no call/proposal/visit yet
+//   2. Contacted         — call notes logged OR proposal sent (not approved)
+//   3. Awaiting dates    — visit row in awaiting_date state
+//   4. Homeowner picked  — date_slot proposal approved, visit pre-scheduled
+//   5. Locked            — visit state=scheduled (date confirmed with vendor)
+//
+// All data flows from existing state caches — no new DB reads. The board
+// is read-only data with action buttons that route through the existing
+// handleConciergeAction dispatcher (open-proposal-builder, propose-
+// alternate-dates, visit-mark-scheduled, etc.) so wiring stays centralized.
+function renderConciergeVendorPipelineHtml(req, visits, messages) {
+  const analysis = (state.chezAnalysisByRequest || {})[req.id] || {};
+  const candidatesFromAnalysis = []
+    .concat(Array.isArray(analysis.existing_vendors) ? analysis.existing_vendors : [])
+    .concat(Array.isArray(analysis.places_candidates) ? analysis.places_candidates : []);
+  const callState = (state.chezVendorCallsByRequest || {})[req.id] || {};
+  const visitRows = Array.isArray(visits) ? visits : [];
+  const vendorProposals = (messages || []).filter((m) => m.proposal_kind === "vendor");
+  const dateProposals = (messages || []).filter((m) => m.proposal_kind === "date_slot");
+
+  // Build a candidate map keyed by lowercased vendor name. Each candidate
+  // carries a stage, the latest activity timestamp, source meta, and
+  // optional FK ids we'll need for action wiring.
+  const candidates = new Map();
+  const keyFor = (name) => String(name || "").trim().toLowerCase();
+
+  const ensure = (name, seed) => {
+    const key = keyFor(name);
+    if (!key) return null;
+    if (!candidates.has(key)) {
+      candidates.set(key, {
+        key,
+        name: name,
+        meta: { rating: null, reviews: null, phone: null, address: null, source: null },
+        stage: "researching",
+        lastActivityMs: 0,
+        visitId: null,
+        proposalId: null,
+        sourceLabel: null,
+      });
+    }
+    const c = candidates.get(key);
+    if (seed) {
+      // Merge known metadata (don't overwrite non-null with null).
+      if (seed.rating != null && c.meta.rating == null) c.meta.rating = seed.rating;
+      if (seed.reviews != null && c.meta.reviews == null) c.meta.reviews = seed.reviews;
+      if (seed.review_count != null && c.meta.reviews == null) c.meta.reviews = seed.review_count;
+      if (seed.phone && !c.meta.phone) c.meta.phone = seed.phone;
+      if (seed.address && !c.meta.address) c.meta.address = seed.address;
+      if (seed.source && !c.meta.source) c.meta.source = seed.source;
+    }
+    return c;
+  };
+
+  // Seed from analysis (researching baseline).
+  candidatesFromAnalysis.forEach((v) => {
+    if (!v || !v.name) return;
+    const c = ensure(v.name, { ...v, source: v._source || (analysis.existing_vendors?.includes?.(v) ? "existing" : "places") });
+    if (c) c.sourceLabel = c.meta.source === "existing" ? "Network" : "Local pro";
+  });
+
+  // Layer call state — anyone with notes/availability bumps to "contacted".
+  Object.entries(callState).forEach(([candidateKey, callData]) => {
+    if (!callData) return;
+    const hasNotes = (callData.notes && callData.notes.trim()) || (callData.outcome && callData.outcome.trim());
+    const hasAvailability = Array.isArray(callData.availability_slots) && callData.availability_slots.some((s) => s && s.trim());
+    if (!hasNotes && !hasAvailability) return;
+    // Call state is keyed by vendor card key in the analysis cache; we
+    // try to find a matching candidate by direct key match first, falling
+    // back to fuzzy substring match for legacy keys.
+    let candidate = candidates.get(candidateKey);
+    if (!candidate) {
+      for (const c of candidates.values()) {
+        if (c.key.includes(candidateKey) || candidateKey.includes(c.key)) {
+          candidate = c;
+          break;
+        }
+      }
+    }
+    if (!candidate) {
+      // Standalone call note for a vendor not in analysis cache. Add as
+      // a researching candidate so it doesn't disappear from view.
+      candidate = ensure(candidateKey, { source: "manual" });
+      if (candidate) candidate.sourceLabel = "Manual";
+    }
+    if (candidate) {
+      candidate.stage = "contacted";
+      if (callData.last_updated_ms && callData.last_updated_ms > candidate.lastActivityMs) {
+        candidate.lastActivityMs = callData.last_updated_ms;
+      }
+    }
+  });
+
+  // Layer vendor proposals — pending = contacted, approved = picked/locked.
+  vendorProposals.forEach((m) => {
+    const vendor = m.proposal?.vendor || {};
+    if (!vendor.name) return;
+    const c = ensure(vendor.name, vendor);
+    if (!c) return;
+    const status = m.proposal?.status || "pending";
+    const msgMs = m.created_at ? new Date(m.created_at).getTime() : 0;
+    if (msgMs > c.lastActivityMs) c.lastActivityMs = msgMs;
+    c.proposalId = m.id;
+    if (status === "approved") {
+      // Will get bumped further if there's a visit row.
+      if (c.stage === "researching") c.stage = "contacted";
+    } else if (status === "pending") {
+      if (c.stage === "researching") c.stage = "contacted";
+    }
+  });
+
+  // Layer visits — strongest signal for stage 3-5.
+  visitRows.forEach((v) => {
+    if (!v?.vendor_name) return;
+    const c = ensure(v.vendor_name, { phone: v.vendor_phone });
+    if (!c) return;
+    c.visitId = v.id;
+    const visitMs = v.updated_at ? new Date(v.updated_at).getTime() : (v.created_at ? new Date(v.created_at).getTime() : 0);
+    if (visitMs > c.lastActivityMs) c.lastActivityMs = visitMs;
+    if (v.state === "scheduled" || v.state === "completed") {
+      c.stage = "locked";
+    } else if (v.state === "awaiting_date") {
+      // Check if there's an approved date_slot proposal between us and
+      // the homeowner — if so, homeowner has picked, we're locking in.
+      const decided = dateProposals.find((dp) => dp.proposal?.status === "approved");
+      c.stage = decided ? "picked" : "awaiting_dates";
+    }
+  });
+
+  const candidateList = Array.from(candidates.values()).sort((a, b) => b.lastActivityMs - a.lastActivityMs);
+
+  // Group by stage.
+  const stages = [
+    { id: "researching",    label: "Researching",        hint: "Decide who to call" },
+    { id: "contacted",      label: "Contacted",          hint: "Logged outreach" },
+    { id: "awaiting_dates", label: "Awaiting dates",     hint: "Vendor needs availability" },
+    { id: "picked",         label: "Homeowner picked",   hint: "Confirm with vendor" },
+    { id: "locked",         label: "Locked",             hint: "Visit on calendar" },
+  ];
+  const grouped = stages.map((s) => ({ ...s, items: candidateList.filter((c) => c.stage === s.id) }));
+
+  // The "active" stage is the leftmost stage that has at least one card
+  // AND has next-action work to do. Picked + Awaiting dates take priority
+  // over Researching because they're blocking a homeowner; Contacted only
+  // beats Researching when there's actually a follow-up needed.
+  const activePriority = ["picked", "awaiting_dates", "contacted", "researching"];
+  const activeStage = activePriority.find((id) => grouped.find((g) => g.id === id)?.items.length > 0) || null;
+
+  // Empty-state guard — nothing to render if no candidates at all.
+  if (candidateList.length === 0) {
+    return `
+      <section class="vendor-pipeline">
+        <div class="vendor-pipeline__head">
+          <div>
+            <h3 class="vendor-pipeline__title">Vendor pipeline</h3>
+            <p class="vendor-pipeline__sub">Track every vendor candidate from research → locked appointment.</p>
+          </div>
+          <div class="vendor-pipeline__intro-cta">
+            <button type="button" class="vendor-pipeline__intro-btn" data-cockpit-action="rerun-analysis">Research local pros</button>
+            <button type="button" class="vendor-pipeline__intro-btn vendor-pipeline__intro-btn--ghost" data-cockpit-action="add-vendor-manual">Add vendor manually</button>
+          </div>
+        </div>
+        <div class="vendor-pipeline__empty" style="padding: 24px; text-align: center;">
+          No vendors in this case yet. Use the buttons above to source candidates.
+        </div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="vendor-pipeline">
+      <div class="vendor-pipeline__head">
+        <div>
+          <h3 class="vendor-pipeline__title">Vendor pipeline · ${candidateList.length} ${candidateList.length === 1 ? "candidate" : "candidates"}</h3>
+          <p class="vendor-pipeline__sub">${activeStage ? `Next: ${escapeHtml((grouped.find((g) => g.id === activeStage) || {}).hint || "")}` : "All vendors are locked in."}</p>
+        </div>
+        <div class="vendor-pipeline__intro-cta">
+          <button type="button" class="vendor-pipeline__intro-btn vendor-pipeline__intro-btn--ghost" data-cockpit-action="find-more-vendors" title="Search Google Places for more local pros">+ Find more</button>
+        </div>
+      </div>
+      <div class="vendor-pipeline__board">
+        ${grouped.map((g) => `
+          <div class="vendor-pipeline__col ${activeStage === g.id ? "vendor-pipeline__col--active" : ""}">
+            <div class="vendor-pipeline__col-head">
+              <span>${escapeHtml(g.label)}</span>
+              <span class="vendor-pipeline__col-count">${g.items.length}</span>
+            </div>
+            ${g.items.length === 0
+              ? `<div class="vendor-pipeline__empty">—</div>`
+              : g.items.map((c) => renderConciergeVendorPipelineCardHtml(c, g.id)).join("")}
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderConciergeVendorPipelineCardHtml(candidate, stageId) {
+  const metaBits = [];
+  if (candidate.meta.rating) metaBits.push(`★ ${Number(candidate.meta.rating).toFixed(1)}`);
+  if (candidate.meta.reviews) metaBits.push(`${candidate.meta.reviews} reviews`);
+  if (candidate.meta.phone) metaBits.push(escapeHtml(candidate.meta.phone));
+  const metaHtml = metaBits.length ? `<div class="vendor-pipeline__card-meta">${metaBits.join(" · ")}</div>` : "";
+
+  // Stage-specific next-action label + buttons.
+  let nextLabel = "";
+  let actions = [];
+  switch (stageId) {
+    case "researching":
+      nextLabel = "Open call form";
+      actions = [
+        { label: "Open call form", action: "expand-vendor", primary: true, vendorKey: candidate.key },
+      ];
+      break;
+    case "contacted":
+      nextLabel = "Ask homeowner for dates";
+      actions = [
+        { label: "Ask homeowner for dates", action: "pipeline-ask-availability", primary: true, vendorName: candidate.name },
+        { label: "Update notes", action: "expand-vendor", vendorKey: candidate.key },
+      ];
+      break;
+    case "awaiting_dates":
+      nextLabel = "Send dates to homeowner";
+      actions = [
+        { label: "Send dates to homeowner", action: "pipeline-ask-availability", primary: true, vendorName: candidate.name },
+        candidate.visitId ? { label: "Open visit", action: "scroll-to-visits" } : null,
+      ].filter(Boolean);
+      break;
+    case "picked":
+      nextLabel = "Confirm with vendor + lock";
+      actions = [
+        candidate.visitId ? { label: "Mark locked", action: "visit-mark-scheduled", primary: true, visitId: candidate.visitId } : null,
+        { label: "Log call", action: "expand-vendor", vendorKey: candidate.key },
+      ].filter(Boolean);
+      break;
+    case "locked":
+      nextLabel = "On the calendar";
+      actions = [
+        candidate.visitId ? { label: "Mark completed", action: "visit-mark-completed", primary: true, visitId: candidate.visitId } : null,
+      ].filter(Boolean);
+      break;
+  }
+
+  const actionsHtml = actions.map((a) => {
+    const attrs = [
+      `type="button"`,
+      `class="vendor-pipeline__btn ${a.primary ? "vendor-pipeline__btn--primary" : ""}"`,
+      `data-cockpit-action="${escapeHtml(a.action)}"`,
+    ];
+    if (a.vendorKey) attrs.push(`data-pipeline-vendor-key="${escapeHtml(a.vendorKey)}"`);
+    if (a.vendorName) attrs.push(`data-pipeline-vendor-name="${escapeHtml(a.vendorName)}"`);
+    if (a.visitId) attrs.push(`data-visit-id="${escapeHtml(a.visitId)}"`);
+    return `<button ${attrs.join(" ")}>${escapeHtml(a.label)}</button>`;
+  }).join("");
+
+  return `
+    <div class="vendor-pipeline__card">
+      <div class="vendor-pipeline__card-name" title="${escapeHtml(candidate.name)}">${escapeHtml(candidate.name)}</div>
+      ${metaHtml}
+      ${nextLabel ? `<div class="vendor-pipeline__card-next">→ ${escapeHtml(nextLabel)}</div>` : ""}
+      ${actionsHtml ? `<div class="vendor-pipeline__card-actions">${actionsHtml}</div>` : ""}
     </div>
   `;
 }
@@ -9282,9 +9631,63 @@ async function handleConciergeAction(action, req, btn) {
       renderConciergeCockpit();
       return;
 
+    case "pipeline-ask-availability": {
+      // Phase 9c — one-tap "ask homeowner for date options" from a vendor
+      // pipeline card. Opens the proposal builder, switches to the
+      // date_slot tab, and pre-fills both 3 default weekday windows AND
+      // a vendor-named message body so the operator can hit Send in
+      // one motion (or edit the windows first).
+      const vendorName = btn?.dataset?.pipelineVendorName || "your vendor";
+      startProposalFlow(req);
+      requestAnimationFrame(() => {
+        const modal = document.querySelector("[data-chez-proposal-modal]");
+        if (!modal) return;
+        // Switch to date_slot tab.
+        modal.querySelector("[data-proposal-tab='date']")?.click();
+        // Pre-fill message with the vendor's name.
+        const messageInput = modal.querySelector("textarea[name='content']");
+        if (messageInput && !messageInput.value) {
+          messageInput.value = `${vendorName} would like to come out and quote this for you. Tap Approve on whichever window works best — we'll lock it in with them on your behalf. Reply with a different date if none of these fit.`;
+        }
+        // Pre-fill three default windows: next 3 weekdays at 9-11am.
+        // Operators can edit before sending.
+        const windowInputs = modal.querySelectorAll("input[data-proposal-date-window]");
+        if (windowInputs.length) {
+          const labels = pipelineDefaultAvailabilityLabels(3);
+          windowInputs.forEach((input, idx) => {
+            if (labels[idx] && !input.value) input.value = labels[idx];
+          });
+        }
+        // Focus the first window input so the operator can immediately
+        // edit / approve.
+        const firstWindow = modal.querySelector("input[data-proposal-date-window]");
+        if (firstWindow) firstWindow.focus();
+      });
+      return;
+    }
+
     default:
       console.warn("[concierge] unhandled action:", action);
   }
+}
+
+// Phase 9c helper — generate N "Tue Mar 5, 9-11am"-style window labels
+// starting from the next business day. Skips weekends. Used by the
+// "Ask homeowner for dates" pipeline action to pre-fill the proposal
+// builder so operators don't retype defaults.
+function pipelineDefaultAvailabilityLabels(count) {
+  const labels = [];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  while (labels.length < count) {
+    cursor.setDate(cursor.getDate() + 1);
+    const dow = cursor.getDay();
+    if (dow === 0 || dow === 6) continue; // skip weekends
+    labels.push(`${days[dow]} ${months[cursor.getMonth()]} ${cursor.getDate()}, 9–11am`);
+  }
+  return labels;
 }
 
 // Phase 84 — Operator-initiated case ("+ New case" in cockpit topbar).
