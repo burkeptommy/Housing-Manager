@@ -4,6 +4,11 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "service.getchez.com" }],
+      "destination": "/service.html"
+    },
+    {
       "source": "/admin",
       "destination": "/admin.html"
     },
