@@ -137,6 +137,7 @@
 		2170015E862B5BFD87966FF1 /* AddRecurringServiceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D80FFAD22E5878A8A9903B /* AddRecurringServiceSheet.swift */; };
 		21B5E5D06E2F5FF1DABAC6C3 /* IntroExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA84C3892EACD5DC6B221B8B /* IntroExplainerView.swift */; };
 		21F98631DD0B2736C51BF81F /* ServiceHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693871EEED4A9EE08752B6C7 /* ServiceHistoryView.swift */; };
+		21FE8FBF8E7F840AB32F46E1 /* ChezTaskActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895971CA24A69B378786CA3D /* ChezTaskActivityCard.swift */; };
 		220EEA68FE9B5BA71D142D3B /* ChezActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46FB0312A697ED4EE92D39D4 /* ChezActivityLog.swift */; };
 		228AA0B7F6AC66A97E84687A /* LegacyTasksNotificationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323BDB0C2C8F73B8F72CFCD7 /* LegacyTasksNotificationCard.swift */; };
 		22BF0DA63A2A880747C5E6D6 /* LegacyTasksNotificationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323BDB0C2C8F73B8F72CFCD7 /* LegacyTasksNotificationCard.swift */; };
@@ -545,6 +546,7 @@
 		8EE3DF1D2033FC9F32D8965B /* PropertyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */; };
 		8EF2B378249168288CAE289A /* PersonalQuizQuestionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CB3E3AFBFACE1E3B2F4BC6 /* PersonalQuizQuestionLibrary.swift */; };
 		8F1D2D71CADE93F741FB79B8 /* AssessmentReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5BB53A681620165B7C097F /* AssessmentReviewView.swift */; };
+		8F692AEE9ACEB460F4384A76 /* ChezTaskActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895971CA24A69B378786CA3D /* ChezTaskActivityCard.swift */; };
 		8FBAFE246BE54D26FB6DF5BB /* StandaloneTaskRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E9C9D439169BA07CDAB851 /* StandaloneTaskRow.swift */; };
 		8FD68D2E5CD959C8229DD664 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023E3D28374E39856E2661A0 /* NewProjectView.swift */; };
 		8FD7DE0B6179607692B15DB9 /* VendorLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F404802C9E338E592601FED /* VendorLogoView.swift */; };
@@ -1248,6 +1250,7 @@
 		88CB1E595AC46EC435723506 /* ExpirationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpirationBadge.swift; sourceTree = "<group>"; };
 		88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanVisitDetailView.swift; sourceTree = "<group>"; };
 		88E8328FB5ED10D6AFDBE7F0 /* ChezQuickQuestionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezQuickQuestionSheet.swift; sourceTree = "<group>"; };
+		895971CA24A69B378786CA3D /* ChezTaskActivityCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezTaskActivityCard.swift; sourceTree = "<group>"; };
 		898D3AEC29B0E076E61AA176 /* HavenTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HavenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A79F1CBC5C229985B274954 /* VINScannerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VINScannerSheet.swift; sourceTree = "<group>"; };
 		8AA28167AD30616B817ACECE /* VersionCheckService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCheckService.swift; sourceTree = "<group>"; };
@@ -1678,6 +1681,7 @@
 				FD30AD1C4BB9E3D9AF3B488F /* ChezProposalCard.swift */,
 				369C161B6C44E4A1318499AB /* ChezRequestRowCard.swift */,
 				EC78BF7917E6B290AB909069 /* ChezStatusBadge.swift */,
+				895971CA24A69B378786CA3D /* ChezTaskActivityCard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -2824,6 +2828,7 @@
 				F363BC7D9B986E8AEC42CFCC /* ChezRequestsListView.swift in Sources */,
 				0A735469150BB0CDF4FBFD10 /* ChezRequestsViewModel.swift in Sources */,
 				78C2CFA02E60DA1FE6F31C15 /* ChezStatusBadge.swift in Sources */,
+				8F692AEE9ACEB460F4384A76 /* ChezTaskActivityCard.swift in Sources */,
 				355888DCD1168D6EB16EA195 /* Color+Haven.swift in Sources */,
 				F60F37AF63B774DF7449EC98 /* CompletedTasksSheet.swift in Sources */,
 				933430937C48605A9C99D706 /* Constants.swift in Sources */,
@@ -3316,6 +3321,7 @@
 				C13F2ECD5395964B7086A509 /* ChezRequestsListView.swift in Sources */,
 				195318FFA6B7BF7BCBFE1EFB /* ChezRequestsViewModel.swift in Sources */,
 				A678E63C34FD5F4F4EF30726 /* ChezStatusBadge.swift in Sources */,
+				21FE8FBF8E7F840AB32F46E1 /* ChezTaskActivityCard.swift in Sources */,
 				92F2718BF8A80427D29361FB /* Color+Haven.swift in Sources */,
 				5912A111B44B5442E6A11363 /* CompletedTasksSheet.swift in Sources */,
 				FF43A02330353A46BA74D972 /* Constants.swift in Sources */,

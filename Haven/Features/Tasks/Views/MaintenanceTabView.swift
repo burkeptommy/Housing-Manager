@@ -384,7 +384,17 @@ struct MaintenanceTabView: View {
                         detailTask = nil
                     },
                     onDeleteTask: {
+                        // Friend feedback (May 2026): callback used to only
+                        // dismiss the sheet — the DB delete never fired.
+                        // Capture the id before dismiss so the Task closure
+                        // survives the sheet teardown. Analytics already
+                        // fires inside MaintenanceTaskDetailSheet.actionsSection.
+                        let taskId = task.id
                         detailTask = nil
+                        Task {
+                            try? await DatabaseService.shared.deleteMaintenanceTask(id: taskId)
+                            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        }
                     }
                 )
             }
@@ -915,6 +925,56 @@ struct MaintenanceTabView: View {
                 }
             }
             .padding(.bottom, TasksV5.sectionGap)
+        } else if activeFeed.decisions.isEmpty {
+            // Friend feedback (May 2026): when the year-aware filter
+            // strips a tile down to zero rows, surface a graceful
+            // "wrapped" empty state instead of silently rendering
+            // nothing under the previous section's footer.
+            seasonWrappedEmptyCard
+                .padding(.horizontal, TasksV5.pageMargin)
+                .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
+    /// Empty-state for season tiles with no work left for the current
+    /// calendar instance. Nudges the homeowner toward the next season's
+    /// tile rather than leaving them on a blank screen.
+    private var seasonWrappedEmptyCard: some View {
+        let nextSeason = activeSeason.next
+        return HStack(alignment: .center, spacing: 12) {
+            Image(systemName: activeSeason.icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(HavenColors.action)
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle().fill(HavenColors.action.opacity(0.12))
+                )
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(activeSeason.rawValue) is wrapped")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("Nothing left to schedule this season. Tap \(nextSeason.rawValue) →")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            Spacer(minLength: 8)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(HavenColors.creamLight)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(HavenColors.beige200, lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            Haptics.selection()
+            withAnimation(HavenTheme.animationStandard) {
+                activeSeason = nextSeason
+            }
         }
     }
 
@@ -1175,7 +1235,8 @@ struct MaintenanceTabView: View {
     @ViewBuilder
     private var combinedProgramsSection: some View {
         let programs = activeFeed.programs
-        if programs.isEmpty {
+        let chezTasks = activeFeed.chezTasks
+        if programs.isEmpty && chezTasks.isEmpty {
             SectionLabel(
                 eyebrow: "Your active programs",
                 sub: "On autopilot"
@@ -1188,8 +1249,8 @@ struct MaintenanceTabView: View {
         } else {
             SectionLabel(
                 eyebrow: "Your active programs",
-                sub: programsSubtitle(programs),
-                action: programs.count > 4 ? .init(title: "See all", perform: {
+                sub: programsSubtitle(programs, chezTasks: chezTasks),
+                action: (programs.count + chezTasks.count) > 4 ? .init(title: "See all", perform: {
                     pushTarget = .routinesList
                 }) : nil
             )
@@ -1208,21 +1269,69 @@ struct MaintenanceTabView: View {
                         }
                     }
                 }
+                // Friend feedback (May 2026): chez-owned standalone tasks
+                // render below the routine rows in the same section so
+                // the homeowner sees them with the Chez pill instead of
+                // them nagging from "Needs your attention." Tap → opens
+                // the task detail sheet, where the ChezTaskActivityCard
+                // surfaces request status + recent messages.
+                ForEach(Array(chezTasks.prefix(max(0, 4 - programs.count)))) { task in
+                    ProgramRow(
+                        icon: chezTaskIcon(task: task),
+                        name: task.title,
+                        nextEventLabel: chezTaskNextEventLabel(task: task),
+                        chezOwned: true
+                    ) {
+                        detailTask = task
+                    }
+                }
             }
             .padding(.horizontal, TasksV5.pageMargin)
             .padding(.bottom, TasksV5.sectionGap)
         }
     }
 
-    private func programsSubtitle(_ programs: [RoutineRow]) -> String {
-        let chezCount = programs.filter { $0.chezOwned }.count
+    /// Resolve a category-derived SF Symbol for a chez-owned task row
+    /// in the Active Programs section. Routes through the existing
+    /// template lookup → SystemCategoryRegistry icon so the row reads
+    /// at a glance (handyman wrench, plumbing droplet, etc.).
+    private func chezTaskIcon(task: MaintenanceTaskDBRow) -> String {
+        if let templateKey = task.templateId,
+           let colon = templateKey.firstIndex(of: ":") {
+            let category = String(templateKey[..<colon])
+            if let meta = SystemCategoryRegistry.metaForCategory(category) {
+                return meta.icon
+            }
+        }
+        return "checkmark.seal"
+    }
+
+    /// "Chez is on it" caption for a chez-owned task row. Falls back to
+    /// the task's scheduled / due date if Chez hasn't proposed anything
+    /// yet.
+    private func chezTaskNextEventLabel(task: MaintenanceTaskDBRow) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateString = task.scheduledDate ?? task.nextDueDate
+        if let date = formatter.date(from: dateString) {
+            let display = DateFormatter()
+            display.dateStyle = .medium
+            display.timeStyle = .none
+            return "Chez is on it · Due \(display.string(from: date))"
+        }
+        return "Chez is on it"
+    }
+
+    private func programsSubtitle(_ programs: [RoutineRow], chezTasks: [MaintenanceTaskDBRow] = []) -> String {
+        let chezCount = programs.filter { $0.chezOwned }.count + chezTasks.count
+        let totalCount = programs.count + chezTasks.count
         let visits = activeFeed.routineVisitCount
         let visitsPart: String? = visits > 0
             ? "\(visits) visit\(visits == 1 ? "" : "s") this \(activeSeason.displayName.lowercased())"
             : nil
         let chezPart: String?
         if chezCount == 0 { chezPart = nil }
-        else if chezCount == programs.count { chezPart = "Chez is handling these" }
+        else if chezCount == totalCount { chezPart = "Chez is handling these" }
         else { chezPart = "\(chezCount) handled by Chez" }
 
         let parts = [visitsPart, chezPart, "On autopilot"].compactMap { $0 }
@@ -2018,6 +2127,12 @@ struct SeasonFeed {
     /// renders a salmon Chez pill inline. Collapsed by default in the UI.
     let programs: [RoutineRow]
 
+    /// Friend feedback (May 2026) — chez-owned tasks for this season.
+    /// Rendered in the same Active Programs section as `programs`, just
+    /// below the routine rows with a Chez pill. Keeps chez-managed work
+    /// visible without it nagging from "Needs your attention."
+    let chezTasks: [MaintenanceTaskDBRow]
+
     /// Total recurring-visit count for this season's active routines.
     /// Surfaces in the Active Programs section subtitle ("12 visits this
     /// summer · On autopilot") so the user knows the routine cadence
@@ -2303,6 +2418,35 @@ final class MaintenanceTabViewModel: ObservableObject {
         }
     }
 
+    /// Friend feedback (May 2026) — chez-owned TASK rows (per-task
+    /// delegations) the homeowner has handed off. Parallel to
+    /// `chezHandlingPrograms` but scoped to maintenance tasks rather
+    /// than routines. Surfaces in the Active Programs section with a
+    /// Chez pill so the homeowner sees active status without the row
+    /// nagging from "Needs your attention."
+    func chezHandlingTasks(scopedTo season: Season? = nil) -> [MaintenanceTaskDBRow] {
+        MaintenanceViewModel.shared.tasks.filter { task in
+            if let scope = activePropertyId, task.propertyId != scope { return false }
+            guard task.vehicleId == nil else { return false }
+            if (task.isArchived ?? false) == true { return false }
+            if let last = task.lastCompletedDate, !last.isEmpty { return false }
+            guard task.isChezOwned == true else { return false }
+            if task.parentRoutineId != nil { return false }
+            // Hide bundle children — they live inline under the parent
+            // card, not as their own rows (same predicate seasonFeed uses).
+            if let templateKey = task.templateId,
+               let template = MaintenanceTemplates.template(forKey: templateKey),
+               template.bundleId != nil {
+                return false
+            }
+            if let season { return isTask(task, in: season) }
+            return true
+        }
+        .sorted { lhs, rhs in
+            lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+
     /// Phase 70.A1 follow-on F3 — Up Next 14-day strip data source.
     /// Surfaces tasks and routine occurrences in the next N days
     /// (default 14) regardless of which season tile the user has
@@ -2483,11 +2627,16 @@ final class MaintenanceTabViewModel: ObservableObject {
         let routineDecisions = pendingDecisions(scopedTo: season)
             .map { DecisionEntry.routinePendingVendor($0) }
         // (b) standalone tasks needing a vendor pick (find-a-pro variants)
+        // Friend feedback (May 2026): exclude chez-owned tasks from the
+        // decision queue — once delegated, Chez is making the call, not
+        // the homeowner. They surface in `chezHandlingTasks` below and
+        // render in the Active Programs section with a Chez pill.
         let taskDecisions = allTasks
             .filter { task in
                 task.parentRoutineId == nil &&
                 task.assignmentType == "vendor" &&
                 task.assignedContractorId == nil &&
+                task.isChezOwned != true &&
                 isTask(task, in: season) &&
                 taskMatchesActiveStatsFilter(task)
             }
@@ -2600,11 +2749,14 @@ final class MaintenanceTabViewModel: ObservableObject {
             return MonthSection(month: month, entries: entries)
         }
 
+        let chezTasksInSeason = chezHandlingTasks(scopedTo: season)
+
         return SeasonFeed(
             season: season,
             decisions: combinedDecisions,
             monthSections: monthSections,
             programs: mergedPrograms,
+            chezTasks: chezTasksInSeason,
             routineVisitCount: routineVisitCountInSeason
         )
     }
@@ -2671,35 +2823,36 @@ final class MaintenanceTabViewModel: ObservableObject {
     private func isTask(_ task: MaintenanceTaskDBRow, in season: Season) -> Bool {
         if task.parentRoutineId != nil { return false }
 
-        // Phase 70.A1 follow-on L1 (REVERSES H1): year-scope removed.
-        // H1 hid every Spring-tagged task rolled to next year, but in
-        // late May the 2026 Spring window has essentially no work left
-        // and all the recurring Spring items already advanced to their
-        // 2027 anchor. The result was a Spring tile showing 0 task
-        // rows — read as "the app is broken" even though it was
-        // technically correct. F2's year-aware date display ("Due Thu,
-        // Feb 4, 2027") already communicates which tasks are
-        // next-year, so an extra year filter on top over-corrects.
-        // Tasks now appear in any season tile whose seasonalTiming
-        // they match; users mentally bucket via the visible year.
-        if let timing = task.seasonalTiming?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !timing.isEmpty {
-            // Phase 70.A1.x: Flexible tasks never match a specific
-            // season — they render in the dedicated Flexible section
-            // instead via `flexibleTasks(propertyId:)`.
-            if timing.lowercased() == "flexible" { return false }
-            let labels = timing.split(whereSeparator: { $0 == "/" || $0 == "," })
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-            return labels.contains(season.rawValue)
-        }
-
-        // No seasonalTiming → fall back to the month of the actual
-        // due/scheduled date. Custom user tasks and AI-generated
-        // follow-ups land here.
+        // Friend feedback (May 2026) reverses the prior L1 reversion.
+        // L1 dropped the year cap so May-2026 Spring tile wouldn't read
+        // empty, but the side effect is that March-2027-anchored
+        // recurring tasks render under Spring 2026 — confusing
+        // ("why is 2027 in This Season?"). Restore the year-aware cap
+        // via the existing `dateBelongsTo(season:on:)` helper so each
+        // tile shows the CURRENT calendar instance of the season.
+        // Empty active tile is handled gracefully by the
+        // "Season is wrapped" empty-state copy in the view body.
         let dateString = task.scheduledDate ?? task.nextDueDate
         guard let date = TasksV2DateFormatting.parseRowDate(dateString) else { return false }
-        let month = Calendar.current.component(.month, from: date)
-        return season.months.contains(month)
+
+        let timingTag = task.seasonalTiming?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if timingTag?.lowercased() == "flexible" {
+            // Flexible tasks render in their own section, not in a
+            // season tile.
+            return false
+        }
+
+        let tagMatches: Bool = {
+            if let timing = timingTag, !timing.isEmpty {
+                let labels = timing.split(whereSeparator: { $0 == "/" || $0 == "," })
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                return labels.contains(season.rawValue)
+            }
+            return season.months.contains(Calendar.current.component(.month, from: date))
+        }()
+        guard tagMatches else { return false }
+
+        return Self.dateBelongsTo(season: season, on: date)
     }
 
     /// Phase 70.A1 follow-on H1 — single source of truth for "does this

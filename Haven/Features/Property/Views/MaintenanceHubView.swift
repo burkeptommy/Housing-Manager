@@ -625,7 +625,16 @@ struct MaintenanceHubView: View {
         }
         .sheet(item: $selectedTaskDetail) { task in
             NavigationStack {
-                MaintenanceTaskDetailSheet(task: task)
+                MaintenanceTaskDetailSheet(
+                    task: task,
+                    onDeleteTask: {
+                        let taskId = task.id
+                        Task {
+                            try? await DatabaseService.shared.deleteMaintenanceTask(id: taskId)
+                            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        }
+                    }
+                )
             }
             .presentationDetents([.medium, .large])
         }
@@ -3069,7 +3078,16 @@ struct HandymanQueueView: View {
                     }
                 } else {
                     NavigationStack {
-                        MaintenanceTaskDetailSheet(task: task)
+                        MaintenanceTaskDetailSheet(
+                            task: task,
+                            onDeleteTask: {
+                                let taskId = task.id
+                                Task {
+                                    try? await DatabaseService.shared.deleteMaintenanceTask(id: taskId)
+                                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                                }
+                            }
+                        )
                     }
                     .presentationDetents([.medium, .large])
                 }

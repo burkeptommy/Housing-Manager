@@ -49,6 +49,11 @@ struct MaintenanceTaskDetailSheet: View {
     /// Phase 95 audit (Wave 5c) — drives the "Request a window" sheet
     /// for Chez-owned tasks.
     @State private var showRequestSlotSheet: Bool = false
+    /// Friend feedback (May 2026) — when the homeowner taps "View full
+    /// thread →" inside the ChezTaskActivityCard, drive the navigation
+    /// destination from this binding. The detail sheet is already
+    /// wrapped in a NavigationStack by every presenter, so push works.
+    @State private var chezThreadToOpen: UUID?
     @State private var showScheduleChat = false
     @State private var showContractorDirectory = false
     @State private var showHandymanPunchList = false
@@ -308,6 +313,22 @@ struct MaintenanceTaskDetailSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                         }
                         .buttonStyle(.plain)
+
+                        // Friend feedback (May 2026) — surface what Chez
+                        // has actually done. Renders the parent request's
+                        // status pill, SLA caption, and the most recent
+                        // concierge/system messages so the homeowner can
+                        // see the work in motion without leaving the
+                        // detail sheet.
+                        if let requestId = task.chezRequestId {
+                            ChezTaskActivityCard(
+                                taskTitle: task.title,
+                                chezRequestId: requestId,
+                                onOpenThread: { id in
+                                    chezThreadToOpen = id
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -433,6 +454,12 @@ struct MaintenanceTaskDetailSheet: View {
         }
         .navigationTitle("Task Details")
         .navigationBarTitleDisplayMode(.inline)
+        // Friend feedback (May 2026) — ChezTaskActivityCard's "View
+        // full thread →" pushes the full Chez request thread without
+        // leaving this NavigationStack.
+        .navigationDestination(item: $chezThreadToOpen) { requestId in
+            ChezRequestDetailView(requestId: requestId)
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") {

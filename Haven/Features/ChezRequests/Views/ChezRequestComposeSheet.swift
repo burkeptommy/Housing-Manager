@@ -265,7 +265,7 @@ struct ChezRequestComposeSheet: View {
 
     private var summarySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("ONE-LINE SUMMARY")
+            sectionLabel("ONE-LINE SUMMARY · OPTIONAL")
             TextField(summaryPlaceholder, text: $viewModel.summary, axis: .horizontal)
                 .font(HavenTypography.body)
                 .padding(.horizontal, 12)

@@ -38,17 +38,51 @@ final class ChezRequestComposeViewModel: ObservableObject {
     }
 
     var canSubmit: Bool {
-        !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        // Friend feedback (May 2026): summary is no longer required.
+        // When the user submits blank, we derive a one-line summary
+        // from the category + source entity label via `resolvedSummary`.
+        !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !isSubmitting
             && !isUploading
     }
 
+    /// Friend feedback (May 2026): when the user leaves the summary
+    /// blank, derive it from the category + source entity label so
+    /// Chez always has a one-line read on the request. Every existing
+    /// entry-point populates `source_entity_label` in the context dict.
+    var resolvedSummary: String {
+        let trimmed = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        let label = contextHints["source_entity_label"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeLabel = (label?.isEmpty == false) ? label! : "this task"
+        switch category {
+        case .findVendor:     return "Find a vendor for \(safeLabel)"
+        case .getQuote:       return "Get a quote for \(safeLabel)"
+        case .scheduleVisit:  return "Schedule visit for \(safeLabel)"
+        case .coordinateTask: return "Coordinate \(safeLabel)"
+        case .findHandyman:   return "Handyman for \(safeLabel)"
+        case .general:        return "Help with \(safeLabel)"
+        }
+    }
+
+    /// Friend feedback (May 2026): switched from an open passthrough
+    /// to an allowlist of display-safe keys so raw UUIDs (property_id,
+    /// system_id, task_id) never leak into the "Re:" card. Any new
+    /// context-key from a future entry-point must be added here
+    /// explicitly to render.
+    private static let displayContextKeys: Set<String> = [
+        "task_title", "due", "due_date", "next_due_date", "scheduled_date",
+        "frequency", "notes", "system_category", "system_name",
+        "town", "state", "vendor_name", "project_name", "vehicle_label",
+        "task_route", "estimated_cost"
+    ]
+
     /// Pretty-printed context list used inside the read-only "Re:" card.
     var contextLines: [(key: String, value: String)] {
         contextHints
-            .filter { !$0.key.hasPrefix("_") }  // hide internal keys
-            .filter { $0.key != "source_entity_type" && $0.key != "source_entity_label" }
+            .filter { Self.displayContextKeys.contains($0.key) }
+            .filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .sorted(by: { $0.key < $1.key })
             .map { ($0.key.replacingOccurrences(of: "_", with: " ").capitalized, $0.value) }
     }
@@ -144,7 +178,7 @@ final class ChezRequestComposeViewModel: ObservableObject {
         do {
             let request = try await HavenSupabase.submitChezRequest(
                 category: category,
-                summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
+                summary: resolvedSummary,
                 description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 context: contextHints.isEmpty ? nil : contextHints,
                 attachments: pendingAttachments.isEmpty ? nil : pendingAttachments
