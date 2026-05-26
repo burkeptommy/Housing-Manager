@@ -267,6 +267,7 @@
 		8E5D7E31C6D62556DF1222E8 /* OnboardingScheduleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90723058FEB3AFEEA7917516 /* OnboardingScheduleGenerator.swift */; };
 		8ED76C1CE6A11663C9BA5E77 /* SkipToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217536EBFAF9040F783D1536 /* SkipToastView.swift */; };
 		8EE3DF1D2033FC9F32D8965B /* PropertyDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */; };
+		8F692AEE9ACEB460F4384A76 /* ChezTaskActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895971CA24A69B378786CA3D /* ChezTaskActivityCard.swift */; };
 		8FD68D2E5CD959C8229DD664 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 023E3D28374E39856E2661A0 /* NewProjectView.swift */; };
 		8FDEE014FD307093EF940542 /* RoutinesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B226FE8C4A4BA9B47699F359 /* RoutinesListView.swift */; };
 		907DF6DB46C7079D4741BF74 /* HandymanPunchListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A740417CB34B9B5F709C29F /* HandymanPunchListView.swift */; };
@@ -768,6 +769,7 @@
 		88CB1E595AC46EC435723506 /* ExpirationBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpirationBadge.swift; sourceTree = "<group>"; };
 		88DA832465038F92503F6FF7 /* HandymanVisitDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandymanVisitDetailView.swift; sourceTree = "<group>"; };
 		88E8328FB5ED10D6AFDBE7F0 /* ChezQuickQuestionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezQuickQuestionSheet.swift; sourceTree = "<group>"; };
+		895971CA24A69B378786CA3D /* ChezTaskActivityCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezTaskActivityCard.swift; sourceTree = "<group>"; };
 		898D3AEC29B0E076E61AA176 /* HavenTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HavenTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A79F1CBC5C229985B274954 /* VINScannerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VINScannerSheet.swift; sourceTree = "<group>"; };
 		8AA28167AD30616B817ACECE /* VersionCheckService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionCheckService.swift; sourceTree = "<group>"; };
@@ -1180,6 +1182,7 @@
 				FD30AD1C4BB9E3D9AF3B488F /* ChezProposalCard.swift */,
 				369C161B6C44E4A1318499AB /* ChezRequestRowCard.swift */,
 				EC78BF7917E6B290AB909069 /* ChezStatusBadge.swift */,
+				895971CA24A69B378786CA3D /* ChezTaskActivityCard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -2277,6 +2280,7 @@
 				F363BC7D9B986E8AEC42CFCC /* ChezRequestsListView.swift in Sources */,
 				0A735469150BB0CDF4FBFD10 /* ChezRequestsViewModel.swift in Sources */,
 				78C2CFA02E60DA1FE6F31C15 /* ChezStatusBadge.swift in Sources */,
+				8F692AEE9ACEB460F4384A76 /* ChezTaskActivityCard.swift in Sources */,
 				355888DCD1168D6EB16EA195 /* Color+Haven.swift in Sources */,
 				F60F37AF63B774DF7449EC98 /* CompletedTasksSheet.swift in Sources */,
 				933430937C48605A9C99D706 /* Constants.swift in Sources */,

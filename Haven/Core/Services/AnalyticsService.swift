@@ -306,6 +306,12 @@ enum AnalyticsEvent: String {
     /// without surfacing a hard error to the user — initials are a
     /// graceful fallback.
     case contractorBrandLogoMissed = "contractor_brand_logo_missed"
+    /// Friend feedback (May 2026) — Vendors sub-tab popular vendor
+    /// section visibility. Payload: `season`, `gap_count`.
+    case popularVendorsSectionShown = "popular_vendors_section_shown"
+    /// Friend feedback (May 2026) — homeowner tapped a popular vendor
+    /// card and opened FindLocalVendorSheet. Payload: `category`, `season`.
+    case popularVendorTapped = "popular_vendor_tapped"
 
     // MARK: - Warranties
     case warrantyTrackerViewed = "warranty_tracker_viewed"

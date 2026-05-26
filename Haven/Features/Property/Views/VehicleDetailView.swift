@@ -1443,9 +1443,20 @@ struct VehicleDetailView: View {
         }
         .sheet(item: $selectedMaintenanceTask) { task in
             NavigationStack {
-                MaintenanceTaskDetailSheet(task: task, onTaskCompleted: {
-                    Task { await viewModel.load(vehicleId: vehicleID) }
-                })
+                MaintenanceTaskDetailSheet(
+                    task: task,
+                    onTaskCompleted: {
+                        Task { await viewModel.load(vehicleId: vehicleID) }
+                    },
+                    onDeleteTask: {
+                        let taskId = task.id
+                        Task {
+                            try? await DatabaseService.shared.deleteMaintenanceTask(id: taskId)
+                            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                            await viewModel.load(vehicleId: vehicleID)
+                        }
+                    }
+                )
             }
             .presentationDetents([.medium, .large])
         }

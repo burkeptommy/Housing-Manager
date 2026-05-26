@@ -51,6 +51,26 @@ enum ContactsFilter: String, CaseIterable, Identifiable {
     }
 }
 
+/// Friend feedback (May 2026) — one seasonal recommendation row on the
+/// Vendors sub-tab. Identifiable for `.sheet(item:)`; carries enough
+/// state to open `FindLocalVendorSheet` with the right category +
+/// display name + analytics tag.
+struct PopularVendorEntry: Identifiable, Hashable {
+    let id: String
+    let categoryKey: String
+    let displayName: String
+    let icon: String
+    let season: Season
+
+    init(categoryKey: String, displayName: String, icon: String, season: Season) {
+        self.id = "\(season.rawValue):\(categoryKey)"
+        self.categoryKey = categoryKey
+        self.displayName = displayName
+        self.icon = icon
+        self.season = season
+    }
+}
+
 struct PropertyDetailView: View {
     private struct CoverageGapItem: Identifiable {
         let system: HomeSystemRow
@@ -204,6 +224,11 @@ struct PropertyDetailView: View {
     /// key so switching households doesn't leak dismissals across.
     @State private var attentionDismissedIds: Set<UUID> = []
 
+    /// Friend feedback (May 2026) — drives the "Popular vendors near
+    /// you" section on the Vendors sub-tab. Non-nil = present
+    /// FindLocalVendorSheet for that gap category.
+    @State private var popularVendorTarget: PopularVendorEntry?
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -240,6 +265,9 @@ struct PropertyDetailView: View {
             }
             .sheet(item: $seasonalFindVendorTask) { task in
                 seasonalFindVendorContent(task: task)
+            }
+            .sheet(item: $popularVendorTarget) { entry in
+                popularVendorSheetContent(entry)
             }
             .sheet(isPresented: $showAddVendor) {
                 addVendorSheetContent
@@ -917,6 +945,13 @@ struct PropertyDetailView: View {
                             serviceHistorySection
                                 .padding(.horizontal, HavenTheme.pageMargin)
                         }
+                        // Friend feedback (May 2026): seasonal gap-based
+                        // recommendations. Spring → landscaping/pressure
+                        // washing/pest control; winter → snow removal /
+                        // electrical / generator. Hides entirely when the
+                        // home has no seasonal gaps left.
+                        popularVendorsSection
+                            .padding(.horizontal, HavenTheme.pageMargin)
 
                     case .documents:
                         documentsEnhancedVaultHero
@@ -5299,6 +5334,163 @@ struct PropertyDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    // MARK: - Popular vendors (May 2026 friend feedback)
+
+    /// Static season → recommendation category map. Used to surface
+    /// "popular vendors near you" cards on the Vendors sub-tab. Only
+    /// categories the homeowner has a coverage gap in show up.
+    private static let popularVendorCategoriesBySeason: [Season: [String]] = [
+        .spring: ["Landscaping", "Pressure Washing", "Pest Control", "Gutter Cleaning"],
+        .summer: ["Pool/Spa", "Mosquito & Tick", "Window Cleaning", "Tree Service"],
+        .fall:   ["Chimney", "Gutter Cleaning", "Snow Removal", "Generator"],
+        .winter: ["Snow Removal", "Generator", "Electrical", "Handyman"]
+    ]
+
+    /// Resolves the seasonal candidate list against the current coverage
+    /// gap set. Returns up to 3 entries; empty when the home is fully
+    /// covered for the season.
+    private var popularVendorsGapEntries: [PopularVendorEntry] {
+        let season = Season.current()
+        let candidates = Self.popularVendorCategoriesBySeason[season] ?? []
+        let coverage = SystemCategoryRegistry.vendorCoverageItems(
+            existingSystems: viewModel.systems,
+            contractors: viewModel.contractors,
+            vendorTasks: viewModel.maintenanceTasks.filter {
+                $0.vehicleId == nil && $0.assignmentType?.lowercased() == "vendor"
+            },
+            activeChezVendorRequests: viewModel.activeChezVendorRequests
+        )
+        let uncoveredKeys = Set(coverage.uncovered.compactMap { item -> String? in
+            SystemCategoryRegistry.canonical(category: item.categoryKey) ?? item.categoryKey
+        })
+        return candidates
+            .compactMap { categoryKey -> PopularVendorEntry? in
+                let canonical = SystemCategoryRegistry.canonical(category: categoryKey) ?? categoryKey
+                guard uncoveredKeys.contains(canonical) else { return nil }
+                guard let meta = SystemCategoryRegistry.metaForCategory(categoryKey) else { return nil }
+                return PopularVendorEntry(
+                    categoryKey: categoryKey,
+                    displayName: meta.displayName,
+                    icon: meta.icon,
+                    season: season
+                )
+            }
+            .prefix(3)
+            .map { $0 }
+    }
+
+    @ViewBuilder
+    private var popularVendorsSection: some View {
+        let entries = popularVendorsGapEntries
+        if !entries.isEmpty {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Popular vendors near you")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer(minLength: 0)
+                    Text(seasonalSubtitle)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+
+                VStack(spacing: 8) {
+                    ForEach(entries) { entry in
+                        popularVendorRow(entry)
+                    }
+                }
+            }
+            .padding(.top, HavenTheme.spacing12)
+            .onAppear {
+                Analytics.track(.popularVendorsSectionShown, [
+                    "season": Season.current().rawValue,
+                    "gap_count": String(entries.count)
+                ])
+            }
+        }
+    }
+
+    private var seasonalSubtitle: String {
+        let town = viewModel.property?.city?.trimmingCharacters(in: .whitespaces) ?? ""
+        let prefix = Season.current().displayName
+        if !town.isEmpty {
+            return "\(prefix) picks in \(town)"
+        }
+        return "\(prefix) picks near you"
+    }
+
+    private func popularVendorRow(_ entry: PopularVendorEntry) -> some View {
+        Button {
+            Haptics.light()
+            popularVendorTarget = entry
+            Analytics.track(.popularVendorTapped, [
+                "category": entry.categoryKey,
+                "season": entry.season.rawValue
+            ])
+        } label: {
+            HStack(spacing: HavenTheme.spacing12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium, style: .continuous)
+                        .fill(HavenColors.action.opacity(0.10))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: entry.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.displayName)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text(popularVendorCaption(for: entry))
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                    .strokeBorder(HavenColors.beige200, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func popularVendorCaption(for entry: PopularVendorEntry) -> String {
+        let town = viewModel.property?.city?.trimmingCharacters(in: .whitespaces) ?? ""
+        if !town.isEmpty {
+            return "Top-rated pros in \(town)"
+        }
+        return "Top-rated local pros"
+    }
+
+    @ViewBuilder
+    private func popularVendorSheetContent(_ entry: PopularVendorEntry) -> some View {
+        if let property = viewModel.property {
+            FindLocalVendorSheet(
+                task: nil,
+                householdId: property.householdId,
+                town: property.city ?? "",
+                state: property.state ?? "",
+                systemCategory: entry.categoryKey,
+                categoryDisplayName: entry.displayName,
+                onComplete: {
+                    popularVendorTarget = nil
+                    Task { await viewModel.loadProperty(id: propertyID) }
+                }
+            )
+        } else {
+            EmptyView()
         }
     }
 
