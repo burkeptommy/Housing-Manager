@@ -64,7 +64,7 @@
 }
 
 .admin-button--danger {
-  color: #b4443a;
+  color: #5025D1;
 }
 
 .admin-login {
@@ -331,9 +331,9 @@
 }
 
 .admin-warning {
-  background: #fff7e8;
-  border-bottom: 1px solid rgba(199, 126, 46, 0.22);
-  color: #8a571f;
+  background: #F4F0FE;
+  border-bottom: 1px solid rgba(105, 56, 239, 0.22);
+  color: #5025D1;
   font: 600 13px/1.45 var(--sans);
   padding: 12px 30px;
 }
@@ -525,14 +525,14 @@
 }
 
 .admin-pill[data-tone="cut"] {
-  background: rgba(194, 90, 94, 0.12);
-  color: #a9444b;
+  background: rgba(105, 56, 239, 0.12);
+  color: #5025D1;
 }
 
 .admin-pill[data-tone="defer"],
 .admin-pill[data-tone="reshape"] {
-  background: rgba(199, 126, 46, 0.12);
-  color: #9c6322;
+  background: rgba(105, 56, 239, 0.12);
+  color: #5025D1;
 }
 
 /* Admin Lab v2 — Phase 4 list-row badges */
@@ -549,11 +549,11 @@
 /* Phase 5p — handyman bundle / library tier pills */
 .admin-pill--bundle-spring {
   background: rgba(10, 10, 15, 0.16);
-  color: #2f5e3f;
+  color: #0A0A0A;
 }
 .admin-pill--bundle-fall {
-  background: rgba(192, 122, 64, 0.18);
-  color: #8a4a17;
+  background: rgba(105, 56, 239, 0.18);
+  color: #5025D1;
 }
 .admin-pill--library {
   background: rgba(69, 58, 112, 0.10);
@@ -562,8 +562,8 @@
 
 /* Phase 5q — Tasks/Recommended/Handyman row badges + facet pill rows */
 .admin-pill--bundle-child {
-  background: rgba(150, 90, 200, 0.12);
-  color: #5b3585;
+  background: rgba(105, 56, 239, 0.12);
+  color: #6938EF;
   font: 600 11px var(--sans);
   white-space: nowrap;
   max-width: 200px;
@@ -571,8 +571,8 @@
   text-overflow: ellipsis;
 }
 .admin-pill--optin {
-  background: rgba(160, 120, 30, 0.14);
-  color: #8a6213;
+  background: rgba(105, 56, 239, 0.14);
+  color: #5025D1;
 }
 /* Phase 5z+16 — Auto-seeds badges. The ✨ Auto-seeds pill marks
    templates that fire automatically at quiz completion (every
@@ -582,16 +582,16 @@
    anything" vs. the indigo/yellow tones used for opt-in. */
 .admin-pill--autoseed {
   background: rgba(10, 10, 15, 0.16);
-  color: rgba(46, 88, 60, 1);
+  color: rgba(10, 10, 10, 1);
 }
 .admin-pill--autoseed-conditional {
   background: rgba(10, 10, 15, 0.08);
   border: 1px dashed rgba(10, 10, 15, 0.5);
-  color: rgba(46, 88, 60, 1);
+  color: rgba(10, 10, 10, 1);
 }
 .admin-pill--season {
-  background: rgba(70, 110, 90, 0.12);
-  color: #2f5e3f;
+  background: rgba(10, 10, 15, 0.12);
+  color: #0A0A0A;
 }
 
 /* Phase 5q — routing-tier pills, color-coded for fast scanning */
@@ -600,16 +600,16 @@
   color: var(--indigo-700);
 }
 .admin-pill--routing-vendor_or_handyman {
-  background: rgba(120, 130, 150, 0.16);
-  color: #4a5365;
+  background: rgba(107, 107, 123, 0.16);
+  color: #6B6B7B;
 }
 .admin-pill--routing-handyman {
   background: rgba(105, 56, 239, 0.14);
   color: var(--salmon-dark);
 }
 .admin-pill--routing-bundled {
-  background: rgba(150, 90, 200, 0.12);
-  color: #5b3585;
+  background: rgba(105, 56, 239, 0.12);
+  color: #6938EF;
   font: 600 11px var(--sans);
   white-space: nowrap;
   max-width: 220px;
@@ -752,7 +752,7 @@
 }
 
 .admin-form__changed {
-  background: var(--salmon-dark, #c25a4a);
+  background: var(--salmon-dark, #5025D1);
   border-radius: 999px;
   color: #fff;
   font: 700 9px var(--sans);
@@ -1104,7 +1104,7 @@
    this is reference info, not action items. Dismissible via the × in
    the head row; persists in localStorage. */
 .admin-explainer {
-  background: linear-gradient(135deg, rgba(69, 58, 112, 0.05), rgba(82, 69, 128, 0.06));
+  background: linear-gradient(135deg, rgba(69, 58, 112, 0.05), rgba(105, 56, 239, 0.06));
   border: 1px solid rgba(69, 58, 112, 0.2);
   border-radius: 14px;
   margin-bottom: 14px;
@@ -1275,7 +1275,7 @@
   color: #fff;
 }
 .admin-button--primary:hover {
-  background: var(--indigo-600, #3d3265);
+  background: var(--indigo-600, #5025D1);
 }
 
 /* Phase 5z+3 — Delete-note buttons. Per-row × on the Notes tab list,
@@ -1337,7 +1337,7 @@
 }
 .admin-rec--salmon { border-left-color: var(--salmon-dark); }
 .admin-rec--indigo { border-left-color: var(--indigo-700); }
-.admin-rec--purple { border-left-color: #5b3585; }
+.admin-rec--purple { border-left-color: #6938EF; }
 .admin-rec__main {
   display: grid;
   flex: 1;
@@ -1380,15 +1380,15 @@
 }
 .admin-eyebrow__flavor--live {
   background: rgba(10, 10, 15, 0.14);
-  color: #2f5e3f;
+  color: #0A0A0A;
 }
 .admin-eyebrow__flavor--overlay {
-  background: rgba(160, 120, 30, 0.14);
-  color: #8a6213;
+  background: rgba(105, 56, 239, 0.14);
+  color: #5025D1;
 }
 .admin-eyebrow__flavor--draft {
-  background: rgba(150, 90, 200, 0.12);
-  color: #5b3585;
+  background: rgba(105, 56, 239, 0.12);
+  color: #6938EF;
 }
 .admin-eyebrow__flavor--neutral {
   background: rgba(0, 0, 0, 0.06);
@@ -1453,21 +1453,21 @@
 
 /* Phase 5t — Stats bar admin-draft variant */
 .admin-stat--draft {
-  background: rgba(160, 120, 30, 0.08);
-  border-color: rgba(160, 120, 30, 0.3);
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.3);
 }
 .admin-stat--draft strong {
-  color: #8a6213;
+  color: #5025D1;
 }
 
 /* Phase 5t — Gating pills (region + subtype + opt-in) */
 .admin-pill--gating-region {
-  background: rgba(160, 120, 30, 0.14);
-  color: #8a6213;
+  background: rgba(105, 56, 239, 0.14);
+  color: #5025D1;
 }
 .admin-pill--gating-subtype {
-  background: rgba(70, 110, 90, 0.12);
-  color: #2f5e3f;
+  background: rgba(10, 10, 15, 0.12);
+  color: #0A0A0A;
 }
 .admin-pill--gating-subtype code {
   background: rgba(0, 0, 0, 0.06);
@@ -1492,15 +1492,15 @@
   padding: 12px 14px;
 }
 .admin-summary__section--proactive h4 {
-  color: #2f5e3f;
+  color: #0A0A0A;
 }
 .admin-summary__section--proactive p:first-of-type {
   font: 600 15px var(--sans);
 }
 
 .admin-summary__bundle-map {
-  background: rgba(150, 90, 200, 0.04);
-  border: 1px solid rgba(150, 90, 200, 0.18);
+  background: rgba(105, 56, 239, 0.04);
+  border: 1px solid rgba(105, 56, 239, 0.18);
   border-radius: 10px;
   display: grid;
   gap: 8px;
@@ -1511,7 +1511,7 @@
   gap: 2px;
 }
 .admin-summary__bundle-parent strong {
-  color: #5b3585;
+  color: #6938EF;
   font: 700 14px var(--sans);
 }
 .admin-summary__bundle-parent span {
@@ -1529,7 +1529,7 @@
   padding: 2px 0;
 }
 .admin-summary__sibling.is-self {
-  background: rgba(150, 90, 200, 0.08);
+  background: rgba(105, 56, 239, 0.08);
   border-radius: 6px;
   font-weight: 700;
   padding: 4px 8px;
@@ -1548,7 +1548,7 @@
   text-decoration: underline;
 }
 .admin-summary__sibling-marker {
-  color: #5b3585;
+  color: #6938EF;
   font: 600 11px var(--sans);
   margin-left: 6px;
 }
@@ -1589,7 +1589,7 @@
 }
 
 .admin-diff-strip__header strong {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
   font: 800 12px var(--sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1627,7 +1627,7 @@
 }
 
 .admin-diff__arrow {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
   font: 800 14px var(--sans);
   text-align: center;
 }
@@ -1673,7 +1673,7 @@
 }
 
 .qp-modal__scrim {
-  background: rgba(20, 12, 40, 0.5);
+  background: rgba(10, 10, 10, 0.5);
   backdrop-filter: blur(4px);
   inset: 0;
   position: absolute;
@@ -1682,7 +1682,7 @@
 .qp-modal__panel {
   background: var(--pearl, #FAFAFC);
   border-radius: 24px;
-  box-shadow: 0 32px 80px rgba(20, 12, 40, 0.4);
+  box-shadow: 0 32px 80px rgba(10, 10, 10, 0.4);
   display: grid;
   gap: 0;
   grid-template-rows: auto 1fr;
@@ -1770,7 +1770,7 @@
   background: #fff;
   border: 1px solid var(--neutral-200);
   border-radius: 32px;
-  box-shadow: 0 16px 38px rgba(20, 12, 40, 0.18);
+  box-shadow: 0 16px 38px rgba(10, 10, 10, 0.18);
   display: grid;
   grid-template-rows: auto auto auto 1fr auto;
   height: 640px;
@@ -1903,7 +1903,7 @@
 .qp__option-custom {
   background: rgba(105, 56, 239, 0.12);
   border-radius: 999px;
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
   font: 700 9px var(--sans);
   letter-spacing: 0.1em;
   padding: 1px 6px;
@@ -2036,10 +2036,10 @@
 .qp__skip-note,
 .qp__impact,
 .qp__lint {
-  background: rgba(199, 126, 46, 0.08);
-  border: 1px solid rgba(199, 126, 46, 0.24);
+  background: rgba(105, 56, 239, 0.08);
+  border: 1px solid rgba(105, 56, 239, 0.24);
   border-radius: 10px;
-  color: #9c6322;
+  color: #5025D1;
   font: 500 12px var(--sans);
   line-height: 1.5;
   margin: 0;
@@ -2049,7 +2049,7 @@
 .qp__lint {
   background: rgba(105, 56, 239, 0.08);
   border-color: rgba(105, 56, 239, 0.32);
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
 }
 
 .qp__lint ul {
@@ -2111,7 +2111,7 @@
 }
 
 .qf__legend-dot--ok { background: var(--indigo-700); }
-.qf__legend-dot--skip { background: rgba(199, 126, 46, 0.7); }
+.qf__legend-dot--skip { background: rgba(105, 56, 239, 0.7); }
 .qf__legend-dot--lint { background: var(--salmon, #6938EF); }
 .qf__legend-dot--token { background: rgba(69, 58, 112, 0.5); }
 
@@ -2233,8 +2233,8 @@
   padding: 2px 6px;
 }
 
-.qf__flag--skip { background: rgba(199, 126, 46, 0.16); color: #9c6322; }
-.qf__flag--lint { background: rgba(105, 56, 239, 0.18); color: var(--salmon-dark, #c25a4a); }
+.qf__flag--skip { background: rgba(105, 56, 239, 0.16); color: #5025D1; }
+.qf__flag--lint { background: rgba(105, 56, 239, 0.18); color: var(--salmon-dark, #5025D1); }
 .qf__flag--token { background: rgba(69, 58, 112, 0.16); }
 
 .qf__notes {
@@ -2294,7 +2294,7 @@
 .admin-palette[hidden] { display: none; }
 
 .admin-palette__scrim {
-  background: rgba(20, 12, 40, 0.55);
+  background: rgba(10, 10, 10, 0.55);
   backdrop-filter: blur(4px);
   inset: 0;
   position: absolute;
@@ -2304,7 +2304,7 @@
   background: #fff;
   border: 1px solid rgba(69, 58, 112, 0.2);
   border-radius: 16px;
-  box-shadow: 0 32px 80px rgba(20, 12, 40, 0.4);
+  box-shadow: 0 32px 80px rgba(10, 10, 10, 0.4);
   display: grid;
   margin: 80px auto 0;
   max-height: calc(100vh - 160px);
@@ -2469,7 +2469,7 @@
 }
 
 .admin-arch__edge-fn-warn {
-  color: var(--salmon-dark, #c25a4a) !important;
+  color: var(--salmon-dark, #5025D1) !important;
 }
 
 /* =============================================================================
@@ -2703,7 +2703,7 @@
 
 .admin-arch__rel-panel--belongs-to { border-left-color: var(--salmon, #6938EF); }
 .admin-arch__rel-panel--owns       { border-left-color: #0A0A0A; }
-.admin-arch__rel-panel--references { border-left-color: rgba(199, 126, 46, 0.85); }
+.admin-arch__rel-panel--references { border-left-color: rgba(105, 56, 239, 0.85); }
 .admin-arch__rel-panel--incoming   { border-left-color: var(--indigo-700); }
 
 .admin-arch__rel-panel header h4 {
@@ -2713,9 +2713,9 @@
   text-transform: uppercase;
 }
 
-.admin-arch__rel-panel--belongs-to header h4 { color: var(--salmon-dark, #c25a4a); }
-.admin-arch__rel-panel--owns header h4 { color: #3a6048; }
-.admin-arch__rel-panel--references header h4 { color: #9c6322; }
+.admin-arch__rel-panel--belongs-to header h4 { color: var(--salmon-dark, #5025D1); }
+.admin-arch__rel-panel--owns header h4 { color: #0A0A0A; }
+.admin-arch__rel-panel--references header h4 { color: #5025D1; }
 .admin-arch__rel-panel--incoming header h4 { color: var(--indigo-700); }
 
 .admin-arch__rel-panel header p {
@@ -2862,7 +2862,7 @@
 .admin-list-item__jump {
   background: rgba(105, 56, 239, 0.1);
   border-radius: 999px;
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
   font: 700 10px var(--sans);
   letter-spacing: 0.06em;
   margin-left: auto;
@@ -2918,12 +2918,12 @@
 }
 
 .admin-claude-file__section--question {
-  background: rgba(199, 126, 46, 0.05);
-  border-color: rgba(199, 126, 46, 0.32);
+  background: rgba(105, 56, 239, 0.05);
+  border-color: rgba(105, 56, 239, 0.32);
 }
 
 .admin-claude-file__section--question h3 {
-  color: #9c6322;
+  color: #5025D1;
 }
 
 .admin-claude-file__section--pending {
@@ -2932,7 +2932,7 @@
 }
 
 .admin-claude-file__section--pending h3 {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
 }
 
 .admin-claude-file__section--applied {
@@ -2941,7 +2941,7 @@
 }
 
 .admin-claude-file__section--applied h3 {
-  color: #3a6048;
+  color: #0A0A0A;
 }
 
 .admin-claude-file__entity {
@@ -3080,7 +3080,7 @@
   background: #fff;
   border: 1px solid var(--neutral-200);
   border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(20, 12, 40, 0.22);
+  box-shadow: 0 24px 60px rgba(10, 10, 10, 0.22);
   max-width: 360px;
   padding: 14px 16px 12px;
   position: fixed;
@@ -3152,7 +3152,7 @@
 }
 
 .qp-nav__btn--primary:hover {
-  background: var(--salmon-dark, #c25a4a);
+  background: var(--salmon-dark, #5025D1);
 }
 
 .qp-nav__btn--ghost {
@@ -3227,7 +3227,7 @@
 }
 
 .qp__exp-section--lint h3 {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
 }
 
 .qp__effect-list {
@@ -3321,7 +3321,7 @@
 }
 
 .qp__notes h3 {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
   font: 700 11px var(--sans);
   letter-spacing: 0.08em;
   margin: 0;
@@ -3391,7 +3391,7 @@
 }
 
 .qp__notes-feedback[data-tone="warn"] {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
 }
 
 .qp__notes-recent {
@@ -3443,8 +3443,8 @@
    ============================================================================= */
 
 .admin-sim__lane--punch {
-  background: linear-gradient(135deg, rgba(199, 126, 46, 0.06), rgba(199, 126, 46, 0.01));
-  border-color: rgba(199, 126, 46, 0.32);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.06), rgba(105, 56, 239, 0.01));
+  border-color: rgba(105, 56, 239, 0.32);
 }
 
 .admin-sim__punch-grid {
@@ -3514,8 +3514,8 @@
    ============================================================================= */
 
 .admin-sim__lane--gaps {
-  background: linear-gradient(135deg, rgba(220, 130, 50, 0.07), rgba(220, 130, 50, 0.01));
-  border-color: rgba(220, 130, 50, 0.34);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.07), rgba(105, 56, 239, 0.01));
+  border-color: rgba(105, 56, 239, 0.34);
 }
 
 .admin-sim__gap-grid {
@@ -3547,8 +3547,8 @@
 }
 
 .admin-pill--warn {
-  background: rgba(220, 130, 50, 0.14);
-  color: #a55a16;
+  background: rgba(105, 56, 239, 0.14);
+  color: #5025D1;
 }
 
 .admin-sim__gap-list {
@@ -3589,8 +3589,8 @@
 }
 
 .admin-sim__routine.is-pending {
-  border-left-color: rgba(199, 126, 46, 0.85);
-  background: linear-gradient(135deg, rgba(199, 126, 46, 0.06), #fff);
+  border-left-color: rgba(105, 56, 239, 0.85);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.06), #fff);
 }
 
 .admin-sim__routine header {
@@ -3616,12 +3616,12 @@
 
 .admin-sim__routine.is-active .admin-sim__routine-status {
   background: rgba(10, 10, 15, 0.18);
-  color: #3a6048;
+  color: #0A0A0A;
 }
 
 .admin-sim__routine.is-pending .admin-sim__routine-status {
-  background: rgba(199, 126, 46, 0.18);
-  color: #9c6322;
+  background: rgba(105, 56, 239, 0.18);
+  color: #5025D1;
 }
 
 .admin-sim__routine-blurb {
@@ -3720,7 +3720,7 @@
   background: rgba(10, 10, 15, 0.10);
 }
 .admin-sim__funnel-step--final strong {
-  color: #2f5e3f;
+  color: #0A0A0A;
 }
 .admin-sim__funnel-note {
   font: 500 12px var(--sans);
@@ -3773,7 +3773,7 @@
 
 .admin-sim__mode.is-active {
   background: #fff;
-  box-shadow: 0 2px 6px rgba(20, 12, 40, 0.12);
+  box-shadow: 0 2px 6px rgba(10, 10, 10, 0.12);
   color: var(--indigo-800, #6938EF);
 }
 
@@ -3795,7 +3795,7 @@
 }
 
 .admin-quizsim__presets > strong {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
   display: block;
   font: 800 10px var(--sans);
   letter-spacing: 0.12em;
@@ -4168,7 +4168,7 @@
 }
 
 .admin-impact__section--lint h4 {
-  color: var(--salmon-dark, #c25a4a);
+  color: var(--salmon-dark, #5025D1);
 }
 
 .admin-impact__section--lint code {
@@ -4300,19 +4300,19 @@
 .admin-usage__recommendation[data-tone="active"] {
   background: rgba(10, 10, 15, 0.08);
   border-color: rgba(10, 10, 15, 0.32);
-  color: #3a6048;
+  color: #0A0A0A;
 }
 
 .admin-usage__recommendation[data-tone="reshape"] {
-  background: rgba(199, 126, 46, 0.08);
-  border-color: rgba(199, 126, 46, 0.32);
-  color: #9c6322;
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.32);
+  color: #5025D1;
 }
 
 .admin-usage__recommendation[data-tone="cut"] {
-  background: rgba(194, 90, 94, 0.08);
-  border-color: rgba(194, 90, 94, 0.32);
-  color: #a9444b;
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.32);
+  color: #5025D1;
 }
 
 .admin-usage__recommendation[data-tone="defer"] {
@@ -4338,30 +4338,30 @@
 }
 
 .admin-pill--launch[data-tone="staged"] {
-  background: rgba(199, 126, 46, 0.14);
-  color: #9c6322;
+  background: rgba(105, 56, 239, 0.14);
+  color: #5025D1;
 }
 
 .admin-pill--launch[data-tone="approved"] {
   background: rgba(10, 10, 15, 0.18);
-  color: #3a6048;
+  color: #0A0A0A;
 }
 
 .admin-pill--launch[data-tone="shipped"] {
   background: rgba(10, 10, 15, 0.32);
-  color: #2a4a35;
+  color: #0A0A0A;
 }
 
 .admin-pill--launch[data-tone="sunset"] {
-  background: rgba(194, 90, 94, 0.18);
-  color: #a9444b;
+  background: rgba(105, 56, 239, 0.18);
+  color: #5025D1;
 }
 
 /* Lock button — when locked, render as solid green */
 .admin-button--lock {
   background: rgba(10, 10, 15, 0.1);
   border-color: rgba(10, 10, 15, 0.3);
-  color: #3a6048;
+  color: #0A0A0A;
 }
 
 .admin-button--lock:hover {
@@ -4376,7 +4376,7 @@
 }
 
 .admin-button--lock.admin-button--locked:hover {
-  background: #3a6048;
+  background: #0A0A0A;
 }
 
 /* Topbar readiness pill */
@@ -4477,13 +4477,13 @@
 }
 
 .admin-button--danger {
-  background: rgba(194, 90, 94, 0.08);
-  border-color: rgba(194, 90, 94, 0.3);
-  color: #a9444b;
+  background: rgba(105, 56, 239, 0.08);
+  border-color: rgba(105, 56, 239, 0.3);
+  color: #5025D1;
 }
 
 .admin-button--danger:hover {
-  background: rgba(194, 90, 94, 0.16);
+  background: rgba(105, 56, 239, 0.16);
 }
 
 /* Activity feed */
@@ -4520,7 +4520,7 @@
 }
 
 .admin-activity--applied { border-left: 3px solid #0A0A0A; }
-.admin-activity--reverted { border-left: 3px solid #c25a4a; }
+.admin-activity--reverted { border-left: 3px solid #5025D1; }
 .admin-activity--locked { border-left: 3px solid var(--indigo-700); }
 
 /* Admin Lab v2 — admin-note-card layout */
@@ -6181,19 +6181,19 @@
 }
 
 .admin-pill[data-tone="green"] {
-  background: rgba(34, 197, 94, 0.14);
+  background: rgba(10, 10, 15, 0.14);
   color: rgb(21, 128, 61);
 }
 .admin-pill[data-tone="amber"] {
-  background: rgba(234, 179, 8, 0.16);
+  background: rgba(105, 56, 239, 0.16);
   color: rgb(161, 98, 7);
 }
 .admin-pill[data-tone="red"] {
-  background: rgba(239, 68, 68, 0.16);
+  background: rgba(10, 10, 15, 0.16);
   color: rgb(185, 28, 28);
 }
 .admin-pill[data-tone="muted"] {
-  background: rgba(100, 116, 139, 0.14);
+  background: rgba(107, 107, 123, 0.14);
   color: rgb(71, 85, 105);
 }
 
@@ -6233,7 +6233,7 @@
 }
 
 .admin-chez__context {
-  background: rgba(245, 224, 217, 0.35);
+  background: rgba(239, 234, 254, 0.35);
   border-radius: 12px;
   padding: 12px 14px;
 }
@@ -6276,7 +6276,7 @@
   padding: 10px 12px;
 }
 .admin-chez__msg--admin {
-  background: rgba(245, 224, 217, 0.5);
+  background: rgba(239, 234, 254, 0.5);
   border-color: rgba(105, 56, 239, 0.25);
 }
 .admin-chez__msg-head {
@@ -6309,7 +6309,7 @@
   justify-content: center;
 }
 .admin-chez__system span:first-child {
-  background: rgba(100, 116, 139, 0.14);
+  background: rgba(107, 107, 123, 0.14);
   border-radius: 999px;
   padding: 4px 10px;
 }
@@ -6368,8 +6368,8 @@
 
 .admin-chez__resolved-bar {
   align-items: center;
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: rgba(10, 10, 15, 0.08);
+  border: 1px solid rgba(10, 10, 15, 0.25);
   border-radius: 12px;
   display: flex;
   font: 500 13px var(--sans);
@@ -6387,7 +6387,7 @@
 /* Phase 80.1 — Profile + proposal cards in the focused chez panel */
 
 .admin-chez__profile {
-  background: rgba(245, 224, 217, 0.35);
+  background: rgba(239, 234, 254, 0.35);
   border-radius: 12px;
   padding: 12px 14px;
 }
@@ -6398,10 +6398,10 @@
   text-transform: uppercase;
 }
 .admin-chez__profile--empty {
-  background: rgba(100, 116, 139, 0.06);
+  background: rgba(107, 107, 123, 0.06);
 }
 .admin-chez__profile-tier {
-  background: rgba(234, 179, 8, 0.16);
+  background: rgba(105, 56, 239, 0.16);
   border-radius: 8px;
   color: rgb(161, 98, 7);
   font: 600 12px var(--sans);
@@ -6442,7 +6442,7 @@
 /* Dossier */
 
 .admin-chez__dossier {
-  background: rgba(245, 224, 217, 0.35);
+  background: rgba(239, 234, 254, 0.35);
   border-radius: 14px;
   padding: 16px 18px;
 }
@@ -6451,7 +6451,7 @@
   margin: 0;
 }
 .admin-chez__dossier--empty {
-  background: rgba(100, 116, 139, 0.06);
+  background: rgba(107, 107, 123, 0.06);
 }
 .admin-chez__dossier-head {
   align-items: flex-start;
@@ -6461,7 +6461,7 @@
   margin-bottom: 12px;
 }
 .admin-chez__dossier-tier {
-  background: rgba(234, 179, 8, 0.16);
+  background: rgba(105, 56, 239, 0.16);
   border-radius: 8px;
   color: rgb(161, 98, 7);
   font: 600 12px var(--sans);
@@ -6770,7 +6770,7 @@
 }
 .admin-chez__proposal-intro {
   align-items: center;
-  background: rgba(245, 224, 217, 0.4);
+  background: rgba(239, 234, 254, 0.4);
   border-radius: 10px;
   display: flex;
   gap: 10px;
@@ -6935,8 +6935,8 @@
   background: rgba(105, 56, 239, 0.08);
 }
 .admin-chez__vendor-picker-row.is-picked {
-  background: rgba(34, 197, 94, 0.14);
-  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(10, 10, 15, 0.14);
+  border-color: rgba(10, 10, 15, 0.4);
 }
 .admin-chez__vendor-picker-meta {
   color: var(--text-soft);
@@ -6952,7 +6952,7 @@
 
 .admin-chez__hdr-line {
   align-items: center;
-  background: rgba(245, 224, 217, 0.35);
+  background: rgba(239, 234, 254, 0.35);
   border-radius: 12px;
   display: flex;
   flex-wrap: wrap;
@@ -6984,7 +6984,7 @@
   gap: 10px;
 }
 .admin-chez__hdr-tier {
-  background: rgba(234, 179, 8, 0.16);
+  background: rgba(105, 56, 239, 0.16);
   border-radius: 6px;
   color: rgb(161, 98, 7);
   font: 600 11px var(--sans);
@@ -7027,16 +7027,16 @@
 /* AI analysis panel */
 
 .admin-chez__analysis {
-  background: linear-gradient(135deg, rgba(105, 56, 239, 0.06) 0%, rgba(245, 224, 217, 0.4) 100%);
+  background: linear-gradient(135deg, rgba(105, 56, 239, 0.06) 0%, rgba(239, 234, 254, 0.4) 100%);
   border: 1px solid rgba(105, 56, 239, 0.18);
   border-radius: 14px;
   padding: 14px 16px;
 }
 .admin-chez__analysis--loading {
-  background: rgba(245, 224, 217, 0.3);
+  background: rgba(239, 234, 254, 0.3);
 }
 .admin-chez__analysis--empty {
-  background: rgba(100, 116, 139, 0.06);
+  background: rgba(107, 107, 123, 0.06);
 }
 .admin-chez__analysis > header {
   align-items: center;
@@ -7122,11 +7122,11 @@ details.admin-chez__analysis-section pre {
   transition: border-color 100ms ease;
 }
 .admin-chez__vendor-card.is-recommended {
-  background: rgba(34, 197, 94, 0.06);
-  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(10, 10, 15, 0.06);
+  border-color: rgba(10, 10, 15, 0.35);
 }
 .admin-chez__vendor-card.is-noanswer {
-  border-color: rgba(234, 179, 8, 0.4);
+  border-color: rgba(105, 56, 239, 0.4);
 }
 .admin-chez__vendor-card-head {
   align-items: flex-start;
@@ -7321,7 +7321,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-chez__stage-dot {
   align-items: center;
-  background: var(--bg, #f0f1f3);
+  background: var(--bg, #EDEEF0);
   border: 2px solid var(--border, #d8dadf);
   border-radius: 999px;
   color: var(--text-soft);
@@ -7386,8 +7386,8 @@ details.admin-chez__analysis-section pre {
 /* Visits panel */
 
 .admin-chez__visits {
-  background: rgba(34, 197, 94, 0.04);
-  border: 1px solid rgba(34, 197, 94, 0.18);
+  background: rgba(10, 10, 15, 0.04);
+  border: 1px solid rgba(10, 10, 15, 0.18);
   border-radius: 14px;
   padding: 14px 16px;
 }
@@ -7518,7 +7518,7 @@ details.admin-chez__analysis-section pre {
 
 .admin-chez__analysis--collapsed-line {
   align-items: center;
-  background: rgba(245, 224, 217, 0.3);
+  background: rgba(239, 234, 254, 0.3);
   border: 1px solid rgba(105, 56, 239, 0.15);
   border-radius: 10px;
   display: flex;
@@ -7758,7 +7758,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-btn--ai {
   background: linear-gradient(135deg, #FFFFFF 0%, #F4F0FE 100%);
   color: var(--indigo, #6938EF);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
 }
 .cockpit-btn--ai:hover {
   border-color: var(--indigo-500, #6B6B7B);
@@ -7782,7 +7782,7 @@ details.admin-chez__analysis-section pre {
   gap: 5px;
   padding: 3px 9px;
   border-radius: 999px;
-  background: #F1F2F4;
+  background: #EDEEF0;
   color: var(--text-muted, #6B6B7B);
   font-size: 11px;
   font-weight: 600;
@@ -7790,13 +7790,13 @@ details.admin-chez__analysis-section pre {
   white-space: nowrap;
 }
 .cockpit-pill--xs { padding: 1px 7px; font-size: 9.5px; }
-.cockpit-pill--success  { background: rgba(10, 10, 15, 0.12); color: #3F6A4D; }
-.cockpit-pill--warning  { background: rgba(199, 126, 46, 0.14); color: #A76420; }
-.cockpit-pill--critical { background: rgba(194, 90, 94, 0.14); color: #9F4448; }
-.cockpit-pill--info     { background: rgba(90, 141, 181, 0.14); color: #406F94; }
+.cockpit-pill--success  { background: rgba(10, 10, 15, 0.12); color: #0A0A0A; }
+.cockpit-pill--warning  { background: rgba(105, 56, 239, 0.14); color: #5025D1; }
+.cockpit-pill--critical { background: rgba(105, 56, 239, 0.14); color: #0A0A0A; }
+.cockpit-pill--info     { background: rgba(105, 56, 239, 0.14); color: #6B6B7B; }
 .cockpit-pill--salmon   { background: var(--salmon-pale, #EFEAFE); color: #2A0F75; }
 .cockpit-pill--indigo   { background: var(--indigo-50, #F4F0FE); color: var(--indigo, #6938EF); }
-.cockpit-pill--neutral  { background: #F1F2F4; color: var(--text-muted, #6B6B7B); }
+.cockpit-pill--neutral  { background: #EDEEF0; color: var(--text-muted, #6B6B7B); }
 .cockpit-pill--solid-salmon { background: var(--salmon, #6938EF); color: #fff; }
 /* Phase 2.5: salmon-tinted "Quiz" badge on requests sourced from the
  * homeowner's House Quiz. Distinct from `salmon` so operators can tell
@@ -7840,7 +7840,7 @@ details.admin-chez__analysis-section pre {
 .cockpit-avatar--sm { width: 28px; height: 28px; font-size: 11px; background: var(--indigo-600, #7A55F0); }
 .cockpit-avatar--md { width: 30px; height: 30px; font-size: 12px; border-radius: 8px; }
 .cockpit-avatar--lg { width: 44px; height: 44px; font-size: 16px; border-radius: 50%; }
-.cockpit-avatar--soft   { background: var(--indigo-100, #DDD3FA); color: var(--indigo, #6938EF); }
+.cockpit-avatar--soft   { background: var(--indigo-100, #B49BFA); color: var(--indigo, #6938EF); }
 .cockpit-avatar--vendor { background: var(--indigo-500, #6B6B7B); border-radius: 8px; }
 .cockpit-avatar--indigo { background: var(--indigo, #6938EF); }
 
@@ -8161,7 +8161,7 @@ details.admin-chez__analysis-section pre {
   margin: 8px 6px 0;
   padding: 12px;
   background: linear-gradient(135deg, #F4F0FE 0%, #F4F0FE 100%);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
   border-radius: 10px;
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
@@ -8268,7 +8268,7 @@ details.admin-chez__analysis-section pre {
   font-size: 11px;
   color: var(--warning, #6938EF);
   font-weight: 600;
-  background: rgba(199, 126, 46, 0.06);
+  background: rgba(105, 56, 239, 0.06);
 }
 .cockpit-homeowner__profile-cta {
   margin: 10px 16px 14px;
@@ -8743,7 +8743,7 @@ details.admin-chez__analysis-section pre {
   border-radius: 10px;
   margin-bottom: 12px;
   background: var(--indigo-50, #F4F0FE);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
 }
 .cockpit-voice-banner.is-listening {
   background: var(--salmon-50, #F4F0FE);
@@ -8816,7 +8816,7 @@ details.admin-chez__analysis-section pre {
   color: var(--text-muted, #6B6B7B);
 }
 .cockpit-suggest-btn {
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
   background: linear-gradient(135deg, #fff, #F4F0FE);
   color: var(--indigo, #6938EF);
   font-size: 11px;
@@ -8850,8 +8850,8 @@ details.admin-chez__analysis-section pre {
 .cockpit-preview {
   margin-top: 16px;
   padding: 16px;
-  background: linear-gradient(180deg, #fff, #FAF7F1);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  background: linear-gradient(180deg, #fff, #FAFAFC);
+  border: 1px solid var(--indigo-100, #B49BFA);
   border-radius: 14px;
 }
 .cockpit-preview__head {
@@ -8965,7 +8965,7 @@ details.admin-chez__analysis-section pre {
   margin-top: 16px;
   padding: 14px;
   background: var(--indigo-50, #F4F0FE);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -9045,7 +9045,7 @@ details.admin-chez__analysis-section pre {
   margin-top: 8px;
   padding: 8px 10px;
   background: var(--indigo-50, #F4F0FE);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
   border-radius: 8px;
   font-size: 11px;
   color: var(--indigo, #6938EF);
@@ -9295,7 +9295,7 @@ details.admin-chez__analysis-section pre {
   width: 100%;
 }
 .cockpit-action:hover {
-  border-color: var(--indigo-100, #DDD3FA);
+  border-color: var(--indigo-100, #B49BFA);
   transform: translateY(-1px);
 }
 .cockpit-action__icon {
@@ -9333,7 +9333,7 @@ details.admin-chez__analysis-section pre {
   padding: 12px;
   border-radius: 10px;
   background: var(--indigo-50, #F4F0FE);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
 }
 .cockpit-context-box__eyebrow {
   font-size: 10px;
@@ -9427,7 +9427,7 @@ details.admin-chez__analysis-section pre {
   transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 .cockpit-similar__card:hover {
-  border-color: var(--indigo-100, #DDD3FA);
+  border-color: var(--indigo-100, #B49BFA);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(15, 10, 40, 0.06);
 }
@@ -9468,7 +9468,7 @@ details.admin-chez__analysis-section pre {
   padding: 14px;
   border-radius: 14px;
   background: linear-gradient(135deg, #F4F0FE, #F4F0FE);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
 }
 .cockpit-pattern__head {
   display: flex;
@@ -9677,7 +9677,7 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-chatpanel__msg--admin .cockpit-chatpanel__msg-bubble {
   background: var(--indigo-50, #F4F0FE);
-  border-color: var(--indigo-100, #DDD3FA);
+  border-color: var(--indigo-100, #B49BFA);
 }
 .cockpit-chatpanel__system {
   align-self: center;
@@ -9761,10 +9761,10 @@ details.admin-chez__analysis-section pre {
 .cockpit-resolve.is-resolved {
   opacity: 0.9;
   background: linear-gradient(135deg, #F4F0FE, #FFFFFF);
-  border-color: var(--indigo-100, #DDD3FA);
+  border-color: var(--indigo-100, #B49BFA);
 }
 .cockpit-resolve.is-complete {
-  background: linear-gradient(135deg, #EDF6EF, #FFFFFF);
+  background: linear-gradient(135deg, #F4F0FE, #FFFFFF);
   border-color: rgba(10, 10, 15, 0.32);
 }
 .cockpit-resolve.is-complete .cockpit-resolve__eyebrow,
@@ -10036,7 +10036,7 @@ details.admin-chez__analysis-section pre {
   font: 500 13px/1.5 var(--sans, system-ui, sans-serif);
   color: var(--text-muted, #6B6B7B);
   background: var(--bg, #FAFAFC);
-  border-left: 3px solid var(--indigo-100, #DDD3FA);
+  border-left: 3px solid var(--indigo-100, #B49BFA);
   padding: 8px 12px;
   border-radius: 6px;
   margin: 0;
@@ -10079,15 +10079,15 @@ details.admin-chez__analysis-section pre {
 }
 
 .admin-vendor-apps__status--pending_email_confirm {
-  background: rgba(199, 126, 46, 0.14);
+  background: rgba(105, 56, 239, 0.14);
   color: var(--warning, #6938EF);
-  border: 1px solid rgba(199, 126, 46, 0.3);
+  border: 1px solid rgba(105, 56, 239, 0.3);
 }
 
 .admin-vendor-apps__status--live_unverified {
   background: var(--indigo-50, #F4F0FE);
   color: var(--indigo, #6938EF);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
 }
 
 .admin-vendor-apps__status--chez_certified {
@@ -10128,13 +10128,13 @@ details.admin-chez__analysis-section pre {
 .admin-vendor-apps__completion--indigo {
   background: var(--indigo-50, #F4F0FE);
   color: var(--indigo, #6938EF);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
 }
 
 .admin-vendor-apps__completion--warning {
-  background: rgba(199, 126, 46, 0.14);
+  background: rgba(105, 56, 239, 0.14);
   color: var(--warning, #6938EF);
-  border: 1px solid rgba(199, 126, 46, 0.3);
+  border: 1px solid rgba(105, 56, 239, 0.3);
 }
 
 /* Modal overrides — the admin-modal infrastructure already supplies the
@@ -10290,7 +10290,7 @@ details.admin-chez__analysis-section pre {
 .admin-households__entity-chevron {
   grid-column: 3;
   font: 400 16px var(--sans);
-  color: var(--text-soft, #C7C5D6);
+  color: var(--text-soft, #D8DADF);
   line-height: 1;
 }
 .admin-households__entity-row.is-clickable:hover .admin-households__entity-chevron {
@@ -10474,13 +10474,13 @@ details.admin-chez__analysis-section pre {
   cursor: pointer;
 }
 .admin-households__entity-action:hover {
-  background: var(--surface-hover, #F1F0F7) !important;
+  background: var(--surface-hover, #F4F0FE) !important;
 }
 
 .admin-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(20, 16, 50, 0.4);
+  background: rgba(10, 10, 10, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10493,7 +10493,7 @@ details.admin-chez__analysis-section pre {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 60px rgba(20, 16, 50, 0.24);
+  box-shadow: 0 24px 60px rgba(10, 10, 10, 0.24);
 }
 .admin-modal--wide {
   width: min(960px, 92vw);
@@ -10503,7 +10503,7 @@ details.admin-chez__analysis-section pre {
   justify-content: space-between;
   align-items: center;
   padding: 18px 22px;
-  border-bottom: 1px solid var(--border, #E8E6F2);
+  border-bottom: 1px solid var(--border, #EDEEF0);
 }
 .admin-modal__head h2 {
   font: 600 16px var(--serif);
@@ -10523,7 +10523,7 @@ details.admin-chez__analysis-section pre {
 }
 
 .admin-negotiation__quote {
-  border: 1px solid var(--border, #E8E6F2);
+  border: 1px solid var(--border, #EDEEF0);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 14px;
@@ -10544,8 +10544,8 @@ details.admin-chez__analysis-section pre {
 .admin-negotiation__turn {
   padding: 8px 12px;
   border-radius: 10px;
-  background: var(--surface-soft, #F8F7FB);
-  border-left: 3px solid var(--brand-soft, #C9C2E6);
+  background: var(--surface-soft, #FAFAFC);
+  border-left: 3px solid var(--brand-soft, #D8DADF);
 }
 .admin-negotiation__turn--chez {
   border-left-color: var(--brand-strong, #6938EF);
@@ -10681,13 +10681,13 @@ details.admin-chez__analysis-section pre {
   color: var(--brand-strong, #6938EF);
 }
 .cockpit-pill--info {
-  background: rgba(90, 110, 200, 0.10);
-  border-color: rgba(90, 110, 200, 0.30);
-  color: #4A5FB8;
+  background: rgba(105, 56, 239, 0.10);
+  border-color: rgba(105, 56, 239, 0.30);
+  color: #6938EF;
 }
 .cockpit-pill--muted {
-  background: rgba(111, 106, 136, 0.06);
-  border-color: rgba(111, 106, 136, 0.20);
+  background: rgba(107, 107, 123, 0.06);
+  border-color: rgba(107, 107, 123, 0.20);
   color: var(--text-muted, #6B6B7B);
 }
 
@@ -10741,7 +10741,7 @@ details.admin-chez__analysis-section pre {
 }
 .admin-modal__error {
   margin: 0;
-  color: #C53030;
+  color: #0A0A0A;
   font: 500 12px var(--sans);
 }
 
@@ -10765,7 +10765,7 @@ details.admin-chez__analysis-section pre {
   color: var(--text, #0A0A0A);
 }
 .admin-households__back-pill:hover {
-  background: var(--surface-hover, #F1F0F7);
+  background: var(--surface-hover, #F4F0FE);
 }
 
 .admin-focused__entity {
@@ -10859,9 +10859,9 @@ details.admin-chez__analysis-section pre {
   margin-bottom: 8px;
 }
 .admin-pill--secondary {
-  background: rgba(67, 75, 145, 0.10);
-  border-color: rgba(67, 75, 145, 0.25);
-  color: #434B91;
+  background: rgba(105, 56, 239, 0.10);
+  border-color: rgba(105, 56, 239, 0.25);
+  color: #5025D1;
 }
 
 .admin-focused__list-block {
@@ -10891,8 +10891,8 @@ details.admin-chez__analysis-section pre {
 .admin-modal__intro {
   margin: 0 0 8px;
   padding: 10px 12px;
-  background: rgba(67, 75, 145, 0.06);
-  border-left: 3px solid rgba(67, 75, 145, 0.4);
+  background: rgba(105, 56, 239, 0.06);
+  border-left: 3px solid rgba(105, 56, 239, 0.4);
   border-radius: 6px;
   font: 400 12px var(--sans);
   color: var(--text-muted, #6B6B7B);
@@ -10918,7 +10918,7 @@ details.admin-chez__analysis-section pre {
 .admin-quickpill:hover {
   background: var(--surface-hover, #FAFAFC);
   color: var(--text, #0A0A0A);
-  border-color: var(--border-strong, #DCDDE3);
+  border-color: var(--border-strong, #D8DADF);
 }
 .admin-quickpill.is-active {
   background: var(--text, #0A0A0A);
@@ -10956,7 +10956,7 @@ details.admin-chez__analysis-section pre {
   gap: 8px;
   padding: 8px 14px 10px;
   border-top: 1px solid var(--border, #EDEEF0);
-  background: rgba(67, 75, 145, 0.03);
+  background: rgba(105, 56, 239, 0.03);
 }
 .cockpit-vendor__notes-label {
   font: 600 9px var(--sans);
@@ -10979,14 +10979,14 @@ details.admin-chez__analysis-section pre {
 /* Danger-styled confirm button used by destructive case actions (Revoke
    Chez ownership). Pairs with admin-pill base styles. */
 .admin-pill--danger {
-  background: #B83C2E;
-  border-color: #B83C2E;
+  background: #5025D1;
+  border-color: #5025D1;
   color: #FFF;
   font: 500 11px var(--sans);
   padding: 5px 12px;
 }
 .admin-pill--danger:hover {
-  background: #9B3225;
+  background: #0A0A0A;
 }
 .admin-pill[disabled] {
   opacity: 0.45;
@@ -10996,7 +10996,7 @@ details.admin-chez__analysis-section pre {
 
 /* Required-field asterisk in modal labels. */
 .admin-required {
-  color: #B83C2E;
+  color: #5025D1;
   font-weight: 600;
 }
 
@@ -11013,7 +11013,7 @@ details.admin-chez__analysis-section pre {
   display: flex;
   align-items: center;
   padding: 0 10px;
-  background: rgba(67, 75, 145, 0.05);
+  background: rgba(105, 56, 239, 0.05);
   color: var(--text-muted, #6B6B7B);
   font: 500 13px var(--sans);
   border-right: 1px solid var(--border, #EDEEF0);
@@ -11085,7 +11085,7 @@ details.admin-chez__analysis-section pre {
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 .admin-quickpill:hover {
-  background: rgba(67, 75, 145, 0.05);
+  background: rgba(105, 56, 239, 0.05);
   border-color: var(--text, #0A0A0A);
 }
 .admin-quickpill.is-active {
@@ -11128,11 +11128,11 @@ details.admin-chez__analysis-section pre {
   color: #FFF;
 }
 .admin-toast--error {
-  background: #B83C2E;
+  background: #5025D1;
   color: #FFF;
 }
 .admin-toast--success {
-  background: #1F7A4A;
+  background: #0A0A0A;
   color: #FFF;
 }
 
@@ -11213,7 +11213,7 @@ details.admin-chez__analysis-section pre {
   transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
 }
 .admin-focused__action-row .admin-pill:hover {
-  background: var(--indigo-50, rgba(67, 75, 145, 0.05));
+  background: var(--indigo-50, rgba(105, 56, 239, 0.05));
   border-color: var(--text, #0A0A0A);
 }
 .admin-focused__action-row .admin-pill:active {
@@ -11231,8 +11231,8 @@ details.admin-chez__analysis-section pre {
   box-shadow: 0 6px 16px rgba(105, 56, 239, 0.25);
 }
 .admin-focused__action-row .admin-pill.admin-pill--action:hover {
-  background: #D85440;
-  border-color: #D85440;
+  background: #6938EF;
+  border-color: #6938EF;
 }
 /* Secondary / ghost — muted text on white. */
 .admin-focused__action-row .admin-pill.admin-pill--secondary,
@@ -11242,8 +11242,8 @@ details.admin-chez__analysis-section pre {
 /* Danger — red outline (used by Revoke Chez ownership). */
 .admin-focused__action-row .admin-pill.admin-pill--danger {
   background: #FFF;
-  border-color: #B83C2E;
-  color: #B83C2E;
+  border-color: #5025D1;
+  color: #5025D1;
 }
 .admin-focused__action-row .admin-pill.admin-pill--danger:hover {
   background: rgba(184, 60, 46, 0.06);
@@ -11288,7 +11288,7 @@ details.admin-chez__analysis-section pre {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px 24px;
   padding: 16px 18px;
-  background: rgba(67, 75, 145, 0.025);
+  background: rgba(105, 56, 239, 0.025);
   border-radius: 14px;
   border: 1px solid var(--neutral-200, #EDEEF0);
 }
@@ -11339,12 +11339,12 @@ details.admin-chez__analysis-section pre {
    .admin-pill[data-tone="red|amber|muted|green"] rules live around L6045;
    we add `indigo` and `yellow` here so urgency steps read clearly. --- */
 .admin-pill[data-tone="indigo"] {
-  background: var(--indigo-100, #DDD3FA);
+  background: var(--indigo-100, #B49BFA);
   color: var(--indigo, #6938EF);
 }
 .admin-pill[data-tone="yellow"] {
-  background: rgba(199, 126, 46, 0.10);
-  color: #95621F;
+  background: rgba(105, 56, 239, 0.10);
+  color: #5025D1;
 }
 
 /* --- Today greeting card --- */
@@ -11809,7 +11809,7 @@ details.admin-chez__analysis-section pre {
   line-height: 1.55;
   margin: 0;
   padding: 12px 14px;
-  background: rgba(67, 75, 145, 0.025);
+  background: rgba(105, 56, 239, 0.025);
   border-radius: 10px;
   border: 1px solid var(--neutral-200, #EDEEF0);
 }
@@ -11961,7 +11961,7 @@ details.admin-chez__analysis-section pre {
   padding: 4px 10px;
   transition: background 120ms ease, color 120ms ease;
 }
-.cockpit-tag-chip:hover { background: rgba(199, 126, 46, 0.16); }
+.cockpit-tag-chip:hover { background: rgba(105, 56, 239, 0.16); }
 
 .cockpit-tag-chip__x {
   font-size: 14px;
@@ -11976,16 +11976,16 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-tag-chip--add:hover {
   background: var(--indigo-50, #F4F0FE);
-  border-color: var(--indigo-100, #DDD3FA);
+  border-color: var(--indigo-100, #B49BFA);
   color: var(--indigo, #6938EF);
 }
 
 /* Color variants — one per tag_definitions.color enum value. */
-.cockpit-tag-chip--indigo { background: var(--indigo-100, #DDD3FA); color: var(--indigo, #6938EF); }
-.cockpit-tag-chip--salmon { background: var(--salmon-pale, #EFEAFE); color: #B23E2C; }
-.cockpit-tag-chip--amber  { background: rgba(199, 126, 46, 0.14); color: #7E4F18; }
-.cockpit-tag-chip--green  { background: rgba(10, 10, 15, 0.14); color: #3A6448; }
-.cockpit-tag-chip--red    { background: rgba(214, 71, 60, 0.12); color: #C03A2D; }
+.cockpit-tag-chip--indigo { background: var(--indigo-100, #B49BFA); color: var(--indigo, #6938EF); }
+.cockpit-tag-chip--salmon { background: var(--salmon-pale, #EFEAFE); color: #5025D1; }
+.cockpit-tag-chip--amber  { background: rgba(105, 56, 239, 0.14); color: #5025D1; }
+.cockpit-tag-chip--green  { background: rgba(10, 10, 15, 0.14); color: #0A0A0A; }
+.cockpit-tag-chip--red    { background: rgba(105, 56, 239, 0.12); color: #5025D1; }
 .cockpit-tag-chip--muted  { background: var(--neutral-200, #EDEEF0); color: var(--text-muted, #6B6B7B); }
 
 /* --- Tag picker dropdown --- */
@@ -12028,7 +12028,7 @@ details.admin-chez__analysis-section pre {
  * ============================================================================ */
 .cockpit-vendor__act {
   background: var(--indigo-50, #F4F0FE);
-  border: 1px solid var(--indigo-100, #DDD3FA);
+  border: 1px solid var(--indigo-100, #B49BFA);
   border-radius: 6px;
   color: var(--indigo, #6938EF);
   cursor: pointer;
@@ -12038,13 +12038,13 @@ details.admin-chez__analysis-section pre {
   transition: background 120ms ease, border-color 120ms ease;
 }
 .cockpit-vendor__act:hover {
-  background: var(--indigo-100, #DDD3FA);
+  background: var(--indigo-100, #B49BFA);
   border-color: var(--indigo, #6938EF);
 }
 .cockpit-vendor__act--counter {
   background: var(--salmon-50, #F4F0FE);
   border-color: var(--salmon-pale, #EFEAFE);
-  color: #B23E2C;
+  color: #5025D1;
 }
 .cockpit-vendor__act--counter:hover {
   background: var(--salmon-pale, #EFEAFE);
