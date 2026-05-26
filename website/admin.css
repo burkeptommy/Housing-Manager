@@ -173,9 +173,9 @@
 
 .admin-sidebar {
   background:
-    radial-gradient(circle at 0 0, rgba(105, 56, 239, 0.22), transparent 32%),
-    var(--indigo-900);
-  color: rgba(255, 255, 255, 0.9);
+    radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.10), transparent 32%),
+    var(--indigo);
+  color: rgba(255, 255, 255, 0.92);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -190,7 +190,7 @@
 }
 
 .admin-sidebar__brand img {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 11px;
   height: 38px;
   object-fit: cover;
@@ -207,7 +207,7 @@
 }
 
 .admin-sidebar__brand span {
-  color: rgba(255, 255, 255, 0.56);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -224,28 +224,32 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: 12px;
-  color: rgba(255, 255, 255, 0.74);
+  color: rgba(255, 255, 255, 0.82);
   cursor: pointer;
   display: flex;
   font: 700 13px var(--sans);
   justify-content: space-between;
   padding: 11px 12px;
   text-align: left;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .admin-nav button:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
 
+/* Inverted active state — white pill on purple. Reads as an action target
+   pulled forward, vs the prior faint-purple-on-black that disappeared
+   against the new brand purple bg. */
 .admin-nav button.is-active {
-  background: rgba(105, 56, 239, 0.18);
-  border-color: rgba(105, 56, 239, 0.32);
-  color: #fff;
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--indigo);
 }
 
 .admin-nav small {
-  color: rgba(255, 255, 255, 0.48);
+  color: rgba(255, 255, 255, 0.66);
   font-size: 11px;
 }
 
@@ -254,9 +258,9 @@
    the eye. Replaces the pre-5z+13 "live + draft" split (the +N
    notation Tom found cryptic). */
 .admin-nav-badge {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.72);
+  color: #fff;
   font: 700 11px var(--sans);
   letter-spacing: 0.02em;
   min-width: 22px;
@@ -264,18 +268,25 @@
   text-align: center;
 }
 
+/* Active-state inversion: badge pulls the brand palette since the
+   button bg is white. Counts read as purple-on-pale-purple. */
 .admin-nav button.is-active .admin-nav-badge {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: var(--indigo-100);
+  color: var(--indigo);
 }
 
 .admin-nav-badge--zero {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.32);
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.admin-nav button.is-active .admin-nav-badge--zero {
+  background: var(--neutral-200);
+  color: var(--text-soft);
 }
 
 .admin-sidebar__footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
   display: grid;
   gap: 10px;
   margin-top: auto;
@@ -283,7 +294,7 @@
 }
 
 .admin-sidebar__footer span {
-  color: rgba(255, 255, 255, 0.62);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -291,8 +302,8 @@
 }
 
 .admin-sidebar__footer button {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 10px;
   color: #fff;
   cursor: pointer;
@@ -343,6 +354,14 @@
   gap: 22px;
   grid-template-columns: minmax(340px, 0.9fr) minmax(520px, 1.25fr);
   min-height: 0;
+  /* When the Today view fills .admin-layout via `.admin-layout--single`,
+     content exceeds viewport on smaller laptops and bunches at the
+     bottom because the layout grid never enables its own scroll. The
+     legacy `.admin-list` had `max-height: calc(100vh - 220px)` for the
+     two-column entity list, but Today doesn't use that — it renders
+     directly into the grid. Adding overflow-y:auto here gives the
+     single-column Today view a scrollable container. */
+  overflow-y: auto;
   padding: 24px 30px 44px;
 }
 
@@ -6184,17 +6203,26 @@
   background: rgba(10, 10, 15, 0.14);
   color: rgb(21, 128, 61);
 }
+/* Phase 9d — pill tones collapsed onto the purple/white/black palette.
+   Previously: red (rgb(185,28,28)) for SLA-overdue + amber for warning +
+   slate for muted. That set was the source of the alarm-fatigue red look
+   the operator saw on Today (16 red pills, no priority). The new triad
+   uses purple-pale + purple-deep for urgent, brand-purple for warning,
+   neutral gray for muted — semantic hierarchy preserved, brand discipline
+   intact. */
 .admin-pill[data-tone="amber"] {
-  background: rgba(105, 56, 239, 0.16);
-  color: rgb(161, 98, 7);
+  background: var(--indigo-100);
+  color: var(--indigo);
+  font-weight: 700;
 }
 .admin-pill[data-tone="red"] {
-  background: rgba(10, 10, 15, 0.16);
-  color: rgb(185, 28, 28);
+  background: var(--indigo-100);
+  color: var(--indigo-600);
+  font-weight: 800;
 }
 .admin-pill[data-tone="muted"] {
-  background: rgba(107, 107, 123, 0.14);
-  color: rgb(71, 85, 105);
+  background: var(--neutral-200);
+  color: var(--text-muted);
 }
 
 .admin-chez__focused {
@@ -7588,7 +7616,11 @@ details.admin-chez__analysis-section pre {
   flex-direction: column;
   height: 100vh;
   max-height: 100vh;
-  min-height: 720px;
+  /* min(720px, 100vh) so the floor never pushes past the viewport on
+     short laptops (e.g. 13" MacBook in window mode). Without this,
+     a <720px tall viewport gets a scrollbar at the body level instead
+     of the cockpit's internal scroll regions, breaking pane layout. */
+  min-height: min(720px, 100vh);
   width: 100%;
   max-width: 100%;
   background: var(--pearl, #FAFAFC);
@@ -8007,6 +8039,11 @@ details.admin-chez__analysis-section pre {
   border-right: 1px solid var(--neutral-200, #EDEEF0);
   display: flex;
   flex-direction: column;
+  /* Defensive: lets the rail shrink below content height in edge layouts so
+     the list child's overflow-y:auto can actually scroll. The real fix is
+     `min-height: 0` on .cockpit-queue__list below — but pinning it here
+     too keeps the column-flex chain unblocked. */
+  min-height: 0;
   overflow: hidden;
   transition: width 0.18s ease-out;
 }
@@ -8075,6 +8112,13 @@ details.admin-chez__analysis-section pre {
 
 .cockpit-queue__list {
   flex: 1;
+  /* The real scroll fix. Without `min-height: 0`, a flex:1 child in a
+     column-flex parent sizes to content height (16 cases ~= 1100px) and
+     pushes the page past the viewport — `overflow-y: auto` never engages
+     because there's nothing to overflow against. Adding min-height:0
+     lets the list shrink to the available rail height, at which point
+     overflow-y:auto starts scrolling. */
+  min-height: 0;
   overflow-y: auto;
   padding: 0 8px 16px;
   display: flex;
@@ -8273,6 +8317,80 @@ details.admin-chez__analysis-section pre {
 .cockpit-homeowner__profile-cta {
   margin: 10px 16px 14px;
   width: calc(100% - 32px);
+}
+
+/* =====================================================================
+ * Phase 9d — Standing-engagement rail in the homeowner panel
+ * =====================================================================
+ * Surfaces chez_owned routines + chez_owned contractors at a glance so
+ * the operator sees what they're recurringly responsible for above the
+ * rest of the household catalog. Brand-purple wash to distinguish from
+ * the white profile card above. Lives in the cockpit-homeowner column
+ * (320px), so rows are compact name + next-due time.
+ * ===================================================================== */
+
+.cockpit-homeowner__standing {
+  background: var(--indigo-50, #F4F0FE);
+  border: 1px solid var(--indigo-100, #EFEAFE);
+  border-radius: 10px;
+  margin: 0 16px 14px;
+  padding: 10px 12px;
+}
+
+.cockpit-homeowner__standing-head {
+  align-items: center;
+  color: var(--indigo, #6938EF);
+  display: flex;
+  font: 700 10px / 1 var(--sans, system-ui);
+  gap: 8px;
+  letter-spacing: 0.10em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.cockpit-homeowner__standing-head strong {
+  background: var(--indigo, #6938EF);
+  border-radius: 999px;
+  color: #fff;
+  font: 700 10px / 1 var(--sans, system-ui);
+  letter-spacing: 0;
+  padding: 2px 7px;
+}
+
+.cockpit-homeowner__standing-row {
+  align-items: center;
+  border-top: 1px solid var(--indigo-100, #EFEAFE);
+  display: flex;
+  font: 500 12px / 1.3 var(--sans, system-ui);
+  gap: 8px;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.cockpit-homeowner__standing-row:first-of-type {
+  border-top: none;
+  padding-top: 2px;
+}
+
+.cockpit-homeowner__standing-name {
+  color: var(--text, #0A0A0A);
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cockpit-homeowner__standing-when {
+  color: var(--indigo-600, #5025D1);
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.cockpit-homeowner__standing-more {
+  color: var(--indigo, #6938EF);
+  font: 600 11px / 1 var(--sans, system-ui);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--indigo-100, #EFEAFE);
 }
 
 /* ===== Case workspace (flex:1) ============================================= */
@@ -9054,6 +9172,40 @@ details.admin-chez__analysis-section pre {
   gap: 8px;
 }
 .cockpit-critique b { color: var(--indigo, #6938EF); }
+
+/* =====================================================================
+ * Phase 9d — Quick-reply chips under the chat composer
+ * =====================================================================
+ * Five short situation-agnostic phrases the operator can drop into the
+ * reply textarea with one click. Cuts ~70% of "I'll get back to you"
+ * typing time. Lives between the textarea and the composer foot row
+ * so it stays visible whenever the composer is open.
+ * ===================================================================== */
+.cockpit-quickreplies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.cockpit-quickreply {
+  background: #fff;
+  border: 1px solid var(--neutral-200, #EDEEF0);
+  border-radius: 999px;
+  color: var(--text-muted, #6B6B7B);
+  cursor: pointer;
+  font: 500 11px var(--sans, system-ui);
+  padding: 4px 10px;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+  white-space: nowrap;
+}
+.cockpit-quickreply:hover {
+  background: var(--indigo-50, #F4F0FE);
+  border-color: var(--indigo, #6938EF);
+  color: var(--indigo, #6938EF);
+}
+.cockpit-quickreply:active {
+  background: var(--indigo-100, #EFEAFE);
+}
 .cockpit-critique__tone {
   margin-left: auto;
   font-weight: 600;
@@ -11322,8 +11474,18 @@ details.admin-chez__analysis-section pre {
   margin: 0 0 4px 0;
 }
 
-/* Notes block — homeowner notes / description / etc. */
+/* Notes block — homeowner notes / description / etc.
+ * Phase 9d note: the empty `.admin-focused__notes-block { … }` declaration
+ * that lived here previously was missing its closing brace, which caused
+ * every CSS rule emitted below to be parsed as a nested child of this
+ * selector (via CSS Nesting). Closing the brace fixes the cascade for
+ * every Today + Overview rule that follows. */
 .admin-focused__notes-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ============================================================================
  * Phase 86A — Today command center + Home Overview
  * ============================================================================
@@ -11347,84 +11509,155 @@ details.admin-chez__analysis-section pre {
   color: #5025D1;
 }
 
-/* --- Today greeting card --- */
+/* =====================================================================
+ * Phase 9d — Today view redesign
+ *
+ * Reference patterns: Intercom inbox, Linear triage, Front shared inbox.
+ * Anchors:
+ *   1. ONE hero card with greeting + adaptive subline + 5 inline chips.
+ *      Replaces the prior 5-tile stat grid + standalone greeting row.
+ *   2. Sections collapse onto a single white card each, rows separated
+ *      by hairline dividers (no per-row borders / box-in-box chrome).
+ *   3. SLA urgency lives in ONE anchored group label, not on every row
+ *      ("Past SLA · 3 cases" not 16 red pills).
+ *   4. Hover any row → action buttons swap in (Reply / Snooze / Resolve).
+ *   5. Family fold when a single household has ≥ 5 items in a group.
+ *
+ * The legacy `.admin-today__row-{left,right,sub,excerpt,time,time--compact}`
+ * tokens are retained below as no-ops in case any external surface
+ * still emits them. New markup uses `.admin-today__row-{main,meta,tail,
+ * actions,action,icon}` and the grid layout in `.admin-today__row`.
+ * ===================================================================== */
+
 .admin-today {
   display: flex;
   flex-direction: column;
   gap: 28px;
+  padding-bottom: 32px; /* tail breathing room inside the scrollable layout */
 }
 
-.admin-today__greeting {
-  align-items: center;
-  background: linear-gradient(135deg, var(--indigo) 0%, var(--indigo-700) 100%);
+/* ----- Hero ---------------------------------------------------------- */
+
+.admin-today__hero {
+  background: linear-gradient(135deg, var(--indigo) 0%, var(--indigo-600) 100%);
   border-radius: var(--radius);
-  color: #fff;
-  display: flex;
-  gap: 24px;
-  justify-content: space-between;
-  padding: 28px 32px;
+  color: var(--text-on-indigo, #fff);
+  padding: 30px 36px 26px;
+  box-shadow: 0 12px 32px rgba(15, 10, 40, 0.10), 0 4px 8px rgba(15, 10, 40, 0.04);
 }
 
-.admin-today__greeting-text { flex: 1; }
-
-.admin-today__greeting-eyebrow {
-  color: rgba(255, 255, 255, 0.7);
+.admin-today__hero-eyebrow {
+  color: rgba(255, 255, 255, 0.78);
   display: block;
   font: 700 11px / 1 var(--sans);
   letter-spacing: 0.14em;
-  margin-bottom: 8px;
+  margin: 0 0 12px;
   text-transform: uppercase;
 }
 
-.admin-today__greeting h2 {
+.admin-today__hero-title {
   color: #fff;
-  font: 700 28px / 1.15 var(--serif);
-  margin: 0 0 6px;
+  font: 600 32px / 1.1 var(--serif);
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
 }
 
-.admin-today__greeting p {
-  color: rgba(255, 255, 255, 0.85);
-  font: 400 15px / 1.4 var(--sans);
-  margin: 0;
+.admin-today__hero-sub {
+  color: rgba(255, 255, 255, 0.86);
+  font: 400 15px / 1.5 var(--sans);
+  margin: 0 0 20px;
 }
 
-.admin-today__refresh {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: var(--radius-sm);
+.admin-today__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-today__chip {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
   color: #fff;
   cursor: pointer;
-  font: 600 12px var(--sans);
-  padding: 10px 14px;
-  transition: background 160ms ease;
+  display: inline-flex;
+  font: 600 12.5px / 1 var(--sans);
+  gap: 6px;
+  padding: 7px 14px;
+  transition: background 120ms ease, transform 80ms ease;
 }
-.admin-today__refresh:hover { background: rgba(255, 255, 255, 0.22); }
+.admin-today__chip:hover { background: rgba(255, 255, 255, 0.24); transform: translateY(-1px); }
+.admin-today__chip:active { transform: scale(0.97); }
+.admin-today__chip strong {
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
 
-/* --- Today sections --- */
+/* Urgent chip — pulled forward as a white-on-purple inverse pill so the
+   operator's eye lands on it. Only renders when count > 0. */
+.admin-today__chip--urgent {
+  background: #fff;
+  border-color: #fff;
+  color: var(--indigo);
+}
+.admin-today__chip--urgent:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* Static chips (open + homes) — no jump target, no hover lift. */
+.admin-today__chip--static {
+  cursor: default;
+}
+.admin-today__chip--static:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: none;
+}
+
+/* ----- Section + group ---------------------------------------------- */
+
 .admin-today__section {
-  background: var(--white);
-  border: 1px solid var(--neutral-200);
-  border-radius: var(--radius);
-  padding: 24px;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .admin-today__sec-head {
   align-items: center;
+  cursor: pointer;
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
+  list-style: none;
+  margin-bottom: 14px;
+  outline: none;
 }
+.admin-today__sec-head::-webkit-details-marker { display: none; }
+.admin-today__sec-head::marker { content: ""; }
 
-.admin-today__sec-head h3 {
+.admin-today__sec-head h2 {
   color: var(--text);
-  font: 700 17px / 1 var(--serif);
+  font: 600 22px / 1.1 var(--serif);
+  letter-spacing: -0.015em;
   margin: 0;
+}
+/* Visual cue that the section header is collapsible — small chevron */
+.admin-today__sec-head::before {
+  color: var(--text-soft);
+  content: "▾";
+  display: inline-block;
+  font-size: 12px;
+  transition: transform 160ms ease;
+  width: 12px;
+}
+.admin-today__section:not([open]) > .admin-today__sec-head::before {
+  transform: rotate(-90deg);
 }
 
 .admin-today__sec-count {
-  background: var(--indigo-50);
+  background: var(--neutral-200);
   border-radius: 999px;
-  color: var(--indigo);
+  color: var(--text-muted);
   font: 700 11px / 1 var(--sans);
   padding: 4px 10px;
 }
@@ -11433,76 +11666,127 @@ details.admin-chez__analysis-section pre {
   color: var(--text-muted);
   font: 400 14px / 1.5 var(--sans);
   margin: 0;
-  padding: 12px 0;
+  padding: 0 4px 12px;
 }
 
-/* --- Today row (case / visit / message) --- */
+.admin-today__group {
+  margin-bottom: 24px;
+}
+.admin-today__group:last-child {
+  margin-bottom: 0;
+}
+
+.admin-today__group-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
+.admin-today__group-label {
+  color: var(--text-muted);
+  font: 800 10.5px / 1 var(--sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The ONE place urgency lives — a purple dot in front of the group label.
+   Replaces the 16 red pills the prior design put on every row. */
+.admin-today__group--urgent .admin-today__group-label {
+  align-items: center;
+  color: var(--indigo);
+  display: inline-flex;
+  gap: 8px;
+}
+.admin-today__group--urgent .admin-today__group-label::before {
+  background: var(--indigo);
+  border-radius: 999px;
+  content: "";
+  display: inline-block;
+  height: 7px;
+  width: 7px;
+}
+
+.admin-today__group-count {
+  color: var(--text-soft);
+  font: 600 11px var(--sans);
+}
+
+/* ----- Rows --------------------------------------------------------- */
+
 .admin-today__rows {
+  background: var(--white);
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  overflow: hidden;
 }
 
 .admin-today__row {
   align-items: center;
-  background: var(--white);
-  border: 1px solid var(--neutral-200);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--neutral-200);
   color: var(--text);
   cursor: pointer;
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   padding: 14px 16px;
   text-align: left;
-  transition: background 160ms ease, border-color 160ms ease, transform 80ms ease;
+  transition: background 120ms ease;
   width: 100%;
 }
-
+.admin-today__row:last-child {
+  border-bottom: none;
+}
 .admin-today__row:hover {
   background: var(--indigo-50);
-  border-color: var(--indigo-100);
 }
-.admin-today__row:active { transform: scale(0.997); }
+.admin-today__row:active { background: var(--indigo-100); }
 
-/* SLA-overdue rows get a salmon left-border per brand discipline: salmon is
-   reserved for action/urgency. Uses :has() — graceful no-op on browsers
-   without support; the pill itself still communicates severity. */
-.admin-today__row:has(.admin-pill[data-tone="red"]) {
-  background: var(--salmon-50);
-  border-color: var(--salmon-pale);
-  box-shadow: inset 3px 0 0 var(--salmon);
-}
-
-.admin-today__row-left {
-  align-items: flex-start;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.admin-today__row-right {
+.admin-today__row-icon {
   align-items: center;
+  background: var(--neutral-200);
+  border-radius: 8px;
+  color: var(--text);
   display: flex;
-  flex-shrink: 0;
-  gap: 8px;
+  font-size: 14px;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+.admin-today__row-icon--quiet {
+  background: var(--indigo-50);
+  color: var(--indigo);
+  font-weight: 700;
+}
+
+.admin-today__row-main {
+  min-width: 0;
 }
 
 .admin-today__row-title {
   color: var(--text);
-  font: 600 14px / 1.3 var(--sans);
-  margin: 0;
-  max-width: 100%;
+  font: 600 14px / 1.35 var(--sans);
+  margin: 0 0 3px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.admin-today__row-sub {
+.admin-today__row-meta {
   color: var(--text-muted);
-  font: 400 12px / 1.4 var(--sans);
+  font: 400 12px / 1.35 var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-today__row-meta strong {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .admin-today__row-excerpt {
@@ -11510,58 +11794,157 @@ details.admin-chez__analysis-section pre {
   font: 400 12px / 1.4 var(--sans);
   font-style: italic;
   margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* The right-edge tail — SLA timer + chevron, inline on one line so the
+   chevron never wraps to a second row on narrow widths. */
+.admin-today__row-tail {
+  align-items: center;
+  color: var(--text-muted);
+  display: inline-flex;
+  font: 600 12px var(--sans);
+  gap: 6px;
+  white-space: nowrap;
+}
+.admin-today__row-tail strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.admin-today__row-tail--urgent {
+  color: var(--indigo-600);
+}
+.admin-today__row-tail--urgent strong {
+  color: var(--indigo);
+  font-weight: 800;
+}
+
+/* Vendor-visit phone chip lives inside the tail */
+.admin-today__row-phone {
+  align-items: center;
+  background: var(--neutral-200);
+  border-radius: 999px;
+  color: var(--text);
+  display: inline-flex;
+  font: 600 11px var(--sans);
+  gap: 4px;
+  padding: 3px 9px;
+}
+
+/* Time column for visit rows — sits in the icon slot, but typographic */
 .admin-today__row-time {
   color: var(--indigo);
   font: 700 13px / 1 var(--sans);
+  text-align: right;
 }
 
-.admin-today__row-time--compact {
-  background: var(--indigo-50);
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
+/* Hover row actions — swap in for the tail on :hover. Reply / Snooze /
+   Resolve buttons. Each calls stopPropagation in the JS so clicking the
+   button doesn't also fire the row's open-case handler. */
+.admin-today__row-actions {
+  display: none;
+  gap: 6px;
 }
+.admin-today__row:hover .admin-today__row-tail { display: none; }
+.admin-today__row:hover .admin-today__row-actions { display: inline-flex; }
+.admin-today__row--visit:hover .admin-today__row-actions { display: none; }
+.admin-today__row--visit:hover .admin-today__row-tail { display: inline-flex; }
 
-.admin-today__chip {
-  background: var(--indigo-50);
-  border-radius: 999px;
-  color: var(--indigo);
-  font: 600 11px / 1 var(--sans);
-  padding: 4px 8px;
-}
-
-.admin-today__chevron {
+.admin-today__row-action {
+  background: var(--white);
+  border: 1px solid var(--neutral-300);
+  border-radius: 6px;
   color: var(--text-muted);
-  font: 600 16px / 1 var(--sans);
+  cursor: pointer;
+  font: 600 11px / 1 var(--sans);
+  padding: 6px 10px;
+  transition: all 100ms ease;
+}
+.admin-today__row-action:hover {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #fff;
 }
 
-.admin-today__row--compact { padding: 10px 14px; }
+/* Family fold — "+ Show 12 more from Burke" expander inside a rows card */
+.admin-today__family-fold {
+  border-top: 1px solid var(--neutral-200);
+  width: 100%;
+}
+.admin-today__family-fold:first-child {
+  border-top: none;
+}
+.admin-today__family-fold summary {
+  align-items: center;
+  background: transparent;
+  color: var(--indigo);
+  cursor: pointer;
+  display: flex;
+  font: 600 12px var(--sans);
+  list-style: none;
+  outline: none;
+  padding: 12px 16px;
+  transition: background 100ms ease;
+}
+.admin-today__family-fold summary::-webkit-details-marker { display: none; }
+.admin-today__family-fold summary::marker { content: ""; }
+.admin-today__family-fold summary:hover {
+  background: var(--indigo-50);
+}
+.admin-today__family-fold[open] summary {
+  border-bottom: 1px solid var(--neutral-200);
+  color: var(--text-muted);
+}
 
-.admin-today__day-block { margin-bottom: 16px; }
-.admin-today__day-block:last-child { margin-bottom: 0; }
-
+/* Day-block stack inside Upcoming */
+.admin-today__day-block {
+  margin-bottom: 18px;
+}
+.admin-today__day-block:last-child {
+  margin-bottom: 0;
+}
 .admin-today__day-label {
   color: var(--text-muted);
   font: 700 11px / 1 var(--sans);
   letter-spacing: 0.12em;
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  padding: 0 4px;
   text-transform: uppercase;
 }
 
+/* Footer link inside the urgent section */
 .admin-today__view-all {
   background: transparent;
   border: none;
   color: var(--indigo);
   cursor: pointer;
-  display: block;
+  display: inline-block;
   font: 600 13px var(--sans);
-  margin-top: 16px;
-  padding: 0;
+  margin-top: 8px;
+  padding: 8px 4px;
   text-align: left;
-  width: 100%;
 }
-.admin-today__view-all:hover { color: var(--indigo-700); }
+.admin-today__view-all:hover { color: var(--indigo-600); }
+
+/* ----- Responsive --------------------------------------------------- */
+@media (max-width: 760px) {
+  .admin-today__hero {
+    padding: 24px 22px 20px;
+  }
+  .admin-today__hero-title {
+    font-size: 26px;
+  }
+  .admin-today__row {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    padding: 12px 12px;
+  }
+  /* On touch, the hover-actions affordance becomes useless. Always show
+     the tail and provide a separate menu in a follow-up. */
+  .admin-today__row-actions { display: none !important; }
+  .admin-today__row-tail { display: inline-flex !important; }
+}
 
 /* Stat tile clickable variant — used by the Today header tiles that jump
    the page to their matching section. */
@@ -11857,6 +12240,7 @@ details.admin-chez__analysis-section pre {
 }
 .cockpit-queue__case.is-active .cockpit-queue__case-household {
   color: var(--brand-strong, #6938EF);
+}
 
 .admin-overview__activity-row {
   align-items: baseline;

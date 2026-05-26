@@ -1541,6 +1541,60 @@ function relativeTimeString(iso) {
   return formatDate(iso);
 }
 
+// =============================================================================
+// Phase 9d — Browser-tab presence
+// =============================================================================
+// Surfaces unread inbound case count in:
+//   1. The tab title — "(3) Chez Service Desk" — visible even when the tab
+//      isn't focused, so the operator notices new customer messages without
+//      having to leave whatever they're heads-down on.
+//   2. A small purple dot in the top-right corner of the favicon — same
+//      signal at a glance from a tab strip with many tabs.
+// Both helpers are idempotent and called from `render()` after every state
+// change that could move the unread count.
+
+function chezUnreadCount() {
+  return (state.chezRequests || []).filter(
+    (r) => r.unread_for_admin === true && r.status !== "resolved"
+  ).length;
+}
+
+function updateBrowserTitleBadge() {
+  const isService = document.body?.dataset?.portalMode === "service";
+  const base = isService ? "Chez Service Desk" : "Chez Admin";
+  const unread = chezUnreadCount();
+  document.title = unread > 0 ? `(${unread}) ${base}` : base;
+}
+
+function updateFaviconBadge() {
+  const link = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+  if (!link) return;
+  const unread = chezUnreadCount();
+  if (unread === 0) {
+    // Restore the static favicon by removing any inline data-uri override.
+    // Reading the original href off the dataset preserves the cache-bust
+    // query string we set the first time we mutated it.
+    if (link.dataset.faviconBaseHref && link.href !== link.dataset.faviconBaseHref) {
+      link.href = link.dataset.faviconBaseHref;
+    }
+    return;
+  }
+  // Memoize the base href so we can restore it when unread drops to zero.
+  if (!link.dataset.faviconBaseHref) {
+    link.dataset.faviconBaseHref = link.href;
+  }
+  // Inline SVG: brand-purple square with a lowercase "c" + purple-pale dot.
+  // Encoded inline so we don't need a sibling favicon-alert.svg file.
+  const svg =
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>" +
+    "<rect width='64' height='64' rx='14' fill='%236938EF'/>" +
+    "<text x='32' y='46' font-family='Georgia, serif' font-size='40' font-weight='700' " +
+    "text-anchor='middle' fill='white'>c</text>" +
+    "<circle cx='52' cy='12' r='10' fill='%23EFEAFE'/>" +
+    "</svg>";
+  link.href = "data:image/svg+xml;utf8," + svg;
+}
+
 function liveItemsForView(viewId) {
   const view = VIEWS.find((v) => v.id === viewId);
   if (!view?.liveSource) return null;
@@ -2023,6 +2077,12 @@ function render() {
   // whenever the view re-renders (e.g. after a refresh).
   if (el.refreshTime) el.refreshTime.textContent = relativeTimeString(state.lastDataLoadAt);
   renderNav();
+  // Phase 9d — update tab title + favicon dot so unread cases are visible
+  // even when the browser tab isn't focused. Cheap, idempotent; fires
+  // every render so any state-mutating action that calls render() picks
+  // up the new count.
+  updateBrowserTitleBadge();
+  updateFaviconBadge();
 
   // Phase 4b — Preview-entire-quiz button is only relevant on the quiz view.
   if (el.previewQuiz) {
@@ -2046,6 +2106,18 @@ function render() {
   // list + detail surfaces (Tasks, Quiz, Routines, etc.) but cramped for
   // a command center that wants to span the viewport.
   el.adminLayout?.classList.toggle("admin-layout--single", state.view === "today");
+
+  // Phase 9d — Today renders its own hero card with inline chips and hides
+  // the legacy 5-tile stats grid (set in renderTodayView). Restore the
+  // grid's visibility on every OTHER view so the existing surfaces keep
+  // working. Cheap idempotent toggle.
+  if (el.stats) {
+    if (state.view === "today") {
+      el.stats.classList.add("is-hidden");
+    } else {
+      el.stats.classList.remove("is-hidden");
+    }
+  }
 
   if (state.view === "chez") {
     renderConciergeCockpit();
@@ -5526,9 +5598,10 @@ function renderConciergeTopBarHtml(activeReq) {
   return `
     <header class="cockpit-topbar">
       <div class="cockpit-topbar__brand">
-        <div class="cockpit-topbar__mark">c</div>
+        <div class="cockpit-topbar__mark" aria-hidden="true">
+          <img src="/chez-mark-white.svg?v=6" alt="" width="20" height="20" />
+        </div>
         <span class="cockpit-topbar__wordmark">Concierge</span>
-        <span class="cockpit-topbar__eyebrow">Customer service cockpit</span>
       </div>
       <div class="cockpit-topbar__right">
         <label class="cockpit-search">
@@ -5746,6 +5819,22 @@ function renderConciergeChatPanelHtml(req) {
             placeholder="Tell the homeowner what's next…"
             data-cockpit-reply-input
           >${escapeHtml(draft)}</textarea>
+          <!-- Phase 9d — Quick-reply chips. Five short, situation-agnostic
+               phrases that cover ~70% of operator replies. Click → fills
+               the textarea; operator can edit before sending. Each chip
+               carries the literal text in data-cockpit-quickreply so the
+               handler can read it directly without a per-chip listener. -->
+          <div class="cockpit-quickreplies" data-cockpit-quickreplies>
+            ${[
+              "On it — will follow up shortly.",
+              "Need a bit more info — can you confirm…",
+              "Booked! Confirmation incoming.",
+              "Working on it — should have an update by end of day.",
+              "Closed out — let me know if anything else comes up.",
+            ].map((q) => `
+              <button type="button" class="cockpit-quickreply" data-cockpit-quickreply="${escapeHtml(q)}">${escapeHtml(q)}</button>
+            `).join("")}
+          </div>
           ${critique ? `
             <div class="cockpit-critique">
               <span class="cockpit-spark cockpit-spark--sm">✦</span>
@@ -5978,6 +6067,37 @@ function renderConciergeHomeownerPanelHtml(req) {
     ? `Auto $${tier.auto_approve_under} · Ping $${tier.ping_under} · Ask &gt; $${tier.explicit_above}`
     : "Default tiers (200/500/500)";
 
+  // Phase 9d — standing-engagement rail. Pulls every chez_owned routine
+  // + chez_owned contractor from the dossier so the operator sees
+  // "Recurring with Chez · 5" at the top of the panel — distinct from
+  // the rest of the household's catalog. Surfaces the next-due date when
+  // available so the operator can see "we're up next on landscaping in 4d".
+  const standingRoutines = ((dossier.routines || []).filter((r) => r.chez_owned && !r.archived_at)) || [];
+  const standingContractors = ((dossier.contractors || []).filter((c) => c.chez_owned)) || [];
+  const standingHtml = (standingRoutines.length + standingContractors.length) > 0 ? `
+    <div class="cockpit-homeowner__standing">
+      <div class="cockpit-homeowner__standing-head">
+        <span>Recurring with Chez</span>
+        <strong>${standingRoutines.length + standingContractors.length}</strong>
+      </div>
+      ${standingRoutines.slice(0, 3).map((r) => `
+        <div class="cockpit-homeowner__standing-row">
+          <span class="cockpit-homeowner__standing-name">${escapeHtml(r.label || prettyCategoryLabel(r.routine_kind || "general"))}</span>
+          <span class="cockpit-homeowner__standing-when">${r.next_due_at ? escapeHtml(relativeTimeString(r.next_due_at)) : "—"}</span>
+        </div>
+      `).join("")}
+      ${standingContractors.slice(0, 2).map((c) => `
+        <div class="cockpit-homeowner__standing-row">
+          <span class="cockpit-homeowner__standing-name">${escapeHtml(c.company_name || c.name || "Vendor")}</span>
+          <span class="cockpit-homeowner__standing-when cockpit-muted">point of contact</span>
+        </div>
+      `).join("")}
+      ${(standingRoutines.length + standingContractors.length) > 5
+        ? `<div class="cockpit-homeowner__standing-more">+ ${(standingRoutines.length + standingContractors.length) - 5} more</div>`
+        : ""}
+    </div>
+  ` : "";
+
   return `
     <aside class="cockpit-homeowner">
       <div class="cockpit-homeowner__profile">
@@ -6015,6 +6135,8 @@ function renderConciergeHomeownerPanelHtml(req) {
           View full profile →
         </button>
       </div>
+
+      ${standingHtml}
 
       ${(dossier.users?.length || dossier.family_members?.length) ? `
         <div class="cockpit-eyebrow">Family &amp; access<span class="cockpit-eyebrow__count">${(dossier.users?.length || 0) + (dossier.family_members?.length || 0)}</span></div>
@@ -9068,6 +9190,27 @@ function attachConciergeCockpitHandlers(activeReq, filteredCases) {
       await submitConciergeReply(activeReq, replyForm, "waiting_customer");
     });
   }
+
+  // ---- Phase 9d — Quick-reply chips -------------------------------------
+  // Click a chip → fills the textarea with the literal phrase, fires
+  // an input event so the existing draft-persistence picks it up, then
+  // focuses the input so the operator can edit/extend before sending.
+  host.querySelectorAll("[data-cockpit-quickreply]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const phrase = btn.dataset.cockpitQuickreply || "";
+      const input = host.querySelector("[data-cockpit-reply-input]");
+      if (!input) return;
+      // If there's already a draft, append on a new line so the operator
+      // can stack templates. Otherwise just set the value.
+      const existing = (input.value || "").trim();
+      input.value = existing ? `${existing}\n\n${phrase}` : phrase;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+      // Place cursor at the end so typing continues naturally.
+      try { input.setSelectionRange(input.value.length, input.value.length); } catch {}
+    });
+  });
 
   // ---- Cockpit-wide [data-cockpit-action] delegation --------------------
 
@@ -19336,7 +19479,11 @@ function prettifyEnum(value) {
 
 async function renderTodayView() {
   el.search.value = state.search || "";
-  el.stats.innerHTML = `<div class="admin-stat"><strong>—</strong><span>Loading…</span></div>`;
+  // Hide the legacy 5-tile stats grid; the new hero card carries inline
+  // chips that replace it. Stash a flag so other view switches can
+  // restore it without re-rendering everything.
+  el.stats.innerHTML = "";
+  el.stats.classList.add("is-hidden");
   el.list.innerHTML = `<p class="admin-audit__intro">Loading today's brief…</p>`;
   // Hide the focused-detail rail (only relevant on entity views).
   el.auditFocused?.classList.add("is-hidden");
@@ -19366,89 +19513,143 @@ async function renderTodayView() {
     state.today.loading = false;
   }
 
-  const stats = state.today.stats;
-  // Stat tiles use the same `.admin-stat` chrome as every other surface so
-  // visual rhythm stays consistent.
-  el.stats.innerHTML = `
-    <div class="admin-stat admin-stat--clickable" data-today-jump="urgent">
-      <strong>${stats.sla_overdue || 0}</strong><span>Overdue</span>
-    </div>
-    <div class="admin-stat admin-stat--clickable" data-today-jump="urgent">
-      <strong>${stats.sla_due_soon || 0}</strong><span>Due soon</span>
-    </div>
-    <div class="admin-stat admin-stat--clickable" data-today-jump="visits-today">
-      <strong>${stats.visits_today || 0}</strong><span>Visits today</span>
-    </div>
-    <div class="admin-stat"><strong>${stats.open_cases || 0}</strong><span>Open cases</span></div>
-    <div class="admin-stat"><strong>${stats.homes_under_management || 0}</strong><span>Homes</span></div>
-  `;
-
-  const greetingHtml = renderTodayGreetingHtml(stats);
+  // Phase 9d — Today view redesign:
+  //   Hero card (greeting + adaptive subline + 5 inline chips)
+  //   Needs you now (grouped by severity: overdue / unread / due-soon)
+  //     · single anchored "Past SLA" callout per group, not per-row
+  //     · family fold when one household has 5+ in a group
+  //   Today (merged: visits + unread messages, sorted by time)
+  //   Upcoming · next 7 days (grouped by day)
+  const heroHtml = renderTodayHeroHtml(state.today.stats);
   const urgentHtml = renderTodayUrgentSectionHtml(state.today.urgentCases);
-  const visitsHtml = renderTodayVisitsTodaySectionHtml(state.today.todaysVisits);
+  const todayHtml = renderTodayHappeningNowHtml(state.today.todaysVisits, state.today.recentUnread);
   const upcomingHtml = renderTodayUpcomingSectionHtml(state.today.upcomingVisits);
-  const unreadHtml = renderTodayUnreadSectionHtml(state.today.recentUnread);
 
   el.list.innerHTML = `
     <div class="admin-audit admin-today">
-      ${greetingHtml}
-      <section class="admin-today__section" id="today-section-urgent" data-section="urgent">
-        <header class="admin-today__sec-head">
-          <h3>Needs you now</h3>
-          <span class="admin-today__sec-count">${state.today.urgentCases.length}</span>
-        </header>
-        ${urgentHtml}
-      </section>
-      <section class="admin-today__section" id="today-section-visits-today" data-section="visits-today">
-        <header class="admin-today__sec-head">
-          <h3>Today's visits</h3>
-          <span class="admin-today__sec-count">${state.today.todaysVisits.length}</span>
-        </header>
-        ${visitsHtml}
-      </section>
-      <section class="admin-today__section" id="today-section-unread" data-section="unread">
-        <header class="admin-today__sec-head">
-          <h3>Recent customer messages</h3>
-          <span class="admin-today__sec-count">${state.today.recentUnread.length}</span>
-        </header>
-        ${unreadHtml}
-      </section>
-      <section class="admin-today__section" id="today-section-upcoming" data-section="upcoming">
-        <header class="admin-today__sec-head">
-          <h3>Coming up · next 7 days</h3>
-          <span class="admin-today__sec-count">${state.today.upcomingVisits.length}</span>
-        </header>
-        ${upcomingHtml}
-      </section>
+      ${heroHtml}
+      ${urgentHtml}
+      ${todayHtml}
+      ${upcomingHtml}
     </div>
   `;
 
-  // Stat-tile scroll jumps: clicking a tile scrolls the matching section
-  // into view. Mirrors the iOS Dashboard "Up Next" stat-pill filter pattern.
-  el.list.querySelectorAll("[data-today-jump]").forEach((tile) => {
-    tile.addEventListener("click", () => {
-      const target = el.list.querySelector(`#today-section-${tile.dataset.todayJump}`);
+  attachTodayHandlers();
+}
+
+// Reusable handler attach so re-renders (after row actions) can re-wire.
+function attachTodayHandlers() {
+  // Chip → scroll matching section into view.
+  el.list.querySelectorAll("[data-today-jump]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const target = el.list.querySelector(`#today-section-${chip.dataset.todayJump}`);
       target?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 
-  // Case rows → open the Concierge cockpit with that case pre-selected.
+  // Row → open case in cockpit. Wired to bubble; per-row hover-action
+  // buttons stopPropagation so they don't double-fire.
   el.list.querySelectorAll("[data-today-open-case]").forEach((row) => {
-    row.addEventListener("click", async () => {
+    row.addEventListener("click", async (e) => {
+      // If the click came from a hover action button, that handler
+      // already ran (and stopped propagation). Defensive guard.
+      if (e.target.closest("[data-today-row-action]")) return;
+      const requestId = row.dataset.todayOpenCase;
+      await openCaseInCockpit(requestId);
+    });
+    // The row is a <div role="button"> (so nested action <button>s aren't
+    // ejected by the HTML parser). Add Enter / Space keyboard activation.
+    row.addEventListener("keydown", async (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (e.target.closest("[data-today-row-action]")) return;
+      e.preventDefault();
       const requestId = row.dataset.todayOpenCase;
       await openCaseInCockpit(requestId);
     });
   });
 
-  // Visit rows + home rows → open the home workbench at that household.
   el.list.querySelectorAll("[data-today-open-home]").forEach((row) => {
-    row.addEventListener("click", async () => {
+    row.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-today-row-action]")) return;
+      const householdId = row.dataset.todayOpenHome;
+      await openHomeFromToday(householdId);
+    });
+    row.addEventListener("keydown", async (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (e.target.closest("[data-today-row-action]")) return;
+      e.preventDefault();
       const householdId = row.dataset.todayOpenHome;
       await openHomeFromToday(householdId);
     });
   });
 
-  // "View all cases" / "View all homes" footer links.
+  // Hover row actions: Reply / Snooze / Resolve. Each stops propagation
+  // so the row's open-case handler doesn't also fire.
+  el.list.querySelectorAll("[data-today-row-action]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.todayRowAction;
+      const requestId = btn.dataset.id;
+      if (!requestId) return;
+      if (action === "reply") {
+        await openCaseInCockpit(requestId);
+        setTimeout(() => {
+          document.querySelector("[data-cockpit-reply-input]")?.focus();
+        }, 250);
+      } else if (action === "snooze") {
+        try {
+          await callChezConcierge({
+            action: "transition_status",
+            request_id: requestId,
+            status: "waiting_customer",
+          });
+          showAdminToast?.("Snoozed — waiting on customer");
+          state.today.loadedAt = 0;
+          renderTodayView();
+        } catch (err) {
+          console.warn("[today] snooze failed", err);
+          showAdminToast?.("Snooze failed");
+        }
+      } else if (action === "resolve") {
+        if (!confirm("Mark this case resolved?")) return;
+        try {
+          await callChezConcierge({
+            action: "transition_status",
+            request_id: requestId,
+            status: "resolved",
+          });
+          showAdminToast?.("Resolved");
+          state.today.loadedAt = 0;
+          renderTodayView();
+        } catch (err) {
+          console.warn("[today] resolve failed", err);
+          showAdminToast?.("Resolve failed");
+        }
+      }
+    });
+  });
+
+  // Family-fold toggle persistence — remember which expanders the
+  // operator opened so re-renders don't collapse them.
+  state.today.familyFolded = state.today.familyFolded || {};
+  el.list.querySelectorAll("[data-family-fold-id]").forEach((details) => {
+    const id = details.dataset.familyFoldId;
+    if (state.today.familyFolded[id]) details.open = true;
+    details.addEventListener("toggle", () => {
+      state.today.familyFolded[id] = details.open;
+    });
+  });
+
+  // Section open/closed persistence.
+  state.today.sectionsOpen = state.today.sectionsOpen || { urgent: true, today: true, upcoming: true };
+  el.list.querySelectorAll("[data-today-section]").forEach((details) => {
+    const id = details.dataset.todaySection;
+    if (state.today.sectionsOpen[id] === false) details.open = false;
+    details.addEventListener("toggle", () => {
+      state.today.sectionsOpen[id] = details.open;
+    });
+  });
+
   el.list.querySelector("[data-today-view-all-cases]")?.addEventListener("click", () => {
     state.view = "chez";
     render();
@@ -19463,8 +19664,10 @@ async function renderTodayView() {
   });
 }
 
-// Greeting card — operator + date + headline that adapts to what's hot.
-function renderTodayGreetingHtml(stats) {
+// Hero card — operator + adaptive headline + inline stat chips.
+// Replaces both the prior 5-tile stats grid AND the standalone greeting
+// row, anchoring the whole view at the top in one purple gradient card.
+function renderTodayHeroHtml(stats) {
   const now = new Date();
   const hour = now.getHours();
   let greeting;
@@ -19474,155 +19677,359 @@ function renderTodayGreetingHtml(stats) {
   else greeting = "Good evening";
 
   const dateStr = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const s = stats || {};
 
   let headline;
-  if ((stats.sla_overdue || 0) > 0) {
-    headline = `${stats.sla_overdue} ${stats.sla_overdue === 1 ? "case is" : "cases are"} past SLA.`;
-  } else if ((stats.sla_due_soon || 0) > 0) {
-    headline = `${stats.sla_due_soon} ${stats.sla_due_soon === 1 ? "case is" : "cases are"} due within 6 hours.`;
-  } else if ((stats.visits_today || 0) > 0) {
-    headline = `${stats.visits_today} vendor ${stats.visits_today === 1 ? "visit is" : "visits are"} scheduled today.`;
-  } else if ((stats.open_cases || 0) > 0) {
-    headline = `All caught up on SLAs. ${stats.open_cases} ${stats.open_cases === 1 ? "case" : "cases"} open.`;
+  if ((s.sla_overdue || 0) > 0) {
+    headline = `${s.sla_overdue} ${s.sla_overdue === 1 ? "case is" : "cases are"} past SLA.`;
+  } else if ((s.sla_due_soon || 0) > 0) {
+    headline = `${s.sla_due_soon} ${s.sla_due_soon === 1 ? "case is" : "cases are"} due within 6 hours.`;
+  } else if ((s.visits_today || 0) > 0) {
+    headline = `${s.visits_today} vendor ${s.visits_today === 1 ? "visit is" : "visits are"} scheduled today.`;
+  } else if ((s.open_cases || 0) > 0) {
+    headline = `All caught up on SLAs. ${s.open_cases} ${s.open_cases === 1 ? "case" : "cases"} open.`;
   } else {
     headline = "All clear. No open cases.";
   }
 
   return `
-    <header class="admin-today__greeting">
-      <div class="admin-today__greeting-text">
-        <span class="admin-today__greeting-eyebrow">${escapeHtml(dateStr)}</span>
-        <h2>${escapeHtml(greeting)}, Tom.</h2>
-        <p>${escapeHtml(headline)}</p>
+    <section class="admin-today__hero">
+      <p class="admin-today__hero-eyebrow">Start of day · ${escapeHtml(dateStr)}</p>
+      <h1 class="admin-today__hero-title">${escapeHtml(greeting)}, Tom.</h1>
+      <p class="admin-today__hero-sub">${escapeHtml(headline)}</p>
+      <div class="admin-today__chips">
+        ${renderTodayChip(s.sla_overdue, "past SLA", "urgent", "urgent")}
+        ${renderTodayChip(s.sla_due_soon, "due soon", null, "urgent")}
+        ${renderTodayChip(s.visits_today, "visits today", null, "today")}
+        ${renderTodayChip(s.open_cases, "open", null, null, true)}
+        ${renderTodayChip(s.homes_under_management, "homes", null, null, true)}
       </div>
-      <button type="button" class="admin-today__refresh" data-today-refresh title="Refresh">
-        ↻ Refresh
-      </button>
-    </header>
+    </section>
   `;
 }
 
+function renderTodayChip(value, label, tone, jumpTo, isStatic) {
+  const n = value ?? 0;
+  const isUrgent = tone === "urgent" && n > 0;
+  const cls = [
+    "admin-today__chip",
+    isUrgent ? "admin-today__chip--urgent" : "",
+    isStatic ? "admin-today__chip--static" : "",
+  ].filter(Boolean).join(" ");
+  const tag = isStatic ? "span" : "button";
+  const attrs = isStatic ? "" : `type="button" ${jumpTo ? `data-today-jump="${escapeHtml(jumpTo)}"` : ""}`;
+  return `<${tag} class="${cls}" ${attrs}><strong>${n}</strong> ${escapeHtml(label)}</${tag}>`;
+}
+
+// "Needs you now" — group by severity (overdue / unread / due-soon) so the
+// alarm reads as 3 anchored groups, not 16 individual red pills. When one
+// household has ≥5 in a group, fold the tail into a "+ Show N more" expander
+// per the Linear pattern.
 function renderTodayUrgentSectionHtml(items) {
-  if (items.length === 0) {
-    return `<p class="admin-today__empty">No SLA pressure and no unread homeowner messages. Beautiful.</p>`;
-  }
-  const rows = items.map((c) => {
-    const tone = c.severity === "overdue" ? "red" : c.severity === "unread" ? "amber" : "yellow";
-    const label = c.severity === "overdue"
-      ? `Overdue · SLA ${relativeTimeString(c.sla_due_at)}`
-      : c.severity === "unread"
-      ? `Unread reply · ${relativeTimeString(c.last_message_at || c.sla_due_at)}`
-      : `Due ${relativeTimeString(c.sla_due_at)}`;
-    const proposalChip = (c.pending_proposal_count ?? 0) > 0
-      ? `<span class="admin-pill" data-tone="indigo">${c.pending_proposal_count} pending proposal${c.pending_proposal_count === 1 ? "" : "s"}</span>`
-      : "";
+  if (!items || items.length === 0) {
     return `
-      <button type="button" class="admin-today__row" data-today-open-case="${escapeHtml(c.id)}">
-        <div class="admin-today__row-left">
-          <span class="admin-pill" data-tone="${tone}">${escapeHtml(label)}</span>
-          <strong class="admin-today__row-title">${escapeHtml(c.summary || "Untitled case")}</strong>
-          <span class="admin-today__row-sub">${escapeHtml(c.household_address)} · ${escapeHtml(prettyCategoryLabel(c.category))}</span>
-        </div>
-        <div class="admin-today__row-right">
-          ${proposalChip}
-          <span class="admin-today__chevron">→</span>
-        </div>
-      </button>
+      <details class="admin-today__section" data-today-section="urgent" id="today-section-urgent" open>
+        <summary class="admin-today__sec-head">
+          <h2>Needs you now</h2>
+          <span class="admin-today__sec-count">0</span>
+        </summary>
+        <p class="admin-today__empty">No SLA pressure and no unread homeowner messages. Beautiful.</p>
+      </details>
     `;
-  }).join("");
+  }
+
+  const overdue = items.filter((c) => c.severity === "overdue");
+  const unread = items.filter((c) => c.severity === "unread");
+  const dueSoon = items.filter((c) => c.severity === "due_soon");
+
+  const blocks = [];
+  if (overdue.length) blocks.push(renderTodayUrgentGroupHtml("Past SLA", "urgent", overdue));
+  if (unread.length) blocks.push(renderTodayUrgentGroupHtml("Awaiting your reply", "reply", unread));
+  if (dueSoon.length) blocks.push(renderTodayUrgentGroupHtml("Due soon", "soon", dueSoon));
+
   return `
-    <div class="admin-today__rows">${rows}</div>
-    <button type="button" class="admin-today__view-all" data-today-view-all-cases>
-      View all cases in Concierge →
-    </button>
+    <details class="admin-today__section" data-today-section="urgent" id="today-section-urgent" open>
+      <summary class="admin-today__sec-head">
+        <h2>Needs you now</h2>
+        <span class="admin-today__sec-count">${items.length}</span>
+      </summary>
+      ${blocks.join("")}
+      <button type="button" class="admin-today__view-all" data-today-view-all-cases>
+        View all cases in Concierge →
+      </button>
+    </details>
   `;
 }
 
-function renderTodayVisitsTodaySectionHtml(items) {
-  if (items.length === 0) {
-    return `<p class="admin-today__empty">No vendor visits scheduled today.</p>`;
-  }
-  const rows = items.map((v) => {
-    const timeStr = v.scheduled_for
-      ? new Date(v.scheduled_for).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
-      : "Time TBD";
-    const window = v.scheduled_window ? ` · ${escapeHtml(v.scheduled_window)}` : "";
-    const phoneChip = v.vendor_phone
-      ? `<span class="admin-today__chip">📞 ${escapeHtml(v.vendor_phone)}</span>`
-      : "";
-    return `
-      <button type="button" class="admin-today__row" data-today-open-home="${escapeHtml(v.household_id)}">
-        <div class="admin-today__row-left">
-          <strong class="admin-today__row-time">${escapeHtml(timeStr)}${window}</strong>
-          <span class="admin-today__row-title">${escapeHtml(v.vendor_name || "Vendor")}</span>
-          <span class="admin-today__row-sub">${escapeHtml(v.household_address)}</span>
-        </div>
-        <div class="admin-today__row-right">
-          ${phoneChip}
-          <span class="admin-today__chevron">→</span>
-        </div>
-      </button>
-    `;
-  }).join("");
-  return `<div class="admin-today__rows">${rows}</div>`;
+function renderTodayUrgentGroupHtml(label, tone, cases) {
+  const grouped = foldCasesByFamily(cases, 5);
+  const inlineRows = grouped.inline.map((c) => renderTodayCaseRowHtml(c, tone)).join("");
+  const foldRows = Object.entries(grouped.folded).map(([id, info]) => `
+    <details class="admin-today__family-fold" data-family-fold-id="${escapeHtml(id)}">
+      <summary>+ Show ${info.rest.length} more from ${escapeHtml(info.name)}</summary>
+      ${info.rest.map((c) => renderTodayCaseRowHtml(c, tone)).join("")}
+    </details>
+  `).join("");
+  const groupClass = `admin-today__group ${tone === "urgent" ? "admin-today__group--urgent" : ""}`.trim();
+  return `
+    <div class="${groupClass}">
+      <div class="admin-today__group-head">
+        <span class="admin-today__group-label">${escapeHtml(label)}</span>
+        <span class="admin-today__group-count">${cases.length} case${cases.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="admin-today__rows">
+        ${inlineRows}
+        ${foldRows}
+      </div>
+    </div>
+  `;
 }
 
-function renderTodayUnreadSectionHtml(items) {
-  if (items.length === 0) {
-    return `<p class="admin-today__empty">Inbox is clear. No unread homeowner messages in the last 48 hours.</p>`;
+// Given an array of cases, return { inline, folded } where:
+//   inline = the first 3 cases of any household that has ≥ threshold cases,
+//            plus all cases from households with < threshold (interleaved
+//            in original priority order).
+//   folded = { householdId: { name, rest: [...cases] } } — the rest of each
+//            heavy household, to be rendered behind a per-family expander.
+// This keeps the "Burke Family" wall-of-rows from dominating the urgent
+// section without hiding any work.
+function foldCasesByFamily(cases, threshold) {
+  if (!cases || cases.length === 0) return { inline: [], folded: {} };
+  const counts = {};
+  for (const c of cases) {
+    const hid = c.household_id || "_";
+    counts[hid] = (counts[hid] || 0) + 1;
   }
-  const rows = items.map((m) => {
-    return `
-      <button type="button" class="admin-today__row" data-today-open-case="${escapeHtml(m.request_id)}">
-        <div class="admin-today__row-left">
-          <span class="admin-pill" data-tone="amber">${escapeHtml(relativeTimeString(m.sent_at))}</span>
-          <strong class="admin-today__row-title">${escapeHtml(m.summary || "Untitled case")}</strong>
-          <span class="admin-today__row-sub">${escapeHtml(m.household_address)} · ${escapeHtml(prettyCategoryLabel(m.category))}</span>
-          <span class="admin-today__row-excerpt">"${escapeHtml(m.excerpt || "")}"</span>
-        </div>
-        <div class="admin-today__row-right">
-          <span class="admin-today__chevron">→</span>
-        </div>
-      </button>
-    `;
-  }).join("");
-  return `<div class="admin-today__rows">${rows}</div>`;
+  const heavy = new Set(
+    Object.entries(counts).filter(([, n]) => n >= threshold).map(([id]) => id)
+  );
+  if (heavy.size === 0) return { inline: cases, folded: {} };
+  const inline = [];
+  const folded = {};
+  const seen = {};
+  for (const c of cases) {
+    const hid = c.household_id || "_";
+    if (!heavy.has(hid)) {
+      inline.push(c);
+      continue;
+    }
+    seen[hid] = (seen[hid] || 0) + 1;
+    if (seen[hid] <= 3) {
+      inline.push(c);
+    } else {
+      if (!folded[hid]) {
+        const family = c.household_name || c.household_address || "Household";
+        folded[hid] = { name: shortenFamilyName(family), rest: [] };
+      }
+      folded[hid].rest.push(c);
+    }
+  }
+  return { inline, folded };
 }
 
+function shortenFamilyName(name) {
+  return String(name || "").replace(/\s+Family$/i, "").trim() || name;
+}
+
+// The single shared row markup. One white card per group holds rows
+// separated by hairline dividers; no per-row borders. Hover swaps the
+// SLA/time tail for Reply / Snooze / Resolve action buttons.
+//
+// `tone`: "urgent" (overdue) | "reply" (unread) | "soon" (due-soon)
+//       | "visit" (visit row) | "message" (recent unread message)
+//       | "compact" (next-7-days variant — even tighter)
+function renderTodayCaseRowHtml(c, tone) {
+  const icon = CHEZ_CATEGORY_ICONS[c.category] || "💬";
+  const familyName = c.household_name || c.household_address || "Household";
+  const familyShort = shortenFamilyName(familyName);
+  const address = c.household_address && c.household_address !== familyName
+    ? ` · ${escapeHtml(c.household_address)}`
+    : "";
+
+  let tailHtml;
+  if (tone === "urgent") {
+    tailHtml = `<span class="admin-today__row-tail admin-today__row-tail--urgent">
+      <strong>past SLA</strong> ${escapeHtml(relativeTimeString(c.sla_due_at))} →
+    </span>`;
+  } else if (tone === "reply") {
+    tailHtml = `<span class="admin-today__row-tail">
+      <strong>unread</strong> ${escapeHtml(relativeTimeString(c.last_message_at || c.sla_due_at))} →
+    </span>`;
+  } else {
+    tailHtml = `<span class="admin-today__row-tail">
+      Due ${escapeHtml(relativeTimeString(c.sla_due_at))} →
+    </span>`;
+  }
+
+  const id = escapeHtml(c.id);
+  // Use a div with role="button" so the inner action <button>s aren't
+  // auto-ejected by the HTML parser (nested <button> is invalid markup
+  // and the browser closes the outer one before reaching the inner ones).
+  return `
+    <div class="admin-today__row" role="button" tabindex="0" data-today-open-case="${id}">
+      <span class="admin-today__row-icon">${icon}</span>
+      <div class="admin-today__row-main">
+        <div class="admin-today__row-title">${escapeHtml(c.summary || "Untitled case")}</div>
+        <div class="admin-today__row-meta">
+          <strong>${escapeHtml(familyShort)}</strong> · ${escapeHtml(prettyCategoryLabel(c.category))}${address}
+        </div>
+      </div>
+      ${tailHtml}
+      <span class="admin-today__row-actions">
+        <button type="button" class="admin-today__row-action" data-today-row-action="reply" data-id="${id}">Reply</button>
+        <button type="button" class="admin-today__row-action" data-today-row-action="snooze" data-id="${id}">Snooze</button>
+        <button type="button" class="admin-today__row-action" data-today-row-action="resolve" data-id="${id}">Resolve</button>
+      </span>
+    </div>
+  `;
+}
+
+// Visit row — same chrome, but the time becomes the left "icon" slot and
+// the meta line carries the vendor + address. Clicks open the household
+// workbench, not the case (visits aren't cases).
+function renderTodayVisitRowHtml(v) {
+  const timeStr = v.scheduled_for
+    ? new Date(v.scheduled_for).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : "TBD";
+  const windowStr = v.scheduled_window ? ` · ${escapeHtml(v.scheduled_window)}` : "";
+  const phoneChip = v.vendor_phone
+    ? `<span class="admin-today__row-phone">📞 ${escapeHtml(v.vendor_phone)}</span>`
+    : "";
+  return `
+    <div class="admin-today__row admin-today__row--visit" role="button" tabindex="0" data-today-open-home="${escapeHtml(v.household_id)}">
+      <span class="admin-today__row-time">${escapeHtml(timeStr)}</span>
+      <div class="admin-today__row-main">
+        <div class="admin-today__row-title">${escapeHtml(v.vendor_name || "Vendor")}${windowStr}</div>
+        <div class="admin-today__row-meta">${escapeHtml(v.household_address || "Household")}</div>
+      </div>
+      <span class="admin-today__row-tail">${phoneChip} →</span>
+    </div>
+  `;
+}
+
+// Unread-message row — case-like behavior (clicks open the case thread)
+// but renders an excerpt for context. Used inside the merged "Today"
+// section alongside visits.
+function renderTodayUnreadRowHtml(m) {
+  const icon = "↩";
+  const familyName = m.household_name || m.household_address || "Household";
+  const familyShort = shortenFamilyName(familyName);
+  const id = escapeHtml(m.request_id);
+  return `
+    <div class="admin-today__row admin-today__row--message" role="button" tabindex="0" data-today-open-case="${id}">
+      <span class="admin-today__row-icon admin-today__row-icon--quiet">${icon}</span>
+      <div class="admin-today__row-main">
+        <div class="admin-today__row-title">${escapeHtml(m.summary || "Untitled case")}</div>
+        <div class="admin-today__row-meta">
+          <strong>${escapeHtml(familyShort)}</strong> · ${escapeHtml(prettyCategoryLabel(m.category))}
+        </div>
+        ${m.excerpt ? `<div class="admin-today__row-excerpt">"${escapeHtml(m.excerpt)}"</div>` : ""}
+      </div>
+      <span class="admin-today__row-tail">${escapeHtml(relativeTimeString(m.sent_at))} →</span>
+      <span class="admin-today__row-actions">
+        <button type="button" class="admin-today__row-action" data-today-row-action="reply" data-id="${id}">Reply</button>
+        <button type="button" class="admin-today__row-action" data-today-row-action="snooze" data-id="${id}">Snooze</button>
+      </span>
+    </div>
+  `;
+}
+
+// "Today" section — merges today's vendor visits + recent unread
+// customer messages into a single time-sorted list. Previously these
+// were two separate sections, but operators triage them together
+// ("what's happening between now and end-of-day").
+function renderTodayHappeningNowHtml(visits, unreadMessages) {
+  visits = visits || [];
+  unreadMessages = unreadMessages || [];
+  const total = visits.length + unreadMessages.length;
+  if (total === 0) {
+    return `
+      <details class="admin-today__section" data-today-section="today" id="today-section-today" open>
+        <summary class="admin-today__sec-head">
+          <h2>Today</h2>
+          <span class="admin-today__sec-count">0</span>
+        </summary>
+        <p class="admin-today__empty">No visits scheduled and inbox is clear.</p>
+      </details>
+    `;
+  }
+
+  // Sort by time within each kind, render visits first (they're time-anchored
+  // events the operator wants visible at a glance) then unread.
+  const sortedVisits = [...visits].sort((a, b) => {
+    const at = a.scheduled_for ? new Date(a.scheduled_for).getTime() : Infinity;
+    const bt = b.scheduled_for ? new Date(b.scheduled_for).getTime() : Infinity;
+    return at - bt;
+  });
+  const sortedMessages = [...unreadMessages].sort((a, b) => {
+    const at = a.sent_at ? new Date(a.sent_at).getTime() : 0;
+    const bt = b.sent_at ? new Date(b.sent_at).getTime() : 0;
+    return bt - at; // most recent first
+  });
+
+  const visitRows = sortedVisits.map(renderTodayVisitRowHtml).join("");
+  const messageRows = sortedMessages.map(renderTodayUnreadRowHtml).join("");
+  const labels = [];
+  if (visits.length) labels.push(`${visits.length} visit${visits.length === 1 ? "" : "s"}`);
+  if (unreadMessages.length) labels.push(`${unreadMessages.length} unread message${unreadMessages.length === 1 ? "" : "s"}`);
+
+  return `
+    <details class="admin-today__section" data-today-section="today" id="today-section-today" open>
+      <summary class="admin-today__sec-head">
+        <h2>Today</h2>
+        <span class="admin-today__sec-count">${escapeHtml(labels.join(" · "))}</span>
+      </summary>
+      <div class="admin-today__rows">
+        ${visitRows}
+        ${messageRows}
+      </div>
+    </details>
+  `;
+}
+
+// "Upcoming · next 7 days" — same row markup as Today's visits, but
+// grouped by day. Defaults to open; operator can collapse after scan.
 function renderTodayUpcomingSectionHtml(items) {
-  if (items.length === 0) {
-    return `<p class="admin-today__empty">Quiet week. No scheduled vendor visits in the next 7 days.</p>`;
+  if (!items || items.length === 0) {
+    return `
+      <details class="admin-today__section" data-today-section="upcoming" id="today-section-upcoming" open>
+        <summary class="admin-today__sec-head">
+          <h2>Upcoming · next 7 days</h2>
+          <span class="admin-today__sec-count">0</span>
+        </summary>
+        <p class="admin-today__empty">Quiet week. No scheduled vendor visits in the next 7 days.</p>
+      </details>
+    `;
   }
-  // Group by day for readability.
+
   const byDay = new Map();
   for (const v of items) {
-    const day = v.scheduled_for ? new Date(v.scheduled_for).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "TBD";
+    const day = v.scheduled_for
+      ? new Date(v.scheduled_for).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+      : "TBD";
     if (!byDay.has(day)) byDay.set(day, []);
     byDay.get(day).push(v);
   }
+
   const blocks = [...byDay.entries()].map(([day, visits]) => {
-    const rows = visits.map((v) => {
-      const timeStr = v.scheduled_for
-        ? new Date(v.scheduled_for).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
-        : "Time TBD";
-      return `
-        <button type="button" class="admin-today__row admin-today__row--compact" data-today-open-home="${escapeHtml(v.household_id)}">
-          <div class="admin-today__row-left">
-            <span class="admin-today__row-time admin-today__row-time--compact">${escapeHtml(timeStr)}</span>
-            <span class="admin-today__row-title">${escapeHtml(v.vendor_name || "Vendor")} · ${escapeHtml(v.household_address)}</span>
-          </div>
-          <span class="admin-today__chevron">→</span>
-        </button>
-      `;
-    }).join("");
+    const rows = visits.map(renderTodayVisitRowHtml).join("");
     return `
       <div class="admin-today__day-block">
         <h4 class="admin-today__day-label">${escapeHtml(day)}</h4>
-        ${rows}
+        <div class="admin-today__rows">${rows}</div>
       </div>
     `;
   }).join("");
-  return `<div class="admin-today__rows">${blocks}</div>`;
+
+  return `
+    <details class="admin-today__section" data-today-section="upcoming" id="today-section-upcoming" open>
+      <summary class="admin-today__sec-head">
+        <h2>Upcoming · next 7 days</h2>
+        <span class="admin-today__sec-count">${items.length}</span>
+      </summary>
+      ${blocks}
+    </details>
+  `;
 }
 
 // Map chez_request.category enum → human label. Single source of truth so
