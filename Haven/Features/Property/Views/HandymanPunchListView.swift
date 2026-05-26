@@ -1161,11 +1161,11 @@ final class HandymanPunchListViewModel: ObservableObject {
             }
 
             // Phase 73 follow-up: every visit on the Handyman tab needs
-            // a `handyman_request` row so the provider's dispatch board
-            // (handyman.html) and the iOS coordination surfaces (chat,
-            // scheduling round-trip, quote review) all have something
-            // to hang off. Without this the visit lives only as a
-            // maintenance_task and the provider never sees it.
+            // a `handyman_request` row so the provider dispatch and
+            // iOS coordination surfaces (chat, scheduling round-trip,
+            // quote review) all have something to hang off. Without
+            // this the visit lives only as a maintenance_task and the
+            // provider never sees it.
             //
             // Best-effort — a request-create failure shouldn't block
             // the visit itself. The homeowner can still see the
