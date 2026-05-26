@@ -4814,6 +4814,12 @@ async function handleFetchTodayBrief(
         id: r.id,
         household_id: r.household_id,
         household_address: addressOrName(r.household_id),
+        // Phase 9d — surface the household NAME alongside the address so
+        // the redesigned Today row can render "Burke · find vendor · 14
+        // Bay Rd" (family name as the strong anchor, address as muted
+        // suffix). The prior payload only emitted addressOrName which
+        // collapsed the two — the new UI needs them separable.
+        household_name: householdName.get(r.household_id) || null,
         category: r.category,
         summary: r.summary,
         status: r.status,
@@ -4844,6 +4850,7 @@ async function handleFetchTodayBrief(
       id: v.id,
       household_id: v.household_id,
       household_address: addressOrName(v.household_id),
+      household_name: householdName.get(v.household_id) || null,
       request_id: v.request_id,
       vendor_name: v.vendor_name,
       vendor_phone: v.vendor_phone,
@@ -4859,6 +4866,7 @@ async function handleFetchTodayBrief(
       id: v.id,
       household_id: v.household_id,
       household_address: addressOrName(v.household_id),
+      household_name: householdName.get(v.household_id) || null,
       request_id: v.request_id,
       vendor_name: v.vendor_name,
       vendor_phone: v.vendor_phone,
@@ -4886,6 +4894,7 @@ async function handleFetchTodayBrief(
         request_id: m.request_id,
         household_id: req.household_id,
         household_address: addressOrName(req.household_id),
+        household_name: householdName.get(req.household_id) || null,
         category: req.category,
         summary: req.summary,
         excerpt: m.content.length > 160 ? m.content.slice(0, 160) + "…" : m.content,
