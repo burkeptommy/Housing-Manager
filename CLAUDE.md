@@ -897,37 +897,19 @@ The Tasks tab's Maintenance mode is rebuilt around a single source of truth — 
 
 **Files touched:** [Haven/Features/Tasks/Views/MaintenanceTabView.swift](Haven/Features/Tasks/Views/MaintenanceTabView.swift) (large additive rewrite — new section helpers, deep-link handler, quick-schedule committer); [Haven/Features/Property/Services/MaintenanceTemplates.swift](Haven/Features/Property/Services/MaintenanceTemplates.swift) (`bundleChildren(...)` + `isBundleId(_:)` helpers); [Haven/App/MainTabView.swift](Haven/App/MainTabView.swift) (`.openMaintenanceTask` notification name); [Haven/App/HavenApp.swift](Haven/App/HavenApp.swift) (push handler integration); [Haven/Core/Services/AnalyticsService.swift](Haven/Core/Services/AnalyticsService.swift) (Phase 70 events). New components in [Haven/Features/Tasks/Views/Components/](Haven/Features/Tasks/Views/Components/): `BundleParentCard`, `BundleChildList`, `ChezOwnedPill`, `SeasonScopeBanner`, `MonthSubheader`, `QuickSchedulingSheet`, `StandaloneTaskRow`, `TasksV2RoutineOccurrenceRow`.
 
-## Chez Handyman Operations Desk (Web — Phase 67)
+## Provider surfaces — REMOVED (May 2026)
 
-Eight-screen authenticated React + Vite SPA at `website/operations/`. Replaces the 9 embedded workspace tabs that `handyman.html` was inflating after auth. Lives at `/operations/*` routes; `handyman.html` keeps the auth pitch + sign-in/sign-up form and redirects to `/operations/` after a successful session, preserving `?next=` deep links from the SPA.
+The handyman Operations Desk (`website/operations/` React + Vite SPA), the legacy `handyman.html` workspace, `handyman-quote.html`, `vendor-portal.html`, and the standalone `Chez Field` iOS app target are all decommissioned. Field tech work will move to dedicated offline visit websites (TBD) that handymen execute on-site at customer homes. The remaining customer-facing brand surfaces are the homeowner iOS app, the admin portal (`admin.html`), the service desk (`service.html`, served at service.getchez.com), and the vendor application flow (`vendor-apply.html` → `vendor-confirm.html`).
 
-**Stack:** React 18 + TypeScript + Vite 5 + React Router v6 + `@supabase/supabase-js` v2. Plain CSS modules + `chez.css` tokens via `<link>`. No CSS-in-JS, no icon font (inline SVG `Icon.tsx` library, stroke 1.8 round caps, ~24 icons). Build emits to `website/operations/dist/`.
+**What stayed on purpose:**
+- **`handyman-provider` Edge Function** — backs the homeowner-side punch-list flow (`HandymanTabView.respondToProposal`, `MaintenanceTaskDetailSheet.delegateTaskToPunchList`). Function will likely be renamed / refactored when the offline visit surface ships.
+- **`Haven/App/HavenFieldView.swift`** — defines `AppExperience` enum + view extensions consumed by `AppState` and `ContentView`. The Field-only target was removed, but the enum stays so the homeowner code compiles. `.field` branches in the homeowner code path are dormant since the field bundle ID no longer ships.
+- **`handyman_requests`, `home_assessments`, workspace tables** — still in the schema; some homeowner-side write paths (Chez concierge dispatch, contractor adoption) still insert into them so the future offline visit surface has data to read.
 
-**Modes:** `WorkspaceProvider` reads `provider_workspace_members` for the signed-in user, then loads the workspace + full roster in parallel. `mode = members.length > 1 ? "crew" : "sole"`, overridable via `?mode=sole|crew`. Sole mode hides the Crew nav item, swaps Crew today → Today (you), uses the personal hero copy ("Four stops today, finished by 3:30"). Crew mode adds the Crew workload strip on Overview + operational hero ("Own the queue, route the field team").
-
-**Eight routes:**
-| Route | File | Purpose |
-|---|---|---|
-| `/` | `screens/Overview.tsx` | Hero banner + KPI strip + 2-col body (Field board / Decision queue + Pipeline + Threads) + crew workload (crew mode) |
-| `/dispatch` | `screens/Dispatch.tsx` | 3-col grid (Unassigned 320 / Lanes 1fr / Assign panel 360). Selected card has salmon-50 bg + 3px salmon left-border. Best-fit tech in Assign panel gets salmon border + "Best fit" success pill. |
-| `/calendar` | `screens/Calendar.tsx` | Day/Week/Month toggle + 7-col month grid + tech filter chips. Today: salmon pill + salmon-50 cell bg. |
-| `/routes` | `screens/Routes.tsx` | 3-col tech route cards. Each has SVG mini-map preview (gradient bg + dashed indigo path + numbered salmon stop circles) + numbered stop list with index circle + connector line. |
-| `/crew` | `screens/Crew.tsx` | 2-col Roster / Profile + Permissions + Activity. Profile gradient indigo header. Permissions toggles in salmon. |
-| `/homes` | `screens/Homes.tsx` | Toolbar + 3-up home cards (gradient header + roof SVG + 3-up Stats + History/New visit buttons) + service history table. |
-| `/quotes` | `screens/Quotes.tsx` | 2-col Pipeline + Saved-line-items library / Quote builder spreadsheet (drag grip + line items + live totals: subtotal · materials markup · tax · 26pt serif total). |
-| `/messages` | `screens/Messages.tsx` | 3-col Inbox 320 / Thread 1fr / Selected-client rail 320. Thread has white "their" bubbles + indigo "ours" bubbles + system events as success pills + suggestion chips composer + Alfred suggestion card. |
-
-**Chrome primitives** at `website/operations/src/components/chrome/`: `Sidebar` (248px wide, deep-indigo `#2A2252` bg, brand row + workspace switcher + nav with active salmon-glow border + footer), `Topbar` (sticky pearl-with-blur bg, eyebrow + serif title + breadcrumb + 240px search + bell + per-route primary CTA via `ROUTE_META`), `Pill` (7 tones), `Card` (default + tight padding + hoverable), `Avatar` (initials + color), `StatTile`, `EmptyState`, `Icon`.
-
-**Data wiring:** Every screen v1-fixture-backed via `lib/fixtures.ts` (verbatim port of the design handoff's `data.jsx` so screenshot diffs match the prototype). The fixtures shape mirrors the Supabase row types in `lib/types.ts` (`ProviderWorkspace`, `ProviderWorkspaceMember`, `HandymanRequest`, `ProviderVisitAssignment`, `ProviderQuote`, `ProviderQuoteLineItem`, `ProviderSavedQuoteItem`, `HandymanRequestMessage`) — swap in real queries via Supabase client by extending `WorkspaceProvider` or adding a `lib/api.ts` layer. RLS already gates per-workspace via `provider_workspace_members.user_id = auth.uid()` (Phase 71/72 migrations).
-
-**Auth flow:** `WorkspaceProvider.refresh()` calls `supabase.auth.getSession()` on mount + `onAuthStateChange`. Unauth → `window.location.assign("/handyman.html?next=…")`. `handyman.js` post-auth redirect (line ~470) swaps the legacy `renderWorkspace()` for `window.location.assign(safeNext)`, defaulting to `/operations/`. The legacy embedded workspace DOM in `handyman.html` is unreachable post-redirect but kept in place as a fallback.
-
-**Deployment:** `website/Dockerfile` is now multi-stage — `node:20-alpine` builds the SPA → `nginx:alpine` serves both `handyman.html` (vanilla auth pitch) and `/operations/*` (React SPA). `nginx.conf` gained a `location /operations/` block with SPA-fallback rewrite (`try_files $uri $uri/ /operations/index.html`) so React Router owns every `/operations/*` route. `chez.css` + `favicon.svg` are now COPY'd into the image (previously missing — referenced by both vanilla pages and the Operations Desk's `<link rel="stylesheet" href="/chez.css">`).
-
-**Mobile:** `<768px` shows a "Use the field app on your phone" interstitial linking to the Chez Field iOS app on TestFlight (`https://testflight.apple.com/join/sw4xWsTA`). The legacy `/handyman-visit.html` PWA was retired 2026-05-08 — every field-tech surface is now native HavenField. Tablet 768–1279px collapses 3-col layouts (Dispatch, Messages) to single column.
-
-**Local dev:** `cd website/operations && npm install && npm run dev` runs Vite at `localhost:5173/operations/`. Use `python3 -m http.server 8000` from `website/` in another terminal so Vite's proxy can forward `/handyman.html` for the auth flow. Production build: `npm run build` emits to `dist/` → Docker stage 1 picks it up.
+**What got deleted:**
+- Website: `website/operations/` (entire React SPA), `handyman.html` + `.js` + `.css`, `handyman-quote.*`, `vendor-portal.html`, `assessment-offline.js`, all `chez-handyman-*` icon assets, `apple-touch-icon-handyman.png`. Dockerfile reverted to single-stage nginx; nginx.conf and vercel.json stripped of `/operations/` blocks.
+- iOS: `HavenField` target removed from `project.yml`, `Chez Field` scheme removed, `Haven/App/HavenFieldApp.swift` deleted, `Haven/Features/HavenField/` directory deleted, `Haven/Config/HavenField-Info.plist` deleted, `HavenFieldAppIcon` + `ChezFieldBrand` + `ChezFieldLaunch` + `ChezFieldLaunchBackground` asset sets deleted.
+- Edge Function URL pointers updated in `chez-concierge` (assessment dispatch email no longer references `/operations/`), `submit-vendor-application` + `admin-vendor-applications` (vendor emails no longer reference `vendor-portal.html` — applicants reply by email instead).
 
 ## Chez Concierge — homeowner concierge service (Phase 80 / 80.1 / 80.2)
 

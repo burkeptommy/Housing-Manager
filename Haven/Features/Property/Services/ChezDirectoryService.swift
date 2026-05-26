@@ -99,12 +99,12 @@ final class ChezDirectoryService {
         Haptics.success()
 
         // Phase 73 follow-up: insert the workspace ↔ contractor link
-        // server-side so the provider's dispatch board immediately
-        // shows this homeowner. Without this the handyman.html
-        // dashboard returns an empty list of homes for this workspace
-        // even though the contractor row exists. Best-effort —
-        // adoption is already a success from the homeowner's side
-        // even if the link insert fails or races.
+        // server-side so the provider's dispatch surface (and any
+        // future offline-visit website) immediately shows this
+        // homeowner. Without this the workspace returns an empty
+        // list of homes even though the contractor row exists.
+        // Best-effort — adoption is already a success from the
+        // homeowner's side even if the link insert fails or races.
         if let workspaceId = UUID(uuidString: provider.workspaceId) {
             do {
                 _ = try await HavenSupabase.linkAdoptedHandymanProvider(
