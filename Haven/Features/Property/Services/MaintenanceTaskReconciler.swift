@@ -1618,10 +1618,40 @@ enum MaintenanceTaskReconciler {
                 picks.append(pick)
             } else if let nearest = anchorSurfaces.first(where: { $0 >= today }) {
                 picks.append(nearest)
+            } else if Self.todayIsInSeasonForAnchorMonth(anchor.month, today: today, calendar: calendar) {
+                // Phase 80 (discovery study) mid-season fix: when this year's
+                // anchor is past AND next year's is far away BUT today is
+                // still within the season's months, surface at today so the
+                // task lands in this year's seasonal tile. Otherwise the
+                // homeowner who joins in late May sees Spring=0 because every
+                // Spring task auto-advanced to 2027. Tom's specific feedback:
+                // "When someone joins mid season we should still show all
+                // spring tasks so they can tell us they already did them."
+                picks.append(today)
             }
         }
 
         return picks.isEmpty ? fallback : picks.sorted()
+    }
+
+    /// Phase 80: returns true when today falls within the season window
+    /// implied by the given anchor month. Spring anchor (March/April/May) →
+    /// season window March–May; Fall (Sep/Oct/Nov) → Sep–Nov; etc. Used
+    /// by `plannedDueDates` to keep mid-season tasks anchored to this
+    /// year rather than auto-advancing to next year.
+    private static func todayIsInSeasonForAnchorMonth(
+        _ anchorMonth: Int,
+        today: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let m = calendar.component(.month, from: today)
+        switch anchorMonth {
+        case 3, 4, 5:   return (3...5).contains(m)
+        case 6, 7, 8:   return (6...8).contains(m)
+        case 9, 10, 11: return (9...11).contains(m)
+        case 12, 1, 2:  return m == 12 || m == 1 || m == 2
+        default:        return false
+        }
     }
 
     /// Phase 70: thin wrapper for callers that only need the next

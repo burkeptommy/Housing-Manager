@@ -288,6 +288,12 @@ final class AppState: ObservableObject {
                         // created by that pass (no-op on _v3 installs) gets
                         // its subtype reconciled against the new rule too.
                         await Self.migrateChimneyEvidenceOnceIfNeeded()
+                        // Phase 80 mid-season repair — pull back tasks
+                        // that auto-advanced to next year because the
+                        // backfill ran past this year's seasonal anchor.
+                        // Must run AFTER backfillMissingSystemsOnceIfNeeded
+                        // since that's where the bad dates got seeded.
+                        await Self.reanchorMidSeasonTasksOnceIfNeeded()
                         // Phase 54E.3: mirror existing waste haulers +
                         // service utilities to the contractors table.
                         await Self.backfillUtilityContractorMirrorOnceIfNeeded()
@@ -527,6 +533,8 @@ final class AppState: ObservableObject {
                             // backfillMissingSystemsOnceIfNeeded so any
                             // newly-seeded chimney row gets reconciled.
                             await Self.migrateChimneyEvidenceOnceIfNeeded()
+                            // Phase 80 mid-season repair (resume path).
+                            await Self.reanchorMidSeasonTasksOnceIfNeeded()
                             // Phase 58 orphan archive pass.
                             await Self.archivePhase58OrphanedTasksOnceIfNeeded()
                         }
@@ -966,6 +974,100 @@ final class AppState: ObservableObject {
     ///   pass archives scheduled/incomplete tasks whose `requiredSubtypes`
     ///   no longer match. Completed tasks are untouched.
     ///
+    /// Phase 80 (discovery study) mid-season seeding repair. The original
+    /// Phase 80 backfill ran on existing users in late May, seeding ~70
+    /// Spring tasks per property — all with `next_due_date` advanced to
+    /// 2027 because Spring 2026 anchors (April 1) were already past by
+    /// the time the user installed the build. Tom's specific feedback:
+    /// "When someone joins mid season we should still show all spring
+    /// tasks so they can tell us they already did them." The seeding
+    /// logic in `MaintenanceTaskReconciler.plannedDueDates` was fixed to
+    /// fall back to today when mid-season + past anchor, but existing
+    /// 2027-dated rows need a one-time pull-back.
+    ///
+    /// Rule: re-date any template-driven task whose `next_due_date` is
+    /// more than 6 months out AND whose `seasonal_timing` matches today's
+    /// current season AND that has NOT been user-touched (no
+    /// `last_completed_date`, no manual `scheduled_date`). Set
+    /// `next_due_date` to today so it surfaces in the current season's
+    /// tile as "due today" — the homeowner can mark done if they
+    /// already did it, or schedule for later.
+    ///
+    /// Gated on `hasReanchoredMidSeasonTasksP80_v1`.
+    @MainActor
+    static func reanchorMidSeasonTasksOnceIfNeeded() async {
+        let key = "hasReanchoredMidSeasonTasksP80_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+
+        // Determine today's season.
+        let calendar = Calendar.current
+        let now = Date()
+        let currentMonth = calendar.component(.month, from: now)
+        let currentSeasonNames: [String] = {
+            switch currentMonth {
+            case 3, 4, 5:   return ["spring", "spring/fall"]
+            case 6, 7, 8:   return ["summer"]
+            case 9, 10, 11: return ["fall", "spring/fall"]
+            case 12, 1, 2:  return ["winter"]
+            default:        return []
+            }
+        }()
+
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let todayString: String = {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            return df.string(from: now)
+        }()
+        // Threshold: tasks dated more than 6 months out qualify as
+        // auto-advanced.
+        guard let cutoff = calendar.date(byAdding: .month, value: 6, to: now) else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+        let cutoffString: String = {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            return df.string(from: cutoff)
+        }()
+
+        var totalUpdated = 0
+        for property in properties {
+            let tasks = (try? await db.fetchMaintenanceTasks(propertyId: property.id)) ?? []
+            for task in tasks {
+                guard task.isArchived != true else { continue }
+                guard task.lastCompletedDate == nil || task.lastCompletedDate?.isEmpty == true else { continue }
+                guard task.scheduledDate == nil || task.scheduledDate?.isEmpty == true else { continue }
+                guard let templateId = task.templateId, !templateId.isEmpty else { continue }
+                guard !templateId.hasPrefix("Admin:") else { continue }
+                guard let timing = task.seasonalTiming?.lowercased(),
+                      currentSeasonNames.contains(timing) else { continue }
+                guard !task.nextDueDate.isEmpty, task.nextDueDate > cutoffString else { continue }
+
+                var update = MaintenanceTaskUpdate()
+                update.nextDueDate = todayString
+                _ = try? await db.updateMaintenanceTask(id: task.id, update)
+                totalUpdated += 1
+            }
+        }
+
+        if totalUpdated > 0 {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
     /// Gated on `hasMigratedChimneyEvidence_v1`.
     @MainActor
     static func migrateChimneyEvidenceOnceIfNeeded() async {
