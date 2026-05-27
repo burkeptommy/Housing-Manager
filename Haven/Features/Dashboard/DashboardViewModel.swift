@@ -1297,6 +1297,15 @@ final class DashboardViewModel: ObservableObject {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd"
             let now = Date()
+            // Phase 80 fix: compare against start-of-day instead of the
+            // raw `now` timestamp. Without this, tasks dated TODAY (e.g.
+            // post-mid-season-reanchor sets next_due_date = CURRENT_DATE)
+            // parse to midnight, and midnight < 7:36pm = true → today
+            // gets counted as overdue. Homeowner sees "17 overdue" on
+            // the Dashboard but the 17 are really "due today." Use
+            // startOfDay so the threshold is "anything strictly before
+            // today."
+            let todayStart = Calendar.current.startOfDay(for: now)
 
             // Phase 61: also count archived tasks for the LegacyTasksNotificationCard.
             // Separate fetch so the main list stays filtered to active rows.
@@ -1306,7 +1315,7 @@ final class DashboardViewModel: ObservableObject {
 
             overdueMaintenanceTasks = tasks.filter { task in
                 guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                return date < now
+                return date < todayStart
             }
 
             let endOfWeek = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
