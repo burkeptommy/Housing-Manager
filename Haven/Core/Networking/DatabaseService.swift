@@ -3463,6 +3463,43 @@ final class DatabaseService {
             .value
     }
 
+    // MARK: - Dismissed Templates (Phase 80)
+
+    func fetchDismissedTemplates(propertyId: UUID) async throws -> [DismissedTemplateRow] {
+        try await from("dismissed_templates")
+            .select()
+            .eq("property_id", value: propertyId.uuidString)
+            .execute()
+            .value
+    }
+
+    /// Upsert by (property_id, template_key). Idempotent — calling twice
+    /// on the same template no-ops the second time.
+    func dismissTemplate(
+        propertyId: UUID,
+        householdId: UUID,
+        templateKey: String,
+        reason: String = "not_applicable"
+    ) async throws {
+        let insert = DismissedTemplateInsert(
+            propertyId: propertyId,
+            householdId: householdId,
+            templateKey: templateKey,
+            reason: reason
+        )
+        try await from("dismissed_templates")
+            .upsert(insert, onConflict: "property_id,template_key")
+            .execute()
+    }
+
+    func restoreTemplate(propertyId: UUID, templateKey: String) async throws {
+        try await from("dismissed_templates")
+            .delete()
+            .eq("property_id", value: propertyId.uuidString)
+            .eq("template_key", value: templateKey)
+            .execute()
+    }
+
     // MARK: - Dismissed Categories
 
     func fetchDismissedCategories() async throws -> [DismissedCategoryRow] {

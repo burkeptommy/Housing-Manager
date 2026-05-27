@@ -277,6 +277,17 @@ enum AnalyticsEvent: String {
     /// (`q20_wood` / `q20_gas` / `q20_unknown` / `q3_fossil` / `none`)
     /// so we can debug "why does this user have a chimney" later.
     case chimneyAutoCreated = "chimney_auto_created"
+    /// Phase 80 (discovery study): user tapped "Not for my home" on a task
+    /// or template. Payload: `template_key` + `category` + `reason`.
+    case templateDismissed = "template_dismissed"
+    /// Phase 80: user restored a previously dismissed template via Settings
+    /// → Hidden Tasks or the Browse-all "Restore" affordance. Payload:
+    /// `template_key` + `category`.
+    case templateRestored = "template_restored"
+    /// Phase 80: user tapped "Undo" on the dismiss toast within the 5-second
+    /// window. Distinct from `templateRestored` (which is the manual restore
+    /// from Settings). Payload: `template_key`.
+    case dismissedTaskFlowUndone = "dismissed_task_flow_undone"
 
     // MARK: - Maintenance
     case maintenanceTaskViewed = "maintenance_task_viewed"

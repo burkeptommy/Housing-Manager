@@ -276,6 +276,12 @@ final class AppState: ObservableObject {
                         // backfill last so the reconciler has somewhere to hang templates.
                         await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
                         await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                        // Phase 80: backfill dismissed_categories →
+                        // dismissed_templates BEFORE the missing-system
+                        // backfill seeds new templates. Without this,
+                        // categories the user previously hid would
+                        // resurface tasks via the show-everything model.
+                        await Self.migrateDismissedCategoriesToTemplatesOnceIfNeeded()
                         await Self.backfillMissingSystemsOnceIfNeeded()
                         // Evidence-based chimney cleanup. Runs after the
                         // missing-system backfill so any chimney row newly
@@ -511,6 +517,10 @@ final class AppState: ObservableObject {
                         Task {
                             await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
                             await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                            // Phase 80: backfill dismissed_categories →
+                            // dismissed_templates before the missing-system
+                            // pass seeds new templates.
+                            await Self.migrateDismissedCategoriesToTemplatesOnceIfNeeded()
                             await Self.backfillMissingSystemsOnceIfNeeded()
                             // Evidence-based chimney cleanup. Same order
                             // as the cold-start path — runs after
@@ -824,11 +834,16 @@ final class AppState: ObservableObject {
     /// key so it only runs once per install.
     @MainActor
     static func backfillMissingSystemsOnceIfNeeded() async {
-        // Phase 70.A1 follow-on H4: bumped to _v3 so existing TestFlight
-        // users pick up the expanded auto-create rules — Siding/Exterior,
-        // Window Cleaning, Tree Service, Driveway Sealcoating. Chimney
-        // is now evidence-based (see `resolveChimneyRule`); existing
-        // false-positive chimney rows from the prior unconditional
+        // Phase 80 (discovery study): bumped to _v4 so existing TestFlight
+        // users pick up the new universal-tier categories — Plumbing,
+        // Electrical, Attic & Foundation, and (NE only) Air Quality. These
+        // were registry-universal but had no auto-create rule before, which
+        // is why "Annual plumbing inspection" never fired for anyone.
+        //
+        // Phase 70.A1 follow-on H4 history: previously bumped to _v3 for
+        // Siding/Exterior, Window Cleaning, Tree Service, Driveway
+        // Sealcoating. Chimney is evidence-based (see `resolveChimneyRule`);
+        // existing false-positive chimney rows from the prior unconditional
         // behavior get cleaned up by `migrateChimneyEvidenceOnceIfNeeded`
         // which runs immediately after this backfill. Tom flagged "where
         // are power washing + chimney cleaning?" — those templates lived
@@ -836,7 +851,7 @@ final class AppState: ObservableObject {
         // categories weren't auto-created. ensureAutoCreatedSystems is
         // idempotent (dedups by category) so re-running on fully-set-up
         // users is a no-op except for the categories that newly qualify.
-        let key = "hasRunMissingSystemBackfillP70H4_v3"
+        let key = "hasRunMissingSystemBackfillP70H4_v4"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         let db = DatabaseService.shared
         let properties: [PropertyRow]
@@ -861,6 +876,77 @@ final class AppState: ObservableObject {
         }
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 80 (discovery study): one-time migration that translates
+    /// existing `dismissed_categories` rows into per-template
+    /// `dismissed_templates` rows so users who hid categories pre-Phase-80
+    /// don't see those templates resurface under the show-everything model.
+    ///
+    /// For each permanent dismissal (snoozed_until is null) in
+    /// `dismissed_categories`, walks every template in that category and
+    /// inserts a `dismissed_templates` row per (property, template_key).
+    /// Snoozes (snoozed_until is set) are left in `dismissed_categories`
+    /// untouched — they keep their auto-resurfacing behavior via the
+    /// existing snooze code path.
+    ///
+    /// Gated on `hasMigratedDismissedCategoriesToTemplatesP80_v1`.
+    @MainActor
+    static func migrateDismissedCategoriesToTemplatesOnceIfNeeded() async {
+        let key = "hasMigratedDismissedCategoriesToTemplatesP80_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+
+        let dismissals: [DismissedCategoryRow]
+        do {
+            dismissals = try await db.fetchDismissedCategories()
+        } catch {
+            return
+        }
+        // Skip snoozes (those keep their existing semantics) and walk only
+        // permanent dismissals.
+        let permanent = dismissals.filter { $0.snoozedUntil == nil }
+        guard !permanent.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        // Build a category → [templateKey] map once, walking the full
+        // template library. Category match is case-insensitive.
+        var templatesByCategory: [String: [String]] = [:]
+        for (category, templates) in MaintenanceTemplates.allTemplates {
+            let lower = category.lowercased()
+            templatesByCategory[lower, default: []].append(contentsOf: templates.map { $0.templateKey })
+        }
+
+        for dismissal in permanent {
+            let categoryLower = dismissal.category.lowercased()
+            guard let templateKeys = templatesByCategory[categoryLower] else { continue }
+            let householdProperties = properties.filter { $0.householdId == dismissal.householdId }
+            for property in householdProperties {
+                for templateKey in templateKeys {
+                    try? await db.dismissTemplate(
+                        propertyId: property.id,
+                        householdId: dismissal.householdId,
+                        templateKey: templateKey,
+                        reason: "migrated_from_dismissed_category"
+                    )
+                }
+            }
+        }
+
         UserDefaults.standard.set(true, forKey: key)
     }
 

@@ -2402,13 +2402,22 @@ final class HouseQuizAnswerMapper {
         // Painting, and Gutter Cleaning — their work items live under
         // Siding/Exterior + Roofing bundles, so auto-creating empty
         // system rows would be noise without any seeded tasks.
+        // Post-discovery-study (Phase 80): universal-tier categories
+        // that were silently orphaned (no system row → no templates fired).
+        // Plumbing, Electrical, Attic & Foundation now auto-create on every
+        // property. Air Quality auto-creates only in the Northeast where
+        // radon risk is meaningful.
+        let regionalPack = RegionalPack(state: property?.state)
         let rules: [Rule] = [
             .init(category: "Chimney", subtype: chimneyRule.subtype, shouldCreate: chimneyRule.shouldCreate, evidence: chimneyRule.evidence),
             .init(category: "Siding/Exterior", subtype: nil, shouldCreate: true, evidence: nil),
             .init(category: "Window Cleaning", subtype: nil, shouldCreate: true, evidence: nil),
             .init(category: "Tree Service", subtype: nil, shouldCreate: true, evidence: nil),
             .init(category: "Driveway Sealcoating", subtype: nil, shouldCreate: true, evidence: nil),
-            // Phase 67 fix: Air Quality removed — see prior comment.
+            .init(category: "Plumbing", subtype: nil, shouldCreate: true, evidence: nil),
+            .init(category: "Electrical", subtype: nil, shouldCreate: true, evidence: nil),
+            .init(category: "Attic & Foundation", subtype: nil, shouldCreate: true, evidence: nil),
+            .init(category: "Air Quality", subtype: nil, shouldCreate: regionalPack == .northeast, evidence: nil),
         ]
 
         for rule in rules {

@@ -3104,6 +3104,53 @@ struct TrustedContactDocumentInsert: Codable {
 
 // MARK: - Dismissed Category
 
+/// Phase 80 (discovery study): per-template "Not for my home" dismissal.
+/// Replaces the per-category `DismissedCategoryRow` for individual hide
+/// decisions while keeping `dismissed_categories` alive for snooze
+/// semantics. The reconciler reads this table and skips any template
+/// whose `templateKey` matches a row for the property. Restore via
+/// Settings → Hidden Tasks deletes the row.
+struct DismissedTemplateRow: Codable, Identifiable {
+    let id: UUID
+    let propertyId: UUID
+    let householdId: UUID
+    let templateKey: String
+    let reason: String?
+    let dismissedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, reason
+        case propertyId = "property_id"
+        case householdId = "household_id"
+        case templateKey = "template_key"
+        case dismissedAt = "dismissed_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        templateKey = try c.decode(String.self, forKey: .templateKey)
+        reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+        dismissedAt = try? c.decodeIfPresent(Date.self, forKey: .dismissedAt)
+    }
+}
+
+struct DismissedTemplateInsert: Codable {
+    let propertyId: UUID
+    let householdId: UUID
+    let templateKey: String
+    var reason: String? = "not_applicable"
+
+    enum CodingKeys: String, CodingKey {
+        case reason
+        case propertyId = "property_id"
+        case householdId = "household_id"
+        case templateKey = "template_key"
+    }
+}
+
 struct DismissedCategoryRow: Codable, Identifiable {
     let id: UUID
     let householdId: UUID

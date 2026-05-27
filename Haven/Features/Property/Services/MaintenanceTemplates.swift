@@ -77,8 +77,25 @@ struct MaintenanceTemplate: Identifiable {
     /// Tags that mark this template as requiring a specific subtype.
     /// e.g. ["lawn"] means only for natural lawns, ["ducted"] means only for ducted HVAC, ["tank"] for tank water heaters.
     var requiredSubtypes: Set<String> = []
-    /// Whether this task is essential (created during setup) vs recommended (available to add later).
+    /// Phase 80 (discovery study): legacy field, no longer gates seeding.
+    /// All templates whose `requiredSubtypes` match the home now seed by
+    /// default. Field is kept for analytics + UI ("Recommended" badge) but
+    /// the reconciler no longer reads it. Default remains `true` so old
+    /// code that still references it doesn't change behavior — and so new
+    /// templates default to "shown" rather than "catalog-only."
+    /// To carve a template out of default seeding, set `isCatalogOnly: true`
+    /// instead. See the field below.
     var isEssential: Bool = true
+    /// Phase 80 (discovery study): when true, this template skips the
+    /// reconciler entirely and only surfaces via Browse-all and Handyman
+    /// punch-list intake. Use for "as needed" catalog items that are not
+    /// recurring tasks — drywall patches, fixture swaps, smart-home
+    /// installs, single-use repairs. The ~70 Handyman `routingOverride:
+    /// .diyCapable` + `frequency: "As needed"` templates carry this flag.
+    /// Recurring Handyman bundles (Handyman:spring, Handyman:fall,
+    /// Handyman:summer) and recurring standalones DO seed and do NOT
+    /// carry this flag.
+    var isCatalogOnly: Bool = false
     /// Keywords identifying which specific equipment this task applies to.
     /// When a child system matching these keywords is added, this task migrates from parent to child.
     var equipmentKeywords: [String] = []
@@ -424,17 +441,26 @@ extension MaintenanceTemplate {
 
 enum MaintenanceTemplates {
 
-    /// Returns only essential templates for setup. Non-essential tasks are available to add later.
+    /// Phase 80 (discovery study): returns every template whose subtypes
+    /// match the home, excluding catalog-only items (browse-only "as
+    /// needed" punch-list templates). The old `essentialTemplates` filter
+    /// (`isEssential: true`) is gone — under the new model, the user
+    /// sees everything that fits their home and dismisses "Not for my
+    /// home" what doesn't apply. The kept filter is `isCatalogOnly:
+    /// false` so the bottomless Handyman "as needed" catalog stays out
+    /// of the auto-seed loop (those still surface via Browse + punch list
+    /// intake). Function name kept as `essentialTemplates` for backward
+    /// compatibility with existing callers; conceptually it's now
+    /// "seedable templates."
     /// Phase 57: `regionalPack` filters out templates gated to a different
-    /// region. Nil (the default) includes universal templates only — the
-    /// same behavior callers got before Phase 57.
+    /// region. Nil (the default) includes universal templates only.
     static func essentialTemplates(
         for category: String,
         activeSubtypes: Set<String> = [],
         regionalPack: RegionalPack? = nil
     ) -> [MaintenanceTemplate] {
         templates(for: category, activeSubtypes: activeSubtypes, regionalPack: regionalPack)
-            .filter(\.isEssential)
+            .filter { !$0.isCatalogOnly && $0.frequency != "As needed" }
     }
 
     /// Builds the set of active subtype tokens for a system, given its persisted subtype string,
@@ -678,6 +704,15 @@ enum MaintenanceTemplates {
             if flags["has_asphalt_driveway"] == true { s.insert("driveway_asphalt") }
             if flags["has_concrete_driveway"] == true { s.insert("driveway_concrete") }
             if flags["has_paver_driveway"] == true { s.insert("driveway_paver") }
+        case "tree service":
+            // Phase 80: under the show-everything-by-default model, Tree
+            // Service templates need a positive signal that the property
+            // has trees worth arboring. `mature_trees` (Phase 57 HNW
+            // review flag) is the gate. Properties without it: Tree
+            // Service system row still auto-creates (so Browse-all can
+            // surface tree templates), but the bundle children don't
+            // seed automatically.
+            if flags["has_mature_trees"] == true { s.insert("mature_trees") }
         default:
             break
         }
@@ -2929,6 +2964,7 @@ enum MaintenanceTemplates {
                 seasonalTiming: "Winter",
                 professionalRequired: true,
                 notes: "Dormant-season pruning (Dec-Mar) is safest for the trees and cheapest for you.",
+                requiredSubtypes: ["mature_trees"],
                 isEssential: false,
                 assignmentType: .vendor,
                 bundleId: "Tree Service:annual",
@@ -2947,6 +2983,7 @@ enum MaintenanceTemplates {
                 seasonalTiming: "Fall",
                 professionalRequired: true,
                 notes: "Arborist required for large trees",
+                requiredSubtypes: ["mature_trees"],
                 isEssential: false,
                 assignmentType: .vendor,
                 bundleId: "Tree Service:annual",
@@ -3013,6 +3050,7 @@ enum MaintenanceTemplates {
                 seasonalTiming: "Summer",
                 professionalRequired: true,
                 notes: "Sealer needs 80°F+ surface temps to cure properly. Mid-summer is the sweet spot in the Northeast — warm enough for the cure, ahead of the early-fall rains that can pit fresh sealer.",
+                requiredSubtypes: ["driveway_asphalt"],
                 isEssential: false,
                 assignmentType: .vendor
             ),

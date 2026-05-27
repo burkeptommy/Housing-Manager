@@ -279,6 +279,16 @@ struct SettingsView: View {
                     Label("Task Routing", systemImage: "arrow.triangle.branch")
                         .font(HavenTypography.body)
                 }
+
+                // Phase 80 (discovery study): restore templates the user
+                // tapped "Not for my home" on. Empty most of the time; fills
+                // in as users prune the show-everything default.
+                NavigationLink {
+                    HiddenTasksView()
+                } label: {
+                    Label("Hidden Tasks", systemImage: "eye.slash")
+                        .font(HavenTypography.body)
+                }
             } header: {
                 Text("PREFERENCES")
                     .font(HavenTypography.uiSectionHeader)

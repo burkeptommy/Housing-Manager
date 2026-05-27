@@ -2844,6 +2844,54 @@ struct MaintenanceTaskDetailSheet: View {
                 .disabled(isDelegatingToHandyman)
             }
 
+            // Phase 80 (discovery study): "Not for my home" — template-
+            // level dismissal. Disappears the task AND prevents future
+            // re-seeding of the same template via the reconciler. Distinct
+            // from Delete (per-instance) and Archive (per-instance, kept
+            // for history). Restore via Settings → Hidden Tasks.
+            // Only shown for template-driven tasks (has templateId).
+            if let templateKey = task.templateId, !templateKey.isEmpty,
+               let propertyId = task.propertyId {
+                Button {
+                    Haptics.light()
+                    let category = templateKey.split(separator: ":").first.map(String.init) ?? "unknown"
+                    Analytics.track(.templateDismissed, [
+                        "template_key": templateKey,
+                        "category": category,
+                        "reason": "not_applicable"
+                    ])
+                    Task {
+                        try? await DatabaseService.shared.dismissTemplate(
+                            propertyId: propertyId,
+                            householdId: task.householdId,
+                            templateKey: templateKey,
+                            reason: "not_applicable"
+                        )
+                        // Archive this task instance — the template
+                        // dismissal prevents future seeding, but the
+                        // currently-scheduled row also needs to disappear.
+                        await MaintenanceViewModel.shared.archiveTask(task)
+                        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        await MainActor.run { dismiss() }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "eye.slash")
+                        Text("Not for my home")
+                    }
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: HavenTheme.buttonHeight)
+                    .background(HavenColors.creamLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                            .stroke(HavenColors.beige300, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+            }
+
             Button {
                 Haptics.light()
                 Analytics.track(.maintenanceTaskDeleted, ["task_id": task.id.uuidString])

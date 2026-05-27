@@ -215,11 +215,18 @@ enum MaintenanceTaskReconciler {
             fuelType: fuelType,
             flags: mergedFlags
         )
-        let rawTemplates = MaintenanceTemplates.essentialTemplates(
+        let rawCandidates = MaintenanceTemplates.essentialTemplates(
             for: systemCategory,
             activeSubtypes: activeSubtypes,
             regionalPack: regionalPack
         )
+
+        // Phase 80 (discovery study): skip templates the user has marked
+        // "Not for my home" on this property. Failures fall back to seeding
+        // everything — better to over-seed than to miss a real task.
+        let dismissedRows = (try? await DatabaseService.shared.fetchDismissedTemplates(propertyId: propertyId)) ?? []
+        let dismissedKeys = Set(dismissedRows.map { $0.templateKey })
+        let rawTemplates = rawCandidates.filter { !dismissedKeys.contains($0.templateKey) }
 
         // Phase 84.5 G28: when the handyman submits an assessment, the
         // ingestion path passes the templateKeys of recommended tasks
