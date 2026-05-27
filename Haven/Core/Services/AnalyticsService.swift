@@ -621,6 +621,16 @@ enum AnalyticsEvent: String {
     case tasksV2ProgramExpanded = "tasks_v2_program_expanded"
     /// Search icon tap on SeasonScopeBanner.
     case tasksV2SearchTapped = "tasks_v2_search_tapped"
+    /// Phase 80 (discovery study): user submitted a search in
+    /// RecommendedServicesView. Payload: `query` + `result_count` so we can
+    /// see what's searched-for-but-not-found.
+    case tasksV2SearchPerformed = "tasks_v2_search_performed"
+    /// Phase 80: user tapped "Ask Chez →" on the search empty state — they
+    /// searched for something we didn't have. Payload: `query`.
+    case tasksV2SearchAlfredHandoff = "tasks_v2_search_alfred_handoff"
+    /// Phase 80: user tapped a child row inside a `BundleParentCard` to see
+    /// the child's full detail. Payload: `bundle_id` + `child_template_key`.
+    case tasksV2BundleChildOpened = "tasks_v2_bundle_child_opened"
     /// Phase F1 — time-window stats-pill filter applied. Properties:
     /// filter ("overdue|thisWeek|thisMonth|later"), season.
     case tasksV2StatsFilterApplied = "tasks_v2_stats_filter_applied"

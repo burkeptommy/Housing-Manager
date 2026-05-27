@@ -27,21 +27,28 @@ struct RecommendedServicesView: View {
     // Phase 59: lazy-fetched property so we can present UpdateHomeDetailsSheet.
     @State private var property: PropertyRow?
     @State private var showUpdateHomeDetails = false
+    // Phase 80 (discovery study): search across the recommendations
+    // library so a user typing "chimney sweep" finds it instantly
+    // instead of scrolling. Match runs against template title +
+    // description + systemCategory (case-insensitive substring).
+    @State private var searchQuery: String = ""
+    /// Tracks whether the user has run a search yet so we only fire
+    /// the analytics event when they actually engaged.
+    @State private var hasFiredSearchAnalytics = false
 
     var body: some View {
-        Group {
-            if viewModel.isLoading && viewModel.groups.isEmpty {
-                ProgressView("Loading recommendations...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if viewModel.groups.isEmpty {
-                emptyState
-            } else {
-                mainList
+        bodyContent
+            .background(HavenColors.background)
+            .navigationTitle("Recommended for You")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search services")
+            .onSubmit(of: .search) {
+                let count = filteredGroups.reduce(0) { $0 + $1.items.count }
+                Analytics.track(.tasksV2SearchPerformed, [
+                    "query": searchQuery,
+                    "result_count": String(count)
+                ])
             }
-        }
-        .background(HavenColors.background)
-        .navigationTitle("Recommended for You")
-        .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.load(
                 householdId: householdId,
@@ -93,6 +100,23 @@ struct RecommendedServicesView: View {
         .trackScreen("RecommendedServicesView")
     }
 
+    /// Phase 80: extracted from `body` to keep the modifier chain in `body`
+    /// short enough for the Swift type-checker. Returns the right inner
+    /// view based on loading / empty / search-empty / populated state.
+    @ViewBuilder
+    private var bodyContent: some View {
+        if viewModel.isLoading && viewModel.groups.isEmpty {
+            ProgressView("Loading recommendations...")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if viewModel.groups.isEmpty {
+            emptyState
+        } else if !searchQuery.isEmpty && filteredGroups.isEmpty {
+            searchEmptyState
+        } else {
+            mainList
+        }
+    }
+
     private var emptyState: some View {
         ContentUnavailableView {
             Label("You're all set", systemImage: "sparkles")
@@ -109,6 +133,67 @@ struct RecommendedServicesView: View {
                 }
             }
         }
+    }
+
+    /// Phase 80: filtered view of `viewModel.groups` based on the search
+    /// query. Substring match (case-insensitive) on template title,
+    /// description, and systemCategory. Groups with no matching items
+    /// are dropped from the result. Returns the full `viewModel.groups`
+    /// when the query is empty.
+    private var filteredGroups: [RecommendedServicesViewModel.Group] {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return viewModel.groups }
+        let needle = trimmed.lowercased()
+        return viewModel.groups.compactMap { group in
+            let matchingItems = group.items.filter { item in
+                let template = item.template
+                if template.title.lowercased().contains(needle) { return true }
+                if template.description.lowercased().contains(needle) { return true }
+                if template.systemCategory.lowercased().contains(needle) { return true }
+                return false
+            }
+            guard !matchingItems.isEmpty else { return nil }
+            return RecommendedServicesViewModel.Group(
+                category: group.category,
+                icon: group.icon,
+                items: matchingItems
+            )
+        }
+    }
+
+    private var searchEmptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 36, weight: .light))
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("No services match “\(searchQuery)”")
+                .font(HavenTypography.title3)
+                .foregroundStyle(HavenColors.textPrimary)
+                .multilineTextAlignment(.center)
+            Text("Try a broader term, or ask Chez what fits your home.")
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Button {
+                Analytics.track(.tasksV2SearchAlfredHandoff, ["query": searchQuery])
+                NotificationCenter.default.post(
+                    name: .openAlfredWithContext,
+                    object: nil,
+                    userInfo: ["message": "I'm looking for help with: \(searchQuery)"]
+                )
+            } label: {
+                Text("Ask Chez →")
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(HavenColors.textOnAction)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+                    .background(HavenColors.action)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(HavenColors.background)
     }
 
     private var mainList: some View {
@@ -131,7 +216,7 @@ struct RecommendedServicesView: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 16, trailing: 16))
             }
 
-            ForEach(viewModel.groups, id: \.category) { group in
+            ForEach(filteredGroups, id: \.category) { group in
                 Section {
                     ForEach(group.items, id: \.templateKey) { item in
                         recommendationCard(item)

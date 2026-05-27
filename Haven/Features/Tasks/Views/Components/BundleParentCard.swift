@@ -68,6 +68,11 @@ struct BundleParentCard: View {
     /// depending on whether a contractor is linked.
     var onBookIt: () -> Void = {}
 
+    /// Phase 80 (discovery study): tap a child line item. Parent view
+    /// presents `BundleChildDetailSheet` with the child's full template
+    /// info. When nil, children render non-tappable (legacy behavior).
+    var onChildTap: ((MaintenanceTemplate) -> Void)? = nil
+
     // MARK: - Local state
 
     /// Controls the BundleChildList expansion. Per-session only — the
@@ -150,7 +155,8 @@ struct BundleParentCard: View {
                 .foregroundColor(HavenColors.textTertiary)
             BundleChildList(
                 children: children,
-                isExpanded: $childrenExpanded
+                isExpanded: $childrenExpanded,
+                onChildTap: onChildTap
             )
         }
     }

@@ -394,6 +394,7 @@
 		CE906811F6BDAE0BB0DAE413 /* VehicleProgramSetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49D3108EC0097CE38B95B253 /* VehicleProgramSetupSheet.swift */; };
 		CF00A608E9E39BB7C132EC68 /* ChezProposalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD30AD1C4BB9E3D9AF3B488F /* ChezProposalCard.swift */; };
 		CF5F43382C818085844EC5D8 /* SecurityDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA558B3CCF8FD03A1DB1B36 /* SecurityDashboardView.swift */; };
+		CF7051849FD745282626D77B /* BundleChildDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF0B4C836C74FC18C4D795A4 /* BundleChildDetailSheet.swift */; };
 		CFA016496AE42337FF9C2AED /* HavenPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2A56293D700D83ACF5FBFC /* HavenPill.swift */; };
 		CFB6815B74786B7545C83C4C /* InvoiceLineItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D64C4BB072879F1D5DAD7AB /* InvoiceLineItem.swift */; };
 		CFDB01EE280ACF649D549187 /* ServiceOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03A24F3C7936018D3191CFF4 /* ServiceOrchestrator.swift */; };
@@ -861,6 +862,7 @@
 		BC7272D05EEB647B08773166 /* Validators.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Validators.swift; sourceTree = "<group>"; };
 		BCED3F91C128394EBFF7BB27 /* Warranty.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Warranty.swift; sourceTree = "<group>"; };
 		BE7A6C1B272FC927DC070565 /* ChezActivityCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezActivityCard.swift; sourceTree = "<group>"; };
+		BF0B4C836C74FC18C4D795A4 /* BundleChildDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleChildDetailSheet.swift; sourceTree = "<group>"; };
 		BF20CEFC8C2F36620876F9BC /* AddHouseholdStaffSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddHouseholdStaffSheet.swift; sourceTree = "<group>"; };
 		BF82EF48FF699827460350F3 /* ChezOwnsToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezOwnsToggle.swift; sourceTree = "<group>"; };
 		BFA4AB80D1956BBD146735AE /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
@@ -1686,6 +1688,7 @@
 			isa = PBXGroup;
 			children = (
 				EA07A5036C7F8D62584F86AA /* AfterActionReportCard.swift */,
+				BF0B4C836C74FC18C4D795A4 /* BundleChildDetailSheet.swift */,
 				309D6976FD8E265514A4B1BF /* BundleChildList.swift */,
 				CFF6AD7781346C052D1FAE44 /* BundleParentCard.swift */,
 				745FA68647C61C1AF9759D1E /* ChezOwnedPill.swift */,
@@ -2237,6 +2240,7 @@
 				B5816C122201999EBA84312D /* BrandTheme.swift in Sources */,
 				14E7EE9FFE768968487AE2B2 /* BrowseSpecialtySystemsSheet.swift in Sources */,
 				4BCF7D44E08CD47DC286A24C /* Bundle+Version.swift in Sources */,
+				CF7051849FD745282626D77B /* BundleChildDetailSheet.swift in Sources */,
 				C9C67E77D7C3D32F3BEA061A /* BundleChildList.swift in Sources */,
 				B0419988F9A5CF0AD7188A0C /* BundleCustomSubitem.swift in Sources */,
 				811852335B55AA3DA7B9CB1C /* BundleParentCard.swift in Sources */,

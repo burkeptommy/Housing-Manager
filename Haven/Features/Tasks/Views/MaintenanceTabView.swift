@@ -34,6 +34,11 @@ struct MaintenanceTabView: View {
     /// heavy Phase 56.4 timeline) just to re-tap the same row from
     /// inside that view.
     @State private var detailTask: MaintenanceTaskDBRow?
+    /// Phase 80 (discovery study): read-only child detail sheet. Set when
+    /// the user taps a child line item inside a `BundleParentCard`. The
+    /// sheet shows the template's title, frequency, cost, description,
+    /// and "Part of: [Bundle Title]" link.
+    @State private var bundleChildDetail: BundleChildPresentation?
     /// Phase F3: MaintenanceScheduleView parity — duplicate banner.
     /// `DuplicateDetector` scans routines + tasks for high-confidence
     /// match pairs (same vendor + category family + title similarity);
@@ -399,6 +404,12 @@ struct MaintenanceTabView: View {
                 )
             }
         }
+        .sheet(item: $bundleChildDetail) { presentation in
+            BundleChildDetailSheet(
+                template: presentation.template,
+                bundleTitle: presentation.bundleTitle
+            )
+        }
         // Phase 70.A1 follow-on G3 — Completed sheet.
         .sheet(isPresented: $showCompletedSheet) {
             if let householdId {
@@ -701,9 +712,10 @@ struct MaintenanceTabView: View {
             totalItems: activeFeed.totalItems,
             actionItems: activeFeed.actionItems,
             onSearch: {
-                // Search overlay ships in 70.A1.10; for now no-op so the
-                // affordance is present and discoverable but inert.
+                // Phase 80 (discovery study): route to RecommendedServicesView
+                // which now hosts the search bar across the full library.
                 Analytics.track(.tasksV2SearchTapped, [:])
+                pushTarget = .recommendedServices
             },
             onYearOverview: {
                 showYearOverview = true
@@ -1004,6 +1016,20 @@ struct MaintenanceTabView: View {
                     },
                     onBookIt: {
                         quickScheduleTask = task
+                    },
+                    onChildTap: { template in
+                        // Phase 80 (discovery study): tap a bundle child →
+                        // open the child detail sheet. Bundle parent's task
+                        // is the atomic completion unit; this sheet is
+                        // read-only and surfaces the child's full info.
+                        Analytics.track(.tasksV2BundleChildOpened, [
+                            "bundle_id": task.templateId ?? "",
+                            "child_template_key": template.templateKey
+                        ])
+                        bundleChildDetail = BundleChildPresentation(
+                            template: template,
+                            bundleTitle: task.title
+                        )
                     }
                 )
                 // Phase F2 + 70.A1 follow-on F5: leading swipe = complete,
@@ -1985,6 +2011,18 @@ struct MaintenanceTabView: View {
             case .archived:  return "Archived"
             }
         }
+    }
+
+    // MARK: - Bundle child detail presentation (Phase 80)
+
+    /// Identifiable wrapper so we can drive a `.sheet(item:)` from a
+    /// MaintenanceTemplate (which isn't itself Identifiable in a way that
+    /// SwiftUI accepts cleanly). Carries the bundle title so the sheet's
+    /// "Part of:" link reads correctly.
+    struct BundleChildPresentation: Identifiable {
+        let id = UUID()
+        let template: MaintenanceTemplate
+        let bundleTitle: String?
     }
 
     // MARK: - Navigation destinations
