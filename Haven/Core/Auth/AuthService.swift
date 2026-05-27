@@ -277,6 +277,10 @@ final class AuthService: ObservableObject {
                 try? await HavenSupabase.auth.signOut(scope: .local)
             }
             SecureStorageService.shared.delete(key: "biometric_enabled")
+            // Phase 80 perf cache: drop the on-disk tasks blob so a
+            // different user signing in on the same device doesn't
+            // briefly see the previous user's Tasks tab.
+            await MainActor.run { MaintenanceCacheStore.clearAll() }
         }
     }
 

@@ -66,6 +66,25 @@ final class MaintenanceViewModel: ObservableObject {
     }
 
     private let db = DatabaseService.shared
+
+    /// Phase 80 perf fix: synchronously hydrate from the on-disk cache
+    /// so the Tasks tab renders the correct YearRibbon counts on cold
+    /// launch instead of climbing from 0 as the network fetch lands.
+    /// Tom's complaint: "the task numbers show up when I click the
+    /// screen then a second or two later it loads the rest of the
+    /// ribbons correctly … why does this not save to the phone to
+    /// allow it to run faster?"
+    ///
+    /// Stale-while-revalidate: cache populates the @Published arrays
+    /// before the view appears; loadTasks() still hits the network
+    /// and overwrites with fresh data (which then re-caches via
+    /// `MaintenanceCacheStore.write` in `loadTasks`).
+    init() {
+        if let cached = MaintenanceCacheStore.read() {
+            self.tasks = cached.tasks
+            self.contractors = cached.contractors
+        }
+    }
     /// Phase 95 (gap #94) — Realtime subscription for cross-device
     /// task sync. Stays nil until `startRealtimeIfNeeded()` resolves
     /// the household, then survives until the view model's deinit.
@@ -261,6 +280,10 @@ final class MaintenanceViewModel: ObservableObject {
             tasks = t
             properties = p
             contractors = c
+            // Phase 80 perf fix: persist tasks + contractors so the
+            // next cold launch can paint instant counts from disk
+            // instead of climbing from 0 while the network fetch lands.
+            MaintenanceCacheStore.write(tasks: t, contractors: c)
             // Augmented load so linked family members whose `users` row
             // has a stale `household_id` still appear in the assignee
             // picker. Defensive against the early-onboarding state where

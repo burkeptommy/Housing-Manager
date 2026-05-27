@@ -341,6 +341,7 @@
 		AC77668356F0306E6AD6CBCB /* ChezConciergeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C3E85C92E536C944040AD6 /* ChezConciergeService.swift */; };
 		AD005EAEACB25EDD6C4CFCD8 /* AddressHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F5571589E414F74E0C5700 /* AddressHookView.swift */; };
 		AD2F8F6B4F3A53889D53398C /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3AAB2BFCB6E921B9BE9C459 /* LoadingView.swift */; };
+		ADB0E2051C9C89E5412881B3 /* MaintenanceCacheStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D797793DCD875D5112602E /* MaintenanceCacheStore.swift */; };
 		ADD0A64441CA3144F9621105 /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C29C1DC171EAF26E9A985A6 /* Date+Extensions.swift */; };
 		AE640787BE30EAE0049C12BB /* QuizContinueButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7940D86E0543CF38978E45F3 /* QuizContinueButton.swift */; };
 		B0419988F9A5CF0AD7188A0C /* BundleCustomSubitem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9F17EC3D832149D4CC09D7 /* BundleCustomSubitem.swift */; };
@@ -736,6 +737,7 @@
 		6E60CB5AC78EAFC4C067A93E /* CertificatePinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinning.swift; sourceTree = "<group>"; };
 		6F13092318CF6C77B67C12FD /* VehicleMileageScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleMileageScheduler.swift; sourceTree = "<group>"; };
 		6F63E60DF583540D084B910B /* PersonalQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalQuizView.swift; sourceTree = "<group>"; };
+		70D797793DCD875D5112602E /* MaintenanceCacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceCacheStore.swift; sourceTree = "<group>"; };
 		711654EA5D0A9057C14D073B /* NewArrivalChecklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewArrivalChecklist.swift; sourceTree = "<group>"; };
 		71228BE51DFC940B0B1EEE3E /* HouseQuizInsightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizInsightOverlay.swift; sourceTree = "<group>"; };
 		715AA20065124665D9D16D60 /* AvatarPhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarPhotoService.swift; sourceTree = "<group>"; };
@@ -1994,6 +1996,7 @@
 			children = (
 				52C5FEDC0CF120BB8C30FC54 /* CacheManager.swift */,
 				7B4CEAEAAB9A80F3874FB94C /* EncryptionService.swift */,
+				70D797793DCD875D5112602E /* MaintenanceCacheStore.swift */,
 				CEEB86217778DF5F0F55AB58 /* SecureStorageService.swift */,
 			);
 			path = Storage;
@@ -2469,6 +2472,7 @@
 				487F35214AE587A6B21CDC5C /* LoginView.swift in Sources */,
 				FCA7F82C49D56AA387BF333B /* MailComposeView.swift in Sources */,
 				B954FBF089BE6E6AB1B2DCE5 /* MainTabView.swift in Sources */,
+				ADB0E2051C9C89E5412881B3 /* MaintenanceCacheStore.swift in Sources */,
 				E0C8491DA8127ADBB4899923 /* MaintenanceDuplicateSheet.swift in Sources */,
 				5DF9A806B0D6F12FC620201C /* MaintenanceHubSections.swift in Sources */,
 				E3F851472B6A1FD5E93E4E2F /* MaintenanceHubView.swift in Sources */,

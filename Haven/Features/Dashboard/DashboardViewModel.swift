@@ -1316,11 +1316,51 @@ final class DashboardViewModel: ObservableObject {
             // visit. The Tasks tab's seasonFeed already filters them out;
             // this brings the Dashboard's overdue/due-this-week lists in
             // line so both surfaces match the "rollup to parent" model.
+            //
+            // Phase 80 defensive check: only hide children when an
+            // ALIGNED-YEAR parent exists in the same household. Some
+            // older households (Phase 58 dissolved certain bundles +
+            // Phase 70 restored them) ended up with orphan children
+            // pointing at a missing or future-year parent. Hiding the
+            // children silently makes the work disappear from both
+            // Dashboard AND Tasks tab. The defensive check keeps
+            // children visible when there's no parent to roll them
+            // into.
+            let parentDateFormatter = DateFormatter()
+            parentDateFormatter.dateFormat = "yyyy-MM-dd"
+            // Pre-index active parent tasks by templateId so the inner
+            // check is O(1) per task instead of O(n).
+            let parentsByTemplateId: [String: [MaintenanceTaskDBRow]] = {
+                var index: [String: [MaintenanceTaskDBRow]] = [:]
+                for candidate in rawTasks
+                    where candidate.isArchived != true
+                    && candidate.lastCompletedDate == nil
+                    && MaintenanceTemplates.isBundleId(candidate.templateId)
+                {
+                    guard let key = candidate.templateId else { continue }
+                    index[key, default: []].append(candidate)
+                }
+                return index
+            }()
             let tasks = rawTasks.filter { task in
                 guard let templateKey = task.templateId,
                       let template = MaintenanceTemplates.template(forKey: templateKey),
-                      template.bundleId != nil else { return true }
-                return false
+                      let bundleId = template.bundleId else { return true }
+                // Look for an active parent in same household + property,
+                // dated within 90 days of the child. Children dated today
+                // with a parent dated next-Feb (~250 days out) read as
+                // orphaned — they need to surface so the homeowner can
+                // act on them.
+                guard let candidates = parentsByTemplateId[bundleId] else { return true }
+                guard let childDate = parentDateFormatter.date(from: task.nextDueDate) else { return true }
+                let hasAlignedParent = candidates.contains { parent in
+                    guard parent.householdId == task.householdId else { return false }
+                    if parent.propertyId != task.propertyId { return false }
+                    guard let parentDate = parentDateFormatter.date(from: parent.nextDueDate) else { return false }
+                    let days = Calendar.current.dateComponents([.day], from: parentDate, to: childDate).day ?? 0
+                    return abs(days) <= 90
+                }
+                return !hasAlignedParent
             }
 
             // Phase 61: also count archived tasks for the LegacyTasksNotificationCard.
