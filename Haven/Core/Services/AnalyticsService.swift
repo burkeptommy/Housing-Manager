@@ -631,6 +631,22 @@ enum AnalyticsEvent: String {
     /// Phase 80: user tapped a child row inside a `BundleParentCard` to see
     /// the child's full detail. Payload: `bundle_id` + `child_template_key`.
     case tasksV2BundleChildOpened = "tasks_v2_bundle_child_opened"
+
+    // MARK: - Weather card (Phase 80)
+    /// User tapped the WeatherCard's alert state to open the prep sheet.
+    /// Payload: `event_type` + `severity` + `urgency`.
+    case weatherAlertCardOpened = "weather_alert_card_opened"
+    /// The prep sheet appeared. Payload: `event_type` + `task_count`.
+    case weatherPrepSheetOpened = "weather_prep_sheet_opened"
+    /// User toggled a prep task's check state. Payload: `event_type` +
+    /// `task_id` + `checked` (bool as string).
+    case weatherPrepTaskToggled = "weather_prep_task_toggled"
+    /// User tapped "Find a pro" inside the prep sheet. Payload:
+    /// `event_type` + `category`.
+    case weatherPrepFindVendor = "weather_prep_find_vendor"
+    /// User tapped "Ask Chez to handle this" inside the prep sheet.
+    /// Payload: `event_type` + `category`.
+    case weatherPrepAskChez = "weather_prep_ask_chez"
     /// Phase F1 — time-window stats-pill filter applied. Properties:
     /// filter ("overdue|thisWeek|thisMonth|later"), season.
     case tasksV2StatsFilterApplied = "tasks_v2_stats_filter_applied"

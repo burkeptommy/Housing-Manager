@@ -951,6 +951,15 @@ struct DashboardView: View {
         // view. Saves ~32pt vertical.
         compactGreeting
 
+        // Phase 80 weather card — Tom's design ask: surface a
+        // calm-state reassurance ("No severe weather alerts in
+        // your area") OR an alert ("Hard Freeze tonight · tap for
+        // a quick prep checklist") with one-tap access to a per-
+        // event prep sheet. Severity-gated to Severe / Extreme +
+        // Immediate / Expected via `WeatherAlertFilter` so the
+        // homeowner doesn't get nagged for every advisory.
+        WeatherCard(property: viewModel.properties.first)
+
         // Phase 95 (gap #56) — first-launch welcome
         // for users signed in as a home manager.
         // Renders only for staff member_types and
