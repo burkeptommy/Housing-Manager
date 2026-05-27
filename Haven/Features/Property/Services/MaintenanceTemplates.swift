@@ -976,6 +976,30 @@ enum MaintenanceTemplates {
             // ice-dam-risk walk-through respectively). Single-rail
             // discipline: tier-4 DIY perimeter walks belong as bundle
             // children of the existing pro visit, not standalone rows.
+            // Phase 80 (discovery study): mid-winter ice dam walkthrough.
+            // The Fall pro-vendor pass (Roofing:fall) covers prevention
+            // up front. This is the January DIY check from the ground
+            // after the first big snow + thaw cycle — looking up at the
+            // eaves for icicles forming below the gutter line, water
+            // stains on the soffit, or visible ice ridges on the roof
+            // edge. Catching it in January is the difference between
+            // calling a roofer to steam the dam off vs. discovering
+            // interior water damage in February.
+            MaintenanceTemplate(
+                systemCategory: "Roofing",
+                title: "Mid-winter ice dam walkthrough",
+                description: "After the first significant snow + thaw cycle in January, walk the perimeter from the ground and look up at every eave. Icicles are normal; icicles BELOW the gutter line forming directly on the soffit indicate an ice dam upstream. Stains on the soffit or attic ceiling also suggest a dam is melting in. Call a roofer with a steamer (not pickaxes) for immediate removal.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (DIY) or $400-1,500 (emergency removal if needed)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Best time is the morning after a thaw following a 4+ inch snowfall. Use binoculars from the ground; do NOT climb onto an icy roof or use a ladder against an ice-covered eave.",
+                assignmentType: .either,
+                diyEffortMinutes: 20,
+                regionalPack: .northeast
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1073,6 +1097,49 @@ enum MaintenanceTemplates {
                 diyEffortMinutes: 180,
                 routingOverride: .diyCapable
             ),
+            // Phase 80 (discovery study): mid-summer deck stain
+            // walkthrough. Distinct from "Deck or fence staining" (every
+            // 2-3 years full-strip + re-stain) — this is the July spot-
+            // check after enough sun + foot traffic to see where the
+            // stain has faded. Touch up bare spots with the same stain
+            // before the wood greys out.
+            MaintenanceTemplate(
+                systemCategory: "Siding/Exterior",
+                title: "Inspect deck stain and spot-treat",
+                description: "Walk the deck in July looking for spots where the stain has worn — typically high-traffic paths, the area in front of the door, and the rail tops that get full sun. Spot-stain those areas with the same product before bare wood greys out. Less work than waiting for a full re-stain.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$30-60 (stain) or $150-300 (handyman)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Test stain on an inconspicuous spot first — older stains darken with age and a fresh coat can look mis-matched. If the whole deck looks faded, schedule the every-2-3-year re-stain instead.",
+                isEssential: false,
+                assignmentType: .either,
+                diyEffortMinutes: 60,
+                routingOverride: .diyCapable
+            ),
+            // Phase 80 (discovery study): outdoor furniture deep clean
+            // + recover. Early summer task — June, before peak use.
+            // Soap-and-water deep clean for frames + cushions; spot-
+            // repair tears in vinyl / sling; replace cushion covers if
+            // needed.
+            MaintenanceTemplate(
+                systemCategory: "Siding/Exterior",
+                title: "Outdoor furniture deep clean and recover",
+                description: "Pull out the patio furniture, deep clean frames + cushions, spot-repair any tears, and re-protect cushions with fabric guard. June is the right time — gets you ready for peak outdoor season without the cushions baking in storage longer than they need to.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$0-50 (DIY) or $150-400 (handyman)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Powdered Oxiclean + warm water removes most mildew on cushions. If a cushion is permanently stained, check whether the cover unzips — replacement covers are often cheaper than full cushion replacement.",
+                isEssential: false,
+                assignmentType: .either,
+                diyEffortMinutes: 120,
+                routingOverride: .diyCapable
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1144,6 +1211,29 @@ enum MaintenanceTemplates {
             // cooling tune-up. Folding the DIY duplicate eliminates an
             // orphan row that asked the homeowner to schedule what the
             // pro already does.
+            // Phase 80 (discovery study): mid-season filter swap for
+            // ducted systems. The Spring tune-up changes the filter; by
+            // July it's halfway through its life. Swapping mid-summer
+            // keeps cooling efficient through August heat waves and
+            // catches a fouled filter before it starts blowing dirty air
+            // through the registers. DIY 5-minute job, but easy to
+            // forget — hence its own template.
+            MaintenanceTemplate(
+                systemCategory: "HVAC",
+                title: "Mid-season HVAC filter swap",
+                description: "Pull the existing filter, hold it up to a light. If you can't see light through it cleanly, replace. Mid-summer is when air conditioners run hardest; a fouled filter costs efficiency and stresses the blower. 5-minute DIY swap.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$15-40 (filter cost)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Match the size printed on the filter frame. MERV 8-11 is the sweet spot for most homes — higher MERV restricts airflow and can stress the blower.",
+                requiredSubtypes: ["ducted"],
+                assignmentType: .either,
+                diyEffortMinutes: 5,
+                routingOverride: .diyDefault
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1267,6 +1357,29 @@ enum MaintenanceTemplates {
                 notes: "If you find a frozen section, open the closest faucet downstream (so any melt has somewhere to go) and apply heat gently — hair dryer, heat tape, never an open flame. Burst pipes are 4-figure repairs; catching the freeze before the burst is the goal.",
                 assignmentType: .either,
                 diyEffortMinutes: 15,
+                regionalPack: .northeast
+            ),
+            // Phase 80 (discovery study): pre-winter pipe insulation walk.
+            // Distinct from the freeze-risk walk above (which happens
+            // DURING a cold snap) — this is the preventive December check
+            // to confirm every pipe in an unheated space has foam sleeve
+            // or wrap on it. Insulation tears, drops, or gets gnawed by
+            // mice; can't tell from a glance. NE-gated since freezes are
+            // a regional concern.
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Inspect pipe insulation in attic, crawl, and garage",
+                description: "Walk every pipe in unheated spaces (attic, crawl, garage, exterior-wall closets) and confirm intact foam-sleeve insulation. Replace any sections that have torn, slipped, or been chewed. Mice love pipe insulation. The 30 minutes you spend here pays off the first time the temperature drops below 10°F.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0–$50 (DIY) or $100–$200 (handyman)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Foam sleeve insulation is at hardware stores for ~$2/6ft. Pre-slit, just snap on. Time it for early December before any deep cold arrives.",
+                assignmentType: .either,
+                diyEffortMinutes: 30,
+                routingOverride: .diyDefault,
                 regionalPack: .northeast
             ),
         ]),
@@ -1947,6 +2060,26 @@ enum MaintenanceTemplates {
                 assignmentType: .vendor,
                 bundleId: "Irrigation:spring"
             ),
+            // Phase 80 (discovery study): mid-summer irrigation audit.
+            // By July, broken heads, mis-aimed sprays, and over-running
+            // zones have all surfaced. The Spring startup catches what
+            // was broken from winter; this catches what's happened
+            // since. Also right time to re-tune runtimes for peak heat
+            // — the schedule the vendor set in April is often too short
+            // for July dry-spells.
+            MaintenanceTemplate(
+                systemCategory: "Irrigation",
+                title: "Mid-summer irrigation audit",
+                description: "Irrigation tech runs each zone in turn, walks the property looking for broken heads, mis-aimed sprays watering the driveway / sidewalk, missing heads (hit by mower), and dry patches indicating poor coverage. Adjusts runtime upward if needed for July heat. Often catches 1-2 broken heads per zone that the homeowner walked past 50 times without noticing.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$75-200",
+                isDIY: false,
+                seasonalTiming: "Summer",
+                professionalRequired: true,
+                notes: "Best done in mid-July when both broken-head symptoms and dry-spell impact are visible. Some irrigation contracts include this — confirm with your vendor.",
+                assignmentType: .vendor
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -2149,6 +2282,28 @@ enum MaintenanceTemplates {
             // the Generator:annual Fall visit already covers panel
             // readout + fault-code review + fuel verification. Standby
             // generators self-test weekly without homeowner input.
+            //
+            // Phase 80 (discovery study): mid-winter load test. Different
+            // from the Fall annual service — this is a real-world load
+            // test in January, when you'd actually rely on it. Confirm
+            // fuel pressure under load (propane lines often weaken in
+            // freezing temps), automatic transfer switch engages, and
+            // the unit cycles cleanly. If anything's off, you have time
+            // to call the generator tech before the next storm.
+            MaintenanceTemplate(
+                systemCategory: "Generator",
+                title: "Mid-winter generator load test",
+                description: "Run the generator under household load for 30 minutes in deep winter. Watch for: automatic transfer switch engagement (kill grid power at the panel briefly), normal voltage / frequency on the readout, propane regulator behaving under cold (frost on the regulator is normal; ice or hesitation isn't), and no exhaust restrictions from snow drifts around the unit.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (DIY) or $200-400 (vendor visit)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Clear any snow within 3 feet of the generator first. Best done on a cold day so you're testing under realistic conditions. If the transfer switch hesitates or the unit cycles, call your generator tech.",
+                assignmentType: .either,
+                diyEffortMinutes: 45
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -2895,6 +3050,26 @@ enum MaintenanceTemplates {
                 professionalRequired: true,
                 notes: "Contract typically covers Nov 1 – Apr 1 in the Northeast. Lock it in before October.",
                 assignmentType: .vendor
+            ),
+            // Phase 80 (discovery study): Winter content fill. Salt and
+            // ice melt run out fast during a real storm season. This is
+            // the December check that you have what you need before the
+            // first snowfall, not in February when the supply chain has
+            // already dried up.
+            MaintenanceTemplate(
+                systemCategory: "Snow Removal",
+                title: "Stock salt and ice melt",
+                description: "Walk the garage / shed and confirm you have at least 2-3 bags of ice melt or rock salt on hand before the first snow. Calcium chloride works to -25°F; rock salt only down to ~5°F. If you have pets or want to protect plantings, pick a pet-safe / plant-safe brand.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$30-80",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Mid-storm runs to the hardware store are when supplies are sold out. Stock in early December.",
+                assignmentType: .either,
+                diyEffortMinutes: 30,
+                routingOverride: .diyDefault
             ),
         ]),
 
