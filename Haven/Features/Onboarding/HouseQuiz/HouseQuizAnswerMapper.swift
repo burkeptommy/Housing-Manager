@@ -2265,6 +2265,58 @@ final class HouseQuizAnswerMapper {
         return snowStates.contains(raw.uppercased())
     }
 
+    /// Outcome of `resolveChimneyRule`. `evidence` is for analytics/
+    /// debug only and is never persisted to the home_system row.
+    struct ChimneyRule {
+        let shouldCreate: Bool
+        let subtype: String?
+        let evidence: String
+    }
+
+    /// Decide whether to auto-create a Chimney home_system row and
+    /// which subtype it should carry. Single source of truth shared
+    /// between the live quiz-completion path and the one-time
+    /// migration in `AppState.migrateChimneyEvidenceOnceIfNeeded`.
+    ///
+    /// Precedence (Q20 fireplace evidence beats Q3 fuel evidence):
+    ///   1. Fireplace row, name contains "wood"/"pellet" → `wood`
+    ///   2. Fireplace row, name contains "propane"/"gas"  → `gas`
+    ///   3. Fireplace row, name unclassifiable            → `wood` (defensive)
+    ///   4. No fireplace, fossil-fuel heat
+    ///      (natural_gas / oil / propane / not_sure)      → `furnace_flue`
+    ///   5. Otherwise (electric, heat pump, geothermal,
+    ///      electric baseboard, nil)                      → don't create
+    ///
+    /// `not_sure` on Q3 is treated as fossil because the NE TestFlight
+    /// cohort overwhelmingly skews oil/gas. Worst case for the wrong
+    /// guess: one harmless fall flue-inspection task the user dismisses.
+    static func resolveChimneyRule(
+        property: PropertyRow?,
+        fireplaceSystem: HomeSystemRow?
+    ) -> ChimneyRule {
+        if let fireplace = fireplaceSystem {
+            let name = fireplace.name.lowercased()
+            if name.contains("wood") || name.contains("pellet") {
+                return ChimneyRule(shouldCreate: true, subtype: "wood", evidence: "q20_wood")
+            }
+            if name.contains("propane") || name.contains("gas") {
+                return ChimneyRule(shouldCreate: true, subtype: "gas", evidence: "q20_gas")
+            }
+            // Fireplace row with an unrecognized name — default to wood
+            // since that's the safer assumption (creosote is a fire risk
+            // we'd rather over-warn than miss).
+            return ChimneyRule(shouldCreate: true, subtype: "wood", evidence: "q20_unknown")
+        }
+
+        let heatingFuel = property?.attributes?["heating_fuel"]?.stringValue.lowercased()
+        let fossilFuels: Set<String> = ["natural_gas", "oil", "propane", "not_sure"]
+        if let fuel = heatingFuel, fossilFuels.contains(fuel) {
+            return ChimneyRule(shouldCreate: true, subtype: "furnace_flue", evidence: "q3_fossil")
+        }
+
+        return ChimneyRule(shouldCreate: false, subtype: nil, evidence: "none")
+    }
+
     /// Phase 54A: Instance entry point used by the quiz completion path.
     /// Delegates to the static helper so existing-user backfill on
     /// `AppState` can share the same rules without duplicating logic.
@@ -2284,12 +2336,20 @@ final class HouseQuizAnswerMapper {
     /// missing.
     ///
     /// Rules:
-    /// - Always create: Handyman, Mosquito & Tick
-    /// - Conditional:
-    ///     - Pet Waste — if `properties.attributes["has_pets"] == "true"`
-    ///     - Chimney — if any `home_systems` row exists with category
-    ///       "Fireplace" (captures Q20 wood/propane fireplace selections)
-    ///     - Snow Removal — if `property.state` is in `snowStates`
+    /// - Always create: Siding/Exterior, Window Cleaning, Tree Service,
+    ///   Driveway Sealcoating (most NE HNW homes have all four; Vendor
+    ///   Coverage gives a one-tap "Not applicable" for exceptions).
+    /// - Chimney — evidence-based via `resolveChimneyRule`:
+    ///     - `wood` subtype if Q20 wood/pellet fireplace
+    ///     - `gas` subtype if Q20 propane/gas fireplace
+    ///     - `furnace_flue` subtype if Q3 = fossil-fuel heat
+    ///       (natural_gas / oil / propane / not_sure) and no Q20 fireplace
+    ///     - No row at all if all-electric (heat pump / geothermal /
+    ///       electric baseboard) AND no fireplace
+    /// - Pending-vendor routines (Handyman / Mosquito & Tick / Snow
+    ///   Removal / Pet Waste) are seeded by
+    ///   `RoutineSeeder.ensureSystemlessRoutines` further down, no
+    ///   longer as `home_systems` rows.
     ///
     /// Idempotent: categories that already have a top-level system row
     /// are skipped. Callers should run the reconciler afterward so
@@ -2307,16 +2367,7 @@ final class HouseQuizAnswerMapper {
         let hasPets = property?.attributes?["has_pets"]?.stringValue == "true"
 
         let fireplaceSystem = systems.first { $0.category.caseInsensitiveCompare("Fireplace") == .orderedSame }
-        let hasChimney = fireplaceSystem != nil
-        // Pick a chimney subtype that reflects the fuel the user said they use.
-        // Fallback is nil (any chimney template still fires).
-        let chimneySubtype: String? = {
-            guard let fp = fireplaceSystem else { return nil }
-            let name = fp.name.lowercased()
-            if name.contains("wood") || name.contains("pellet") { return "wood" }
-            if name.contains("propane") || name.contains("gas") { return "gas" }
-            return nil
-        }()
+        let chimneyRule = Self.resolveChimneyRule(property: property, fireplaceSystem: fireplaceSystem)
 
         let isSnow = isSnowState(property?.state)
 
@@ -2324,6 +2375,7 @@ final class HouseQuizAnswerMapper {
             let category: String
             let subtype: String?
             let shouldCreate: Bool
+            let evidence: String?
         }
 
         // Chez v1: service-shaped categories (Handyman, Mosquito &
@@ -2331,33 +2383,31 @@ final class HouseQuizAnswerMapper {
         // longer auto-created as `home_systems` rows — they're
         // recurring vendor visits, not equipment with brand/model/
         // serial. Instead they become pending-vendor routines via
-        // `RoutineSeeder.ensureSystemlessRoutines` below. Chimney
-        // STAYS in this loop because a chimney is a real structural
-        // system with install date / type / sweep history.
+        // `RoutineSeeder.ensureSystemlessRoutines` below.
         //
-        // Phase 70.A1 follow-on H4 — Tom's "where are power
-        // washing + chimney cleaning" feedback. Most TestFlight
-        // households are NE HNW homes with siding, chimneys
-        // (boiler/fireplace flue), windows, trees, decks, and
-        // driveways needing seasonal care. The pre-H4 gating left
-        // these categories invisible — templates lived under
-        // `Siding/Exterior` / `Chimney` / etc. but those system
-        // rows never auto-created. We now over-populate by default;
-        // homeowners can dismiss "Not applicable" on Vendor Coverage
-        // for any that don't apply. Chimney is no longer gated on
-        // `hasChimney` — even sewer-and-electric homes with no
-        // fireplace usually have a furnace flue worth inspecting.
-        // Categories below have actual templates anchored to them.
-        // We deliberately skip Deck/Outdoor, Painting, and Gutter
-        // Cleaning — their work items live under Siding/Exterior +
-        // Roofing bundles, so auto-creating empty system rows would
-        // be noise without any seeded tasks.
+        // Chimney is evidence-based: we create the row only when
+        // positive evidence exists (Q20 fireplace OR Q3 fossil-fuel
+        // heat). See `resolveChimneyRule` for the decision tree.
+        // An all-electric townhome with no fireplace gets no chimney
+        // row at all — the prior "default to wood" behavior shipped
+        // a creosote warning to households with no flue, which read
+        // as the app not understanding the home.
+        //
+        // The remaining universal rules (Siding/Exterior, Window
+        // Cleaning, Tree Service, Driveway Sealcoating) are kept from
+        // the Phase 70.A1 H4 over-populate-by-default approach — most
+        // NE HNW homes have siding, windows, trees, and a driveway,
+        // and Vendor Coverage gives a one-tap "Not applicable" for
+        // the rare exception. We deliberately skip Deck/Outdoor,
+        // Painting, and Gutter Cleaning — their work items live under
+        // Siding/Exterior + Roofing bundles, so auto-creating empty
+        // system rows would be noise without any seeded tasks.
         let rules: [Rule] = [
-            .init(category: "Chimney", subtype: chimneySubtype, shouldCreate: true),
-            .init(category: "Siding/Exterior", subtype: nil, shouldCreate: true),
-            .init(category: "Window Cleaning", subtype: nil, shouldCreate: true),
-            .init(category: "Tree Service", subtype: nil, shouldCreate: true),
-            .init(category: "Driveway Sealcoating", subtype: nil, shouldCreate: true),
+            .init(category: "Chimney", subtype: chimneyRule.subtype, shouldCreate: chimneyRule.shouldCreate, evidence: chimneyRule.evidence),
+            .init(category: "Siding/Exterior", subtype: nil, shouldCreate: true, evidence: nil),
+            .init(category: "Window Cleaning", subtype: nil, shouldCreate: true, evidence: nil),
+            .init(category: "Tree Service", subtype: nil, shouldCreate: true, evidence: nil),
+            .init(category: "Driveway Sealcoating", subtype: nil, shouldCreate: true, evidence: nil),
             // Phase 67 fix: Air Quality removed — see prior comment.
         ]
 
@@ -2376,6 +2426,9 @@ final class HouseQuizAnswerMapper {
                 notes: "Auto-created by Chez so vendor coverage stays complete."
             )
             insert.subtype = rule.subtype
+            if rule.category == "Chimney", let evidence = rule.evidence {
+                Analytics.track(.chimneyAutoCreated, ["evidence": evidence])
+            }
             _ = try? await db.createHomeSystem(insert)
         }
 

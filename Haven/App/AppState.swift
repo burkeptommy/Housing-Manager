@@ -277,6 +277,11 @@ final class AppState: ObservableObject {
                         await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
                         await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
                         await Self.backfillMissingSystemsOnceIfNeeded()
+                        // Evidence-based chimney cleanup. Runs after the
+                        // missing-system backfill so any chimney row newly
+                        // created by that pass (no-op on _v3 installs) gets
+                        // its subtype reconciled against the new rule too.
+                        await Self.migrateChimneyEvidenceOnceIfNeeded()
                         // Phase 54E.3: mirror existing waste haulers +
                         // service utilities to the contractors table.
                         await Self.backfillUtilityContractorMirrorOnceIfNeeded()
@@ -507,6 +512,11 @@ final class AppState: ObservableObject {
                             await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
                             await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
                             await Self.backfillMissingSystemsOnceIfNeeded()
+                            // Evidence-based chimney cleanup. Same order
+                            // as the cold-start path — runs after
+                            // backfillMissingSystemsOnceIfNeeded so any
+                            // newly-seeded chimney row gets reconciled.
+                            await Self.migrateChimneyEvidenceOnceIfNeeded()
                             // Phase 58 orphan archive pass.
                             await Self.archivePhase58OrphanedTasksOnceIfNeeded()
                         }
@@ -816,14 +826,16 @@ final class AppState: ObservableObject {
     static func backfillMissingSystemsOnceIfNeeded() async {
         // Phase 70.A1 follow-on H4: bumped to _v3 so existing TestFlight
         // users pick up the expanded auto-create rules — Siding/Exterior,
-        // Chimney (now unconditional), Window Cleaning, Tree Service,
-        // Deck/Outdoor, Driveway Sealcoating, Painting, Gutter Cleaning.
-        // Tom flagged "where are power washing + chimney cleaning?" —
-        // those templates lived under Siding/Exterior + Chimney but
-        // never seeded because the categories weren't auto-created.
-        // ensureAutoCreatedSystems is idempotent (dedups by category)
-        // so re-running on fully-set-up users is a no-op except for the
-        // categories that newly qualify.
+        // Window Cleaning, Tree Service, Driveway Sealcoating. Chimney
+        // is now evidence-based (see `resolveChimneyRule`); existing
+        // false-positive chimney rows from the prior unconditional
+        // behavior get cleaned up by `migrateChimneyEvidenceOnceIfNeeded`
+        // which runs immediately after this backfill. Tom flagged "where
+        // are power washing + chimney cleaning?" — those templates lived
+        // under Siding/Exterior + Chimney but never seeded because the
+        // categories weren't auto-created. ensureAutoCreatedSystems is
+        // idempotent (dedups by category) so re-running on fully-set-up
+        // users is a no-op except for the categories that newly qualify.
         let key = "hasRunMissingSystemBackfillP70H4_v3"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         let db = DatabaseService.shared
@@ -849,6 +861,89 @@ final class AppState: ObservableObject {
         }
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// One-time evidence-based chimney cleanup for existing TestFlight
+    /// users. The pre-change behavior auto-created a Chimney row on
+    /// every property with subtype defaulting to "wood", which seeded
+    /// "Annual chimney sweep" tasks on households with no flue at all.
+    ///
+    /// Walks every existing Chimney `home_systems` row and re-derives
+    /// the correct subtype via `HouseQuizAnswerMapper.resolveChimneyRule`:
+    /// - If the new resolver says the row shouldn't exist
+    ///   (all-electric + no fireplace), clear the subtype so no
+    ///   templates fire. We never delete the row — preserves any
+    ///   completed sweep tasks as service history.
+    /// - If the subtype differs from what's stored, write the new one.
+    /// - In either case, re-run the reconciler so its dedup-by-templateKey
+    ///   pass archives scheduled/incomplete tasks whose `requiredSubtypes`
+    ///   no longer match. Completed tasks are untouched.
+    ///
+    /// Gated on `hasMigratedChimneyEvidence_v1`.
+    @MainActor
+    static func migrateChimneyEvidenceOnceIfNeeded() async {
+        let key = "hasMigratedChimneyEvidence_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        var anyChange = false
+        for property in properties {
+            let systems = (try? await db.fetchHomeSystems(
+                propertyId: property.id,
+                topLevelOnly: false
+            )) ?? []
+
+            let chimneyRow = systems.first {
+                $0.category.caseInsensitiveCompare("Chimney") == .orderedSame
+            }
+            guard let chimneyRow else { continue }
+
+            let fireplaceSystem = systems.first {
+                $0.category.caseInsensitiveCompare("Fireplace") == .orderedSame
+            }
+            let rule = HouseQuizAnswerMapper.resolveChimneyRule(
+                property: property,
+                fireplaceSystem: fireplaceSystem
+            )
+
+            let currentSubtype = chimneyRow.subtype
+            let targetSubtype: String? = rule.shouldCreate ? rule.subtype : nil
+            if currentSubtype == targetSubtype { continue }
+
+            // `HomeSystemUpdate.subtype = nil` would be omitted by the
+            // synthesized encoder, so we use `clearHomeSystemSubtype`
+            // for the explicit Postgres NULL case. The "set new subtype"
+            // case is fine through the normal update path.
+            if let newSubtype = targetSubtype {
+                var update = HomeSystemUpdate()
+                update.subtype = newSubtype
+                _ = try? await db.updateHomeSystem(id: chimneyRow.id, update)
+            } else {
+                try? await db.clearHomeSystemSubtype(id: chimneyRow.id)
+            }
+            anyChange = true
+
+            _ = await MaintenanceTaskReconciler.reconcileAll(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+        }
+
+        if anyChange {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        }
         UserDefaults.standard.set(true, forKey: key)
     }
 

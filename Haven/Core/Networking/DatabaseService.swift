@@ -768,6 +768,21 @@ final class DatabaseService {
             .value
     }
 
+    /// Clear the `subtype` column to NULL. Same Postgres-NULL-via-
+    /// Encodable workaround as `unarchiveHomeSystem` — synthesized
+    /// `encodeIfPresent` on `HomeSystemUpdate.subtype: String?` omits
+    /// the key when nil, so we route through a tiny encodable that the
+    /// Postgrest client serializes as a JSON null. Used by the Phase
+    /// 70-era chimney-evidence migration when a row no longer qualifies
+    /// for any subtype.
+    func clearHomeSystemSubtype(id: UUID) async throws {
+        struct ClearSubtype: Encodable { let subtype: String? = nil }
+        _ = try await from("home_systems")
+            .update(ClearSubtype())
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     // MARK: - Utility Accounts
 
     func fetchUtilityAccounts(propertyId: UUID) async throws -> [UtilityAccountRow] {

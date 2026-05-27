@@ -272,6 +272,11 @@ enum AnalyticsEvent: String {
     case homeSystemsSetupStarted = "home_systems_setup_started"
     case homeSystemsSetupCompleted = "home_systems_setup_completed"
     case specialtySystemAdded = "specialty_system_added"
+    /// Fires every time `ensureAutoCreatedSystems` decides to insert a
+    /// Chimney row. The `evidence` payload key carries the rule branch
+    /// (`q20_wood` / `q20_gas` / `q20_unknown` / `q3_fossil` / `none`)
+    /// so we can debug "why does this user have a chimney" later.
+    case chimneyAutoCreated = "chimney_auto_created"
 
     // MARK: - Maintenance
     case maintenanceTaskViewed = "maintenance_task_viewed"

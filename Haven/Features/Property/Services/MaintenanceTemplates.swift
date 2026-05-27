@@ -621,21 +621,26 @@ enum MaintenanceTemplates {
             if flags["has_leak_detector"] == true { s.insert("has_leak_detector") }
             if flags["has_whole_house_filter"] == true { s.insert("has_whole_house_filter") }
         case "chimney":
-            // Phase 60: Chimney systems are auto-created by the quiz when
-            // a user confirms they have a fireplace. The system's
-            // `subtype` captures the fuel type ("wood" / "gas"); both
-            // types need annual service but different vendors do it —
-            // wood chimneys get a chimney sweep (creosote cleaning),
-            // gas chimneys get a gas tech for burner/pilot servicing.
-            // Default to "wood" when subtype is unset so users who
-            // haven't specified still see the sweep task.
+            // Evidence-based chimney subtype. `resolveChimneyRule` in
+            // HouseQuizAnswerMapper writes one of three values based on
+            // positive evidence — never falls back to a default:
+            //   • "wood"         — wood/pellet fireplace from Q20.
+            //   • "gas"          — propane/gas fireplace from Q20.
+            //   • "furnace_flue" — no fireplace, fossil-fuel heat (oil /
+            //                      natural_gas / propane / not_sure) on Q3.
+            // When subtype is nil or unrecognized we emit nothing — the
+            // row stays inert until evidence arrives. This deliberately
+            // breaks the prior "default to wood" behavior so all-electric
+            // households with no fireplace don't see a creosote warning.
             switch sub {
             case "gas":
                 s.insert("gas")
-            case "wood", "":
+            case "wood":
                 s.insert("wood")
+            case "furnace_flue":
+                s.insert("furnace_flue")
             default:
-                s.insert("wood")
+                break
             }
         default:
             break
@@ -1608,6 +1613,30 @@ enum MaintenanceTemplates {
                 isEssential: false,
                 assignmentType: .vendor,
                 stableId: "Chimney:Re-mortar crown",
+                safetyFloor: true
+            ),
+            // Furnace-flue case: fossil-fuel heat without a fireplace.
+            // Standalone, NOT in Chimney:fall — a furnace flue is a 30-
+            // second visual check by the HVAC tech already on-site for the
+            // annual tune-up. No sweep, no creosote, no separate visit.
+            // Subtype "furnace_flue" is set by `resolveChimneyRule` in
+            // HouseQuizAnswerMapper when the household has fossil-fuel
+            // heat (oil / natural_gas / propane / not_sure) and no Q20
+            // fireplace.
+            MaintenanceTemplate(
+                systemCategory: "Chimney",
+                title: "HVAC tech inspects flue during annual tune-up",
+                description: "The flue is the venting path that carries combustion gases from your furnace or boiler out of the house. The HVAC tech who handles your annual heating tune-up can confirm the flue is clear, the draft is correct, and there's no corrosion or blockage. No separate vendor visit — bundled into the tune-up you're already paying for.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (part of HVAC tune-up)",
+                isDIY: false,
+                seasonalTiming: "Fall",
+                professionalRequired: true,
+                notes: "Just mention the flue check when scheduling the tune-up. If your tech finds anything off, they'll quote the repair separately.",
+                requiredSubtypes: ["furnace_flue"],
+                assignmentType: .vendor,
+                stableId: "Chimney:Furnace flue inspection",
                 safetyFloor: true
             ),
         ]),
