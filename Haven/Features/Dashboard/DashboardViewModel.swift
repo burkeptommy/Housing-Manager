@@ -1293,7 +1293,7 @@ final class DashboardViewModel: ObservableObject {
 
     private func loadOverdueMaintenance() async {
         do {
-            let tasks = try await DatabaseService.shared.fetchMaintenanceTasks()
+            let rawTasks = try await DatabaseService.shared.fetchMaintenanceTasks()
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd"
             let now = Date()
@@ -1307,6 +1307,22 @@ final class DashboardViewModel: ObservableObject {
             // today."
             let todayStart = Calendar.current.startOfDay(for: now)
 
+            // Phase 80 fix: filter bundle children from every downstream
+            // list. Bundle children are work items rolled INSIDE a parent
+            // visit card (e.g. "Fixture leak walkthrough" and "Exercise
+            // main shutoff valve" live under "Annual Plumbing Inspection").
+            // Showing them individually in "Needs your attention" makes
+            // the homeowner see 5 cards for what's really one vendor
+            // visit. The Tasks tab's seasonFeed already filters them out;
+            // this brings the Dashboard's overdue/due-this-week lists in
+            // line so both surfaces match the "rollup to parent" model.
+            let tasks = rawTasks.filter { task in
+                guard let templateKey = task.templateId,
+                      let template = MaintenanceTemplates.template(forKey: templateKey),
+                      template.bundleId != nil else { return true }
+                return false
+            }
+
             // Phase 61: also count archived tasks for the LegacyTasksNotificationCard.
             // Separate fetch so the main list stays filtered to active rows.
             if let allIncludingArchived = try? await DatabaseService.shared.fetchAllMaintenanceTasks(includeArchived: true) {
@@ -1319,21 +1335,26 @@ final class DashboardViewModel: ObservableObject {
             }
 
             let endOfWeek = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
+            // Phase 80: include today-dated tasks in "due this week" so
+            // they surface somewhere on the Dashboard rather than falling
+            // into the gap between overdue (< startOfDay) and future
+            // (>= now-as-timestamp). Compare dates against startOfDay so
+            // a midnight-today timestamp passes the >= check.
             dueThisWeekTasks = tasks.filter { task in
                 guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                return date >= now && date <= endOfWeek
+                return date >= todayStart && date <= endOfWeek
             }
 
             let endOfMonth = Calendar.current.date(byAdding: .month, value: 1, to: now) ?? now
             dueThisMonthTasks = tasks.filter { task in
                 guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                return date >= now && date <= endOfMonth
+                return date >= todayStart && date <= endOfMonth
             }
 
             let futureTasks = tasks
                 .filter { task in
                     guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                    return date >= now
+                    return date >= todayStart
                 }
                 .sorted(by: { $0.nextDueDate < $1.nextDueDate })
 
