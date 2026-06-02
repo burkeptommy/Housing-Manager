@@ -4,7 +4,7 @@
 // Pure-function simulator that takes property facts (state, region,
 // attributes, subtypes, preference tier) and returns the task list that
 // WOULD seed if you ran the reconciler on a real household with those
-// facts. Lets Tom verify proposed template changes against a hypothetical
+// facts. Lets the operator verify proposed template changes against a hypothetical
 // home before asking for an iOS rebuild.
 //
 // Not pixel-perfect parity with Swift — it focuses on the gating + routing
@@ -39,7 +39,7 @@ const STATE_REGION_MAP = {
 };
 
 // Default fact bundle the form pre-fills with. Northeast HNW family of 4
-// in a 4-bed colonial — close to Tom's TestFlight cohort.
+// in a 4-bed colonial — close to the operator's TestFlight cohort.
 export const DEFAULT_FACTS = {
   state: "CT",
   yearBuilt: 1962,
@@ -114,7 +114,7 @@ export const DEFAULT_FACTS = {
 // Phase 5k — Quiz answer → property facts mapper
 // =============================================================================
 // Reproduces the most impactful side-effects of HouseQuizAnswerMapper.swift
-// in JS so Tom can simulate quiz permutations and watch the seeded task
+// in JS so the operator can simulate quiz permutations and watch the seeded task
 // list change live. Covers the system-creating answers + Q15b
 // (contractors-on-file) + Q36 (preference tier). Doesn't try to model
 // every answer (provider names, vehicle adds, family invites) since
@@ -1050,7 +1050,7 @@ function renderVendorCoverageGapsSection(gaps) {
 }
 
 // Phase 5q — Step funnel showing how 220+ templates collapse into the
-// task list the homeowner actually sees. Tom flagged confusion about
+// task list the homeowner actually sees. the operator flagged confusion about
 // "why does only X% of templates fire?" — every step here explains a
 // real piece of the gating + bundling pipeline.
 function renderFunnelBreakdown(f) {
@@ -1247,7 +1247,7 @@ const SIM_ROUTINE_CATEGORIES = new Set([
   "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste",
   "Window Cleaning", "Gutter Cleaning", "Trash & Recycling",
 ]);
-// Phase 5n — Tom's rule: routines are weekly / biweekly / monthly /
+// Phase 5n — the operator's rule: routines are weekly / biweekly / monthly /
 // quarterly only. Semi-annual / annual / multi-year are tasks. No
 // bundleId shortcut — frequency is the ground truth.
 const SIM_ROUTINE_FREQUENCIES = new Set([

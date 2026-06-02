@@ -3,9 +3,11 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Marketing + auth pages
 COPY index.html /usr/share/nginx/html/
+COPY capabilities.html /usr/share/nginx/html/
 COPY security.html /usr/share/nginx/html/
 COPY privacy.html /usr/share/nginx/html/
 COPY terms.html /usr/share/nginx/html/
+COPY referral-terms.html /usr/share/nginx/html/
 COPY styles.css /usr/share/nginx/html/
 COPY og-image.png /usr/share/nginx/html/
 

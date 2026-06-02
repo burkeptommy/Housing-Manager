@@ -293,7 +293,7 @@ function customFormNoteFor(kind) {
 }
 
 // ---- Explainer panel ------------------------------------------------------
-// Pulls together everything we know about a question so Tom can see the
+// Pulls together everything we know about a question so the operator can see the
 // behavior without flipping back to the admin form.
 
 function renderExplainer(q, ctx) {
