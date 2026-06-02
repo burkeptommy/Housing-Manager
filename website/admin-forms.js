@@ -68,7 +68,7 @@ export const ENUMS = {
     { value: "vendor", label: "Vendor — pro only" },
     { value: "either", label: "Either — defaults to DIY, flippable" },
   ],
-  // Phase 5d/5m — Tom-facing renaming of the underlying assignmentType +
+  // Phase 5d/5m — the operator-facing renaming of the underlying assignmentType +
   // routingOverride + safetyFloor combo. Five tiers, with Routine as a
   // first-class option for recurring vendor work that should auto-collapse
   // into a per-category routine when a contractor is on file (instead of
@@ -1146,7 +1146,7 @@ const ROUTINE_CATEGORIES = new Set([
   "Trash & Recycling",
 ]);
 
-// Phase 5n — Tom's rule: routines are weekly, biweekly, monthly, or
+// Phase 5n — the operator's rule: routines are weekly, biweekly, monthly, or
 // quarterly work. Anything semi-annual / annual / multi-year is a TASK
 // the homeowner coordinates with their vendor explicitly. Triweekly +
 // bi-monthly fall in the routine band as they're just cadence variations

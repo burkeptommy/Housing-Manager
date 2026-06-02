@@ -81,7 +81,7 @@ function visibleViewGroups() {
 }
 
 // Phase 5z+18 — VIEWS now carries a `group` field so the left nav can
-// render section headers. Tom: "we should also categorize our left
+// render section headers. the operator: "we should also categorize our left
 // hand panel to make it easier to navigate like a real site."
 //
 // Five sections:
@@ -173,7 +173,7 @@ const VIEWS = [
     // Phase 72.5 — Vendor self-signup review desk. Vendors apply via the
     // public form on getchez.com/vendor-apply.html. Once their email is
     // confirmed, they auto-appear in iOS find-vendor results without a
-    // badge. This surface is where Tom certifies them (badge + top sort)
+    // badge. This surface is where the operator certifies them (badge + top sort)
     // or rejects them. Backed by the admin-vendor-applications edge fn,
     // which gates on the CHEZ_ADMIN_EMAILS allowlist.
     id: "vendor_apps",
@@ -348,7 +348,7 @@ const VIEWS = [
 
 // Phase 5z+18 — Group labels for the left nav. Order here = render order.
 const VIEW_GROUPS = [
-  // Phase 86A.1 — Nav rationalization. Per Tom's "easily navigable"
+  // Phase 86A.1 — Nav rationalization. Per the operator's "easily navigable"
   // ask: only the operator's daily surfaces stay always-visible at the
   // top. The four catalog/reference/archive/tools groups collapse by
   // default so the sidebar reads as a customer-service tool, not a
@@ -384,7 +384,7 @@ const DEFAULT_ROUTINES = [
 
 // Phase 5z+10 — Vendor type catalog. Each entry: [label, oneLineRole,
 // whatTheyHandle, whenTheyAppear, howTheyConnect]. Surfaces on the
-// Vendors tab so Tom can write notes on each vendor type with the same
+// Vendors tab so the operator can write notes on each vendor type with the same
 // focused-note panel as everything else.
 const DEFAULT_VENDOR_CATEGORIES = [
   [
@@ -641,7 +641,7 @@ const state = {
   search: "",
   statusFilter: "all",
   // Phase 5q — extra filter axes for Tasks / Recommended / Handyman so
-  // Tom can narrow 220+ templates down by lifecycle + season + routing
+  // the operator can narrow 220+ templates down by lifecycle + season + routing
   // without scrolling. Reset to "all" on view change.
   // Phase 5z — Default to auto_seed so the Tasks tab opens with the
   // 91 templates that fire on quiz completion (≈ what the homeowner
@@ -659,7 +659,7 @@ const state = {
   // homeowner (one task per visit, not one per child template).
   groupBundles: true,
   // Phase 7 — simulator scratch state. Fact bundle + last result so
-  // re-rendering the surface doesn't reset Tom's edits.
+  // re-rendering the surface doesn't reset the operator's edits.
   simFacts: structuredCloneSafePure(DEFAULT_FACTS),
   simResult: null,
   // Phase 5k — Quiz Mode state.
@@ -683,7 +683,7 @@ const state = {
   lastDataLoadAt: null,
   // Phase 5z+14 — currently-focused decision on the Decisions tab.
   // Cleared on tab navigation; survives renderDecisionsView re-renders
-  // (e.g. after a refresh) so the panel stays open while Tom acts.
+  // (e.g. after a refresh) so the panel stays open while the operator acts.
   selectedDecision: null,
   // Phase 5z+19 — currently-focused audit finding on the Audit tab.
   // Same lifecycle as selectedDecision.
@@ -693,7 +693,7 @@ const state = {
   // request_id so the focused panel can render its thread without a
   // round trip per click. `selectedChezRequest` is whichever row is
   // currently open in the focused panel — survives data refreshes so
-  // the panel stays put while Tom is composing a reply.
+  // the panel stays put while the operator is composing a reply.
   chezRequests: [],
   chezMessages: {},
   selectedChezRequest: null,
@@ -910,7 +910,7 @@ const pendingAttachments = [];
 
 // Phase 4b — per-detail editing state. `original` is the unmodified entity
 // from the JSON snapshot (or admin_content_items row). `current` is a deep
-// clone we mutate as Tom edits. The diff between the two is the
+// clone we mutate as the operator edits. The diff between the two is the
 // proposed_diff that gets attached to the next saved note.
 const editingState = {
   viewId: null,
@@ -1412,7 +1412,7 @@ async function signIn(event) {
   const email = el.loginEmail.value.trim().toLowerCase();
   const password = el.loginPassword.value;
   if (email !== ADMIN_EMAIL) {
-    el.loginFeedback.textContent = "This admin is allowlisted for Tom only.";
+    el.loginFeedback.textContent = "This admin is allowlisted for the operator only.";
     return;
   }
   el.loginFeedback.textContent = "Signing in...";
@@ -1486,7 +1486,7 @@ const LIVE_SOURCES = [
 
 // Phase 5u/5z+10 — Cache-bust admin-data fetches with a per-LOAD
 // timestamp so manual refresh + window-focus auto-refresh always hit
-// origin instead of the CDN/browser cache. Tom hit stale JSON multiple
+// origin instead of the CDN/browser cache. the operator hit stale JSON multiple
 // times after committing because Vercel's CDN + browser cache held
 // yesterday's data even after a push.
 async function loadLiveData() {
@@ -1505,7 +1505,7 @@ async function loadLiveData() {
 }
 
 // Phase 5z+10 — manual + auto refresh. Refetches every JSON snapshot
-// + the cloud notes table, then re-renders the current view. Tom's ask
+// + the cloud notes table, then re-renders the current view. the operator's ask
 // was: "after Claude makes code changes the numbers should reflect
 // the new state without a hard browser refresh."
 let _refreshInFlight = false;
@@ -1617,7 +1617,7 @@ function liveItemsForView(viewId) {
 // Phase 5z+18 — Canonical vehicle task catalog. The vehicle-lookup
 // edge function generates these per VIN at runtime, but they're a
 // stable set across most cars. Surfacing them on the Vehicles tab
-// gives Tom something to read + write notes on, instead of staring at
+// gives the operator something to read + write notes on, instead of staring at
 // a single edge-function prompt entry.
 const CANONICAL_VEHICLE_TASKS = [
   { title: "Oil + filter change", interval: "5,000–7,500 mi or 6 mo", category: "Service", note: "Synthetic oil schedule depends on the manufacturer." },
@@ -1663,7 +1663,7 @@ const LIVE_MAPPERS = {
     id: `live-quiz-${q.id}`,
     source: "live",
     itemType: "question",
-    // Prefix with order number so Tom can scan the actual sequence at
+    // Prefix with order number so the operator can scan the actual sequence at
     // a glance. idx comes from the JSON's source order, which mirrors
     // HouseQuizQuestionLibrary.swift declaration order.
     title: `${idx + 1}. ${q.title || q.id}`,
@@ -2258,7 +2258,7 @@ function runAndRenderSimulation() {
   const lanes = state.simResult.lanes;
   const allTasks = [...(lanes.bundles || []), ...(lanes.vendor || []), ...(lanes.findContractor || []), ...(lanes.personal || [])];
   const ROUTINE_CATS = new Set(["Landscaping", "Cleaning Service", "Pool/Spa", "Hot Tub", "Pest Control", "Snow Removal", "Mosquito & Tick", "Pet Waste", "Window Cleaning", "Gutter Cleaning", "Trash & Recycling"]);
-  // Routine cadences (Tom's rule): weekly / biweekly / monthly / quarterly only.
+  // Routine cadences (the operator's rule): weekly / biweekly / monthly / quarterly only.
   // Semi-annual / annual / multi-year are tasks (need explicit coordination).
   const ROUTINE_FREQS = new Set(["Weekly", "Biweekly", "Triweekly", "Monthly", "Bi-monthly", "Quarterly"]);
   const isRoutineCandidate = (t) => {
@@ -2292,7 +2292,7 @@ function runAndRenderSimulation() {
 }
 
 // Phase 5p — Click any simulator row (task / routine / punch list item /
-// bundle child) and jump straight to that entity's detail panel so Tom
+// bundle child) and jump straight to that entity's detail panel so the operator
 // can leave a note in the same spot the proposal needs to land. Handlers
 // re-attach on every simulator render.
 function attachSimulatorJumpHandlers(host) {
@@ -2579,7 +2579,7 @@ function renderList() {
   const facets = renderFacetPills(all);
   // Phase 5z — Recommendations panel surfaces voice violations,
   // duplicates, and bundle-merge candidates with one-click "Draft note"
-  // actions so Tom can act on the audit findings without leaving the tab.
+  // actions so the operator can act on the audit findings without leaving the tab.
   const recs = renderRecommendationsPanel(all);
   el.list.innerHTML =
     (explainer ? explainer : "") +
@@ -2663,7 +2663,7 @@ function attachTasksTabExplainerHandlers(host) {
 // the label column.
 // Phase 5z+11 — Cross-axis filter counts.
 //
-// Tom's bug report: "I have all (204) selected, then Summer (2), then
+// the operator's bug report: "I have all (204) selected, then Summer (2), then
 // I click 'Bundled into visit (57)' but there are actually 0 for
 // bundled into visit. so we need to make sure based on what we select
 // we update these. also the routing math is broken — all says 204…
@@ -2787,7 +2787,7 @@ function computeFacetCounts(items, view) {
 // underneath; clicking a pill or outside dismisses the popover.
 //
 // The pre-5z+11 layout used ~400px of vertical real estate before any
-// list rows rendered. Tom: "is there a better way to view all the
+// list rows rendered. the operator: "is there a better way to view all the
 // filters we have? these are hard to look through." This one-row bar
 // matches Linear / GitHub / Stripe filter conventions: trigger buttons
 // for each axis, popovers for the values.
@@ -2815,7 +2815,7 @@ function renderFacetPills(allItems) {
   // `axisKey` is just a unique id used to wire open/close; it doesn't
   // need to match a state field.
   // `activeCount` (optional) renders next to the active value as a
-  // small badge so Tom sees the bucket size at a glance.
+  // small badge so the operator sees the bucket size at a glance.
   const dropdown = (axisKey, label, activeLabel, isFiltered, caption, pillsHtml, activeCount) => {
     return `
       <div class="admin-facet-dd" data-facet-dd="${escapeHtml(axisKey)}">
@@ -3012,7 +3012,7 @@ function renderFacetPills(allItems) {
 // findings on Tasks/Handyman/Recommended tabs: voice violations,
 // likely duplicates, and bundle-merge candidates. Each row has a
 // "Draft proposal note" button that opens the note form pre-filled
-// with a structured body Tom can review + save.
+// with a structured body the operator can review + save.
 function renderRecommendationsPanel(allItems) {
   if (!["tasks", "handyman", "recommended", "quiz"].includes(state.view)) return "";
   const findings = computeRecommendations(allItems);
@@ -3045,7 +3045,7 @@ function renderRecommendationsPanel(allItems) {
         <h4>🔠 Voice violations <span class="admin-recs__badge">${findings.voice.length}</span></h4>
         <p class="admin-recs__what">
           <strong>What this is:</strong> Templates flagged by <code>website/admin-data/voice-rules.json</code> for breaking the brand voice (most commonly em-dashes in description / notes).<br/>
-          <strong>Why it matters:</strong> Em-dashes read as AI-generated to HNW audience. Tom's design rule. Fix is mechanical — replace with periods or sentence breaks.<br/>
+          <strong>Why it matters:</strong> Em-dashes read as AI-generated to HNW audience. the operator's design rule. Fix is mechanical — replace with periods or sentence breaks.<br/>
           <strong>Primary action:</strong> Click <em>Apply fix</em> to compute the cleaned text and save a proposal note Claude will apply next session.
         </p>
         ${findings.voice.slice(0, 8).map((v) => {
@@ -3111,13 +3111,13 @@ function renderRecommendationsPanel(allItems) {
       </div>`
     : "";
   // Phase 5z+4 — Misrouted-to-tasks section. Catches templates that
-  // should land on the handyman punch list per Tom's 5-tier model
+  // should land on the handyman punch list per the operator's 5-tier model
   // but currently auto-seed as maintenance_tasks rows.
   const misroutedHtml = findings.misroutedToTasks.length
     ? `<div class="admin-recs__section">
         <h4>🪛 Misrouted to maintenance_tasks <span class="admin-recs__badge">${findings.misroutedToTasks.length}</span></h4>
         <p class="admin-recs__what">
-          <strong>What this is:</strong> Templates with <code>routingOverride: .diyDefault</code> or <code>.diyCapable</code> + <code>diyEffortMinutes ≤ 60</code> + no <code>bundleId</code> + no <code>safetyFloor</code> that auto-seed as <code>maintenance_tasks</code> rows. Per Tom's 5-tier model, these are tier 4 ("tasks just for handymen") and should land as <code>handyman_punch_items</code> directly — not maintenance_tasks rows hidden behind <code>parent_routine_id</code>.<br/>
+          <strong>What this is:</strong> Templates with <code>routingOverride: .diyDefault</code> or <code>.diyCapable</code> + <code>diyEffortMinutes ≤ 60</code> + no <code>bundleId</code> + no <code>safetyFloor</code> that auto-seed as <code>maintenance_tasks</code> rows. Per the operator's 5-tier model, these are tier 4 ("tasks just for handymen") and should land as <code>handyman_punch_items</code> directly — not maintenance_tasks rows hidden behind <code>parent_routine_id</code>.<br/>
           <strong>Why it matters:</strong> Cleaner data model (one row per concept), the homeowner finds them in the right place (Handyman tab punch list, not the main task list), and the bidirectional conversion (task↔punch) becomes straightforward when each side has its own home.<br/>
           <strong>Primary action:</strong> Click <em>Draft punch-list re-route</em> to write a structured proposal Claude will apply next session — flips the seeding path from <code>MaintenanceTaskInsert</code> to <code>HandymanPunchItemInsert</code> for this template.
         </p>
@@ -3140,7 +3140,7 @@ function renderRecommendationsPanel(allItems) {
         <h4>🪺 Sub-question merge candidates <span class="admin-recs__badge">${findings.quizMergePairs.length}</span></h4>
         <p class="admin-recs__what">
           <strong>What this is:</strong> Sub-questions (q3b / q11b / q12b / q14b / q18b / q25b / q28b — the ones with letter suffixes) that act as conditional follow-ups to a parent question. Most are fine but each adds friction with a separate screen + chapter card flash.<br/>
-          <strong>Why it matters:</strong> Tom's earlier audit (Phase A) identified 8 of these as merge candidates — fold the sub-question into the parent via progressive disclosure (parent answer reveals sub-fields inline) and the homeowner sees ONE screen, not two. Reduces quiz length without losing data.<br/>
+          <strong>Why it matters:</strong> the operator's earlier audit (Phase A) identified 8 of these as merge candidates — fold the sub-question into the parent via progressive disclosure (parent answer reveals sub-fields inline) and the homeowner sees ONE screen, not two. Reduces quiz length without losing data.<br/>
           <strong>Primary action:</strong> Click <em>Draft merge proposal</em> to write a note with the new HouseQuizQuestionKind case (e.g. <code>progressivePool</code>) + the migration logic for in-flight quizzes.
         </p>
         ${findings.quizMergePairs.map((m) => recRow({
@@ -3160,7 +3160,7 @@ function renderRecommendationsPanel(allItems) {
     ? `<div class="admin-recs__section">
         <h4>✂️ Drop / move / auto-skip candidates <span class="admin-recs__badge">${findings.quizDropCandidates.length}</span></h4>
         <p class="admin-recs__what">
-          <strong>What this is:</strong> Specific questions flagged for cutting (vestigial), moving (better surface elsewhere), auto-skipping (only relevant in a narrow case), or pre-filling from ATTOM (already in public records). Compiled from Tom's earlier quiz audit.<br/>
+          <strong>What this is:</strong> Specific questions flagged for cutting (vestigial), moving (better surface elsewhere), auto-skipping (only relevant in a narrow case), or pre-filling from ATTOM (already in public records). Compiled from the operator's earlier quiz audit.<br/>
           <strong>Why it matters:</strong> Every removed question is ~20 seconds saved + one less friction point. Goal: 43 → ~30 questions without losing data quality.<br/>
           <strong>Primary action:</strong> Click <em>Draft change proposal</em> to write a note with the specific Swift edit Claude will apply next session.
         </p>
@@ -3234,7 +3234,7 @@ function recRow(opts) {
 }
 
 // Phase 5z+2 — Track resolved recommendations in localStorage so once
-// Tom drafts a fix proposal, the row disappears from the panel and
+// the operator drafts a fix proposal, the row disappears from the panel and
 // stays gone across page reloads. Stable ids per kind:
 //   voice:{itemId}:{field}:{rule}
 //   duplicate:{minId}:{maxId}        (sorted to be order-independent)
@@ -3372,7 +3372,7 @@ function computeRecommendations(allItems) {
 
   // 4a. Quiz merge-pair candidates — sub-questions (q*b_* / q*c_*) that
   // could fold into their parent question via progressive disclosure.
-  // 8 known pairs from Tom's Phase A audit. High-signal: every one of
+  // 8 known pairs from the operator's Phase A audit. High-signal: every one of
   // these reduces quiz length without losing data.
   const quizItems = allItems.filter((i) => i.itemType === "question" && i.source === "live");
   const byQuestionId = new Map(quizItems.map((q) => [q.payload?.id, q]));
@@ -3388,7 +3388,7 @@ function computeRecommendations(allItems) {
     out.quizMergePairs.push({ parent, child: q, recId: recIdValue });
   }
 
-  // 4b. Quiz drop-candidate findings — hardcoded list from Tom's audit
+  // 4b. Quiz drop-candidate findings — hardcoded list from the operator's audit
   // earlier this session. Each carries a specific reason + concrete fix.
   const dropCandidates = [
     {
@@ -3439,7 +3439,7 @@ function computeRecommendations(allItems) {
 
   // 5. Misrouted to maintenance_tasks (should be handyman punch items).
   //
-  // Phase 5z+4 — Tom's 5-tier model: tier 4 = "tasks just for handymen"
+  // Phase 5z+4 — the operator's 5-tier model: tier 4 = "tasks just for handymen"
   // (small DIY-friendly items). Per the architecture, those should
   // create handyman_punch_items rows directly at quiz completion, not
   // maintenance_tasks rows that get hidden behind parent_routine_id.
@@ -3518,7 +3518,7 @@ function attachRecommendationsHandlers(host) {
 
 // Phase 5z — Pre-format a structured note body per recommendation
 // kind and write it to admin_codex_notes (cloud) or local storage.
-// Tom can review + edit in the Notes tab before it syncs to
+// the operator can review + edit in the Notes tab before it syncs to
 // CLAUDE_ADMIN_NOTES.md for next session.
 async function draftRecommendationNote(data) {
   const kind = data.recKind;
@@ -3544,7 +3544,7 @@ async function draftRecommendationNote(data) {
       `Template "${title}" has a \`${ruleId}\` violation in field \`${fieldName}\`.\n\n` +
       `**BEFORE:**\n> ${original}\n\n` +
       `**AFTER (proposed):**\n> ${fixed}\n\n` +
-      `**Why:** Em-dashes read as AI-generated to HNW audience. Tom's design rule baked into website/admin-data/voice-rules.json.\n\n` +
+      `**Why:** Em-dashes read as AI-generated to HNW audience. the operator's design rule baked into website/admin-data/voice-rules.json.\n\n` +
       `**Action for Claude next session:** Apply the diff above to MaintenanceTemplates.swift, re-run the voice lint to confirm clean.`;
   } else if (kind === "duplicate") {
     const otherTitle = JSON.parse(data.recOtherTitle || '""');
@@ -3681,7 +3681,7 @@ async function draftRecommendationNote(data) {
     body =
       `**Punch-list re-route proposal.**\n\n` +
       `Template "${title}" (templateKey: \`${templateKey || "?"}\`) currently seeds as a \`maintenance_tasks\` row at quiz completion. Day1TaskCurator then re-parents it under the singleton handyman routine via \`parent_routine_id\` — which hides it from the main task list but leaves it in maintenance_tasks anyway.\n\n` +
-      `Per Tom's 5-tier model, this is tier 4 ("tasks just for handymen"). It should seed directly as a \`handyman_punch_items\` row, skipping maintenance_tasks entirely. The homeowner finds it on the Handyman tab's punch list — the only place it belongs.\n\n` +
+      `Per the operator's 5-tier model, this is tier 4 ("tasks just for handymen"). It should seed directly as a \`handyman_punch_items\` row, skipping maintenance_tasks entirely. The homeowner finds it on the Handyman tab's punch list — the only place it belongs.\n\n` +
       `**Action for Claude next session:**\n` +
       `1. In \`MaintenanceTaskReconciler.reconcile(...)\`, when the template's tier resolves to handyman (routingOverride .diyDefault/.diyCapable + effort ≤ 60 + no safety floor), insert into \`handyman_punch_items\` instead of \`maintenance_tasks\`.\n` +
       `2. The punch item carries \`source: "auto_seed_handyman_tier"\` so the punch list view can sort auto-populated items separately from manual additions.\n` +
@@ -3853,7 +3853,7 @@ function countBySeason(items) {
   return out;
 }
 
-// Phase 5q — Routing taxonomy per Tom: drop "DIY" nomenclature
+// Phase 5q — Routing taxonomy per the operator: drop "DIY" nomenclature
 // (homeowners don't DIY by default; "I'll do it myself" is a runtime pull
 // only). "Bundled into a visit" is the 5th lane for templates whose
 // bundleId is set — they fold into a parent visit at runtime instead of
@@ -3891,7 +3891,7 @@ function countBySeason(items) {
 //         template.routingOverride == .diyCapable) &&
 //        (template.diyEffortMinutes ?? 0) <= 60
 //
-//      Tom's bug report: "Fire Extinguisher Annual Check… its a
+//      the operator's bug report: "Fire Extinguisher Annual Check… its a
 //      handyman task I thought." It is — at runtime it lands on the
 //      handyman punch list. But its systemCategory is "Electrical"
 //      (not "Handyman"), so the old category-only rule missed it
@@ -3954,7 +3954,7 @@ function renderStats(all, filtered) {
   // Phase 5t/5z+12 — Stat tiles. The "On this tab" count reflects
   // post-view-exclusion total (Tasks tab hides handyman-context items,
   // for example), so it agrees with the dropdown bar's "All" count.
-  // Tom: "Tasks still shows as '204 LIVE (SWIFT)' when in reality its
+  // the operator: "Tasks still shows as '204 LIVE (SWIFT)' when in reality its
   // less than that because we moved a ton over to handyman punch list
   // items."
   //
@@ -4044,7 +4044,7 @@ function renderDetail() {
   //   2. Duplicates of live entities (no live_entity_id, full payload
   //      cloned from the live item). Schema form already worked from 5v.
   //   3. Shadow rows (live_entity_id set, payload = {live_entity_id,
-  //      source: "live_lock"}) — Tom's missing case. These are the
+  //      source: "live_lock"}) — the operator's missing case. These are the
   //      admin_content_items rows that anchor a lock/approval/disposition
   //      on top of a Swift-derived live template. The shadow's payload
   //      is intentionally thin — it points back to the live template.
@@ -4073,7 +4073,7 @@ function renderDetail() {
 
   // Phase 5w — Replace bare "admin task" eyebrow with an explainer
   // pill that names which flavor of entity we're looking at + what
-  // it means. Tom wasn't sure what "admin task" was; now every
+  // it means. the operator wasn't sure what "admin task" was; now every
   // detail panel says it explicitly.
   const flavorPill = describeEntityFlavor(item, underlyingLive);
   if (el.detailKind) {
@@ -4592,7 +4592,7 @@ function renderDiff() {
 // Phase 5z+18 — Coverage Audit
 // =============================================================================
 //
-// Tom: "We need to have AI also review any mismatches in the admin
+// the operator: "We need to have AI also review any mismatches in the admin
 // portal it needs to be our first stop." Five auto-detected coverage
 // checks surface as the first tab on the left:
 //
@@ -4636,7 +4636,7 @@ function getSystemCategoryToVendor() {
 
 // HNW vendor types that aren't in DEFAULT_VENDOR_CATEGORIES today —
 // surfaced as finding #4. Curated to high-confidence common HNW
-// services. Tom can act on any of them by drafting a proposal_add note.
+// services. the operator can act on any of them by drafting a proposal_add note.
 //
 // Phase 67I.4: pruned to just Garage door technician — every other
 // entry from the original list landed in the catalog through Phase 67I
@@ -4699,7 +4699,7 @@ const COMMON_HNW_ROUTINE_GAPS = [
 
 function computeCoverageAudit() {
   // Phase 5z+19 — Audit now also pulls in voice / style fixes and
-  // needs-review entities. Tom: "shouldnt we just fold those both into
+  // needs-review entities. the operator: "shouldnt we just fold those both into
   // 'Audit' since im going to be making decisions on everything in
   // there." The Decisions tab is gone — every auto-detected issue
   // flows through here.
@@ -4752,7 +4752,7 @@ function computeCoverageAudit() {
 
   // -- Finding 2: quiz questions that don't drive anything.
   //
-  // Phase 5z+23 — Tom: "we need to make sure we dont have false
+  // Phase 5z+23 — the operator: "we need to make sure we dont have false
   // positives since this is a huge part of our application." Eight
   // wiring signals checked per question. A question must trip ZERO
   // signals to flag as adrift.
@@ -4804,7 +4804,7 @@ function computeCoverageAudit() {
       if (aid && referencedSubtypes.has(`${id}_${aid}`)) wires.add("template-gate-composite");
     }
     // Signal 3: the snapshot's _impact block knows about creates /
-    // unlocks / gates relationships. Phase 5z+23 — Tom's q1_roof_material
+    // unlocks / gates relationships. Phase 5z+23 — the operator's q1_roof_material
     // example has _impact.creates_systems: ["Roofing"] but the old
     // heuristic ignored _impact entirely. False-positive root cause.
     const impact = q._impact || {};
@@ -4921,12 +4921,12 @@ function computeCoverageAudit() {
   // -- Finding 7 (Phase 5z+19, merged): high-impact entities not yet
   //    approved. Same dedup against pending notes.
   //
-  // Phase 5z+24 — Tom: "'Entities that need a careful review 30' is
+  // Phase 5z+24 — the operator: "'Entities that need a careful review 30' is
   // always 30. even when I click one done another shwos up. why?"
   // The pre-5z+24 code capped the queue at 30 to avoid drowning the
   // user, but every resolution opened a slot for a new candidate so
-  // the count never moved. Frustrating — Tom never felt progress.
-  // Cap dropped. The full queue shows. As Tom approves / cuts items
+  // the count never moved. Frustrating — the operator never felt progress.
+  // Cap dropped. The full queue shows. As the operator approves / cuts items
   // the count actually drops by one each time.
   //
   // Phase 67I.5: dedupe by liveEntityId across surfaces. The same
@@ -5206,7 +5206,7 @@ function renderAuditView() {
 // Phase 80 — Chez Concierge admin tab
 // =============================================================================
 //
-// Lives on the "action" sidebar group, above Audit. Tom works through
+// Lives on the "action" sidebar group, above Audit. the operator works through
 // homeowner requests here: read context, reply, propose vendors / dates,
 // flip status. Reuses the focused-panel right-rail layout already used
 // by Audit + Notes, with a sticky composer at the bottom.
@@ -6689,7 +6689,7 @@ function renderConciergeVendorPipelineCardHtml(candidate, stageId) {
   `;
 }
 
-// Phase 83.5 — "About this case" card. Surfaces the entity Tom needs to
+// Phase 83.5 — "About this case" card. Surfaces the entity the operator needs to
 // know about at a glance: task title, system / area, vendor named in
 // context, original delegation source. Sits between the stage tracker
 // and the AI brief.
@@ -6706,7 +6706,7 @@ function renderConciergeCaseOverviewHtml(req, dossier, archetype) {
     ? dossier.home_systems.find((s) => s.id === systemId)
     : null;
 
-  // Surface the homeowner's first message so Tom sees what they actually
+  // Surface the homeowner's first message so the operator sees what they actually
   // typed without scrolling to the chat.
   const messages = state.chezMessages[req.id] || [];
   const firstUserMsg = messages.find((m) => m.role === "user")?.content;
@@ -6854,7 +6854,7 @@ function renderConciergeAIBriefHtml(req) {
   const sourceCount = (cached.existing_vendors?.length || 0) + (cached.places_candidates?.length || 0) + 5; // rough source count
 
   // Per-tab body. Each tab uses real cached fields when present; falls back
-  // to a coachable empty-state line so Tom is never stranded.
+  // to a coachable empty-state line so the operator is never stranded.
   let bodyHtml = "";
   if (tab === "analysis") {
     bodyHtml = a.summary
@@ -7083,11 +7083,11 @@ function openVendorEmailComposer(activeReq, vendor) {
         <form data-vendor-email-form>
           <label class="cockpit-vendor__rationale">
             <span>Subject</span>
-            <input type="text" name="subject" required placeholder="Quick question about availability for the Burke household" />
+            <input type="text" name="subject" required placeholder="Quick question about availability for the household" />
           </label>
           <label class="cockpit-vendor__rationale">
             <span>Message</span>
-            <textarea name="body" rows="10" required placeholder="Hi [vendor first name],&#10;&#10;Chez is reaching out on behalf of the Burke family about… Could you let us know your availability and a rough estimate for…&#10;&#10;Thanks for the help."></textarea>
+            <textarea name="body" rows="10" required placeholder="Hi [vendor first name],&#10;&#10;Chez is reaching out on behalf of the family about… Could you let us know your availability and a rough estimate for…&#10;&#10;Thanks for the help."></textarea>
           </label>
           <div class="cockpit-vendor__form-actions" style="margin-top: 16px;">
             <span class="admin-muted">From: Chez Concierge &lt;hello@getchez.com&gt;</span>
@@ -7374,7 +7374,7 @@ function renderConciergeVendorRowHtml(req, v, idx, callData) {
 
   // Phase 83.2 — slot inputs are now `datetime-local` so every vendor's
   // offered window lands as a real ISO datetime. The vendor may say
-  // "Thursday 6PM"; Tom converts that to "2026-05-08T18:00" when logging
+  // "Thursday 6PM"; the operator converts that to "2026-05-08T18:00" when logging
   // the call. Existing free-form strings parse if possible; otherwise
   // they fall through to an empty input.
   const slotsHtml = slots.map((s, slotIdx) => {
@@ -7889,7 +7889,7 @@ const CHEZ_VAGUE_PHRASES = [
 ];
 
 function detectConciergeArchetype(req, dossier, messages) {
-  // Phase 83.5 — Manual override wins. Tom can flip the archetype via
+  // Phase 83.5 — Manual override wins. the operator can flip the archetype via
   // the "Reclassify this case" quick action when the auto-classifier
   // gets it wrong.
   const override = state.chezArchetypeOverride && state.chezArchetypeOverride[req.id];
@@ -9567,7 +9567,7 @@ async function handleConciergeAction(action, req, btn) {
           const manualUrl = data?.manual_url || data?.url || null;
           if (manualUrl) {
             // Pre-fill the composer with a reply that includes the manual
-            // link so Tom can click Send.
+            // link so the operator can click Send.
             const dossier = (state.chezDossiersByHousehold || {})[req.household_id];
             const first = dossier ? primaryHomeownerLabel(dossier).split(" ")[0] : "there";
             const tone = state.concierge.composer?.[req.id]?.tone || "warm";
@@ -10354,7 +10354,7 @@ function attachConciergeVendorHandlers(host, req) {
   // wires expand/collapse-vendor against `[data-action]`, but the
   // cockpit context has no equivalent — so clicking "Log this call"
   // on any vendor whose form wasn't already expanded did literally
-  // nothing. Tom's report: "I can only save notes for one vendor
+  // nothing. the operator's report: "I can only save notes for one vendor
   // call." Diagnosis: the first vendor expanded was a happy accident
   // (state persisted across re-renders); no one had wired the
   // toggle in the cockpit codepath. Fix: same handler shape as the
@@ -10587,7 +10587,7 @@ function renderChezAnalysisPanelHtml(req, opts = {}) {
 
   // Phase 82 — When active visits exist, the analysis panel
   // collapses to a one-liner so the visits section becomes the
-  // primary focus. Tom can click the toolbar button to re-research
+  // primary focus. the operator can click the toolbar button to re-research
   // or expand back to the full pre-call workflow.
   if (opts.collapsed) {
     return `
@@ -10664,7 +10664,7 @@ function renderVendorCandidateCardHtml(req, v, idx, callData) {
   const noAnswer = callData?.outcome === "no_answer";
 
   // Phase 81.2 — Multi-slot availability + cost combobox + AI summary.
-  // Tom can add 1-N suggested time windows the vendor offered, pick from
+  // the operator can add 1-N suggested time windows the vendor offered, pick from
   // 8 sensible cost ranges (with Custom escape hatch), and get the AI
   // to summarize his raw notes into homeowner-facing recommendation
   // copy.
@@ -10798,7 +10798,7 @@ async function runChezAnalysis(requestId, force = false) {
 // ============================================================================
 // Phase 82 — Stage tracker + visit cards
 // ============================================================================
-// Tom asked for "a tracker up top" so he can see where each case is in
+// the operator asked for "a tracker up top" so he can see where each case is in
 // its lifecycle at a glance. Once a vendor proposal is approved the
 // case turns into tracking the resulting visits, so we surface those
 // as a dedicated section between the header and the (now-collapsed)
@@ -10871,7 +10871,7 @@ function renderVisitsPanelHtml(req, visits) {
   if (visitsArr.length === 0) return ""; // no approvals yet → no panel
 
   // Active = anything not cancelled. Completed shown collapsed at the
-  // bottom so Tom keeps the audit trail without taking up real estate.
+  // bottom so the operator keeps the audit trail without taking up real estate.
   const active = visitsArr.filter((v) => v.state !== "cancelled" && v.state !== "completed");
   const completed = visitsArr.filter((v) => v.state === "completed");
   const cancelled = visitsArr.filter((v) => v.state === "cancelled");
@@ -10967,7 +10967,7 @@ function renderVisitCardHtml(req, visit, opts = {}) {
           ${slots.map((s) => {
             // Phase 83.4 — vendor proposals no longer carry slots, but legacy
             // visit rows may still have them. Render as adoption chips so
-            // Tom can drop them into the date_slot proposal flow if useful.
+            // the operator can drop them into the date_slot proposal flow if useful.
             // Goes through formatSlotDisplay so mixed-format legacy data
             // ("Thursday 6PM" / "5.24" / ISO) lands as one consistent label.
             const display = formatSlotDisplay(s);
@@ -11055,7 +11055,7 @@ function formatDateTimeShort(iso) {
 // Phase 81 — Customer dossier renderer. Replaces the Phase 80.1
 // profile-only summary with the full household snapshot (property,
 // family, systems, contractors, tasks, vehicles, recent activity).
-// Tom now has every signal he needs to respond to a Chez request
+// the operator now has every signal he needs to respond to a Chez request
 // without leaving the focused panel. Click any chip to drill into
 // detail — the chez-dossier-drawer slides in with the entity's
 // full record.
@@ -11292,7 +11292,7 @@ async function fetchChezHouseholdDossier(householdId) {
   }
 }
 
-// Phase 80.1 — Render a structured proposal as a colored card so Tom
+// Phase 80.1 — Render a structured proposal as a colored card so the operator
 // can see at a glance whether it's pending / approved / declined and
 // what kind it is. Mirrors the iOS `ChezProposalCard` shape.
 function renderProposalCardHtml(proposal) {
@@ -11352,7 +11352,7 @@ function renderProposalCardHtml(proposal) {
 
 // Phase 80.1 — "Propose vendor / date / cost" affordance. Opens a
 // minimal prompt-driven flow rather than a full modal — keeps the
-// admin surface small while still letting Tom send structured
+// admin surface small while still letting the operator send structured
 // proposals one click after typing.
 // Phase 81 — Proposal builder modal. Replaces the prompt-driven Phase
 // 80.1 flow with a proper form + multi-vendor support + research pane.
@@ -11597,7 +11597,7 @@ function attachProposalBuilderHandlers(modal, req, ctx) {
         alert("No vendors returned. Try a different category or add manually.");
         return;
       }
-      // Show a sub-picker so Tom can choose which to seed.
+      // Show a sub-picker so the operator can choose which to seed.
       showVendorPickerOverlay(modal, vendors, addVendorRow);
     } catch (err) {
       console.warn("[admin] vendor research failed", err);
@@ -11894,7 +11894,7 @@ function attachChezPanelHandlers(req) {
         renderFocusedChezDetail(req);
       } else if (action === "expand-analysis") {
         // Phase 82 — Re-open the analysis panel from the collapsed
-        // line so Tom can re-research vendors mid-case.
+        // line so the operator can re-research vendors mid-case.
         state.chezAnalysisExpandedByRequest = state.chezAnalysisExpandedByRequest || {};
         state.chezAnalysisExpandedByRequest[req.id] = true;
         renderFocusedChezDetail(req);
@@ -11902,7 +11902,7 @@ function attachChezPanelHandlers(req) {
         await performChezTransition(req, "resolved");
       } else if (action === "adopt-slot") {
         // Phase 82 — Click a "Times offered" chip on a visit card to
-        // copy that slot's text into the datetime field. Tom still
+        // copy that slot's text into the datetime field. the operator still
         // confirms (since chips are free-form text, not parseable
         // dates), but the UX bypasses re-typing.
         const card = btn.closest("[data-visit-id]");
@@ -12444,7 +12444,7 @@ function openHouseholdProfileDrawer(householdId) {
 
 // Phase 81 — Sliding drawer that shows the full record for an entity
 // the admin clicked from the dossier. Renders read-only — pure context
-// surface so Tom can navigate around without leaving the request.
+// surface so the operator can navigate around without leaving the request.
 function openDossierDrawer(householdId, entity, id) {
   document.querySelector("[data-chez-dossier-drawer]")?.remove();
   const dossier = (state.chezDossiersByHousehold || {})[householdId];
@@ -12884,7 +12884,7 @@ async function callChezConcierge(body) {
 //
 // In-portal version of the standalone admin-vendors.html surface. Lists
 // every vendor_applications row (status filter chips), shows the lifecycle
-// at a glance, and lets Tom resend confirmation emails / certify / reject
+// at a glance, and lets the operator resend confirmation emails / certify / reject
 // without leaving the cockpit. Backed by the admin-vendor-applications
 // edge function — same one the standalone page uses, gated on
 // CHEZ_ADMIN_EMAILS.
@@ -13052,7 +13052,7 @@ function renderVendorAppRows() {
     : va.applications;
 
   // Phase 72.5: prioritize action-needed rows + most-complete profiles.
-  // Status priority — live_unverified first (the queue Tom calls), then
+  // Status priority — live_unverified first (the queue the operator calls), then
   // pending email confirm (waiting on vendor), then certified (already
   // done), then rejected (archive). Within each tier, higher
   // profile_completion_pct floats up so the most-cookable leads are at
@@ -13142,7 +13142,7 @@ function vendorAppStatusPill(status) {
 }
 
 // Phase 72.5: completion pill — shows how filled-in the vendor's profile is.
-// Tone tracks completeness so Tom can scan the queue and pick the most-
+// Tone tracks completeness so the operator can scan the queue and pick the most-
 // cookable leads to call first.
 //   ≥80%  success (green) — rich profile, ready for the certify call
 //   ≥40%  indigo         — a real attempt, getting there
@@ -13353,7 +13353,7 @@ function renderFocusedAuditDetail(finding) {
 }
 
 // Phase 5z+20 — Shared "Note for Claude" form rendered at the BOTTOM
-// of every focused panel (decision + audit). Tom: "have claudes
+// of every focused panel (decision + audit). the operator: "have claudes
 // recommendations go above the note for claude section. I should be
 // able to understand what was identified easily first, the problem is
 // presents, what claudes fix suggestions will do, and then see what
@@ -13719,10 +13719,10 @@ function auditRecommendationFor(finding) {
       ],
     };
   }
-  // Phase 5z+19/+21 — Needs review. Tom's frustration: "I have no
+  // Phase 5z+19/+21 — Needs review. the operator's frustration: "I have no
   // idea what this means. is it asking me to keep or remove the
   // task?" Make it decisive: pick approve / edit / cut explicitly,
-  // surface the actual entity content so Tom can read it without
+  // surface the actual entity content so the operator can read it without
   // jumping tabs, and frame each action's effect in concrete user-
   // facing terms (what happens to homeowners, not abstract Haven
   // plumbing).
@@ -13731,7 +13731,7 @@ function auditRecommendationFor(finding) {
     const t = item.payload || {};
     const value = finding.data.valueAnalysis || valueAnalysisFor(item);
     const pick = decisivePickFor(item, value);
-    // Build the actual content card so Tom reads the title/desc/etc.
+    // Build the actual content card so the operator reads the title/desc/etc.
     const description = (item.description || t.description || "").trim();
     const frequency = t.frequency || "—";
     const seasonal = t.seasonalTiming || "Year-round";
@@ -13770,13 +13770,13 @@ function auditRecommendationFor(finding) {
       </div>
     `;
 
-    // Phase 5z+22 — Tom: "if its giving me a recommendation to edit
+    // Phase 5z+22 — the operator: "if its giving me a recommendation to edit
     // the task — dont tell me to manually go do it. claude should
     // just take this one and put a change request in with a button
     // click that I enter."
     //
     // For "edit" picks we now render a "Draft this fix" primary
-    // button that writes the change-request note for Tom. Mechanical
+    // button that writes the change-request note for the operator. Mechanical
     // fixes (em-dash, Professional-X) ship with a structured
     // proposed_diff the voice-fix script auto-applies. Rewrite picks
     // (vague title, thin description) ship a regular change_request
@@ -13826,7 +13826,7 @@ function auditRecommendationFor(finding) {
       : [];
 
     // Phase 5z+22 — Append the suggested before/after preview to the
-    // context block when we have a mechanical fix. Tom can see the
+    // context block when we have a mechanical fix. the operator can see the
     // rewrite before clicking Apply.
     let contextWithFix = contextHtml;
     if (pick.fix?.kind === "mechanical") {
@@ -13877,7 +13877,7 @@ function auditRecommendationFor(finding) {
 // what should change — mechanical (suggested before/after we can
 // preview) or rewrite (Claude does it on the next session). The
 // focused panel reads `fix` and renders a one-click "Draft this fix"
-// button so Tom doesn't have to manually edit.
+// button so the operator doesn't have to manually edit.
 //
 // Heuristic order:
 //   safety floor              → approve
@@ -13964,7 +13964,7 @@ function decisivePickFor(item, value) {
       recommendation: `Title starts with "Professional X" — Chez's voice rule says use "Annual X" instead. Click below to rename in one shot.`,
     };
   }
-  // Phase 5z+22 — Tom: "Bleed Radiators" is FINE — 2-word action-
+  // Phase 5z+22 — the operator: "Bleed Radiators" is FINE — 2-word action-
   // first titles read cleanly. Loosened from <12 chars / <3 words
   // to <8 chars / <2 words. Catches genuinely-vague titles like
   // "Boiler" or "Inspection" without false-positiving on tight
@@ -14380,7 +14380,7 @@ async function handleFocusedAuditAction(finding, action) {
 // =============================================================================
 // Phase 7.5 — Decisions queue
 // =============================================================================
-// Auto-flagged entities awaiting Tom's call. Rules:
+// Auto-flagged entities awaiting the operator's call. Rules:
 //   - Live entities not yet approved AND with high impact (large bundle,
 //     gates other questions, or template count > 5 in category)
 //   - Entities with lint hits AND launch_status != approved
@@ -14395,7 +14395,7 @@ function renderDecisionsView() {
 
   // Phase 5z+14/+15 — Stats tiles. Decisions tab now only surfaces
   // auto-detected issues that don't already have a pending note about
-  // them — Tom-authored notes (questions, change requests, proposals)
+  // them — the operator-authored notes (questions, change requests, proposals)
   // live on the Notes tab. So the tiles are: everything waiting, plus
   // the two auto-detected categories (voice/style fixes + needs review).
   el.stats.innerHTML = `
@@ -14426,7 +14426,7 @@ function renderDecisionsView() {
   });
   // Phase 5z+14 — Click a row → focused decision panel on the right
   // (no more entity-jump). The panel explains what the decision is,
-  // recommends an action, and gives Tom one-click choices for every
+  // recommends an action, and gives the operator one-click choices for every
   // option. Same pattern as the focused note panel.
   el.list.querySelectorAll("[data-decision-id][data-open-detail]").forEach((row) => {
     row.addEventListener("click", () => {
@@ -14466,7 +14466,7 @@ function renderDecisionsView() {
 
 // Phase 5z+15 — Build a quick lookup of "entities that already have a
 // pending note authored about them." Used to skip lint + impact rows
-// from the decision queue when Tom has already written a note about
+// from the decision queue when the operator has already written a note about
 // the entity (the note lives on the Notes tab and is the canonical
 // place to act on it). Keeps Decisions focused on auto-detected
 // issues that don't have a human-authored note yet.
@@ -14484,7 +14484,7 @@ function computeDecisionQueue() {
   const queue = [];
   const surfaces = ["quiz", "tasks", "routines", "handyman", "systems", "vehicles", "prompts"];
 
-  // Phase 5z+15 — Tom: "if something is already in the notes review or
+  // Phase 5z+15 — the operator: "if something is already in the notes review or
   // to be worked on then it shouldnt show in decisions."
   //
   // Two consequences:
@@ -14492,7 +14492,7 @@ function computeDecisionQueue() {
   //       are dropped from the queue entirely. Those live in the Notes
   //       tab's "Not applied" bucket, which is where they get acted on.
   //   (b) Lint + impact rows skip any entity that already has a pending
-  //       note authored about it — Tom is already on it, no need to
+  //       note authored about it — the operator is already on it, no need to
   //       double-surface.
   const pendingNoteScopes = entitiesWithPendingNote();
   const hasPendingNote = (item, scopeType) => {
@@ -14503,7 +14503,7 @@ function computeDecisionQueue() {
   };
 
   // 1. Lint violations on un-approved live entities — emit one queue
-  // entry per actual lint hit so Tom sees the specific issue + the
+  // entry per actual lint hit so the operator sees the specific issue + the
   // offending snippet, not 35 rows of canned copy.
   for (const surfaceId of surfaces) {
     const items = liveItemsForView(surfaceId) || [];
@@ -14607,7 +14607,7 @@ function isHighImpact(item) {
   // absent) ride on the parent — when the parent visit is approved,
   // every "what's included" line item rides along. The homeowner
   // never sees members as standalone tasks either, so the audit
-  // shouldn't ask Tom to approve them as standalone entities. This
+  // shouldn't ask the operator to approve them as standalone entities. This
   // mirrors the iOS UX: one row per visit, sub-tasks revealed inside.
   if (p.bundleId && p.bundleTitle) return `Bundle parent (${p.bundleId})`;
   // Bundle members (bundleId set, no bundleTitle) ride on the parent —
@@ -14623,7 +14623,7 @@ function isHighImpact(item) {
   return null;
 }
 
-// Phase 67I.5: which needs-review patterns can Tom safely bulk-approve?
+// Phase 67I.5: which needs-review patterns can the operator safely bulk-approve?
 // The audit's "needs review" pool mixes two kinds of work:
 //   (a) "Look at this once and bless it" — bundle parents, safety-floor
 //       templates, universal-tier system rows, opt-in library items.
@@ -14633,7 +14633,7 @@ function isHighImpact(item) {
 //       gating, could be too universal, could be low value. Real review.
 //
 // Bulk-approve covers (a) only. (b) keeps its individual review row.
-// Saves Tom from clicking through ~80% of the queue manually.
+// Saves the operator from clicking through ~80% of the queue manually.
 function isBulkApprovable(finding) {
   const reason = finding.reason || "";
   if (reason.startsWith("Bundle parent")) return true;
@@ -14684,7 +14684,7 @@ async function bulkApproveAuditFindings(findings) {
   }
 }
 
-// Phase 5z+16 — Value analysis for "Needs review" decisions. Tom:
+// Phase 5z+16 — Value analysis for "Needs review" decisions. the operator:
 // "some of the tasks are low value like garage door stuff. we should
 // maybe substitute with higher value things, so for all the needs
 // review things in decisions queue give recommendations also for
@@ -14786,7 +14786,7 @@ function valueAnalysisFor(item) {
       tier: "low",
       verdict: "cut_or_replace",
       summary: `Low value — ${lowValueHits[0]}. Most HNW homeowners skip this without missing it. Consider cutting or replacing with a higher-value HNW service.`,
-      reasoning: `Tom's read: "some of the tasks are low value like garage door stuff." This entry leans into that bucket. Things HNW households genuinely care about tend to be safety, comfort, or expensive-if-neglected — none of which describes ${lowValueHits[0]}.`,
+      reasoning: `the operator's read: "some of the tasks are low value like garage door stuff." This entry leans into that bucket. Things HNW households genuinely care about tend to be safety, comfort, or expensive-if-neglected — none of which describes ${lowValueHits[0]}.`,
       substitutes: HNW_HIGH_VALUE_SUBSTITUTES,
     };
   }
@@ -14930,7 +14930,7 @@ async function handleDecisionAction(decision, action) {
   }
   if (action === "open_note" && decision.noteId) {
     // Phase 5z+14 — for question/proposal decisions, jump into the
-    // Notes tab with the source note focused. Tom can reply, mark
+    // Notes tab with the source note focused. the operator can reply, mark
     // applied, or edit from there.
     const note = state.notes.find((n) => n.id === decision.noteId);
     if (!note) return;
@@ -14955,7 +14955,7 @@ async function handleDecisionAction(decision, action) {
   }
   if (action === "propose_substitute" && decision.targetItem) {
     // Phase 5z+16 — clicking a substitute on the focused panel drafts
-    // a proposal_add note so Tom can ship it next session as a real
+    // a proposal_add note so the operator can ship it next session as a real
     // template addition. The substitute index rides on the third
     // positional arg (passed by attachFocusedDecisionHandlers from
     // the button's data-substitute-idx attribute).
@@ -14971,7 +14971,7 @@ async function handleDecisionAction(decision, action) {
 // Phase 5z+14 — Focused decision panel
 // =============================================================================
 //
-// Tom's ask: "in the 'Decisions' tab when I click on an entity/card it
+// the operator's ask: "in the 'Decisions' tab when I click on an entity/card it
 // should bring up a decision details information screen to the right
 // on the same page to tell me what I need to make a decision on. give
 // your recommendation on the suggested change, and other options as
@@ -14980,7 +14980,7 @@ async function handleDecisionAction(decision, action) {
 // Renders inside the same admin-detail panel slot as the focused note
 // view. Each decision severity has its own body shape:
 //
-//   question  — Tom asked something; Claude needs to reply first.
+//   question  — the operator asked something; Claude needs to reply first.
 //   proposal  — A change request / add / delete is pending.
 //   lint      — Voice or style violation; suggested fix available.
 //   impact    — High-impact entity not yet approved.
@@ -15040,7 +15040,7 @@ function renderFocusedDecisionDetail(decision) {
 
 function decisionSubtitle(decision) {
   return ({
-    question: "Tom is waiting on an answer. Reply first; no code changes until you both agree.",
+    question: "the operator is waiting on an answer. Reply first; no code changes until you both agree.",
     proposal: "A pending change is sitting on this entity. Apply it, defer it, or revert it.",
     lint: "The text breaks one of Chez's voice rules (em-dashes, 'Professional X', long answer chips, etc.). Suggested fix is below.",
     impact: "This entity affects a lot of households. Worth a careful review before it ships to TestFlight.",
@@ -15060,7 +15060,7 @@ function renderFocusedDecisionPanelHtml(decision) {
   if (decision.severity === "question") {
     contextHtml = `
       <div class="admin-decision-focused__quote">
-        <p class="admin-muted">Tom wrote on ${escapeHtml(formatDate(note?.createdAt))}:</p>
+        <p class="admin-muted">the operator wrote on ${escapeHtml(formatDate(note?.createdAt))}:</p>
         <blockquote>${escapeHtml(note?.body || "(empty)")}</blockquote>
       </div>
       ${entity ? entityPreviewCardHtml(entity, { scopeType: decision.itemType, scopeTitle: entity.title }) : ""}
@@ -15106,7 +15106,7 @@ function renderFocusedDecisionPanelHtml(decision) {
     const fix = suggestLintFix(hit);
     // Phase 5z+15 — Always render the Apply button. When we have a
     // mechanical before→after, show it. When we don't, show what
-    // Claude will do instead. Tom: "make sure every decision has an
+    // Claude will do instead. the operator: "make sure every decision has an
     // apply suggested fix option."
     const previewBlock = fix?.kind === "mechanical" && fix.text
       ? `
@@ -15277,7 +15277,7 @@ function attachFocusedDecisionHandlers(decision) {
   });
 }
 
-// Phase 5z+14/+15 — Compute the suggested fix for a lint hit. Tom's
+// Phase 5z+14/+15 — Compute the suggested fix for a lint hit. the operator's
 // rule: every lint decision has an "Apply" action. When we can produce
 // a deterministic before→after, the action drafts a structured voice-
 // fix note the script auto-applies. When we can't, the action drafts a
@@ -15299,7 +15299,7 @@ function suggestLintFix(hit) {
   const snippet = hit.snippet;
 
   // 1. Em-dash → period + capitalize, or bare em-dash → comma. Always
-  //    mechanical since Tom's rule is unambiguous.
+  //    mechanical since the operator's rule is unambiguous.
   if (hit.ruleId === "no-em-dash") {
     let out = snippet.replace(/\s+—\s+/g, ". ").replace(/—/g, ", ");
     out = out.replace(/\.\s+([a-z])/g, (_, c) => `. ${c.toUpperCase()}`);
@@ -15473,7 +15473,7 @@ function trimLongAnswerLabel(snippet) {
 //
 // Either way, drafting the note adds it to the Notes tab. On the next
 // recompute, the lint decision drops out of the Decisions queue
-// (Phase 5z+15 dedupes against pending notes) so Tom doesn't see it
+// (Phase 5z+15 dedupes against pending notes) so the operator doesn't see it
 // twice.
 async function draftLintFixProposal(decision) {
   const hit = decision.lintHit;
@@ -15503,7 +15503,7 @@ Current: ${hit.snippet}
 
 ${fix.summary || "Please pick the right phrasing on the next code session."}
 
-(Drafted from the Decisions tab. Claude rewrites the text manually on the next session — there's no mechanical fix Tom can preview.)`;
+(Drafted from the Decisions tab. Claude rewrites the text manually on the next session — there's no mechanical fix the operator can preview.)`;
 
   const proposedDiff = isMechanical
     ? {
@@ -15871,7 +15871,7 @@ function clearArchitectureObject() {
 // Phase 5b — CLAUDE_ADMIN_NOTES.md live preview
 // =============================================================================
 // Mirrors what scripts/sync_claude_admin_notes.mjs produces, rendered in
-// the browser so Tom can see exactly what next-session Claude will read
+// the browser so the operator can see exactly what next-session Claude will read
 // without dropping into a terminal. Same priority order: questions for
 // Claude → pending changes → open feedback by entity → recently applied.
 
@@ -16113,7 +16113,7 @@ function renderNotesView() {
 
   // Phase 5z+8/+10 — gather every search-matching top-level note BEFORE
   // applying the segment + intent filters, so the pill counts stay
-  // stable as Tom flips between buckets (Apple Mail / Linear pattern).
+  // stable as the operator flips between buckets (Apple Mail / Linear pattern).
   const queryMatched = state.notes.filter((n) => !n.parentNoteId).filter(matchesQuery);
   const pendingNotes = queryMatched.filter((n) => !n.appliedAt);
   const appliedNotes = queryMatched.filter((n) => n.appliedAt);
@@ -16260,7 +16260,7 @@ function renderNotesView() {
       const note = state.notes.find((n) => n.id === button.dataset.noteId);
       if (!note) return;
       // Phase 5z+9 — every note (scoped or general) opens a FOCUSED
-      // note panel on the right. No more entity-jump on click — Tom
+      // note panel on the right. No more entity-jump on click — the operator
       // wanted the note itself to be the centerpiece, with the entity
       // shown as a preview card and Claude's analysis surfaced below.
       // The "View {entity} →" escape hatch lives inside the focused
@@ -16305,7 +16305,7 @@ function noteCanJumpToEntity(note) {
 // Phase 5z+9 — Focused note panel
 // =============================================================================
 //
-// When Tom clicks a note row on the Notes tab, the right pane renders the
+// When the operator clicks a note row on the Notes tab, the right pane renders the
 // note itself as the centerpiece (instead of jumping to the entity it's
 // attached to, which was the pre-5z+9 behavior). The panel has four
 // sections:
@@ -16478,7 +16478,7 @@ function renderFocusedNotePanelHtml(note, entityItem, analysis) {
 
       <!-- 3. Claude's analysis (Not Applied notes only) OR historical
            card (Applied / Reverted notes). The split keeps the analysis
-           focused on what's still pending, per Tom's ask: "you only give
+           focused on what's still pending, per the operator's ask: "you only give
            your feedback on the not applied changes so that we can figure
            out what the impacts are what actually happens." -->
       ${(!isApplied && !isReverted) ? `
@@ -16519,12 +16519,12 @@ function noteFocusedActionsHtml(note, entityItem) {
   const isApplied = !!note.appliedAt;
   const isReverted = !!note.revertedAt;
   const buttons = [];
-  // Edit — always available, even on applied notes (in case Tom wants
+  // Edit — always available, even on applied notes (in case the operator wants
   // to amend the body after the fact). The save path stamps an
   // edited_at field (TBD) but for now we just rewrite body/intent.
   buttons.push(`<button type="button" class="admin-button admin-button--secondary admin-button--small" data-note-edit-toggle title="Inline-edit the body, intent, and target.">Edit</button>`);
   // Mark applied — only when not yet applied + not reverted. Useful for
-  // cases where Tom resolved a note manually outside Claude's workflow.
+  // cases where the operator resolved a note manually outside Claude's workflow.
   if (!isApplied && !isReverted) {
     buttons.push(`<button type="button" class="admin-button admin-button--secondary admin-button--small" data-note-mark-applied title="Mark this note resolved without going through a Claude session. Stamps applied_at = now and applied_commit = 'manual'.">Mark applied</button>`);
   }
@@ -16613,7 +16613,7 @@ function attachFocusedNoteHandlers(note, entityItem, analysis) {
 // Phase 5z+10 — Plain-English note analyzer
 // =============================================================================
 //
-// Tom's ask: "Your replies/feedback should be more focused on the feedback
+// the operator's ask: "Your replies/feedback should be more focused on the feedback
 // itself and if it is good/bad and why. keep it in english and not too
 // technical remember we want normal people to be able to read this that
 // know our app but not the deep technical parts of it."
@@ -16645,7 +16645,7 @@ function analyzeNote(note, entityItem) {
 
   // --- Verdict ---
   // Plain-English read on whether the feedback is solid, useful, or thin.
-  // Frame: did Tom give us enough to act on cleanly?
+  // Frame: did the operator give us enough to act on cleanly?
   const verdictParts = [];
   let tier = "medium";
   let verdictHeadline = "Worth a read";
@@ -16999,7 +16999,7 @@ function entityPreviewCardHtml(item, note) {
 }
 
 function analysisCardHtml(analysis) {
-  // Phase 5z+10 — Verdict tier mapping. Plain-English labels Tom's HNW
+  // Phase 5z+10 — Verdict tier mapping. Plain-English labels the operator's HNW
   // operators read at a glance. Tone maps into the existing pill palette.
   const tierLabel = { high: "Strong ask", medium: "Worth a read", low: "Could use more detail" }[analysis.verdict.tier] || "Worth a read";
   const tierTone = { high: "active", medium: "draft", low: "cut" }[analysis.verdict.tier] || "draft";
@@ -17139,7 +17139,7 @@ async function updateNoteFields(noteId, patch) {
 
 // Phase 5z+9 — Manually mark a note as applied. Stamps applied_at = now,
 // applied_commit = "manual" so syncing scripts can distinguish from
-// scripted-applies. Used when Tom resolves a note outside Claude.
+// scripted-applies. Used when the operator resolves a note outside Claude.
 async function markNoteApplied(noteId) {
   if (!noteId) return;
   const stamp = new Date().toISOString();
@@ -17201,7 +17201,7 @@ function renderContextNotes(item) {
   }
 
   // Phase 5 — thread by parent_note_id so Claude's replies nest under
-  // Tom's original notes inline.
+  // the operator's original notes inline.
   const byId = new Map(allMatching.map((n) => [n.id, { ...n, replies: [] }]));
   const top = [];
   for (const n of allMatching) {
@@ -17406,7 +17406,7 @@ function itemRowHtml(item) {
   const launchBadge = launch && launch !== "draft"
     ? `<span class="admin-pill admin-pill--launch" data-tone="${launch}">${escapeHtml(launch)}</span>`
     : "";
-  // Phase 5p — handyman bucket pill so Tom can scan the library for
+  // Phase 5p — handyman bucket pill so the operator can scan the library for
   // auto-populating items vs. opt-in library items at a glance.
   let handymanBadge = "";
   if (item.itemType === "handyman") {
@@ -17420,7 +17420,7 @@ function itemRowHtml(item) {
   }
   // Phase 5q/5z+16 — Lifecycle badge: explicit "what happens to this
   // template when a homeowner finishes the quiz?" pill on every row.
-  // Tom: "we need to see also in the tasks view which ones can
+  // the operator: "we need to see also in the tasks view which ones can
   // populate automatically after a quiz so we know which tasks show
   // up and which ones dont."
   //
@@ -17447,7 +17447,7 @@ function itemRowHtml(item) {
           lifecycleBadge = `<span class="admin-pill admin-pill--optin" title="${escapeHtml(optInSurface)}">📚 Opt-in</span>`;
         }
       } else if (state.view === "tasks") {
-        // Auto-seeds — show on Tasks tab so Tom sees at a glance which
+        // Auto-seeds — show on Tasks tab so the operator sees at a glance which
         // templates actually fire when a homeowner finishes the quiz.
         if (t.requiredSubtypes?.length) {
           const subtypeList = t.requiredSubtypes.map((s) => (typeof humanizeSubtype === "function" ? humanizeSubtype(s) : s)).join(", ");
@@ -17503,7 +17503,7 @@ function itemRowHtml(item) {
 // Phase 5q — Why does this template route the way it does? Returns
 // { tier, label, tooltip } where tooltip is a plain-English explanation
 // of which template-author rule (in MaintenanceTemplates.swift) matched.
-// Tooltip is what shows on hover — full sentence so Tom can read the
+// Tooltip is what shows on hover — full sentence so the operator can read the
 // rationale without opening the row.
 function routingReason(t) {
   if (!t) return null;
@@ -17609,7 +17609,7 @@ function countBundleSiblings(bundleId) {
 }
 
 // Phase 5r — Return all sibling templates for a bundleId, sorted by title.
-// Used by the bundle map in the entity summary card so Tom can click any
+// Used by the bundle map in the entity summary card so the operator can click any
 // sibling to jump to it.
 function bundleSiblings(bundleId) {
   if (!bundleId) return [];
@@ -17661,7 +17661,7 @@ function templatesForSystem(systemCategoryKey) {
 }
 
 // Phase 5r — Build the plain-English summary card injected at the top
-// of every live-entity detail panel. Tom can show this to anyone
+// of every live-entity detail panel. the operator can show this to anyone
 // (including his wife) and they can read what the entity does without
 // decoding field names. Works across quiz / tasks / handyman /
 // recommended / systems / routines.
@@ -17696,7 +17696,7 @@ function renderQuizSummaryCard(item) {
     : `<em class="admin-muted">No subtitle set. Add one to explain why we're asking.</em>`;
 
   // Phase 5z+18 — Plain-English "what this does for the app" line up
-  // top. Tom: "every quiz question needs to do something in our app,
+  // top. the operator: "every quiz question needs to do something in our app,
   // and it needs to be the very first thing we see on the quiz
   // question details 'HERE IS WHAT THIS QUESTION DOES FOR THE APP'
   // in plain english."
@@ -17886,7 +17886,7 @@ function renderTaskSummaryCard(item) {
       : `<strong>Auto-seeds at quiz completion</strong> if subtypes / region match.`;
 
   // Phase 5s — "Where this template came from" block. Shows the quiz
-  // path that creates the system that hosts this template, so Tom can
+  // path that creates the system that hosts this template, so the operator can
   // trace any task back to its provenance with one click.
   let provenanceBlock = "";
   if (upstreamQuestions.length) {
@@ -17972,7 +17972,7 @@ function renderTaskSummaryCard(item) {
   }
 
   // Phase 5t — Stats strip: cost / effort / frequency / priority all
-  // visible at a glance so Tom doesn't have to scroll the form for the
+  // visible at a glance so the operator doesn't have to scroll the form for the
   // basics.
   const statsStrip = `
     <div class="admin-summary__stats">
@@ -18270,7 +18270,7 @@ async function createNewItem() {
     // Phase 5z+9 — Explicitly open the curated form for general-note
     // creation. Pre-5z+9 this just hid the detail panel and focused
     // a hidden textarea (broken UX). Now it shows the form pre-cleared
-    // so Tom can type a body + intent and click Save.
+    // so the operator can type a body + intent and click Save.
     state.selected = null;
     renderNotesView();
     el.emptyDetail.classList.add("is-hidden");
@@ -18430,7 +18430,7 @@ function findUnderlyingLiveItem(adminItem) {
 
 // Phase 5w — Plain-English explanation of which flavor of entity the
 // detail panel is showing. Replaces the bare "admin task" eyebrow.
-// Tom's question: "I have no clue what an admin task is" — now every
+// the operator's question: "I have no clue what an admin task is" — now every
 // entity announces what it is + what it means in a tooltip.
 function describeEntityFlavor(item, underlyingLive) {
   if (!item) return { label: "—", tone: "neutral", tooltip: "" };
@@ -18613,7 +18613,7 @@ async function uploadAttachment(file) {
     contentType: file.type,
   });
   if (error) throw error;
-  // Signed URL valid for a year; admin is Tom-only so this stays private.
+  // Signed URL valid for a year; admin is the operator-only so this stays private.
   const { data: signed, error: signErr } = await supabase.storage
     .from("admin-attachments")
     .createSignedUrl(path, 60 * 60 * 24 * 365);
@@ -19028,7 +19028,7 @@ function replaceAdminItem(item) {
 
 // Phase 5z+13 — Nav badge counts.
 //
-// Tom's ask: "Lets make sure all these numbers are real too in our tabs
+// the operator's ask: "Lets make sure all these numbers are real too in our tabs
 // on the left… if it says +23 for instance next to tasks…I have no idea
 // what that means and when I click into tasks there is nothing about
 // that '+23' for me to easily see or filter to."
@@ -19695,7 +19695,7 @@ function renderTodayHeroHtml(stats) {
   return `
     <section class="admin-today__hero">
       <p class="admin-today__hero-eyebrow">Start of day · ${escapeHtml(dateStr)}</p>
-      <h1 class="admin-today__hero-title">${escapeHtml(greeting)}, Tom.</h1>
+      <h1 class="admin-today__hero-title">${escapeHtml(greeting)}.</h1>
       <p class="admin-today__hero-sub">${escapeHtml(headline)}</p>
       <div class="admin-today__chips">
         ${renderTodayChip(s.sla_overdue, "past SLA", "urgent", "urgent")}
@@ -19791,7 +19791,7 @@ function renderTodayUrgentGroupHtml(label, tone, cases) {
 //            in original priority order).
 //   folded = { householdId: { name, rest: [...cases] } } — the rest of each
 //            heavy household, to be rendered behind a per-family expander.
-// This keeps the "Burke Family" wall-of-rows from dominating the urgent
+// This keeps the household wall-of-rows from dominating the urgent
 // section without hiding any work.
 function foldCasesByFamily(cases, threshold) {
   if (!cases || cases.length === 0) return { inline: [], folded: {} };
@@ -23287,7 +23287,7 @@ async function renderUpcomingView() {
       // The focused-detail pane renders into the same right pane that
       // shows the "Click a row to drill in" empty state. Previously we
       // navigated to state.view = "households" which felt like a
-      // context switch; Tom flagged it as wrong. Now: load the host
+      // context switch; the operator flagged it as wrong. Now: load the host
       // household's workbench data (so lookupFocusedEntity can resolve
       // the row), but don't switch views — render the focused detail
       // directly into the Upcoming surface's right pane.
@@ -23368,7 +23368,7 @@ function renderUpcomingItemHtml(item) {
     vehicle_insurance: "🛡",
   };
   const icon = iconMap[item.type] || "·";
-  // Phase 84.1 — chez-owned badge so Tom can scan the queue and see at a
+  // Phase 84.1 — chez-owned badge so the operator can scan the queue and see at a
   // glance what's already a Chez commitment vs. a delegation opportunity.
   const chezBadge = item.chez_owned
     ? `<span class="admin-upcoming__row-chez">★ Chez owns</span>`

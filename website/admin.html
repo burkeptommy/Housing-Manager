@@ -32,7 +32,7 @@
           <p class="admin-eyebrow">Private admin</p>
           <h1>Onboarding Lab</h1>
           <p class="admin-muted">
-            Sign in as Tom to curate quiz questions, searches, routines,
+            Sign in to curate quiz questions, searches, routines,
             vendors, task categories, and notes for Codex.
           </p>
           <form class="admin-login__form" data-login-form>
@@ -41,7 +41,7 @@
               <input
                 data-login-email
                 type="email"
-                value="tom@getchez.com"
+                value=""
                 autocomplete="username"
                 spellcheck="false"
               />
@@ -78,7 +78,7 @@
           </a>
           <nav class="admin-nav" data-nav></nav>
           <div class="admin-sidebar__footer">
-            <span data-session-email>tom@getchez.com</span>
+            <span data-session-email></span>
             <button type="button" data-sign-out>Sign out</button>
           </div>
         </aside>
@@ -101,7 +101,7 @@
               <button type="button" class="admin-button is-hidden" data-preview-quiz>
                 Preview entire quiz
               </button>
-              <!-- Phase 5z+10 — Refresh pulls latest snapshots so Tom
+              <!-- Phase 5z+10 — Refresh pulls latest snapshots so the operator
                    sees new counts after Claude ships a code change
                    without forcing a hard browser reload. Hover shows
                    "last synced X ago"; clicking re-fetches every JSON
@@ -319,14 +319,14 @@
                   </div>
                 </div>
 
-                <!-- Phase 5z+9 — Focused note panel. Renders when Tom clicks
+                <!-- Phase 5z+9 — Focused note panel. Renders when the operator clicks
                      a row on the Notes tab. Shows the note body, an entity
                      preview card, Claude's heuristic analysis, replies, and
                      inline edit/delete/applied/revert controls. Stays hidden
                      on every other surface; the renderer toggles it on. -->
                 <div class="admin-note-focused is-hidden" data-note-focused></div>
 
-                <!-- Phase 5z+14 — Focused decision panel. Renders when Tom
+                <!-- Phase 5z+14 — Focused decision panel. Renders when the operator
                      clicks a row on the Decisions tab. Shows what kind of
                      decision it is, why it surfaced, Claude's recommended
                      action, and one-click buttons for every available
@@ -337,7 +337,7 @@
                 <!-- Phase 5z+19 — Focused audit panel. Same shape as the
                      decision panel: click a finding on the Audit tab and
                      this opens on the right with the recommended action
-                     first + all the alternative options Tom can take. -->
+                     first + all the alternative options the operator can take. -->
                 <div class="admin-decision-focused is-hidden" data-audit-focused></div>
 
               </article>
