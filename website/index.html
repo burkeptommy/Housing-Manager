@@ -397,24 +397,24 @@
   // MutationObserver re-applies everything if VL re-renders.
   (function () {
     var SKIN = [
-      '.box{background:transparent!important;color:#0A0A0A!important;padding:0!important;border-radius:0!important;align-items:stretch!important;}',
-      '.box>section,section.state-cont{padding:0!important;margin:0!important;}',
-      '.participation{padding:0!important;margin:0!important;}',
-      'form{padding:0!important;margin:0!important;}',
-      '.headings-custom-style,.normal-custom-style{display:none!important;}',
-      'validator,form,.participation,.parent-flexbox{width:100%!important;}',
-      '.parent-flexbox{display:flex!important;flex-direction:column!important;gap:10px!important;align-items:stretch!important;margin:0!important;padding:0!important;}',
-      '.parent-flexbox>.form-group{margin:0!important;width:100%!important;max-width:none!important;}',
-      '.form-control{background:#fff!important;color:#0A0A0A!important;-webkit-text-fill-color:#0A0A0A!important;border:1px solid #D8DADF!important;border-radius:14px!important;height:54px!important;padding:15px 18px!important;font-size:16px!important;box-shadow:0 6px 16px rgba(15,10,40,0.06)!important;}',
-      '.box input.form-control::placeholder{color:#8A8A97!important;-webkit-text-fill-color:#8A8A97!important;opacity:1!important;}',
-      '.box input.form-control::-webkit-input-placeholder{color:#8A8A97!important;-webkit-text-fill-color:#8A8A97!important;opacity:1!important;}',
-      '.form-control:focus{border-color:#6938EF!important;box-shadow:0 0 0 3px rgba(105,56,239,0.16)!important;outline:none!important;}',
-      '.participation-submit{background:#6938EF!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:0!important;border-radius:14px!important;height:54px!important;width:100%!important;margin:14px 0 0 0!important;font-size:16px!important;font-weight:600!important;box-shadow:0 10px 24px rgba(105,56,239,0.28)!important;}',
-      '.participation-submit:hover{filter:brightness(0.94)!important;}',
-      // Post-signup states (share link, position, leaderboard) and the email
-      // verification state ship white text for VL's purple card. Our join form is
-      // transparent, so give every non-join state its own purple card to stay readable.
-      '.box>section:not(.join-state){background:#6938EF!important;border-radius:18px!important;padding:26px 22px!important;}'
+      // Outer card transparent so the join form sits on the hero. Every non-join
+      // state (the post-signup sharing screen, the email-verification screen) gets
+      // its own purple card, because VL styles those with white text.
+      '.box{background:transparent!important;}',
+      '.box>section:not(.join-state){background:#6938EF!important;border-radius:18px!important;padding:26px 22px!important;}',
+      // Everything below is scoped to the JOIN form only, so it never disturbs the
+      // sharing/verification states (which keep Viral Loops own layout in the card).
+      '.join-state{padding:0!important;margin:0!important;align-items:stretch!important;}',
+      '.join-state .headings-custom-style,.join-state .normal-custom-style{display:none!important;}',
+      '.join-state .participation,.join-state form,.join-state .parent-flexbox{width:100%!important;padding:0!important;margin:0!important;}',
+      '.join-state .parent-flexbox{display:flex!important;flex-direction:column!important;gap:10px!important;align-items:stretch!important;}',
+      '.join-state .parent-flexbox>.form-group{margin:0!important;width:100%!important;max-width:none!important;}',
+      '.join-state .form-control{background:#fff!important;color:#0A0A0A!important;-webkit-text-fill-color:#0A0A0A!important;border:1px solid #D8DADF!important;border-radius:14px!important;height:54px!important;padding:15px 18px!important;font-size:16px!important;box-shadow:0 6px 16px rgba(15,10,40,0.06)!important;}',
+      '.join-state input.form-control::placeholder{color:#8A8A97!important;-webkit-text-fill-color:#8A8A97!important;opacity:1!important;}',
+      '.join-state input.form-control::-webkit-input-placeholder{color:#8A8A97!important;-webkit-text-fill-color:#8A8A97!important;opacity:1!important;}',
+      '.join-state .form-control:focus{border-color:#6938EF!important;box-shadow:0 0 0 3px rgba(105,56,239,0.16)!important;outline:none!important;}',
+      '.join-state .participation-submit{background:#6938EF!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:0!important;border-radius:14px!important;height:54px!important;width:100%!important;margin:14px 0 0 0!important;font-size:16px!important;font-weight:600!important;box-shadow:0 10px 24px rgba(105,56,239,0.28)!important;}',
+      '.join-state .participation-submit:hover{filter:brightness(0.94)!important;}'
     ].join('');
     function skinOne(fw) {
       if (!fw || !fw.shadowRoot) return false;
