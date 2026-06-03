@@ -414,8 +414,57 @@
       '.join-state input.form-control::-webkit-input-placeholder{color:#8A8A97!important;-webkit-text-fill-color:#8A8A97!important;opacity:1!important;}',
       '.join-state .form-control:focus{border-color:#6938EF!important;box-shadow:0 0 0 3px rgba(105,56,239,0.16)!important;outline:none!important;}',
       '.join-state .participation-submit{background:#6938EF!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:0!important;border-radius:14px!important;height:54px!important;width:100%!important;margin:14px 0 0 0!important;font-size:16px!important;font-weight:600!important;box-shadow:0 10px 24px rgba(105,56,239,0.28)!important;}',
-      '.join-state .participation-submit:hover{filter:brightness(0.94)!important;}'
+      '.join-state .participation-submit:hover{filter:brightness(0.94)!important;}',
+      // Post-signup sharing state: the injected "View leaderboard" toggle button.
+      '.sharing-state #chez-lb-toggle{display:block;width:100%;margin:8px 0 2px;padding:13px 18px;background:transparent;color:#fff;-webkit-text-fill-color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;cursor:pointer;}',
+      '.sharing-state #chez-lb-toggle:hover{background:rgba(255,255,255,0.12)!important;}',
+      // Revealed leaderboard: VL mixes a white rank with dark name/count cells (built for a
+      // light card). On our purple card we force every cell white so the whole table reads cleanly.
+      '.sharing-state .chez-lb-wrap,.sharing-state .chez-lb-wrap *{color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:rgba(255,255,255,0.22)!important;}',
+      '.sharing-state .chez-lb-wrap{margin-top:4px!important;}'
     ].join('');
+    // Post-signup "sharing" state: turn VL's leaderboard-first screen into a calm
+    // "you're in" confirmation. Congrats heading; keep the share link + social
+    // buttons; reveal position + referral count ONLY once the user has >=1 referral
+    // (a position earned by signup order alone is noise); and tuck the leaderboard
+    // behind a "View leaderboard" toggle instead of showing it by default. Re-applied
+    // by skinOne's MutationObserver, so it survives VL re-renders. All cosmetic:
+    // VL's signup, verification, referral, and leaderboard data are untouched.
+    function customizeSharing(fw) {
+      var sr = fw.shadowRoot; if (!sr) return;
+      var sharing = sr.querySelector('.sharing-state');
+      if (!sharing) return; // only runs in the post-signup state
+      // 1) Congrats heading (repurpose VL's sharing headline; set once, stays sticky).
+      var h1 = sharing.querySelector('.headings-custom-style');
+      if (h1 && h1.getAttribute('data-chez') !== '1') {
+        h1.textContent = "You're on the waitlist.";
+        h1.setAttribute('data-chez', '1');
+      }
+      // 2) Position + referral count: hidden until the user has at least one referral.
+      var refVal = sharing.querySelector('.my-referrals .vl-metric-value');
+      var count = refVal ? parseInt((refVal.textContent || '').replace(/[^0-9]/g, ''), 10) : 0;
+      if (isNaN(count)) count = 0;
+      var status = sharing.querySelector('.my-status');
+      if (status) status.style.display = count > 0 ? '' : 'none';
+      // 3) Leaderboard behind a toggle (open/closed state stored on the widget element).
+      var lbTable = sharing.querySelector('.vl-leaderboard');
+      var lbBlock = lbTable ? (lbTable.closest('.row') || lbTable.parentElement) : null;
+      if (lbBlock) {
+        if (lbTable.parentElement) lbTable.parentElement.classList.add('chez-lb-wrap');
+        var open = !!fw._chezLbOpen;
+        lbBlock.style.display = open ? '' : 'none';
+        var btn = sharing.querySelector('#chez-lb-toggle');
+        if (!btn) {
+          btn = document.createElement('button');
+          btn.id = 'chez-lb-toggle';
+          btn.type = 'button';
+          btn.addEventListener('click', function () { fw._chezLbOpen = !fw._chezLbOpen; customizeSharing(fw); });
+          if (lbBlock.parentElement) lbBlock.parentElement.insertBefore(btn, lbBlock);
+        }
+        var label = open ? 'Hide leaderboard' : 'View leaderboard';
+        if (btn.textContent !== label) btn.textContent = label;
+      }
+    }
     function skinOne(fw) {
       if (!fw || !fw.shadowRoot) return false;
       var sr = fw.shadowRoot;
@@ -432,6 +481,7 @@
           flex.insertBefore(eg, zg);
         }
       }
+      customizeSharing(fw);
       if (!fw._chezWatch) {
         fw._chezWatch = new MutationObserver(function () { skinOne(fw); });
         fw._chezWatch.observe(sr, { childList: true, subtree: true });
