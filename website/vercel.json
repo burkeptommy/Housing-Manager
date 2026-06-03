@@ -4,56 +4,26 @@
   "framework": null,
   "redirects": [
     {
-      "source": "/",
+      "source": "/(.*)",
       "has": [{ "type": "host", "value": "service.getchez.com" }],
-      "destination": "/service.html",
+      "destination": "https://www.getchez.com/",
       "permanent": false
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/admin",
-      "destination": "/admin.html"
     },
-    {
-      "source": "/admin/",
-      "destination": "/admin.html"
-    },
-    {
-      "source": "/reset-password",
-      "destination": "/reset-password.html"
-    },
-    {
-      "source": "/reset-password/",
-      "destination": "/reset-password.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/admin(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "private, no-store"
-        },
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, noarchive, nosnippet"
-        }
-      ]
-    },
-    {
-      "source": "/admin-data/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "private, no-store"
-        },
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, noarchive, nosnippet"
-        }
-      ]
-    }
+    { "source": "/admin", "destination": "/", "permanent": false },
+    { "source": "/admin/", "destination": "/", "permanent": false },
+    { "source": "/admin.html", "destination": "/", "permanent": false },
+    { "source": "/admin-vendors.html", "destination": "/", "permanent": false },
+    { "source": "/admin-data/(.*)", "destination": "/", "permanent": false },
+    { "source": "/reset-password", "destination": "/", "permanent": false },
+    { "source": "/reset-password/", "destination": "/", "permanent": false },
+    { "source": "/reset-password.html", "destination": "/", "permanent": false },
+    { "source": "/service.html", "destination": "/", "permanent": false },
+    { "source": "/capabilities.html", "destination": "/", "permanent": false },
+    { "source": "/security.html", "destination": "/", "permanent": false },
+    { "source": "/vendor-apply.html", "destination": "/", "permanent": false },
+    { "source": "/vendor-confirm.html", "destination": "/", "permanent": false },
+    { "source": "/homeowners.html", "destination": "/", "permanent": false },
+    { "source": "/privacy.html", "destination": "/", "permanent": false },
+    { "source": "/terms.html", "destination": "/", "permanent": false }
   ]
 }
