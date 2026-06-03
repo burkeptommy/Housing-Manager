@@ -409,11 +409,68 @@
       // Post-signup sharing state: the injected "View leaderboard" toggle button.
       '.sharing-state #chez-lb-toggle{display:block;width:100%;margin:8px 0 2px;padding:13px 18px;background:transparent;color:#fff;-webkit-text-fill-color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:14px;font-family:-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;cursor:pointer;}',
       '.sharing-state #chez-lb-toggle:hover{background:rgba(255,255,255,0.12)!important;}',
-      // Revealed leaderboard: VL mixes a white rank with dark name/count cells (built for a
-      // light card). On our purple card we force every cell white so the whole table reads cleanly.
-      '.sharing-state .chez-lb-wrap,.sharing-state .chez-lb-wrap *{color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:rgba(255,255,255,0.22)!important;}',
-      '.sharing-state .chez-lb-wrap{margin-top:4px!important;}'
+      // Revealed leaderboard: VL renders blank rows (no name is collected) and its public
+      // API only exposes the first letters of each email. So we hide VL's native table and
+      // render our own list from that data: ranks + masked members, with your row in full.
+      '.sharing-state .vl-leaderboard,.sharing-state .vl-show-more{display:none!important;}',
+      '.sharing-state .chez-lb-wrap h6,.sharing-state .chez-lb-wrap .vl-leaderboard-info{color:#fff!important;-webkit-text-fill-color:#fff!important;}',
+      '.sharing-state .chez-lb-wrap{margin-top:4px!important;}',
+      '.sharing-state #chez-custom-lb{display:flex!important;flex-direction:column!important;gap:2px!important;margin:6px 0 10px!important;}',
+      '.sharing-state .chez-lb-row{display:flex!important;align-items:center!important;gap:12px!important;padding:9px 6px!important;border-bottom:1px solid rgba(255,255,255,0.14)!important;}',
+      '.sharing-state .chez-lb-row:last-child{border-bottom:0!important;}',
+      '.sharing-state .chez-lb-rank{min-width:20px!important;font-weight:700!important;font-size:14px!important;color:#fff!important;-webkit-text-fill-color:#fff!important;opacity:0.6!important;}',
+      '.sharing-state .chez-lb-name{flex:1!important;min-width:0!important;font-size:14px!important;color:#fff!important;-webkit-text-fill-color:#fff!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}',
+      '.sharing-state .chez-lb-row-me{background:rgba(255,255,255,0.13)!important;border-radius:10px!important;border-bottom:0!important;padding-left:10px!important;padding-right:8px!important;}',
+      '.sharing-state .chez-lb-row-me .chez-lb-rank{opacity:1!important;}',
+      '.sharing-state .chez-lb-you{flex:none!important;background:#fff!important;color:#6938EF!important;-webkit-text-fill-color:#6938EF!important;font-weight:700!important;font-size:10px!important;letter-spacing:0.05em!important;text-transform:uppercase!important;padding:3px 9px!important;border-radius:999px!important;}'
     ].join('');
+    function chezEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function chezMask(prefix) { var p = (prefix || '').trim(); return p ? (p.charAt(0).toLowerCase() + '•••@•••') : 'Member'; }
+    // Pull the leaderboard from VL's PUBLIC data API (no secret needed). One entry per
+    // participant as { leadname, e } where e is only the first letters of the email.
+    // Cached on the widget so we fetch once; re-renders when it resolves.
+    function chezFetchLeaderboard(fw) {
+      if (fw._chezLbFetching || fw._chezLbData) return;
+      var code = null;
+      try { code = localStorage.getItem('vl_refCode_xnoKUbdGxi7d8Pv8neaMmJioPaw'); } catch (e) {}
+      if (!code) {
+        var sr = fw.shadowRoot, link = sr && sr.querySelector('.sharing-state input');
+        if (link && link.value) { var m = link.value.match(/referralCode=([^&]+)/); if (m) code = m[1]; }
+      }
+      if (!code) return;
+      fw._chezLbFetching = true;
+      var u = 'https://app.viral-loops.com/api/v2/data?publicToken=xnoKUbdGxi7d8Pv8neaMmJioPaw'
+        + '&params[accessors]=leaderBoard&params[user][referralCode]=' + encodeURIComponent(code);
+      fetch(u).then(function (r) { return r.json(); }).then(function (j) {
+        fw._chezLbData = (j && j.leaderBoard) ? j.leaderBoard : [];
+        fw._chezLbFetching = false;
+        customizeSharing(fw);
+      }).catch(function () { fw._chezLbFetching = false; });
+    }
+    // Render our own leaderboard: each participant by rank, others masked (b•••@•••),
+    // your own row highlighted with a "You" pill plus your full email when we have it.
+    function chezRenderLeaderboard(fw, sharing) {
+      var lbTable = sharing.querySelector('.vl-leaderboard');
+      if (!lbTable) return;
+      var data = fw._chezLbData;
+      if (!data) { chezFetchLeaderboard(fw); return; }
+      var rankEl = sharing.querySelector('.my-rank .vl-metric-value');
+      var myRank = rankEl ? parseInt((rankEl.textContent || '').replace(/[^0-9]/g, ''), 10) : 0;
+      var myEmail = ''; try { myEmail = localStorage.getItem('chez_wl_my_email') || ''; } catch (e) {}
+      var host = sharing.querySelector('#chez-custom-lb');
+      if (!host) { host = document.createElement('div'); host.id = 'chez-custom-lb'; lbTable.parentNode.insertBefore(host, lbTable.nextSibling); }
+      var html = '';
+      for (var i = 0; i < data.length; i++) {
+        var rank = i + 1, isMe = !!(myRank && rank === myRank);
+        var label = isMe ? (myEmail || 'You') : chezMask(data[i] && data[i].e);
+        var pill = (isMe && myEmail) ? '<span class="chez-lb-you">You</span>' : '';
+        html += '<div class="chez-lb-row' + (isMe ? ' chez-lb-row-me' : '') + '">'
+          + '<span class="chez-lb-rank">' + rank + '</span>'
+          + '<span class="chez-lb-name">' + chezEsc(label) + '</span>'
+          + pill + '</div>';
+      }
+      if (host.innerHTML !== html) host.innerHTML = html;
+    }
     // Post-signup "sharing" state: turn VL's leaderboard-first screen into a calm
     // "you're in" confirmation. Congrats heading; keep the share link + social
     // buttons; reveal position + referral count ONLY once the user has >=1 referral
@@ -442,6 +499,7 @@
       var lbBlock = lbTable ? (lbTable.closest('.row') || lbTable.parentElement) : null;
       if (lbBlock) {
         if (lbTable.parentElement) lbTable.parentElement.classList.add('chez-lb-wrap');
+        chezRenderLeaderboard(fw, sharing);
         var open = !!fw._chezLbOpen;
         lbBlock.style.display = open ? '' : 'none';
         var btn = sharing.querySelector('#chez-lb-toggle');
@@ -464,6 +522,10 @@
       }
       var flex = sr.querySelector('.parent-flexbox');
       var email = sr.querySelector('input[type=email]');
+      if (email && !email._chezCap) {
+        email._chezCap = true;
+        email.addEventListener('input', function () { try { localStorage.setItem('chez_wl_my_email', (email.value || '').trim()); } catch (e) {} });
+      }
       var zip = sr.querySelector('input[type=text]');
       if (flex && email && zip) {
         var n = email, eg = null; while (n && n.parentElement !== flex) { n = n.parentElement; } eg = n;
