@@ -7422,6 +7422,13 @@ function renderConciergeVendorRowHtml(req, v, idx, callData) {
           Custom cost
           <input type="text" data-vendor-field="cost_custom" value="${escapeHtml(costCustom)}" placeholder="$1,200 firm" />
         </label>
+        <label title="Shows on the homeowner's proposal card as price context. Left blank, package-send fills it from Chez network history when available.">
+          Fair market (USD)
+          <span style="display:flex; gap:6px;">
+            <input type="text" inputmode="numeric" data-vendor-field="fair_low" value="${escapeHtml(callData?.fair_low || "")}" placeholder="low" style="width:72px;" />
+            <input type="text" inputmode="numeric" data-vendor-field="fair_high" value="${escapeHtml(callData?.fair_high || "")}" placeholder="high" style="width:72px;" />
+          </span>
+        </label>
       </div>
 
       <!-- Phase 83.4 — vendor proposals carry vendor + price only.
@@ -11350,6 +11357,13 @@ function renderVendorCandidateCardHtml(req, v, idx, callData) {
         <span>Custom cost text</span>
         <input type="text" data-vendor-field="cost_custom" value="${escapeHtml(costCustom)}" placeholder="e.g. $1,200 firm; $400 + $50/sqft" />
       </label>
+      <label title="Shows on the homeowner's proposal card as price context. Left blank, package-send fills it from Chez network history when available.">
+        <span>Fair market (USD)</span>
+        <span style="display:flex; gap:6px;">
+          <input type="text" inputmode="numeric" data-vendor-field="fair_low" value="${escapeHtml(callData?.fair_low || "")}" placeholder="low" style="width:72px;" />
+          <input type="text" inputmode="numeric" data-vendor-field="fair_high" value="${escapeHtml(callData?.fair_high || "")}" placeholder="high" style="width:72px;" />
+        </span>
+      </label>
 
       <label>Your notes from the call
         <textarea rows="3" data-vendor-field="notes" placeholder="Raw notes — what did they say? Anything specific to this home? AI uses this to write the homeowner-facing recommendation.">${escapeHtml(callData?.notes || "")}</textarea>
@@ -12065,6 +12079,15 @@ function openProposalBuilder(req) {
           <label>Vendor name<input type="text" name="quote-vendor" /></label>
           <label>Total (USD)<input type="number" step="1" name="quote-total" /></label>
           <label>Valid until<input type="text" name="quote-valid" placeholder="e.g. May 15" /></label>
+          <label>Fair-market band, USD (optional)
+            <div style="display:flex; gap:6px;">
+              <input type="number" step="1" name="quote-fair-low" placeholder="low" style="width:50%;" />
+              <input type="number" step="1" name="quote-fair-high" placeholder="high" style="width:50%;" />
+            </div>
+          </label>
+          <label>Alternative quotes, one per line: Vendor | total (optional)
+            <textarea name="quote-alternatives" rows="2" placeholder="Romano Plumbing | 1450&#10;ClearFlow | 1600"></textarea>
+          </label>
         </section>
 
         <label class="admin-chez__proposal-message">
@@ -12327,6 +12350,19 @@ function attachProposalBuilderHandlers(modal, req, ctx) {
         const vendor = modal.querySelector("[name='quote-vendor']").value.trim();
         if (!vendor) { alert("Enter a vendor name."); return; }
         const total = Number(modal.querySelector("[name='quote-total']").value);
+        // Phase 101 (C1/C2) — fair-market band + alternative quotes ride the
+        // proposal so the homeowner sees price context, not a bare number.
+        const fairLow = Number(modal.querySelector("[name='quote-fair-low']").value);
+        const fairHigh = Number(modal.querySelector("[name='quote-fair-high']").value);
+        const alternatives = (modal.querySelector("[name='quote-alternatives']").value || "")
+          .split("\n")
+          .map((line) => {
+            const [name, amount] = line.split("|").map((s) => (s || "").trim());
+            const alt = Number((amount || "").replace(/[^0-9.]/g, ""));
+            return name ? { vendor_name: name, total: Number.isFinite(alt) && alt > 0 ? alt : undefined } : null;
+          })
+          .filter(Boolean)
+          .slice(0, 4);
         await callChezConcierge({
           action: "propose",
           request_id: req.id,
@@ -12336,6 +12372,9 @@ function attachProposalBuilderHandlers(modal, req, ctx) {
               vendor_name: vendor,
               total: total || undefined,
               valid_until: modal.querySelector("[name='quote-valid']").value.trim() || undefined,
+              fair_market_low: Number.isFinite(fairLow) && fairLow > 0 ? fairLow : undefined,
+              fair_market_high: Number.isFinite(fairHigh) && fairHigh >= fairLow ? fairHigh : undefined,
+              alternatives: alternatives.length > 0 ? alternatives : undefined,
             },
           },
           content,
@@ -13016,6 +13055,27 @@ async function packageAndSendRecommendedVendors(req) {
       // The homeowner picks based on vendor + price + fit; date
       // coordination happens AFTER approval via the visit card's
       // "Send dates to homeowner" date_slot proposal flow.
+      // Phase 101 (C1) — fair-market band: operator-entered values win;
+      // otherwise derive from the cross-household Chez network comparables
+      // (same source the homeowner's inbox hint uses).
+      const fairLowOp = Number(String(data.fair_low ?? "").replace(/[^0-9.]/g, ""));
+      const fairHighOp = Number(String(data.fair_high ?? "").replace(/[^0-9.]/g, ""));
+      let fairBand = (fairLowOp > 0 && fairHighOp >= fairLowOp)
+        ? { low: Math.round(fairLowOp * 100), high: Math.round(fairHighOp * 100), source: "operator" }
+        : null;
+      if (!fairBand) {
+        const netCosts = (cached.chez_network || [])
+          .map((r) => Number(r.avg_quoted_cost_cents))
+          .filter((n) => Number.isFinite(n) && n > 500);
+        if (netCosts.length > 0) {
+          fairBand = {
+            low: Math.round(Math.min(...netCosts) * 0.9),
+            high: Math.round(Math.max(...netCosts) * 1.1),
+            source: "chez_network",
+          };
+        }
+      }
+
       const proposal = {
         kind: "vendor",
         vendor: {
@@ -13027,6 +13087,10 @@ async function packageAndSendRecommendedVendors(req) {
           // contractor upsert on approval can stamp google_place_id
           // (unifies the vendor across the registry).
           place_id: vendor.google_place_id || vendor.place_id || undefined,
+          // Phase 101 (C1) — price context on the card.
+          fair_market_low_cents: fairBand ? fairBand.low : undefined,
+          fair_market_high_cents: fairBand ? fairBand.high : undefined,
+          fair_market_source: fairBand ? fairBand.source : undefined,
           // Numeric cost only when the admin clearly typed one.
           estimated_cost: useNumeric ? numericCost : undefined,
           // Range string preferred — homeowner sees "$1,000–2,500"
