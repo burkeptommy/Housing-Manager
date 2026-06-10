@@ -534,7 +534,37 @@ serve(async (req: Request) => {
         .ilike("email", senderEmail)
         .limit(1);
 
+      // Phase 100 — household members are ALWAYS allowed senders. The
+      // whitelist gate shipped (Phase 86C) without any seeding, so the
+      // homeowner's own forwards were rejected. The whitelist remains
+      // the control surface for third parties; your own account email
+      // never needs to be on it. Self-healing: when a member email
+      // passes this fallback, persist it to the list so Settings shows
+      // it and future checks hit the fast path.
+      let isHouseholdMember = false;
       if (!allowedSender || allowedSender.length === 0) {
+        const { data: memberUser } = await supabase
+          .from("users")
+          .select("id")
+          .eq("household_id", householdId)
+          .ilike("email", senderEmail)
+          .limit(1);
+        isHouseholdMember = !!memberUser && memberUser.length > 0;
+        if (isHouseholdMember) {
+          try {
+            await supabase.from("household_allowed_senders").insert({
+              household_id: householdId,
+              email: senderEmail,
+              label: "Household member",
+              is_auto_added: true,
+            });
+          } catch (e) {
+            console.warn("[receive-email] member auto-add to allowed senders failed (non-fatal):", e);
+          }
+        }
+      }
+
+      if ((!allowedSender || allowedSender.length === 0) && !isHouseholdMember) {
         console.log(`[receive-email] Sender not whitelisted: ${senderEmail} (raw: ${fromAddress}) for household ${householdId}`);
         // Update placeholder to show rejection reason instead of silently returning
         if (placeholderId) {

@@ -117,4 +117,44 @@ Scope: Chez handoff pipeline, deployed-state drift, cockpit, alignment, intellig
 ### E7. Quiz triple-implementation diff: NO breaking drift
 - iOS (source of truth) vs _shared/quiz-mapper-shared.ts vs admin-simulator.js: aligned on every contract-bearing vocabulary; differences are intentional subsets/coarsenings (simulator models gating only: tank vs tank_gas split, salt vs saltwater, 13 of 21 Q15b chips by design). Status: `not_reproduced`
 
-## Section F — Rollout verification (filled during foundation rollout)
+## Section F — Rollout verification (2026-06-10)
+
+All 10 foundation migrations applied (zero pending); chez-sla-watch + chez-concierge + receive-email + chat + submit-vendor-application deployed; 3 tables + 6 views + 4 cron jobs verified in prod; SLA watcher caught 12 genuinely-breached cases on its first automatic tick and the manual tick correctly found 0 new (stamp idempotency proven); deployed dispatcher smoke-tested (`fetch_vendor_registry` → "admin only").
+
+## Section G — Homeowner functionality sweep (2026-06-10, as the fixture homeowner via prod APIs)
+
+Method: authenticated as the e2e fixture homeowner (JWT) against the exact endpoints/tables iOS calls; operator side fabricated via service-role SQL where a second party was required.
+
+| Area | Result | Evidence |
+|---|---|---|
+| Pass-off: per-routine delegation | PASS | create routine → delegate_routine → chez_owned stamped + standing-engagement case |
+| Pass-off: go-all-in | PASS | set_ownership_group all_vendors → 17 contractors backfilled + group recorded |
+| Pass-off: per-task | PASS (prior e2e) | 5 tasks delegated with correct find_vendor/coordinate_task smart routing |
+| Collaboration thread | PASS | homeowner reply → message + unread_for_admin; mark_read clears |
+| Vendor proposal approve | **PASS after 2 prod fixes (G1, G2)** | contractor persists w/ chez_recommendation source, numeric rating, google_place_id, provenance; visit auto-created awaiting_date |
+| Vendor scheduling (date_slot) | PASS | approve → oldest awaiting visit flips to scheduled with picked ISO |
+| Find vendors | PASS | find-local-vendors Bethel/CT/electrician → 19 ranked results |
+| Assign tasks | PASS | PATCH assigned_to_user_id round-trips under RLS |
+| Add home members | PASS | family_members insert; invitation row gets the new 30-day expiry default; invite email sends |
+| Add systems | PASS | home_systems insert + read-back (Water Heater / tank_gas) |
+| Scan systems | PASS (note) | identify-equipment returns graceful structured no-match on a JPEG; PNG input is 400ed because media type is hardcoded image/jpeg — iOS always re-encodes JPEG so in-app flow unaffected. `deferred` server robustness note |
+| Add warranties | PASS | warranties insert linked to new system |
+| Forward documents/quotes | **PASS after prod fix (G3)** | accepted → Claude classified contractor_quote (high) → actionable inbox item; dedup guard works; rejection path produces a graceful explainer item |
+| Inbox actions | PASS | process-inbox-item dismiss contract verified; quote docs materialize on save/project actions by design |
+| Saving/persistence | PASS | every write re-read under homeowner RLS |
+
+### G1. FIXED LIVE BUG: "Chez remembers" never persisted approved vendors (source CHECK)
+- Severity: `critical` (feature dead since Phase 83.3 shipped)
+- contractors_source_check allowed only manual/quiz/find_vendor/chez_field; decide_proposal inserts source='chez_recommendation' → constraint violation, swallowed by try/catch; zero rows ever created. Visits being created masked it.
+- Fix: migration 20270110 extends the CHECK. Status: `fixed` (verified live)
+
+### G2. FIXED LIVE BUG: contractors.rating was INTEGER, proposals carry floats
+- Severity: `critical` (second independent killer of the same write)
+- Every Places rating (4.6, 4.8) failed text→integer cast via PostgREST (22P02), swallowed. Fix: migration 20270111, rating → numeric(2,1). iOS follow-up: ContractorRow.rating is Int? (resilient decode → fractional ratings show as nil until the model moves to Double). Status: `fixed` (verified live: 4.7 persisted)
+
+### G3. FIXED LIVE BUG: email forwarding rejected every homeowner (empty whitelist)
+- Severity: `critical` (flagship pipeline dead for all households)
+- Phase 86C (May 19 commit) added the household_allowed_senders gate with no seeding and no member auto-allow; the table had ZERO rows. Latent in repo; ACTIVATED by this session's stale-deploy catch-up of receive-email on 06-09. Caught within a day by this sweep.
+- Fix: receive-email now auto-allows household members (and self-heals them onto the list); migration 20270112 backfills all household users (6 seeded). Status: `fixed` (verified live: full classify→inbox flow green)
+
+Sweep artifacts: fixture household keeps the created entities (contractor "Sweep Final Electric", 3 visits incl. one scheduled, system, warranty, member, invitation) for cockpit/simulator inspection; all sweep-opened chez cases resolved.
