@@ -452,6 +452,33 @@ struct InvoiceReviewSheet: View {
 
                     // Parent assignment — editable on all systems
                     parentAssignmentControl(for: resolved)
+
+                    // Phase 101 (E5) — explicit replacement toggle. The new
+                    // unit looks like it replaces an existing system; when
+                    // approved, the old unit archives and its open tasks
+                    // move to the new one at apply time.
+                    if let oldName = resolved.replaceCandidateName,
+                       resolved.replaceCandidateId != nil {
+                        Toggle(isOn: Binding(
+                            get: { viewModel.replaceApprovedIds.contains(resolved.id) },
+                            set: { on in
+                                Haptics.selection()
+                                if on { viewModel.replaceApprovedIds.insert(resolved.id) }
+                                else { viewModel.replaceApprovedIds.remove(resolved.id) }
+                            }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Replaces \(oldName)")
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundColor(HavenColors.textPrimary)
+                                Text("Archives the old unit and moves its open tasks here")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundColor(HavenColors.textSecondary)
+                            }
+                        }
+                        .tint(HavenColors.navy800)
+                        .padding(.top, 4)
+                    }
                 }
 
                 Spacer()

@@ -782,8 +782,84 @@ struct InboxItemDetailView: View {
                         icon: "doc.fill",
                         isDisabled: isProcessing
                     )
+                } else if isWarrantyAction {
+                    // Phase 101 (E3) — one-tap warranty save. The server
+                    // extracted the coverage facts and fuzzy-matched a
+                    // system at email time; saving writes the warranties
+                    // row plus the document.
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let w = item.metadata?.warranty {
+                            if let provider = w.provider, !provider.isEmpty {
+                                Text("Provider: \(provider)")
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                            }
+                            if let covered = w.coveredItem, !covered.isEmpty {
+                                Text("Covers: \(covered)")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                            }
+                            if let end = w.endDate, !end.isEmpty {
+                                Text("Coverage through \(end)")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            HStack(spacing: 6) {
+                                Image(systemName: w.matchedSystemName == nil ? "questionmark.circle" : "checkmark.seal")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(w.matchedSystemName == nil ? HavenColors.textSecondary : HavenColors.success)
+                                Text(w.matchedSystemName.map { "Attaches to: \($0)" }
+                                     ?? "No matching system found. It will save to your documents.")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                        }
+                    }
+
+                    HavenButton(
+                        title: "Save Warranty",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "save_warranty", nil, nil)
+                            dismiss()
+                        },
+                        icon: "checkmark.shield.fill",
+                        isLoading: isProcessing,
+                        isDisabled: isProcessing
+                    )
+
+                    HavenButton(
+                        title: "Just Save Document",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "process_document", "Warranty", nil)
+                            dismiss()
+                        },
+                        style: .secondary,
+                        icon: "doc.fill",
+                        isDisabled: isProcessing
+                    )
                 } else if isQuoteAction {
                     let matchingProject = findMatchingProject()
+
+                    // Phase 101 (E8) — price context from the cross-household
+                    // Chez network before the homeowner even opens the PDF.
+                    if let fm = item.metadata?.fairMarket,
+                       let low = fm.lowCents, let high = fm.highCents,
+                       high >= low, low > 0 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.system(size: 12))
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Text("Local range from the Chez network: $\(low / 100) to $\(high / 100)")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                    }
 
                     if let match = matchingProject {
                         HStack(spacing: 6) {
@@ -1247,6 +1323,15 @@ struct InboxItemDetailView: View {
 
     /// Find an existing project that matches this quote's vendor or category
     private func findMatchingProject() -> PropertyProjectRow? {
+        // Phase 101 (E1) — the server's multi-signal match (sender appears in
+        // the project's contacts, sender already quoted on the project, or
+        // the subject names the project) wins when present. The local
+        // heuristics below stay as the fallback.
+        if let sid = item.metadata?.suggestedProject?.id,
+           let uuid = UUID(uuidString: sid),
+           let serverMatch = projects.first(where: { $0.id == uuid }) {
+            return serverMatch
+        }
         let vendorName = item.metadata?.vendorName?.lowercased() ?? ""
         let summary = (item.summary ?? "").lowercased()
         let title = item.title.lowercased()
@@ -1278,6 +1363,11 @@ struct InboxItemDetailView: View {
         return actionType == "quote_received"
             || itemType == "contractor_quote"
             || (itemType == "project_created" && item.isPending)
+    }
+
+    /// Phase 101 (E3) — warranty emails get a one-tap save card.
+    private var isWarrantyAction: Bool {
+        (initialActionType ?? item.actionType) == "save_warranty" && item.isPending
     }
 
     private var primaryActionTitle: String {
