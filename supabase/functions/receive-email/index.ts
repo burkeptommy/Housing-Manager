@@ -8,6 +8,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,6 +78,15 @@ interface EmailClassification {
   documentTitle: string | null;
   summary: string;
   vehicleContext?: boolean;
+  // Phase 101 (E3) — populated when the email is a warranty registration,
+  // confirmation, or extended-warranty document.
+  warrantyInfo?: {
+    provider: string | null;
+    covered_item: string | null;
+    warranty_type: string | null;
+    start_date: string | null;
+    end_date: string | null;
+  } | null;
 }
 
 // --- iCal PARSER ---
@@ -850,6 +860,7 @@ Respond with ONLY valid JSON:
   "projectType": "Kitchen Renovation, Plumbing Repair, etc. or null",
   "documentCategory": "best matching category: Will, Trust, Homeowners Insurance, Vehicle Title, Contractor Quote, Warranty, etc. or null",
   "documentTitle": "suggested title for the document or null",
+  "warrantyInfo": "ONLY when the email is a warranty registration, warranty confirmation, or extended-warranty document: { \"provider\": \"company backing the warranty\", \"covered_item\": \"what is covered, e.g. 'Rheem water heater'\", \"warranty_type\": \"manufacturer | extended | home_warranty\", \"start_date\": \"YYYY-MM-DD or null\", \"end_date\": \"YYYY-MM-DD or null\" }. Otherwise null.",
   "summary": "1-2 sentence summary of what this email contains",
   "familyCategory": "school | events | medical | activities | travel | personal | other — only if type is family, otherwise null",
   "familyMemberName": "name of the family member this relates to, or null",
@@ -987,9 +998,18 @@ Respond with ONLY valid JSON:
     let createdProjectId: string | null = null;
     let createdContractorId: string | null = null;
     let createdDocumentId: string | null = null;
+    // Phase 101 — quote intelligence payload (suggested project, specialty
+    // system suggestion, fair-market hint). Filled in the quote branch,
+    // merged into baseMetadata at insert time.
+    let quoteIntel: Record<string, unknown> = {};
 
     // --- STEP 1: AUTO-CREATE VENDOR (for any type that has vendor info, except family emails) ---
-    if (classification.type !== "family" && classification.type !== "insurance_claim" && classification.type !== "bill_invoice" && classification.vendorName && (classification.vendorPhone || classification.vendorEmail)) {
+    // Phase 101 (E7) — a vendor_contact email IS the contact card: keep the
+    // vendor on name alone rather than discarding the extraction when no
+    // phone/email parsed.
+    const vendorContactSignal = !!(classification.vendorPhone || classification.vendorEmail
+      || (classification.type === "vendor_contact" && classification.vendorName));
+    if (classification.type !== "family" && classification.type !== "insurance_claim" && classification.type !== "bill_invoice" && classification.vendorName && vendorContactSignal) {
       // Check if vendor already exists (by name + household)
       const { data: existingVendors } = await supabase
         .from("contractors")
@@ -1037,6 +1057,146 @@ Respond with ONLY valid JSON:
       // then prompt the user to choose: New Project, Existing Project, or Save as Document.
       actions.push("quote_received");
       console.log(`[receive-email] Contractor quote received — awaiting user action. Vendor: ${classification.vendorName || "unknown"}`);
+
+      // Phase 101 — quote intelligence (suggest, never create). Three
+      // enrichments stamped into metadata for the iOS card:
+      //   E1 suggested_project — the multi-signal matcher from the disabled
+      //      block below, reused as a SUGGESTION (pre-selects the project in
+      //      the picker; the homeowner always confirms).
+      //   E6 specialty_system_suggestion — same inference invoices get.
+      //   E8 fair_market — cross-household comparables from the Chez vendor
+      //      registry (zero AI cost).
+      try {
+        // E1 signal 1a: sender → project_contacts on an active project.
+        let suggestedProject: { id: string; name: string; signal: string } | null = null;
+        if (senderEmail) {
+          const { data: contactMatches } = await supabase
+            .from("project_contacts")
+            .select("project_id, contact_email")
+            .eq("household_id", householdId)
+            .ilike("contact_email", senderEmail)
+            .limit(5);
+          if (contactMatches && contactMatches.length > 0) {
+            const ids = contactMatches.map((c: { project_id: string }) => c.project_id);
+            const { data: active } = await supabase
+              .from("property_projects")
+              .select("id, name")
+              .in("id", ids)
+              .in("status", ["planning", "in_progress"])
+              .limit(1);
+            if (active && active.length > 0) {
+              suggestedProject = { id: active[0].id, name: active[0].name, signal: "sender_project_contact" };
+            }
+          }
+          // E1 signal 1b: sender matches a contractor with quotes on an active project.
+          if (!suggestedProject) {
+            const { data: senderContractors } = await supabase
+              .from("contractors")
+              .select("id")
+              .eq("household_id", householdId)
+              .ilike("email", `%${senderEmail}%`)
+              .limit(1);
+            if (senderContractors && senderContractors.length > 0) {
+              const { data: quoted } = await supabase
+                .from("project_quotes")
+                .select("project_id")
+                .eq("household_id", householdId)
+                .eq("contractor_id", senderContractors[0].id)
+                .limit(5);
+              if (quoted && quoted.length > 0) {
+                const { data: active } = await supabase
+                  .from("property_projects")
+                  .select("id, name")
+                  .in("id", quoted.map((q: { project_id: string }) => q.project_id))
+                  .in("status", ["planning", "in_progress"])
+                  .limit(1);
+                if (active && active.length > 0) {
+                  suggestedProject = { id: active[0].id, name: active[0].name, signal: "sender_existing_quote" };
+                }
+              }
+            }
+          }
+        }
+        // E1 signal 2: subject (or body head) mentions an active project name.
+        if (!suggestedProject) {
+          const { data: activeProjects } = await supabase
+            .from("property_projects")
+            .select("id, name")
+            .eq("household_id", householdId)
+            .in("status", ["planning", "in_progress"])
+            .limit(25);
+          const hay = `${subject} ${emailBody.slice(0, 500)}`.toLowerCase();
+          const hit = (activeProjects ?? []).find((p: { id: string; name: string }) =>
+            p.name && p.name.length > 3 && hay.includes(p.name.toLowerCase()));
+          if (hit) suggestedProject = { id: hit.id, name: hit.name, signal: "subject_project_name" };
+        }
+        if (suggestedProject) {
+          quoteIntel.suggested_project = suggestedProject;
+          console.log(`[receive-email] Quote matched project "${suggestedProject.name}" via ${suggestedProject.signal} (suggest-only)`);
+        }
+
+        // E6 — specialty system inference on the quote text (the same rules
+        // invoices run). Suggest-only; iOS renders the existing card.
+        try {
+          const { data: existingSystems } = await supabase
+            .from("home_systems")
+            .select("category")
+            .eq("household_id", householdId);
+          const { data: dismissed } = await supabase
+            .from("household_dismissed_suggestions")
+            .select("category")
+            .eq("household_id", householdId);
+          const inference = inferSpecialtyCategory(
+            `${subject} ${emailBody} ${attachmentFilename ?? ""}`,
+            new Set((existingSystems ?? []).map((s: { category: string }) => s.category)),
+            new Set((dismissed ?? []).map((d: { category: string }) => d.category)),
+          );
+          if (inference) {
+            inference.source = "quote_email";
+            quoteIntel.specialty_system_suggestion = inference;
+          }
+        } catch (e) {
+          console.warn("[receive-email] quote specialty inference failed (non-fatal):", e);
+        }
+
+        // E8 — fair-market hint from the Chez network registry. Category
+        // derives from the specialty inference or the classification's
+        // project type; town from the household's primary property.
+        const fmCategory = ((quoteIntel.specialty_system_suggestion as { category?: string } | undefined)?.category
+          || (classification as { projectType?: string }).projectType || "").toLowerCase().split(/\s+/)[0] ?? "";
+        if (fmCategory.length > 2) {
+          const { data: prop } = await supabase
+            .from("properties")
+            .select("city")
+            .eq("household_id", householdId)
+            .limit(1)
+            .maybeSingle();
+          const { data: regRows } = await supabase
+            .from("chez_vendor_registry")
+            .select("avg_quoted_cost_cents, avg_final_cost_cents, categories, towns")
+            .limit(200);
+          const town = ((prop as { city?: string } | null)?.city ?? "").toLowerCase();
+          const costs = (regRows ?? [])
+            .filter((r: { categories?: string[]; towns?: string[] }) => {
+              const cats = (r.categories ?? []).join(" ");
+              const towns = (r.towns ?? []).map((t) => String(t).toLowerCase());
+              return cats.includes(fmCategory) && (!town || towns.length === 0 || towns.includes(town));
+            })
+            .map((r: { avg_final_cost_cents?: number; avg_quoted_cost_cents?: number }) =>
+              Number(r.avg_final_cost_cents ?? r.avg_quoted_cost_cents))
+            .filter((n: number) => Number.isFinite(n) && n > 500);
+          if (costs.length > 0) {
+            quoteIntel.fair_market = {
+              low_cents: Math.round(Math.min(...costs) * 0.9),
+              high_cents: Math.round(Math.max(...costs) * 1.1),
+              sample_size: costs.length,
+              source: "chez_network",
+            };
+          }
+        }
+      } catch (e) {
+        console.warn("[receive-email] quote intelligence failed (non-fatal):", e);
+      }
 
       if (false) {
       // --- DISABLED: Auto project matching/creation ---
@@ -1816,6 +1976,9 @@ Respond with ONLY valid JSON:
         high_confidence: classification.confidence === "high",
         suggested_category: classification.documentCategory || null,
         document_title: classification.documentTitle || null,
+        // Phase 101 — quote intelligence (suggested_project /
+        // specialty_system_suggestion / fair_market), empty for non-quotes.
+        ...quoteIntel,
         ...(analysisWasSkipped ? {
           analysis_skipped: true,
           analysis_skip_reason: `Unsupported file format (${skippedExt}). Document saved but could not be analyzed automatically.`,
@@ -1997,6 +2160,43 @@ Respond with ONLY valid JSON:
         mainActionType = "resolve_duplicate";
         mainTitle = `Duplicate: ${classification.documentTitle || subject || "Document"}`;
         baseMetadata.duplicate_of_title = duplicateOfTitle;
+      }
+
+      // Phase 101 (E3) — warranty intelligence. When the classifier found
+      // warranty facts (or the suggested category is Warranty), surface a
+      // one-tap save card instead of the generic classify flow: fuzzy-match
+      // the covered item against the household's active systems so the
+      // warranty lands on the right equipment.
+      if (!isDuplicateDoc && (classification.warrantyInfo?.provider
+          || (classification.documentCategory ?? "").toLowerCase().includes("warranty"))) {
+        try {
+          const w = classification.warrantyInfo ?? {
+            provider: classification.vendorName, covered_item: null,
+            warranty_type: null, start_date: null, end_date: null,
+          };
+          const { data: activeSystems } = await supabase
+            .from("home_systems")
+            .select("id, name, category")
+            .eq("household_id", householdId)
+            .eq("is_active", true)
+            .limit(100);
+          const itemText = `${w.covered_item ?? ""} ${subject}`.toLowerCase();
+          const matched = (activeSystems ?? []).find((s: { id: string; name: string; category: string }) =>
+            (s.name && s.name.length > 3 && itemText.includes(s.name.toLowerCase()))
+            || (s.category && s.category.length > 3 && itemText.includes(s.category.toLowerCase())));
+          baseMetadata.warranty = {
+            ...w,
+            matched_system_id: matched?.id ?? null,
+            matched_system_name: matched?.name ?? null,
+            matched_system_category: matched?.category ?? null,
+          };
+          mainNeedsAction = true;
+          mainActionType = "save_warranty";
+          mainTitle = `Warranty found: ${w.covered_item || classification.documentTitle || subject || "your equipment"}`;
+          console.log(`[receive-email] Warranty detected (${w.provider ?? "unknown provider"}) — matched system: ${matched?.name ?? "none"}`);
+        } catch (e) {
+          console.warn("[receive-email] warranty intelligence failed (non-fatal):", e);
+        }
       }
 
       // Insert the final inbox item FIRST, then delete placeholder only on success

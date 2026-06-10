@@ -164,6 +164,57 @@ serve(async (req: Request) => {
     const emailBody = metadata.email_body as string | undefined;
     const classification = metadata.classification as Record<string, unknown> | undefined;
     const fromAddress = item.from_email ?? "";
+
+    // Phase 101 (E2) — persist a quote attachment as a real document so it
+    // shows on the vendor's profile (documents.contractor_id), inside the
+    // project, and in the vault. Quotes used to live only as an
+    // inbox-attachments path: invisible everywhere after the inbox moment.
+    const persistQuoteDocument = async (
+      projectId: string | null,
+      contractorIdForDoc: string | null,
+      propertyIdForDoc: string | null
+    ): Promise<string | null> => {
+      if (!attachmentBase64) return null;
+      try {
+        const filePath = `${householdId}/${crypto.randomUUID()}`;
+        const fileBuffer = Uint8Array.from(atob(attachmentBase64), (c) => c.charCodeAt(0));
+        const { error: upErr } = await supabase.storage
+          .from("documents")
+          .upload(filePath, fileBuffer, {
+            contentType: item.attachment_content_type || "application/pdf",
+          });
+        if (upErr) {
+          console.warn(`[process-inbox] quote document upload failed (non-fatal): ${upErr.message}`);
+          return null;
+        }
+        const docInsert: Record<string, unknown> = {
+          household_id: householdId,
+          title: (classification?.documentTitle as string) || subject || "Contractor Quote",
+          category: "Contractor Quote",
+          status: "active",
+          file_path: filePath,
+          notes: `Quote from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}`,
+          ai_summary: item.summary,
+          visible_to_home_managers: visibleToHomeManagers("Contractor Quote"),
+        };
+        if (projectId) docInsert.project_id = projectId;
+        if (contractorIdForDoc) docInsert.contractor_id = contractorIdForDoc;
+        if (propertyIdForDoc) docInsert.property_id = propertyIdForDoc;
+        const { data: doc, error: docErr } = await supabase
+          .from("documents")
+          .insert(docInsert)
+          .select("id")
+          .single();
+        if (docErr || !doc) {
+          console.warn(`[process-inbox] quote document insert failed (non-fatal): ${docErr?.message}`);
+          return null;
+        }
+        return (doc as { id: string }).id;
+      } catch (e) {
+        console.warn(`[process-inbox] quote document persist exception (non-fatal): ${e}`);
+        return null;
+      }
+    };
     const subject = metadata.subject as string ?? item.title;
 
     // --- Get property info for location context ---
@@ -318,11 +369,26 @@ serve(async (req: Request) => {
 
               actions.push("analyzed_quote");
               result.analysis = analyzeData.analysis;
+              // Phase 101 (E2) — link the persisted quote document to the
+              // project_quotes row (set below once the doc exists).
+              if (savedQuote) result.saved_quote_id = (savedQuote as { id: string }).id;
             }
           }
         } catch (err) {
           console.error(`[process-inbox] Quote analysis failed: ${err}`);
           actions.push("quote_analysis_failed");
+        }
+      }
+
+      // Phase 101 (E2) — the quote becomes a real document: on the vendor
+      // profile, in the project, in the vault.
+      const quoteDocId = await persistQuoteDocument(project.id, contractorId, property_id ?? null);
+      if (quoteDocId) {
+        result.document_id = quoteDocId;
+        if (result.saved_quote_id) {
+          await supabase.from("project_quotes")
+            .update({ document_id: quoteDocId })
+            .eq("id", result.saved_quote_id);
         }
       }
 
@@ -334,6 +400,7 @@ serve(async (req: Request) => {
           type: "project_created",
           related_project_id: project.id,
           related_contractor_id: contractorId,
+          related_document_id: quoteDocId ?? undefined,
         })
         .eq("id", inbox_item_id);
     }
@@ -508,6 +575,11 @@ serve(async (req: Request) => {
           .eq("id", target_project_id);
       } catch (_e) { /* non-blocking */ }
 
+      // Phase 101 (E2) — persist the quote as a document on the vendor +
+      // project + vault, mirroring the process_quote path.
+      const addedQuoteDocId = await persistQuoteDocument(target_project_id, contractorId, null);
+      if (addedQuoteDocId) result.document_id = addedQuoteDocId;
+
       // Update inbox item
       await supabase
         .from("inbox_items")
@@ -516,11 +588,99 @@ serve(async (req: Request) => {
           type: "project_created",
           related_project_id: target_project_id,
           related_contractor_id: contractorId,
+          related_document_id: addedQuoteDocId ?? undefined,
         })
         .eq("id", inbox_item_id);
 
       result.project_id = target_project_id;
       actions.push(`added_to_project:${target_project_id}`);
+    }
+
+    // --- SAVE WARRANTY (Phase 101 E3) ---
+    // The classifier found warranty facts at email time and fuzzy-matched a
+    // system; the homeowner confirmed (optionally overriding the system).
+    // Creates the warranties row + persists the attachment as a document on
+    // that system, so the warranty email becomes structured coverage instead
+    // of a filed PDF the homeowner re-types later.
+    else if (action === "save_warranty") {
+      const w = (metadata.warranty ?? {}) as Record<string, unknown>;
+      const systemId = (body.system_id as string | undefined)
+        || (w.matched_system_id as string | undefined) || null;
+      const provider = String(w.provider ?? classification?.vendorName ?? "Unknown provider").slice(0, 200);
+      const allowedTypes = new Set(["manufacturer", "extended", "home_warranty"]);
+      const warrantyType = allowedTypes.has(String(w.warranty_type ?? ""))
+        ? String(w.warranty_type) : "manufacturer";
+      const startDate = (w.start_date as string | null) || new Date().toISOString().slice(0, 10);
+      // end_date is NOT NULL in schema. When the email didn't state one,
+      // default to one year and say so in the notes; the homeowner can edit.
+      const statedEnd = (w.end_date as string | null) || null;
+      const endDate = statedEnd
+        || new Date(new Date(startDate).getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+      const warrantyInsert: Record<string, unknown> = {
+        household_id: householdId,
+        provider,
+        warranty_type: warrantyType,
+        start_date: startDate,
+        end_date: endDate,
+      };
+      if (systemId) warrantyInsert.system_id = systemId;
+      // warranties has no notes column; the one-year default when the email
+      // omits an end date is documented on the saved document instead.
+
+      const { data: warranty, error: wErr } = await supabase
+        .from("warranties")
+        .insert(warrantyInsert)
+        .select("id")
+        .single();
+      if (wErr || !warranty) {
+        return new Response(
+          JSON.stringify({ error: "Failed to save warranty", detail: wErr?.message }),
+          { status: 500, headers }
+        );
+      }
+      result.warranty_id = (warranty as { id: string }).id;
+      actions.push(`saved_warranty:${provider}`);
+
+      // Persist the warranty email/attachment as a document tied to the system.
+      if (attachmentBase64) {
+        try {
+          const filePath = `${householdId}/${crypto.randomUUID()}`;
+          const fileBuffer = Uint8Array.from(atob(attachmentBase64), (c) => c.charCodeAt(0));
+          const { error: upErr } = await supabase.storage
+            .from("documents")
+            .upload(filePath, fileBuffer, {
+              contentType: item.attachment_content_type || "application/pdf",
+            });
+          if (!upErr) {
+            const docInsert: Record<string, unknown> = {
+              household_id: householdId,
+              title: (classification?.documentTitle as string) || subject || `Warranty: ${provider}`,
+              category: "Warranty",
+              status: "active",
+              file_path: filePath,
+              ai_summary: item.summary,
+              notes: `Warranty saved from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}`,
+              visible_to_home_managers: visibleToHomeManagers("Warranty"),
+            };
+            // documents has no system_id column; the system linkage lives on
+            // the warranties row created above.
+            const { data: doc } = await supabase.from("documents").insert(docInsert).select("id").single();
+            if (doc) result.document_id = (doc as { id: string }).id;
+          }
+        } catch (e) {
+          console.warn(`[process-inbox] warranty document persist failed (non-fatal): ${e}`);
+        }
+      }
+
+      await supabase
+        .from("inbox_items")
+        .update({
+          action_completed: true,
+          needs_action: false,
+          related_document_id: (result.document_id as string | undefined) ?? undefined,
+        })
+        .eq("id", inbox_item_id);
     }
 
     // --- PROCESS DOCUMENT ---
