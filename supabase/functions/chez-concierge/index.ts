@@ -1,26 +1,45 @@
-// Phase 80 — Chez Concierge Edge Function.
+// Chez Concierge Edge Function (Phase 80 → 100).
 //
-// Single function with `action` discriminator (mirrors process-inbox-item):
-//   submit              — homeowner creates a new request
-//   reply               — homeowner OR admin replies on the thread
-//   mark_read           — clear unread flag for caller's side
-//   transition_status   — update status (open / waiting_customer / resolved)
+// Single function with an `action` discriminator. The dispatcher switch in
+// the server entry at the bottom of this file is the canonical action
+// inventory (48+ actions) — do not trust any hand-maintained list here.
+// Major groups:
+//   - Thread lifecycle: submit / reply / mark_read / transition_status
+//     (transition_status accepts an optional structured `outcome` payload
+//     on resolve — Phase 100)
+//   - Profile + delegation: fetch/update_profile, delegate_routine /
+//     _contractor / _task / _entity, set_ownership_group, propose /
+//     decide_proposal / propose_ownership
+//   - Operator cockpit: fetch_dossier, analyze_request (playbook-shared
+//     core with per-category modes), suggest_vendor_framing, ask_alfred,
+//     fetch_visits / update_visit, workbench_action, fetch_today_brief,
+//     fetch_households_list / fetch_household_workbench, fetch_upcoming,
+//     admin_submit, snippets / tags / assign / merge / link
+//   - Home assessments: request / cancel / reschedule / review /
+//     corrections / pre-visit / fetch / assign_handyman
+//   - Phase 100 intelligence foundation: save_vendor_calls /
+//     fetch_vendor_calls (persisted call ledger), record_outcome,
+//     fetch_vendor_registry (cross-household vendor intelligence),
+//     fetch_ops_metrics, log_operator_event
 //
 // Authorization:
 //   - Homeowner actions require a JWT whose auth.uid() owns the request.
 //   - Admin actions require a JWT whose verified email is in CHEZ_ADMIN_EMAILS.
 //
-// Side effects:
+// Side effects (the load-bearing ones):
 //   - submit              → push + email to admin (Tom). SendGrid is the
 //                           backstop because Tom doesn't have the iOS app
-//                           installed, so push alone is not enough.
+//                           installed, so push alone is not enough. Also
+//                           fires the category playbook (pre-warmed
+//                           analysis brief for every category — Phase 100).
 //   - admin reply         → creates an inbox_items row in the homeowner's
 //                           household (type chez_reply_action_needed when
 //                           acknowledgement_required, else chez_reply_informational)
 //                           + push to homeowner.
 //   - homeowner reply     → push + email to admin.
 //   - transition_status   → push to other party + (resolved) inbox_items row
-//                           informing the homeowner it's done.
+//                           informing the homeowner it's done. Reopening
+//                           clears the SLA watcher stamps (chez-sla-watch).
 //
 // Required Supabase secrets:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY  (standard)
@@ -542,26 +561,48 @@ async function playbookFindVendor(ctx: PlaybookContext): Promise<void> {
 }
 
 async function playbookCoordinateTask(ctx: PlaybookContext): Promise<void> {
-  // No extra automation today beyond the first-touch + reminder. When
-  // 86E lands we'll auto-draft an intro email to the linked contractor
-  // here. For now, the message tells the homeowner we're on it; the
-  // operator handles the actual coordination in the cockpit.
-  return;
+  // Phase 100 — same pre-warmed brief as find_vendor, with the prompt
+  // reframed around coordinating the homeowner's EXISTING vendor/task
+  // instead of cold-sourcing. Places lookup is skipped when a matching
+  // household vendor exists (runAnalysisCore handles that per-mode).
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return;
+  const serviceUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  try {
+    await runAnalysisCore(ctx.service, ctx.requestId, false, serviceUrl, ctx.user.id, "coordinate_task");
+  } catch (e) {
+    console.warn("[playbook:coordinate_task] analyze failed:", e);
+  }
 }
 
 async function playbookScheduleVisit(ctx: PlaybookContext): Promise<void> {
-  // Phase 86D v1 leaves this as first-touch only. Future: parse the
-  // description for a preferred-time hint ("next Tuesday afternoon")
-  // and pre-fill the proposal builder's date_slot picker.
-  return;
+  // Phase 100 — pre-warmed brief asking Claude to additionally extract
+  // preferred_time_hints from the homeowner's description ("next
+  // Tuesday afternoon") so the proposal builder can prefill date slots.
+  // No Places lookup: scheduling implies the vendor is already known.
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return;
+  const serviceUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  try {
+    await runAnalysisCore(ctx.service, ctx.requestId, false, serviceUrl, ctx.user.id, "schedule_visit");
+  } catch (e) {
+    console.warn("[playbook:schedule_visit] analyze failed:", e);
+  }
 }
 
 async function playbookGetQuote(ctx: PlaybookContext): Promise<void> {
-  // Phase 86D v1: first-touch only. Future: parse the description for
-  // scope keywords and pre-load comparable rates from past quotes in
-  // the household's network so the operator opens the cockpit with a
-  // "your last 3 plumbers charged $X" reference.
-  return;
+  // Phase 100 — pre-warmed brief with a cost-references block (this
+  // household's completed-visit costs + cross-household registry
+  // averages for nearby vendors) so the operator opens the cockpit
+  // with comparables and a negotiation angle already drafted.
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return;
+  const serviceUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  try {
+    await runAnalysisCore(ctx.service, ctx.requestId, false, serviceUrl, ctx.user.id, "get_quote");
+  } catch (e) {
+    console.warn("[playbook:get_quote] analyze failed:", e);
+  }
 }
 
 // Phase 86E.4 — runChezAnalysisForRequest sentinel removed. The
@@ -814,6 +855,104 @@ interface TransitionPayload {
   request_id: string;
   to_status: "open" | "waiting_customer" | "resolved";
   note?: string;  // optional system message body ("Chez marked this resolved with a note")
+  // Phase 100 — structured outcome captured by the cockpit's resolve
+  // mini-form. Optional at the API for backward compat (old clients and
+  // homeowner reopens send nothing); the cockpit UI makes it required
+  // when the operator resolves.
+  outcome?: OutcomePayload;
+}
+
+interface OutcomePayload {
+  resolution_type: string;
+  winning_contractor_id?: string | null;
+  winning_vendor_name?: string | null;
+  winning_google_place_id?: string | null;
+  final_cost_cents?: number | null;
+  operator_minutes?: number | null;
+  summary?: string | null;
+  automation_candidate?: boolean;
+  friction_tags?: string[];
+}
+
+const OUTCOME_RESOLUTION_TYPES = new Set([
+  "completed_via_vendor",
+  "completed_internal",
+  "advice_only",
+  "converted_to_standing",
+  "no_vendor_found",
+  "homeowner_cancelled",
+  "duplicate_or_merged",
+  "no_response",
+  "other",
+]);
+
+/// Phase 100 — upsert the structured outcome row for a case. Shared by
+/// transition_status (resolve path) and the standalone record_outcome
+/// action (post-hoc edits). Never throws: outcome capture must not
+/// block a resolution.
+async function upsertRequestOutcome(
+  service: ServiceClient,
+  request: ConciergeRequestRow,
+  outcome: OutcomePayload,
+  createdByUserId: string | null
+): Promise<{ ok: boolean; error?: string }> {
+  const resolutionType = compactString(outcome.resolution_type) ?? "";
+  if (!OUTCOME_RESOLUTION_TYPES.has(resolutionType)) {
+    return { ok: false, error: `invalid resolution_type: ${resolutionType}` };
+  }
+  const minutes = typeof outcome.operator_minutes === "number" && outcome.operator_minutes >= 1
+    ? Math.min(Math.round(outcome.operator_minutes), 600)
+    : null;
+  const cost = typeof outcome.final_cost_cents === "number" && outcome.final_cost_cents >= 0
+    ? Math.round(outcome.final_cost_cents)
+    : null;
+  try {
+    const { error } = await service
+      .from("chez_request_outcomes")
+      .upsert({
+        request_id: request.id,
+        household_id: request.household_id,
+        resolution_type: resolutionType,
+        winning_contractor_id: outcome.winning_contractor_id ?? null,
+        winning_vendor_name: outcome.winning_vendor_name ? String(outcome.winning_vendor_name).slice(0, 200) : null,
+        winning_google_place_id: outcome.winning_google_place_id ?? null,
+        final_cost_cents: cost,
+        operator_minutes: minutes,
+        summary: outcome.summary ? String(outcome.summary).slice(0, 2000) : null,
+        automation_candidate: !!outcome.automation_candidate,
+        friction_tags: Array.isArray(outcome.friction_tags)
+          ? outcome.friction_tags.map((t) => String(t).slice(0, 60)).slice(0, 12)
+          : [],
+        created_by_user_id: createdByUserId,
+      }, { onConflict: "request_id" });
+    if (error) {
+      console.warn("[outcome] upsert failed:", error.message);
+      return { ok: false, error: error.message };
+    }
+    // Homeowner-facing activity row when a real cost landed — feeds the
+    // monthly "Chez handled N things, $X coordinated" rollup.
+    if (cost !== null) {
+      try {
+        await service.rpc("log_chez_activity", {
+          p_household_id: request.household_id,
+          p_activity_type: "case_resolved",
+          p_title: `Chez wrapped this up: ${(request.summary ?? "your request").slice(0, 140)}`,
+          p_description: outcome.summary ? String(outcome.summary).slice(0, 500) : null,
+          p_entity_type: "chez_requests",
+          p_entity_id: request.id,
+          p_cost_cents: cost,
+          p_occurred_at: new Date().toISOString(),
+          p_surface_on_dashboard: true,
+        });
+      } catch (e) {
+        console.warn("[outcome] activity log failed (non-fatal):", e);
+      }
+    }
+    return { ok: true };
+  } catch (e) {
+    console.warn("[outcome] upsert exception:", e);
+    return { ok: false, error: String(e) };
+  }
 }
 
 async function handleTransition(
@@ -847,16 +986,31 @@ async function handleTransition(
   }
 
   const now = new Date().toISOString();
+  const transitionUpdate: Record<string, unknown> = {
+    status: toStatus,
+    resolved_at: toStatus === "resolved" ? now : null,
+    last_message_at: now,
+    unread_for_user: isAdmin ? true : request.unread_for_user,
+    unread_for_admin: isAdmin ? request.unread_for_admin : true,
+  };
+  // Phase 100 — a case re-entering "open" (reopen, or admin flip-back)
+  // gets fresh SLA attention: clear the watcher's idempotency stamps.
+  if (toStatus === "open") {
+    transitionUpdate.sla_warned_at = null;
+    transitionUpdate.sla_breach_notified_at = null;
+  }
   await service
     .from("chez_requests")
-    .update({
-      status: toStatus,
-      resolved_at: toStatus === "resolved" ? now : null,
-      last_message_at: now,
-      unread_for_user: isAdmin ? true : request.unread_for_user,
-      unread_for_admin: isAdmin ? request.unread_for_admin : true,
-    })
+    .update(transitionUpdate)
     .eq("id", request.id);
+
+  // Phase 100 — structured outcome from the cockpit resolve form.
+  // Admin-only, resolve-only; failure logs but never blocks the
+  // transition (the case still resolves, the outcome can be recorded
+  // later via record_outcome).
+  if (isAdmin && toStatus === "resolved" && payload.outcome) {
+    await upsertRequestOutcome(service, request, payload.outcome, user?.id ?? null);
+  }
 
   // System message in the thread for the audit trail. Both labels read
   // as "Chez" or "you" from the homeowner's view — the admin portal
@@ -1731,6 +1885,14 @@ async function handleDecideProposal(
       const vendorWebsite = vendorBlob.website ? String(vendorBlob.website) : null;
       const vendorAddress = vendorBlob.address ? String(vendorBlob.address) : null;
       const vendorRationale = vendorBlob.rationale ? String(vendorBlob.rationale) : null;
+      // Phase 100 — Places identity rides the proposal blob (stamped by
+      // the cockpit's package-send) so the registry can unify this
+      // contractor with its call-ledger and Places-cache rows.
+      const vendorPlaceId = vendorBlob.place_id
+        ? String(vendorBlob.place_id)
+        : vendorBlob.google_place_id
+        ? String(vendorBlob.google_place_id)
+        : null;
 
       // === Memory write: upsert contractor by (household_id, lower(name)) ===
       // Idempotent. If the homeowner already has a contractor with this
@@ -1755,15 +1917,18 @@ async function handleDecideProposal(
             chez_recommended_at: string | null;
           };
           if (!existing.chez_recommended_at) {
+            const stampUpdate: Record<string, unknown> = {
+              chez_request_id: request.id,
+              chez_recommended_at: now,
+              // Keep their original source ("manual"/"quiz"/etc.). We
+              // don't overwrite — provenance is captured in the new
+              // chez_request_id field.
+            };
+            // Phase 100 — backfill the Places identity when we have it.
+            if (vendorPlaceId) stampUpdate.google_place_id = vendorPlaceId;
             await service
               .from("contractors")
-              .update({
-                chez_request_id: request.id,
-                chez_recommended_at: now,
-                // Keep their original source ("manual"/"quiz"/etc.). We
-                // don't overwrite — provenance is captured in the new
-                // chez_request_id field.
-              })
+              .update(stampUpdate)
               .eq("id", contractorId);
           }
         } else {
@@ -1782,6 +1947,7 @@ async function handleDecideProposal(
               source: "chez_recommendation",
               chez_request_id: request.id,
               chez_recommended_at: now,
+              google_place_id: vendorPlaceId,
             })
             .select("id")
             .single();
@@ -2164,7 +2330,12 @@ async function runAnalysisCore(
   requestId: string,
   force: boolean,
   serviceUrl: string,
-  forUserId: string
+  forUserId: string,
+  // Phase 100 — playbook mode. Swaps the prompt's task framing + which
+  // extra JSON keys we ask for, and gates the Places lookup. The cache
+  // path, dossier fetch, and response shape stay identical so the
+  // cockpit brief renders unchanged for every mode.
+  mode: AnalysisMode = "find_vendor"
 ): Promise<{ kind: "ok"; payload: Record<string, unknown> } | { kind: "not_found" }> {
   // 1. Fetch the request + household scope.
   const { data: requestRow, error: reqErr } = await service
@@ -2236,7 +2407,63 @@ async function runAnalysisCore(
       logistics: (profile as Record<string, unknown>).logistics,
       spending_tiers: (profile as Record<string, unknown>).spending_tiers,
     }, null, 2);
-    const userPrompt = `You're the Chez Concierge research assistant. A customer just submitted a request — analyze it so Tom (the admin) can act on it in 2 minutes instead of 20.
+
+    // Phase 100 — get_quote cost references: this household's completed
+    // visit costs + cross-household registry comparables for the area.
+    // Two cheap queries, skipped for every other mode.
+    let costReferencesBlock = "";
+    if (mode === "get_quote") {
+      try {
+        const [visitCostsRes, registryCostsRes] = await Promise.all([
+          service
+            .from("chez_visits")
+            .select("vendor_name, final_cost_cents, completed_at")
+            .eq("household_id", request.household_id)
+            .eq("state", "completed")
+            .not("final_cost_cents", "is", null)
+            .order("completed_at", { ascending: false })
+            .limit(5),
+          property.city
+            ? service
+                .from("chez_vendor_registry")
+                .select("display_name, avg_quoted_cost_cents, avg_final_cost_cents, jobs_won")
+                .contains("towns", [String(property.city)])
+                .limit(5)
+            : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+        ]);
+        const visitLines = (((visitCostsRes as { data?: Array<Record<string, unknown>> })?.data) ?? [])
+          .map((v) => `- ${v.vendor_name}: $${((Number(v.final_cost_cents) || 0) / 100).toFixed(0)} actual (this household)`);
+        const registryLines = (((registryCostsRes as { data?: Array<Record<string, unknown>> })?.data) ?? [])
+          .filter((r) => r.avg_quoted_cost_cents || r.avg_final_cost_cents)
+          .map((r) => `- ${r.display_name}: avg $${(((Number(r.avg_final_cost_cents) || Number(r.avg_quoted_cost_cents) || 0)) / 100).toFixed(0)} across Chez homes (${r.jobs_won ?? 0} jobs won)`);
+        const lines = [...visitLines, ...registryLines];
+        if (lines.length > 0) {
+          costReferencesBlock = `\n## Cost references (Chez history)\n${lines.join("\n")}\n`;
+        }
+      } catch (e) {
+        console.warn("[analyze] cost references failed (non-fatal):", e);
+      }
+    }
+
+    const modeTask =
+      mode === "coordinate_task"
+        ? "The homeowner already has this vendor or task on file: the job is COORDINATION, not sourcing. The call_script should open a call to the homeowner's OWN vendor (warm, references the relationship), not a cold call."
+        : mode === "schedule_visit"
+        ? "The job is SCHEDULING a visit; the vendor is normally already known. Additionally extract any preferred-time hints the homeowner gave ('next Tuesday afternoon', 'mornings only') into preferred_time_hints."
+        : mode === "get_quote"
+        ? "The job is gathering a QUOTE and negotiating it down where fair. Ground negotiation_angle in the cost references when present."
+        : "The job is SOURCING a vetted vendor for this request.";
+
+    const extraJsonKeys =
+      mode === "schedule_visit"
+        ? `,
+  "preferred_time_hints": ["Time preferences parsed from the request, normalized ('Tuesday afternoon', 'weekday mornings'). Empty array when none given."]`
+        : mode === "get_quote"
+        ? `,
+  "negotiation_angle": "1-2 sentences: the specific lever to use when the quote comes in high, grounded in the cost references when present."`
+        : "";
+
+    const userPrompt = `You're the Chez Concierge research assistant. A customer just submitted a request — analyze it so Tom (the admin) can act on it in 2 minutes instead of 20. ${modeTask}
 
 ## Request
 Category: ${request.category}
@@ -2248,7 +2475,7 @@ ${propertyContext}
 
 ## Customer profile
 ${profileBlob}
-
+${costReferencesBlock}
 ## Existing vendors on file
 ${contractors.length === 0 ? "(none)" : contractors.map((c) => `- ${c.company_name} (${c.category ?? "unknown trade"})`).join("\n")}
 
@@ -2259,7 +2486,7 @@ ${contractors.length === 0 ? "(none)" : contractors.map((c) => `- ${c.company_na
   "key_considerations": "2-3 sentences naming the SPECIFIC factors that matter for THIS homeowner — e.g. age of home, pet/access notes, vendor preferences, budget orientation. Reference real fields, not fluff.",
   "questions_to_ask": ["3-5 short questions Tom should ask each vendor on the phone. Be specific to this home + situation."],
   "call_script": "A 3-4 sentence call opener Tom can read on the phone. First-person ('Hi, I'm calling on behalf of a homeowner in [town]…'). Ends with the first question. ~80 words.",
-  "recommended_approach": "1-2 sentence playbook for Tom: how many quotes to gather, what to focus on, anything quirky about this specific homeowner."
+  "recommended_approach": "1-2 sentence playbook for Tom: how many quotes to gather, what to focus on, anything quirky about this specific homeowner."${extraJsonKeys}
 }
 
 Return ONLY the JSON. No preamble.`;
@@ -2271,7 +2498,10 @@ Return ONLY the JSON. No preamble.`;
     const result = await callClaudeWithDiscipline({
       supabase: service,
       apiKey,
-      tag: "analyze_request",
+      // Phase 100 — distinct telemetry tags per playbook mode so
+      // chez_ai_usage separates playbook spend from operator-triggered
+      // analysis. find_vendor keeps the legacy tag (same code path).
+      tag: mode === "find_vendor" ? "analyze_request" : `playbook_${mode}`,
       max_tokens: 800,
       messages: [{ role: "user", content: userPrompt }],
       request_id: requestId,
@@ -2303,8 +2533,15 @@ Return ONLY the JSON. No preamble.`;
   // 5. Pre-fetch Places candidates if we have a category + location.
   //    Goes through the existing find-local-vendors function so its
   //    cache + ranking logic stays the source of truth.
+  //    Phase 100 mode gates: scheduling implies the vendor is already
+  //    known (never fetch); coordination only falls back to sourcing
+  //    when no household vendor matched.
+  const wantPlaces =
+    mode === "find_vendor" ||
+    mode === "get_quote" ||
+    (mode === "coordinate_task" && existingMatches.length === 0);
   let placesCandidates: Array<Record<string, unknown>> = [];
-  if (inferredCat && property.city && property.state) {
+  if (wantPlaces && inferredCat && property.city && property.state) {
     try {
       const resp = await fetch(`${serviceUrl}/functions/v1/find-local-vendors`, {
         method: "POST",
@@ -2330,10 +2567,70 @@ Return ONLY the JSON. No preamble.`;
     }
   }
 
+  // Phase 100 — cross-household network intelligence. One registry read,
+  // then annotate every candidate with chez_history so the cockpit's
+  // fit ranking and Network tab can show "called 4x across 3 homes,
+  // answers same-day" without re-research. Identity matching mirrors
+  // chez_vendor_key: place id, then normalized phone, then name.
+  let chezNetwork: Array<Record<string, unknown>> = [];
+  try {
+    const { data: regRows } = await service
+      .from("chez_vendor_registry")
+      .select("vendor_key, display_name, phone, categories, towns, times_called, answer_rate, jobs_won, visits_completed, no_shows, avg_quoted_cost_cents, last_contacted_at, households_touched")
+      .or("jobs_won.gt.0,times_called.gt.0")
+      .limit(50);
+    const rows = (regRows ?? []) as Array<Record<string, unknown>>;
+    const catToken = (inferredCat.split(/\s+/)[0] ?? "").toLowerCase();
+    const cityLower = String(property.city ?? "").toLowerCase();
+    chezNetwork = rows
+      .filter((r) => {
+        const cats = Array.isArray(r.categories) ? (r.categories as string[]).join(" ").toLowerCase() : "";
+        const towns = Array.isArray(r.towns) ? (r.towns as string[]).map((t) => String(t).toLowerCase()) : [];
+        const catHit = catToken.length > 2 ? cats.includes(catToken) : true;
+        const townHit = !cityLower || towns.length === 0 || towns.includes(cityLower);
+        return catHit && townHit;
+      })
+      .slice(0, 8);
+
+    const normPhone = (p: unknown) => String(p ?? "").replace(/\D/g, "");
+    const compactHistory = (r: Record<string, unknown>) => ({
+      times_called: r.times_called,
+      answer_rate: r.answer_rate,
+      jobs_won: r.jobs_won,
+      no_shows: r.no_shows,
+      households_touched: r.households_touched,
+      last_contacted_at: r.last_contacted_at,
+    });
+    const historyFor = (name: unknown, phone: unknown, placeId: unknown) => {
+      const np = normPhone(phone);
+      const nameLower = String(name ?? "").toLowerCase().trim();
+      return chezNetwork.find((r) => {
+        const key = String(r.vendor_key ?? "");
+        if (placeId && key === `place:${placeId}`) return true;
+        if (np && key === `phone:${np}`) return true;
+        const rName = String(r.display_name ?? "").toLowerCase().trim();
+        return !!nameLower && rName === nameLower;
+      }) ?? null;
+    };
+    for (const c of placesCandidates) {
+      const cc = c as Record<string, unknown>;
+      const h = historyFor(cc.name, cc.phone ?? cc.formatted_phone_number, cc.google_place_id ?? cc.place_id);
+      if (h) cc.chez_history = compactHistory(h);
+    }
+    for (const c of existingMatches) {
+      const cc = c as Record<string, unknown>;
+      const h = historyFor(cc.company_name, cc.phone, cc.google_place_id);
+      if (h) cc.chez_history = compactHistory(h);
+    }
+  } catch (e) {
+    console.warn("[analyze] registry annotation failed (non-fatal):", e);
+  }
+
   const responsePayload = {
     analysis,
     existing_vendors: existingMatches,
     places_candidates: placesCandidates,
+    chez_network: chezNetwork,
     property_location: { city: property.city ?? "", state: property.state ?? "" },
   };
 
@@ -2361,7 +2658,12 @@ interface AnalysisResult {
   questions_to_ask: string[];
   call_script: string;
   recommended_approach: string;
+  // Phase 100 mode extras — present only for the matching playbook mode.
+  preferred_time_hints?: string[];   // schedule_visit
+  negotiation_angle?: string;        // get_quote
 }
+
+type AnalysisMode = "find_vendor" | "coordinate_task" | "schedule_visit" | "get_quote";
 
 // ============================================================================
 // Phase 82 — Visit tracking
@@ -2383,6 +2685,11 @@ interface UpdateVisitPayload {
   scheduled_window?: string | null;
   notes?: string | null;
   outcome?: string | null;
+  // Phase 100 — structured completion facts (free-text outcome stays
+  // for operator color; these feed the vendor registry).
+  completed_on_time?: boolean | null;
+  no_show?: boolean;
+  final_cost_cents?: number | null;
   /// Optional reply text that lands as a normal homeowner message in
   /// the parent thread alongside the state change. Lets Tom say
   /// "Booked Smith Plumbing for Tue 2pm — see you then" without
@@ -2545,6 +2852,14 @@ async function handleUpdateVisit(
   if (payload.scheduled_window !== undefined) update.scheduled_window = payload.scheduled_window;
   if (payload.notes !== undefined) update.notes = payload.notes;
   if (payload.outcome !== undefined) update.outcome = payload.outcome;
+  if (payload.completed_on_time !== undefined) update.completed_on_time = payload.completed_on_time;
+  if (payload.no_show !== undefined) update.no_show = !!payload.no_show;
+  if (payload.final_cost_cents !== undefined) {
+    update.final_cost_cents =
+      typeof payload.final_cost_cents === "number" && payload.final_cost_cents >= 0
+        ? Math.round(payload.final_cost_cents)
+        : null;
+  }
   if (payload.state === "completed") update.completed_at = new Date().toISOString();
 
   if (Object.keys(update).length > 0) {
@@ -6037,6 +6352,298 @@ async function handleAssignHandymanToAssessment(
 }
 
 // ============================================================================
+// Phase 100 — Intelligence foundation actions
+// ============================================================================
+// save_vendor_calls / fetch_vendor_calls — persist the cockpit's
+//   per-candidate call ledger (state.chezVendorCallsByRequest) so it
+//   survives refresh and feeds the cross-household vendor registry.
+// record_outcome — post-hoc edits to a case's structured outcome (the
+//   resolve-time path rides transition_status.outcome).
+// fetch_vendor_registry — operator-side network intelligence reads.
+// fetch_ops_metrics — Insights strip rollups.
+// log_operator_event — effort telemetry (case_opened etc.).
+
+interface SaveVendorCallsPayload {
+  request_id: string;
+  calls: Array<{
+    candidate_key: string;
+    source?: "existing" | "places" | "manual";
+    contractor_id?: string | null;
+    google_place_id?: string | null;
+    vendor_name?: string | null;
+    vendor_phone?: string | null;
+    vendor_email?: string | null;
+    category?: string | null;
+    town?: string | null;
+    state?: string | null;
+    outcome?: string | null;
+    notes?: string | null;
+    rationale?: string | null;
+    recommended?: boolean;
+    availability_slots?: string[];
+    cost_range?: string | null;
+    cost_custom?: string | null;
+  }>;
+}
+
+/// Best-effort dollars→cents parser for the call form's free-text cost
+/// fields ("$1,200 firm", "400-600", "1.2k"). Returns the midpoint of a
+/// range. Null when no number is recoverable — never guesses.
+function parseQuotedCostCents(costCustom: string | null | undefined, costRange: string | null | undefined): number | null {
+  const text = `${costCustom ?? ""} ${costRange ?? ""}`.toLowerCase();
+  if (!text.trim()) return null;
+  const matches = text.match(/\$?\s*(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k)?/g);
+  if (!matches) return null;
+  const values: number[] = [];
+  for (const m of matches) {
+    const k = /k\s*$/.test(m.trim());
+    const num = parseFloat(m.replace(/[$,k\s]/g, ""));
+    if (!Number.isFinite(num) || num <= 0) continue;
+    values.push(k ? num * 1000 : num);
+  }
+  if (values.length === 0) return null;
+  // Single number → itself; multiple → midpoint of min/max (ranges).
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const dollars = (lo + hi) / 2;
+  // Ignore implausible parses (under $5 reads like a slot time, not a cost).
+  if (dollars < 5) return null;
+  return Math.round(dollars * 100);
+}
+
+async function handleSaveVendorCalls(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: SaveVendorCallsPayload
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const requestId = compactString(payload.request_id);
+  if (!requestId || !Array.isArray(payload.calls) || payload.calls.length === 0) {
+    return json({ error: "request_id + calls required" }, 400);
+  }
+  const { data: requestRow, error: reqErr } = await service
+    .from("chez_requests")
+    .select("id, household_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
+  const householdId = (requestRow as { household_id: string }).household_id;
+
+  const nowIso = new Date().toISOString();
+  const rows = payload.calls
+    .filter((c) => compactString(c.candidate_key))
+    .slice(0, 40)
+    .map((c) => {
+      const hasOutcome = !!compactString(c.outcome ?? undefined);
+      return {
+        request_id: requestId,
+        household_id: householdId,
+        candidate_key: String(c.candidate_key).slice(0, 300),
+        source: c.source === "existing" || c.source === "manual" ? c.source : "places",
+        contractor_id: c.contractor_id ?? null,
+        google_place_id: c.google_place_id ?? null,
+        vendor_name: c.vendor_name ? String(c.vendor_name).slice(0, 200) : null,
+        vendor_phone: c.vendor_phone ? String(c.vendor_phone).slice(0, 40) : null,
+        vendor_email: c.vendor_email ? String(c.vendor_email).slice(0, 200) : null,
+        category: c.category ? String(c.category).slice(0, 100) : null,
+        town: c.town ? String(c.town).slice(0, 100) : null,
+        state: c.state ? String(c.state).slice(0, 10) : null,
+        outcome: hasOutcome ? String(c.outcome) : null,
+        notes: c.notes ? String(c.notes).slice(0, 4000) : null,
+        rationale: c.rationale ? String(c.rationale).slice(0, 4000) : null,
+        recommended: !!c.recommended,
+        availability_slots: Array.isArray(c.availability_slots)
+          ? c.availability_slots.map((s) => String(s).slice(0, 200)).slice(0, 12)
+          : [],
+        cost_range: c.cost_range ? String(c.cost_range).slice(0, 100) : null,
+        cost_custom: c.cost_custom ? String(c.cost_custom).slice(0, 300) : null,
+        quoted_cost_cents: parseQuotedCostCents(c.cost_custom, c.cost_range),
+        last_called_at: hasOutcome ? nowIso : null,
+      };
+    });
+  if (rows.length === 0) return json({ error: "no valid calls" }, 400);
+
+  const { error: upsertErr } = await service
+    .from("chez_vendor_calls")
+    .upsert(rows, { onConflict: "request_id,candidate_key" });
+  if (upsertErr) return json({ error: upsertErr.message }, 500);
+
+  // first_called_at: stamp once for rows that now have an outcome but no
+  // first_called_at yet. Separate cheap update keeps the upsert simple.
+  try {
+    await service
+      .from("chez_vendor_calls")
+      .update({ first_called_at: nowIso })
+      .eq("request_id", requestId)
+      .is("first_called_at", null)
+      .not("outcome", "is", null);
+  } catch (e) {
+    console.warn("[vendor-calls] first_called_at stamp failed:", e);
+  }
+
+  return json({ ok: true, saved: rows.length });
+}
+
+async function handleFetchVendorCalls(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+  const { data, error } = await service
+    .from("chez_vendor_calls")
+    .select("*")
+    .eq("request_id", requestId)
+    .order("created_at", { ascending: true });
+  if (error) return json({ error: error.message }, 500);
+  return json({ calls: data ?? [] });
+}
+
+async function handleRecordOutcome(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string; outcome?: OutcomePayload }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const requestId = compactString(payload.request_id);
+  if (!requestId || !payload.outcome) return json({ error: "request_id + outcome required" }, 400);
+  const { data: requestRow, error: reqErr } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
+  const result = await upsertRequestOutcome(
+    service,
+    requestRow as ConciergeRequestRow,
+    payload.outcome,
+    user?.id ?? null
+  );
+  if (!result.ok) return json({ error: result.error ?? "outcome upsert failed" }, 400);
+  return json({ ok: true });
+}
+
+async function handleFetchVendorRegistry(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { category?: string; town?: string; search?: string; limit?: number }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const limit = Math.min(Math.max(Number(payload.limit) || 50, 1), 200);
+  let query = service
+    .from("chez_vendor_registry")
+    .select("*")
+    .order("jobs_won", { ascending: false })
+    .order("times_called", { ascending: false })
+    .limit(limit);
+  const category = compactString(payload.category)?.toLowerCase();
+  if (category) query = query.contains("categories", [category]);
+  const town = compactString(payload.town);
+  if (town) query = query.contains("towns", [town]);
+  const search = compactString(payload.search);
+  if (search) query = query.ilike("display_name", `%${search}%`);
+  const { data, error } = await query;
+  if (error) return json({ error: error.message }, 500);
+  return json({ vendors: data ?? [] });
+}
+
+async function handleFetchOpsMetrics(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const safe = async <T>(promise: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await promise; }
+    catch (e) { console.warn(`[ops-metrics] ${label} failed:`, e); return null; }
+  };
+  const [cases30Res, weeklyRes, funnelRes, effortRes] = await Promise.all([
+    safe(service.from("chez_case_metrics").select("*").gte("created_at", since30), "cases30"),
+    safe(service.from("chez_weekly_ops").select("*").order("week", { ascending: false }).limit(16), "weekly"),
+    safe(service.from("chez_playbook_funnel").select("*"), "funnel"),
+    safe(service.from("chez_case_effort").select("*"), "effort"),
+  ]);
+  const cases30 = ((cases30Res as { data?: Array<Record<string, unknown>> } | null)?.data ?? []) as Array<Record<string, unknown>>;
+  const effortRows = ((effortRes as { data?: Array<Record<string, unknown>> } | null)?.data ?? []) as Array<Record<string, unknown>>;
+  const effortById = new Map(effortRows.map((r) => [String(r.request_id), Number(r.effort_minutes) || 0]));
+
+  const median = (values: number[]): number | null => {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+  };
+  const rate = (hits: number, total: number): number | null =>
+    total > 0 ? Math.round((hits / total) * 100) / 100 : null;
+
+  const summarize = (rows: Array<Record<string, unknown>>) => {
+    const resolved = rows.filter((r) => r.status === "resolved");
+    const slaEligible = rows.filter((r) => r.sla_due_at);
+    return {
+      opened: rows.length,
+      resolved: resolved.length,
+      median_first_response_minutes: median(rows.map((r) => Number(r.first_response_minutes)).filter((n) => Number.isFinite(n))),
+      median_resolution_hours: median(resolved.map((r) => Number(r.resolution_hours)).filter((n) => Number.isFinite(n))),
+      sla_hit_rate: rate(slaEligible.filter((r) => r.sla_hit === true).length, slaEligible.length),
+      avg_touches: rows.length > 0
+        ? Math.round((rows.reduce((sum, r) => sum + (Number(r.operator_touches) || 0), 0) / rows.length) * 10) / 10
+        : null,
+      automation_rate: rate(rows.filter((r) => r.automation_proxy === true).length, rows.length),
+      median_effort_minutes: median(rows.map((r) => effortById.get(String(r.id)) ?? NaN).filter((n) => Number.isFinite(n) && n > 0)),
+      total_final_cost_cents: rows.reduce((sum, r) => sum + (Number(r.final_cost_cents) || 0), 0),
+    };
+  };
+
+  return json({
+    last_30_days: summarize(cases30),
+    last_7_days: summarize(cases30.filter((r) => String(r.created_at) >= since7)),
+    weekly: (weeklyRes as { data?: unknown[] } | null)?.data ?? [],
+    playbook_funnel: (funnelRes as { data?: unknown[] } | null)?.data ?? [],
+  });
+}
+
+async function handleLogOperatorEvent(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { events?: Array<{ request_id?: string; event_type?: string; client_session_id?: string }> }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const allowed = new Set(["case_opened", "case_closed", "reply_sent", "call_logged"]);
+  const events = (payload.events ?? [])
+    .filter((e) => compactString(e.request_id) && allowed.has(String(e.event_type)))
+    .slice(0, 50);
+  if (events.length === 0) return json({ ok: true, logged: 0 });
+
+  // household_id is denormalized for per-household queries; resolve in
+  // one batched read.
+  const requestIds = [...new Set(events.map((e) => String(e.request_id)))];
+  const { data: requestRows } = await service
+    .from("chez_requests")
+    .select("id, household_id")
+    .in("id", requestIds);
+  const householdByRequest = new Map(
+    ((requestRows ?? []) as Array<{ id: string; household_id: string }>).map((r) => [r.id, r.household_id])
+  );
+
+  const rows = events
+    .filter((e) => householdByRequest.has(String(e.request_id)))
+    .map((e) => ({
+      request_id: String(e.request_id),
+      household_id: householdByRequest.get(String(e.request_id)) ?? null,
+      event_type: String(e.event_type),
+      operator_user_id: user?.id ?? null,
+      client_session_id: e.client_session_id ? String(e.client_session_id).slice(0, 100) : null,
+    }));
+  if (rows.length === 0) return json({ ok: true, logged: 0 });
+  const { error } = await service.from("chez_operator_events").insert(rows);
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, logged: rows.length });
+}
+
+// ============================================================================
 // Server entry
 // ============================================================================
 
@@ -6187,6 +6794,42 @@ serve(async (req: Request) => {
           service,
           user,
           body as unknown as UpdateVisitPayload
+        );
+
+      // Phase 100 — intelligence foundation: call ledger persistence,
+      // structured outcomes, vendor registry, ops metrics, operator
+      // effort telemetry. All admin-gated inside the handlers.
+      case "save_vendor_calls":
+        return handleSaveVendorCalls(
+          service,
+          user,
+          body as unknown as SaveVendorCallsPayload
+        );
+      case "fetch_vendor_calls":
+        return handleFetchVendorCalls(
+          service,
+          user,
+          body as { request_id?: string }
+        );
+      case "record_outcome":
+        return handleRecordOutcome(
+          service,
+          user,
+          body as { request_id?: string; outcome?: OutcomePayload }
+        );
+      case "fetch_vendor_registry":
+        return handleFetchVendorRegistry(
+          service,
+          user,
+          body as { category?: string; town?: string; search?: string; limit?: number }
+        );
+      case "fetch_ops_metrics":
+        return handleFetchOpsMetrics(service, user);
+      case "log_operator_event":
+        return handleLogOperatorEvent(
+          service,
+          user,
+          body as { events?: Array<{ request_id?: string; event_type?: string; client_session_id?: string }> }
         );
 
       // Phase 83 — Cockpit Alfred chat. Single-shot, case-scoped Q&A.
