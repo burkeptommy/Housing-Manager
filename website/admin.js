@@ -146,21 +146,6 @@ const VIEWS = [
     subtitle: "Routine visits, bills due, warranties expiring, insurance renewals, follow-ups, and stale cases — sorted by urgency across every household Chez manages.",
   },
   {
-    // Phase 84 — Per-household ongoing oversight. Lists every home; clicking
-    // opens the Home overview (address as masthead, contacts, standing
-    // instructions, coverage) → then the 8 entity tabs (routines, systems,
-    // vendors, tasks, projects, documents, bills, vehicles, cases).
-    // Phase 86A — Renamed user-facing label to "Homes". Internal id stays
-    // "households" to avoid breaking the dozens of state references.
-    id: "households",
-    label: "Homes",
-    type: "household",
-    group: "action",
-    title: "Homes",
-    eyebrow: "Every home Chez manages",
-    subtitle: "Drill into any home to see its address, family, standing instructions, coverage, and every entity Chez owns — routines, systems, vendors, tasks, projects, documents, bills, vehicles. Cases open as a slide-over from within a home.",
-  },
-  {
     id: "audit",
     label: "Audit",
     type: "audit",
@@ -5271,6 +5256,9 @@ function renderChezRequestsView() {
 
 function renderFocusedChezDetail(req) {
   if (req) state.selectedChezRequest = req;
+  // Phase 100 — effort telemetry. Self-deduplicating (5-minute window
+  // per case), so render-driven invocation is safe.
+  trackOperatorCaseFocus(req ? req.id : state.selectedChezRequest?.id || null);
   renderConciergeCockpit();
 }
 
@@ -6364,6 +6352,7 @@ function renderConciergeCaseWorkspaceHtml(req) {
   }
   if (visits === undefined) {
     fetchChezVisits(req.id);
+    fetchChezVendorCalls(req.id);
   }
 
   const archetype = detectConciergeArchetype(req, dossier, messages);
@@ -6795,9 +6784,10 @@ function renderConciergeCaseHeaderHtml(req) {
       </div>
       ${renderTagChipsHtml(req)}
       <h2 class="cockpit-case-header__title">${escapeHtml(req.summary || "(no summary)")}</h2>
+      ${renderRelatedCaseChipsHtml(req)}
       <div class="cockpit-case-header__actions">
-        <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="reassign" title="Single-agent setup — reassignment will be enabled when additional Chez operators come online.">
-          Reassign
+        <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="case-menu" title="Take or release ownership, link a related case, or merge a duplicate.">
+          More
         </button>
         <button type="button" class="cockpit-btn cockpit-btn--secondary cockpit-btn--sm" data-cockpit-action="snooze">
           Snooze
@@ -7042,6 +7032,7 @@ function renderConciergeVendorSheetHtml(req) {
           </button>
         </div>
       </div>
+      ${renderChezNetworkBlockHtml(req)}
       ${candidates.length === 0
         ? `<p class="cockpit-muted cockpit-vendors__empty">No vendor candidates yet. Click "Find more" to run a local Places search.</p>`
         : candidates.map((v, i) => renderConciergeVendorRowHtml(req, v, i, callState[vendorCandidateKey(v)] || null)).join("")}
@@ -9340,11 +9331,25 @@ async function handleConciergeAction(action, req, btn) {
       return;
 
     case "reassign":
-      // Single-agent for v1. The button is rendered enabled with a tooltip
-      // explaining the constraint, so clicking it lands a non-blocking
-      // toast rather than freezing the tab with a native alert.
-      showAdminToast("Single-agent setup. Reassignment unlocks when additional Chez operators come online.", { kind: "info" });
+      // Legacy id kept for any stale buttons; routes to the real menu now.
+      await openCaseActionsModal(req);
       return;
+
+    // Phase 100 — CRM hygiene actions finally get UI (the server
+    // handlers shipped in Phase 86B with zero callers).
+    case "case-menu":
+      await openCaseActionsModal(req);
+      return;
+    case "open-related-case": {
+      const relatedId = btn?.dataset?.relatedId;
+      if (relatedId) await openCaseInCockpit(relatedId);
+      return;
+    }
+    case "unlink-related-case": {
+      const relatedId = btn?.dataset?.relatedId;
+      if (relatedId) await unlinkCaseFlow(req, relatedId);
+      return;
+    }
 
     case "snooze":
       await snoozeConciergeCase(req);
@@ -9353,14 +9358,13 @@ async function handleConciergeAction(action, req, btn) {
     case "resolved": {
       // CRITICAL — destructive customer-visible action. The transition writes
       // a permanent "Chez marked this resolved" system message to the
-      // homeowner thread and pushes via iOS. Always confirm.
-      const ok = await openConfirmModal({
-        title: "Mark case as resolved?",
-        body: "The homeowner will see a permanent system message in their Chez thread (\"Chez marked this resolved\"). If you Reopen later, the resolved message stays on the thread — it isn't undoable.",
-        confirmLabel: "Mark resolved",
-      });
-      if (!ok) return;
-      await performChezTransition(req, "resolved");
+      // homeowner thread and pushes via iOS. Phase 100: the confirm IS the
+      // required outcome mini-form — every resolution produces training
+      // data (resolution type, winner, cost, effort) or doesn't happen.
+      const outcome = await openResolveOutcomeModal(req);
+      if (!outcome) return;
+      await flushVendorCallPersist(req.id);
+      await performChezTransition(req, "resolved", outcome);
       return;
     }
     case "waiting": {
@@ -9765,9 +9769,13 @@ async function handleConciergeAction(action, req, btn) {
     case "visit-save-notes":
       await visitSaveAction(req, btn);
       return;
-    case "mark-resolved-from-visits":
-      await performChezTransition(req, "resolved");
+    case "mark-resolved-from-visits": {
+      const outcome = await openResolveOutcomeModal(req);
+      if (!outcome) return;
+      await flushVendorCallPersist(req.id);
+      await performChezTransition(req, "resolved", outcome);
       return;
+    }
     case "expand-analysis":
       state.chezAnalysisExpandedByRequest = state.chezAnalysisExpandedByRequest || {};
       state.chezAnalysisExpandedByRequest[req.id] = true;
@@ -10008,6 +10016,617 @@ function openConfirmModal({ title, body, confirmLabel = "Confirm", cancelLabel =
   });
 }
 
+// ============================================================================
+// Phase 100 — Intelligence foundation (service portal wiring)
+// ============================================================================
+// The per-vendor call ledger now persists server-side (chez_vendor_calls)
+// so call outcomes survive refresh and feed the cross-household vendor
+// registry. Resolving a case captures a structured outcome
+// (chez_request_outcomes). Operator focus emits effort telemetry
+// (chez_operator_events). All server actions are admin-gated in
+// chez-concierge.
+
+const OPERATOR_SESSION_ID = `op_${Math.random().toString(36).slice(2, 10)}`;
+
+// ---- Vendor call ledger: hydrate + debounced persist ----------------------
+
+const vendorCallPersistTimers = {};
+const vendorCallOutcomeEmitted = {}; // requestId -> Set of keys whose call_logged already fired
+
+async function fetchChezVendorCalls(requestId) {
+  state.chezVendorCallsByRequest = state.chezVendorCallsByRequest || {};
+  state.chezVendorCallsHydrated = state.chezVendorCallsHydrated || {};
+  state.chezVendorCallsInFlight = state.chezVendorCallsInFlight || new Set();
+  if (state.chezVendorCallsHydrated[requestId]) return;
+  if (state.chezVendorCallsInFlight.has(requestId)) return;
+  state.chezVendorCallsInFlight.add(requestId);
+  try {
+    const result = await callChezConcierge({ action: "fetch_vendor_calls", request_id: requestId });
+    const local = state.chezVendorCallsByRequest[requestId] || {};
+    const merged = {};
+    (result.calls || []).forEach((row) => {
+      merged[row.candidate_key] = {
+        outcome: row.outcome || "",
+        notes: row.notes || "",
+        rationale: row.rationale || "",
+        recommended: !!row.recommended,
+        availability_slots: Array.isArray(row.availability_slots) ? row.availability_slots : [],
+        cost_range: row.cost_range || "",
+        cost_custom: row.cost_custom || "",
+      };
+      if (row.outcome) {
+        vendorCallOutcomeEmitted[requestId] = vendorCallOutcomeEmitted[requestId] || new Set();
+        vendorCallOutcomeEmitted[requestId].add(row.candidate_key);
+      }
+    });
+    // Local unsaved edits win over server state (the operator may have
+    // typed while hydration was in flight).
+    state.chezVendorCallsByRequest[requestId] = { ...merged, ...local };
+    state.chezVendorCallsHydrated[requestId] = true;
+  } catch (e) {
+    console.warn("[admin] fetch_vendor_calls failed", e);
+    state.chezVendorCallsHydrated[requestId] = true; // don't retry-loop on errors
+  } finally {
+    state.chezVendorCallsInFlight.delete(requestId);
+  }
+  if (state.selectedChezRequest && state.selectedChezRequest.id === requestId) {
+    renderFocusedChezDetail(state.selectedChezRequest);
+  }
+}
+
+function buildVendorCallPersistPayload(reqId) {
+  const callState = state.chezVendorCallsByRequest?.[reqId] || {};
+  const keys = Object.keys(callState);
+  if (keys.length === 0) return null;
+  const cached = state.chezAnalysisByRequest?.[reqId] || {};
+  const loc = cached.property_location || {};
+  const category = cached.analysis?.inferred_category || "";
+  const byKey = {};
+  (cached.existing_vendors || []).forEach((v) => { byKey[`existing:${v.id}`] = v; });
+  (cached.places_candidates || []).forEach((v) => { byKey[`places:${v.name}`] = v; });
+  return {
+    action: "save_vendor_calls",
+    request_id: reqId,
+    calls: keys.map((key) => {
+      const slot = callState[key] || {};
+      const cand = byKey[key] || {};
+      return {
+        candidate_key: key,
+        source: key.startsWith("existing:") ? "existing" : key.startsWith("places:") ? "places" : "manual",
+        contractor_id: key.startsWith("existing:") ? key.slice("existing:".length) : null,
+        google_place_id: cand.google_place_id || cand.place_id || null,
+        vendor_name: cand.company_name || cand.name || (key.startsWith("places:") ? key.slice("places:".length) : null),
+        vendor_phone: cand.phone || cand.formatted_phone_number || null,
+        vendor_email: cand.email || null,
+        category: category || null,
+        town: loc.city || null,
+        state: loc.state || null,
+        outcome: slot.outcome || null,
+        notes: slot.notes || null,
+        rationale: slot.rationale || null,
+        recommended: !!slot.recommended,
+        availability_slots: Array.isArray(slot.availability_slots) ? slot.availability_slots.filter((s) => s != null) : [],
+        cost_range: slot.cost_range || null,
+        cost_custom: slot.cost_custom || null,
+      };
+    }),
+  };
+}
+
+function scheduleVendorCallPersist(reqId) {
+  if (!reqId) return;
+  clearTimeout(vendorCallPersistTimers[reqId]);
+  vendorCallPersistTimers[reqId] = setTimeout(() => flushVendorCallPersist(reqId), 1200);
+}
+
+async function flushVendorCallPersist(reqId) {
+  if (!reqId) return;
+  clearTimeout(vendorCallPersistTimers[reqId]);
+  delete vendorCallPersistTimers[reqId];
+  const payload = buildVendorCallPersistPayload(reqId);
+  if (!payload) return;
+  try {
+    await callChezConcierge(payload);
+    // Effort telemetry: the first time a candidate gets an outcome, that
+    // is a logged call.
+    const emitted = (vendorCallOutcomeEmitted[reqId] = vendorCallOutcomeEmitted[reqId] || new Set());
+    payload.calls.forEach((c) => {
+      if (c.outcome && !emitted.has(c.candidate_key)) {
+        emitted.add(c.candidate_key);
+        queueOperatorEvent(reqId, "call_logged");
+      }
+    });
+  } catch (e) {
+    console.warn("[admin] save_vendor_calls failed (kept locally)", e);
+  }
+}
+
+function flushAllVendorCallPersists() {
+  Object.keys(vendorCallPersistTimers).forEach((reqId) => { flushVendorCallPersist(reqId); });
+}
+
+// Tab close / hide: push unsaved ledger edits + pending telemetry.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    flushAllVendorCallPersists();
+    flushOperatorEvents();
+  }
+});
+
+// ---- Operator effort telemetry --------------------------------------------
+
+let operatorEventBuffer = [];
+let operatorEventTimer = null;
+const operatorCaseOpenedAt = {}; // requestId -> ms of last case_opened emit
+
+function queueOperatorEvent(requestId, eventType) {
+  if (!requestId || !eventType) return;
+  operatorEventBuffer.push({ request_id: requestId, event_type: eventType, client_session_id: OPERATOR_SESSION_ID });
+  clearTimeout(operatorEventTimer);
+  operatorEventTimer = setTimeout(flushOperatorEvents, 2000);
+}
+
+async function flushOperatorEvents() {
+  clearTimeout(operatorEventTimer);
+  operatorEventTimer = null;
+  if (operatorEventBuffer.length === 0) return;
+  const events = operatorEventBuffer.splice(0, 50);
+  try {
+    await callChezConcierge({ action: "log_operator_event", events });
+  } catch (e) {
+    console.warn("[admin] log_operator_event failed (dropped)", e);
+  }
+}
+
+function trackOperatorCaseFocus(nextReqId) {
+  const prevReqId = state._lastFocusedCaseId || null;
+  if (prevReqId === nextReqId) return;
+  state._lastFocusedCaseId = nextReqId;
+  const now = Date.now();
+  if (prevReqId) queueOperatorEvent(prevReqId, "case_closed");
+  if (nextReqId) {
+    const last = operatorCaseOpenedAt[nextReqId] || 0;
+    if (now - last > 5 * 60 * 1000) {
+      operatorCaseOpenedAt[nextReqId] = now;
+      queueOperatorEvent(nextReqId, "case_opened");
+    }
+  }
+}
+
+// ---- Structured case outcomes (the resolve mini-form) ----------------------
+
+const RESOLUTION_TYPES = [
+  { value: "completed_via_vendor", label: "Completed via vendor" },
+  { value: "completed_internal", label: "Completed by Chez directly" },
+  { value: "advice_only", label: "Advice only, nothing booked" },
+  { value: "converted_to_standing", label: "Converted to standing routine" },
+  { value: "no_vendor_found", label: "No vendor found" },
+  { value: "homeowner_cancelled", label: "Homeowner cancelled" },
+  { value: "duplicate_or_merged", label: "Duplicate or merged" },
+  { value: "no_response", label: "Homeowner went quiet" },
+  { value: "other", label: "Other" },
+];
+const FRICTION_TAGS = [
+  "vendor_no_answer", "scheduling_churn", "homeowner_slow_reply",
+  "price_pushback", "scope_unclear", "vendor_no_show", "tooling_gap",
+];
+
+function guessResolveOutcomePrefill(req) {
+  const msgs = state.chezMessages?.[req.id] || [];
+  const visits = Array.isArray(state.chezVisitsByRequest?.[req.id]) ? state.chezVisitsByRequest[req.id] : [];
+  const callState = state.chezVendorCallsByRequest?.[req.id] || {};
+  const approvedVendor = [...msgs].reverse().find((m) => m.proposal_kind === "vendor" && m.proposal?.status === "approved");
+  const completedVisit = visits.find((v) => v.state === "completed");
+  let resolutionType = "advice_only";
+  if (req.merged_into_request_id) resolutionType = "duplicate_or_merged";
+  else if (completedVisit || approvedVendor) resolutionType = "completed_via_vendor";
+  const vendorName = completedVisit?.vendor_name || approvedVendor?.proposal?.vendor?.name || "";
+  let costCents = completedVisit?.final_cost_cents ?? null;
+  if (costCents == null) {
+    const recommended = Object.values(callState).find((s) => s && s.recommended && (s.cost_custom || s.cost_range));
+    const raw = recommended ? (recommended.cost_custom || recommended.cost_range || "") : "";
+    const numeric = Number(String(raw).replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(numeric) && numeric > 4) costCents = Math.round(numeric * 100);
+  }
+  return { resolutionType, vendorName, costCents };
+}
+
+function openResolveOutcomeModal(req) {
+  const prefill = guessResolveOutcomePrefill(req);
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "admin-modal-overlay";
+    overlay.innerHTML = `
+      <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true">
+        <header class="admin-modal__head">
+          <h2>Resolve case</h2>
+          <button type="button" class="admin-modal__close" aria-label="Close" data-outcome-cancel>&times;</button>
+        </header>
+        <div class="admin-modal__body" style="display:flex; flex-direction:column; gap:10px;">
+          <p class="admin-modal__intro">Twenty seconds of structure makes the next case cheaper. The homeowner sees a permanent "Chez marked this resolved" message.</p>
+          <label>How it resolved
+            <select data-outcome-field="resolution_type">${RESOLUTION_TYPES.map((t) => `<option value="${t.value}" ${t.value === prefill.resolutionType ? "selected" : ""}>${escapeHtml(t.label)}</option>`).join("")}</select>
+          </label>
+          <label>Winning vendor (when one won)
+            <input type="text" data-outcome-field="vendor_name" value="${escapeHtml(prefill.vendorName)}" placeholder="e.g. Romano Plumbing" />
+          </label>
+          <label>Final cost in dollars (when known)
+            <input type="text" data-outcome-field="final_cost" value="${prefill.costCents != null ? String(Math.round(prefill.costCents / 100)) : ""}" placeholder="e.g. 1200" inputmode="decimal" />
+          </label>
+          <div>
+            <span class="admin-muted" style="font-size:12px;">Your time on this case</span>
+            <div style="display:flex; gap:6px; margin-top:4px;" data-outcome-minutes>
+              ${[5, 15, 30, 60, 120].map((m) => `<button type="button" class="admin-pill" data-minutes="${m}">${m >= 60 ? `${m / 60}h` : `${m}m`}</button>`).join("")}
+            </div>
+          </div>
+          <div>
+            <span class="admin-muted" style="font-size:12px;">What made it slow (pick any)</span>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;" data-outcome-frictions>
+              ${FRICTION_TAGS.map((t) => `<button type="button" class="admin-pill" data-friction="${t}">${escapeHtml(t.replaceAll("_", " "))}</button>`).join("")}
+            </div>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" data-outcome-field="automation_candidate" />
+            <span>Software could have closed this without me</span>
+          </label>
+          <label>One-line summary (shows on the homeowner activity feed when a cost is set)
+            <textarea rows="2" data-outcome-field="summary" placeholder="e.g. Booked Romano for the water heater swap, done same week"></textarea>
+          </label>
+        </div>
+        <div class="admin-modal__buttons" style="padding: 0 16px 16px;">
+          <button type="button" class="admin-pill" data-outcome-cancel>Cancel</button>
+          <button type="button" class="admin-pill admin-pill--action" data-outcome-ok>Resolve case</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    let minutes = null;
+    const frictions = new Set();
+    overlay.querySelectorAll("[data-minutes]").forEach((b) => b.addEventListener("click", () => {
+      const v = Number(b.dataset.minutes);
+      minutes = minutes === v ? null : v;
+      overlay.querySelectorAll("[data-minutes]").forEach((x) => x.classList.toggle("admin-pill--action", Number(x.dataset.minutes) === minutes));
+    }));
+    overlay.querySelectorAll("[data-friction]").forEach((b) => b.addEventListener("click", () => {
+      const t = b.dataset.friction;
+      if (frictions.has(t)) frictions.delete(t); else frictions.add(t);
+      b.classList.toggle("admin-pill--action", frictions.has(t));
+    }));
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelectorAll("[data-outcome-cancel]").forEach((b) => b.addEventListener("click", () => cleanup(null)));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(null); });
+    overlay.querySelector("[data-outcome-ok]").addEventListener("click", () => {
+      const get = (f) => overlay.querySelector(`[data-outcome-field='${f}']`);
+      const costRaw = get("final_cost").value.trim();
+      const costNum = Number(costRaw.replace(/[^0-9.]/g, ""));
+      cleanup({
+        resolution_type: get("resolution_type").value,
+        winning_vendor_name: get("vendor_name").value.trim() || null,
+        final_cost_cents: costRaw && Number.isFinite(costNum) && costNum > 0 ? Math.round(costNum * 100) : null,
+        operator_minutes: minutes,
+        summary: get("summary").value.trim() || null,
+        automation_candidate: get("automation_candidate").checked,
+        friction_tags: [...frictions],
+      });
+    });
+  });
+}
+
+// ---- Structured visit completion -------------------------------------------
+
+function openVisitCompletionModal(visit) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "admin-modal-overlay";
+    overlay.innerHTML = `
+      <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true">
+        <header class="admin-modal__head">
+          <h2>How did the visit go?</h2>
+          <button type="button" class="admin-modal__close" aria-label="Close" data-visit-done-cancel>&times;</button>
+        </header>
+        <div class="admin-modal__body" style="display:flex; flex-direction:column; gap:10px;">
+          <p class="admin-modal__intro">${escapeHtml(visit.vendor_name || "The vendor")} — this feeds their reliability score in the Chez network.</p>
+          <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="visit-done-how" value="on_time" checked /> <span>Completed, on time</span></label>
+          <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="visit-done-how" value="late" /> <span>Completed, ran late</span></label>
+          <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="visit-done-how" value="no_show" /> <span>Vendor did not show</span></label>
+          <label>Final cost in dollars (when known)
+            <input type="text" data-visit-done-cost inputmode="decimal" placeholder="e.g. 425" />
+          </label>
+        </div>
+        <div class="admin-modal__buttons" style="padding: 0 16px 16px;">
+          <button type="button" class="admin-pill" data-visit-done-cancel>Cancel</button>
+          <button type="button" class="admin-pill admin-pill--action" data-visit-done-ok>Save</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelectorAll("[data-visit-done-cancel]").forEach((b) => b.addEventListener("click", () => cleanup(null)));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(null); });
+    overlay.querySelector("[data-visit-done-ok]").addEventListener("click", () => {
+      const how = overlay.querySelector("input[name='visit-done-how']:checked")?.value || "on_time";
+      const costRaw = (overlay.querySelector("[data-visit-done-cost]")?.value || "").trim();
+      const costNum = Number(costRaw.replace(/[^0-9.]/g, ""));
+      cleanup({
+        no_show: how === "no_show",
+        completed_on_time: how === "no_show" ? null : how === "on_time",
+        final_cost_cents: costRaw && Number.isFinite(costNum) && costNum > 0 ? Math.round(costNum * 100) : null,
+      });
+    });
+  });
+}
+
+// ---- Chez network block (cross-household vendor intelligence) --------------
+
+function formatNetworkStat(row) {
+  const bits = [];
+  if (Number(row.jobs_won) > 0) bits.push(`${row.jobs_won} job${Number(row.jobs_won) === 1 ? "" : "s"} won`);
+  if (Number(row.times_called) > 0) {
+    const rate = row.answer_rate != null ? `, ${Math.round(Number(row.answer_rate) * 100)}% answer` : "";
+    bits.push(`called ${row.times_called}x${rate}`);
+  }
+  if (Number(row.no_shows) > 0) bits.push(`${row.no_shows} no-show${Number(row.no_shows) === 1 ? "" : "s"}`);
+  if (Number(row.households_touched) > 1) bits.push(`${row.households_touched} homes`);
+  return bits.join(" · ") || "in the Chez network";
+}
+
+function renderChezNetworkBlockHtml(req) {
+  const cached = state.chezAnalysisByRequest?.[req.id];
+  const rows = Array.isArray(cached?.chez_network) ? cached.chez_network.slice(0, 5) : [];
+  if (rows.length === 0) return "";
+  return `
+    <div class="admin-chez__network" style="border:1px solid var(--admin-border, #e3e5ea); border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+      <div style="font-size:12px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; opacity:0.7; margin-bottom:6px;">Chez network: used before</div>
+      ${rows.map((r) => `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 0;">
+          <div style="min-width:0;">
+            <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(r.display_name || "Vendor")}</div>
+            <div class="admin-muted" style="font-size:12px;">${escapeHtml(formatNetworkStat(r))}</div>
+          </div>
+          <button type="button" class="admin-pill" data-action="network-add-candidate" data-network-key="${escapeHtml(r.vendor_key || "")}">Add to candidates</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function addNetworkVendorToCandidates(req, vendorKey) {
+  const cached = state.chezAnalysisByRequest?.[req.id];
+  const row = (cached?.chez_network || []).find((r) => r.vendor_key === vendorKey);
+  if (!cached || !row) return;
+  cached.places_candidates = cached.places_candidates || [];
+  const name = row.display_name || "Network vendor";
+  if (cached.places_candidates.some((v) => (v.company_name || v.name) === name)) {
+    showAdminToast?.("Already in the candidate list.", { kind: "info" });
+    return;
+  }
+  cached.places_candidates.unshift({
+    name,
+    phone: row.phone || "",
+    _source: "places",
+    chez_history: {
+      times_called: row.times_called,
+      answer_rate: row.answer_rate,
+      jobs_won: row.jobs_won,
+      no_shows: row.no_shows,
+      households_touched: row.households_touched,
+      last_contacted_at: row.last_contacted_at,
+    },
+  });
+  renderFocusedChezDetail(req);
+}
+
+// ---- Ops insights strip (Today view) ---------------------------------------
+
+async function loadOpsMetricsOnce(force = false) {
+  state.opsMetrics = state.opsMetrics || {};
+  if (state.opsMetrics.inFlight) return;
+  if (!force && state.opsMetrics.data && Date.now() - (state.opsMetrics.loadedAt || 0) < 5 * 60 * 1000) return;
+  if (!force && state.opsMetrics.erroredAt && Date.now() - state.opsMetrics.erroredAt < 60 * 1000) return;
+  state.opsMetrics.inFlight = true;
+  try {
+    state.opsMetrics.data = await callChezConcierge({ action: "fetch_ops_metrics" });
+    state.opsMetrics.loadedAt = Date.now();
+    state.opsMetrics.erroredAt = null;
+  } catch (e) {
+    console.warn("[admin] fetch_ops_metrics failed", e);
+    state.opsMetrics.erroredAt = Date.now();
+  } finally {
+    state.opsMetrics.inFlight = false;
+    if (state.view === "today") renderTodayView();
+  }
+}
+
+function renderOpsInsightsHtml() {
+  const stats = state.opsMetrics?.data?.last_30_days;
+  if (!stats) {
+    loadOpsMetricsOnce();
+    return "";
+  }
+  const fmtMin = (v) => (v == null ? "–" : v >= 90 ? `${Math.round(v / 60)}h` : `${Math.round(v)}m`);
+  const fmtRate = (v) => (v == null ? "–" : `${Math.round(v * 100)}%`);
+  const tiles = [
+    { label: "First response (median)", value: fmtMin(stats.median_first_response_minutes) },
+    { label: "Resolution (median)", value: stats.median_resolution_hours == null ? "–" : `${Math.round(stats.median_resolution_hours)}h` },
+    { label: "SLA hit rate", value: fmtRate(stats.sla_hit_rate) },
+    { label: "Touches per case", value: stats.avg_touches == null ? "–" : String(stats.avg_touches) },
+    { label: "Automation rate", value: fmtRate(stats.automation_rate) },
+    { label: "Effort per case (median)", value: fmtMin(stats.median_effort_minutes) },
+  ];
+  return `
+    <section class="admin-card" style="margin-top:12px;">
+      <header style="display:flex; align-items:center; justify-content:space-between;">
+        <h3 style="margin:0; font-size:13px; letter-spacing:0.04em; text-transform:uppercase; opacity:0.75;">Ops insights · last 30 days</h3>
+        <span class="admin-muted" style="font-size:12px;">${stats.opened} opened · ${stats.resolved} resolved</span>
+      </header>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:8px;">
+        ${tiles.map((t) => `
+          <div style="border:1px solid var(--admin-border, #e3e5ea); border-radius:10px; padding:8px 10px;">
+            <div style="font-size:18px; font-weight:700;">${escapeHtml(String(t.value))}</div>
+            <div class="admin-muted" style="font-size:11px;">${escapeHtml(t.label)}</div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+// ---- Merge / link / assign (CRM hygiene actions finally get UI) -------------
+
+function pickSameHouseholdCase(req, title, intro) {
+  const candidates = (state.chezRequests || []).filter((r) =>
+    r.household_id === req.household_id && r.id !== req.id && !r.merged_into_request_id
+  ).sort((a, b) => (a.status === "open" ? -1 : 1) - (b.status === "open" ? -1 : 1));
+  return new Promise((resolve) => {
+    if (candidates.length === 0) {
+      showAdminToast?.("No other cases for this household.", { kind: "info" });
+      resolve(null);
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.className = "admin-modal-overlay";
+    overlay.innerHTML = `
+      <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true">
+        <header class="admin-modal__head">
+          <h2>${escapeHtml(title)}</h2>
+          <button type="button" class="admin-modal__close" aria-label="Close" data-pick-cancel>&times;</button>
+        </header>
+        <div class="admin-modal__body" style="display:flex; flex-direction:column; gap:10px;">
+          <p class="admin-modal__intro">${escapeHtml(intro)}</p>
+          <select data-pick-case>
+            ${candidates.map((c) => `<option value="${c.id}">${escapeHtml((c.summary || c.category || c.id).slice(0, 80))} (${escapeHtml(c.status)})</option>`).join("")}
+          </select>
+        </div>
+        <div class="admin-modal__buttons" style="padding: 0 16px 16px;">
+          <button type="button" class="admin-pill" data-pick-cancel>Cancel</button>
+          <button type="button" class="admin-pill admin-pill--action" data-pick-ok>Continue</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelectorAll("[data-pick-cancel]").forEach((b) => b.addEventListener("click", () => cleanup(null)));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(null); });
+    overlay.querySelector("[data-pick-ok]").addEventListener("click", () => cleanup(overlay.querySelector("[data-pick-case]").value || null));
+  });
+}
+
+async function mergeCaseFlow(req) {
+  const targetId = await pickSameHouseholdCase(req, "Merge this case", "Messages, visits, and history move to the selected case. This case closes and points there. This cannot be undone.");
+  if (!targetId) return;
+  const ok = await openConfirmModal({
+    title: "Merge this case?",
+    body: "This cannot be undone. The current case resolves and redirects to the selected one.",
+    confirmLabel: "Merge",
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await callChezConcierge({ action: "merge_cases", source_id: req.id, target_id: targetId });
+    showAdminToast?.("Merged.", { kind: "success" });
+    await loadAdminData();
+    await openCaseInCockpit(targetId);
+  } catch (e) {
+    alert(`Merge failed: ${e.message || e}`);
+  }
+}
+
+async function linkCaseFlow(req) {
+  const relatedId = await pickSameHouseholdCase(req, "Link a related case", "Linked cases show as chips on both case headers, for follow-ups and context.");
+  if (!relatedId) return;
+  try {
+    await callChezConcierge({ action: "link_case", request_id: req.id, related_id: relatedId });
+    showAdminToast?.("Linked.", { kind: "success" });
+    await loadAdminData();
+    const refreshed = state.chezRequests.find((r) => r.id === req.id);
+    if (refreshed) state.selectedChezRequest = refreshed;
+    renderChezRequestsView();
+  } catch (e) {
+    alert(`Link failed: ${e.message || e}`);
+  }
+}
+
+async function unlinkCaseFlow(req, relatedId) {
+  try {
+    await callChezConcierge({ action: "link_case", request_id: req.id, related_id: relatedId, unlink: true });
+    await loadAdminData();
+    const refreshed = state.chezRequests.find((r) => r.id === req.id);
+    if (refreshed) state.selectedChezRequest = refreshed;
+    renderChezRequestsView();
+  } catch (e) {
+    alert(`Unlink failed: ${e.message || e}`);
+  }
+}
+
+async function toggleAssignFlow(req) {
+  try {
+    const session = (await supabase.auth.getSession()).data.session;
+    const myId = session?.user?.id;
+    if (!myId) throw new Error("Not signed in");
+    const taking = req.assigned_to_user_id !== myId;
+    await callChezConcierge({ action: "assign_case", request_id: req.id, assignee_user_id: taking ? myId : null });
+    showAdminToast?.(taking ? "You own this case." : "Released.", { kind: "success" });
+    await loadAdminData();
+    const refreshed = state.chezRequests.find((r) => r.id === req.id);
+    if (refreshed) state.selectedChezRequest = refreshed;
+    renderChezRequestsView();
+  } catch (e) {
+    alert(`Assign failed: ${e.message || e}`);
+  }
+}
+
+async function openCaseActionsModal(req) {
+  const session = (await supabase.auth.getSession()).data.session;
+  const mine = req.assigned_to_user_id && req.assigned_to_user_id === session?.user?.id;
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "admin-modal-overlay";
+    overlay.innerHTML = `
+      <div class="admin-modal admin-modal--sm" role="dialog" aria-modal="true">
+        <header class="admin-modal__head">
+          <h2>Case actions</h2>
+          <button type="button" class="admin-modal__close" aria-label="Close" data-case-actions-cancel>&times;</button>
+        </header>
+        <div class="admin-modal__body" style="display:flex; flex-direction:column; gap:8px;">
+          <button type="button" class="admin-pill" data-case-action="assign">${mine ? "Release ownership" : "Take ownership"}</button>
+          <button type="button" class="admin-pill" data-case-action="link">Link a related case</button>
+          <button type="button" class="admin-pill admin-pill--danger" data-case-action="merge">Merge into another case</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const cleanup = (action) => { overlay.remove(); resolve(action); };
+    overlay.querySelectorAll("[data-case-actions-cancel]").forEach((b) => b.addEventListener("click", () => cleanup(null)));
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(null); });
+    overlay.querySelectorAll("[data-case-action]").forEach((b) => b.addEventListener("click", () => cleanup(b.dataset.caseAction)));
+  }).then(async (action) => {
+    if (action === "merge") await mergeCaseFlow(req);
+    else if (action === "link") await linkCaseFlow(req);
+    else if (action === "assign") await toggleAssignFlow(req);
+  });
+}
+
+function renderRelatedCaseChipsHtml(req) {
+  const ids = Array.isArray(req.related_case_ids) ? req.related_case_ids : [];
+  const merged = req.merged_into_request_id;
+  if (ids.length === 0 && !merged) return "";
+  const chip = (id, label, unlinkable) => `
+    <span class="admin-pill" style="display:inline-flex; align-items:center; gap:6px; font-size:12px;">
+      <button type="button" data-cockpit-action="open-related-case" data-related-id="${escapeHtml(id)}" style="all:unset; cursor:pointer;">${escapeHtml(label)}</button>
+      ${unlinkable ? `<button type="button" data-cockpit-action="unlink-related-case" data-related-id="${escapeHtml(id)}" title="Unlink" style="all:unset; cursor:pointer; opacity:0.6;">&times;</button>` : ""}
+    </span>`;
+  const labelFor = (id) => {
+    const c = (state.chezRequests || []).find((r) => r.id === id);
+    return c ? (c.summary || c.category || id).slice(0, 40) : id.slice(0, 8);
+  };
+  return `
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+      ${merged ? chip(merged, `Merged into: ${labelFor(merged)}`, false) : ""}
+      ${ids.map((id) => chip(id, `Related: ${labelFor(id)}`, true)).join("")}
+    </div>
+  `;
+}
+
 // Small non-blocking toast for status messages that don't need a modal.
 // Replaces `alert()` for informational / non-actionable feedback. The toast
 // auto-dismisses after `ms` milliseconds (default 3.5s) or on click.
@@ -10208,6 +10827,7 @@ async function submitConciergeReply(req, form, toStatus) {
       acknowledgement_required: ack,
       to_status: toStatus,
     });
+    queueOperatorEvent(req.id, "reply_sent");
     // Clear the local draft cache so the next render shows an empty composer.
     if (state.concierge.composer && state.concierge.composer[req.id]) {
       state.concierge.composer[req.id] = { draft: "", tone: state.concierge.composer[req.id].tone || "warm" };
@@ -10342,6 +10962,7 @@ function attachConciergeVendorHandlers(host, req) {
       const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
       slot.availability_slots = slot.availability_slots || [];
       slot.availability_slots[idx] = input.value;
+      scheduleVendorCallPersist(req.id);
     };
     input.addEventListener("input", handler);
     input.addEventListener("change", handler);
@@ -10425,6 +11046,7 @@ function attachConciergeVendorHandlers(host, req) {
         slots.splice(removeIdx, 1);
       }
       slot.availability_slots = slots;
+      scheduleVendorCallPersist(req.id);
       renderConciergeCockpit();
     });
   });
@@ -10441,6 +11063,8 @@ function attachConciergeVendorHandlers(host, req) {
       const field = input.dataset.vendorField;
       if (input.type === "checkbox") slot[field] = input.checked;
       else slot[field] = input.value;
+      slot.last_updated_ms = Date.now();
+      scheduleVendorCallPersist(req.id);
       // cost_range "custom" toggles the custom-text row inline.
       if (field === "cost_range") {
         const customRow = card.querySelector("[data-vendor-cost-custom-row]");
@@ -10456,6 +11080,12 @@ function attachConciergeVendorHandlers(host, req) {
     if (input.tagName === "TEXTAREA" || (input.tagName === "INPUT" && input.type !== "checkbox" && input.type !== "select-one")) {
       input.addEventListener("input", handler);
     }
+  });
+
+  // Phase 100 — Chez network block: pull a cross-household vendor into
+  // this case's candidate list.
+  host.querySelectorAll("[data-action='network-add-candidate']").forEach((netBtn) => {
+    netBtn.addEventListener("click", () => addNetworkVendorToCandidates(req, netBtn.dataset.networkKey));
   });
 
   // ✨ Summarize buttons (per vendor card).
@@ -10509,6 +11139,7 @@ function attachConciergeVendorHandlers(host, req) {
           state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
           const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
           slot.rationale = result.framing;
+          scheduleVendorCallPersist(req.id);
           renderConciergeCockpit();
         }
       } catch (err) {
@@ -10641,6 +11272,7 @@ function renderChezAnalysisPanelHtml(req, opts = {}) {
           <h4>Vendors to call · ${allCandidates.length}</h4>
           ${recommendedCount > 0 ? `<button type="button" class="admin-button admin-button--primary admin-button--small" data-action="package-send">Package & send ${recommendedCount} to homeowner</button>` : ""}
         </header>
+        ${renderChezNetworkBlockHtml(req)}
         ${allCandidates.length === 0 ? `<p class="admin-muted">No vendor candidates pre-researched. Use Manual proposal below.</p>` : ""}
         ${allCandidates.map((v, i) => renderVendorCandidateCardHtml(req, v, i, callState[vendorCandidateKey(v)] || null)).join("")}
       </div>
@@ -10865,6 +11497,7 @@ function renderVisitsPanelHtml(req, visits) {
   // Lazy-fetch visits once per request open, caching the result.
   if (visits === undefined) {
     fetchChezVisits(req.id);
+    fetchChezVendorCalls(req.id);
     return ""; // wait for fetch to populate cache
   }
   const visitsArr = Array.isArray(visits) ? visits : [];
@@ -11797,6 +12430,7 @@ function attachChezPanelHandlers(req) {
           acknowledgement_required: ack,
           to_status: toStatus,
         });
+        queueOperatorEvent(req.id, "reply_sent");
         if (feedback) feedback.textContent = "Sent.";
         form.elements.content.value = "";
         form.elements.acknowledgement_required.checked = false;
@@ -11823,7 +12457,11 @@ function attachChezPanelHandlers(req) {
       if (action === "waiting") {
         await performChezTransition(req, "waiting_customer");
       } else if (action === "resolved") {
-        await performChezTransition(req, "resolved");
+        // Phase 100 — required outcome mini-form on every resolution.
+        const outcome = await openResolveOutcomeModal(req);
+        if (!outcome) return;
+        await flushVendorCallPersist(req.id);
+        await performChezTransition(req, "resolved", outcome);
       } else if (action === "reopen") {
         await performChezTransition(req, "open");
       } else if (action === "propose") {
@@ -11877,6 +12515,7 @@ function attachChezPanelHandlers(req) {
         });
         slots.push("");
         slot.availability_slots = slots;
+        scheduleVendorCallPersist(req.id);
         renderFocusedChezDetail(req);
       } else if (action === "remove-slot") {
         const card = btn.closest("[data-vendor-key]");
@@ -11891,7 +12530,10 @@ function attachChezPanelHandlers(req) {
           if (Number.isFinite(idx) && slot.availability_slots[idx] !== undefined) slot.availability_slots[idx] = input.value;
         });
         slot.availability_slots.splice(removeIdx, 1);
+        scheduleVendorCallPersist(req.id);
         renderFocusedChezDetail(req);
+      } else if (action === "network-add-candidate") {
+        addNetworkVendorToCandidates(req, btn.dataset.networkKey);
       } else if (action === "expand-analysis") {
         // Phase 82 — Re-open the analysis panel from the collapsed
         // line so the operator can re-research vendors mid-case.
@@ -11899,7 +12541,10 @@ function attachChezPanelHandlers(req) {
         state.chezAnalysisExpandedByRequest[req.id] = true;
         renderFocusedChezDetail(req);
       } else if (action === "mark-resolved-from-visits") {
-        await performChezTransition(req, "resolved");
+        const outcome = await openResolveOutcomeModal(req);
+        if (!outcome) return;
+        await flushVendorCallPersist(req.id);
+        await performChezTransition(req, "resolved", outcome);
       } else if (action === "adopt-slot") {
         // Phase 82 — Click a "Times offered" chip on a visit card to
         // copy that slot's text into the datetime field. the operator still
@@ -11938,6 +12583,7 @@ function attachChezPanelHandlers(req) {
       const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
       slot.availability_slots = slot.availability_slots || [];
       slot.availability_slots[idx] = input.value;
+      scheduleVendorCallPersist(req.id);
     };
     input.addEventListener("input", handler);
     input.addEventListener("change", handler);
@@ -11959,6 +12605,8 @@ function attachChezPanelHandlers(req) {
       const field = input.dataset.vendorField;
       if (input.type === "checkbox") slot[field] = input.checked;
       else slot[field] = input.value;
+      slot.last_updated_ms = Date.now();
+      scheduleVendorCallPersist(req.id);
       // Phase 81.2 — toggle the Custom cost row visibility without a
       // full re-render so the user's typing focus survives.
       if (field === "cost_range") {
@@ -12032,6 +12680,7 @@ function attachChezPanelHandlers(req) {
           state.chezVendorCallsByRequest[req.id] = state.chezVendorCallsByRequest[req.id] || {};
           const slot = state.chezVendorCallsByRequest[req.id][key] = state.chezVendorCallsByRequest[req.id][key] || {};
           slot.rationale = result.framing;
+          scheduleVendorCallPersist(req.id);
           renderFocusedChezDetail(req);
         }
       } catch (err) {
@@ -12088,6 +12737,20 @@ async function visitMarkAction(req, btn, newState) {
     reason = window.prompt("Why is this visit cancelled? (optional, lands in the homeowner thread)", "") || "";
   }
 
+  // Phase 100 — structured completion facts (on time / late / no-show +
+  // final cost) feed the vendor's reliability score in the registry. A
+  // no-show records as a cancelled visit with no_show=true so the
+  // vendor's completion stats stay honest.
+  let completionFacts = null;
+  if (newState === "completed") {
+    completionFacts = await openVisitCompletionModal(visit);
+    if (!completionFacts) return;
+    if (completionFacts.no_show) {
+      newState = "cancelled";
+      reason = "The vendor missed the window. Chez is lining up the next step.";
+    }
+  }
+
   // Optional one-line reply to lend the homeowner a heads-up. The
   // Edge Function only sends if non-empty.
   let sendReply = "";
@@ -12122,6 +12785,9 @@ async function visitMarkAction(req, btn, newState) {
       scheduled_window: card.querySelector("[data-visit-field='scheduled_window']")?.value || undefined,
       notes: card.querySelector("[data-visit-field='notes']")?.value || undefined,
       outcome: card.querySelector("[data-visit-field='outcome']")?.value || (newState === "cancelled" ? reason : undefined),
+      completed_on_time: completionFacts ? completionFacts.completed_on_time : undefined,
+      no_show: completionFacts ? completionFacts.no_show : undefined,
+      final_cost_cents: completionFacts && completionFacts.final_cost_cents != null ? completionFacts.final_cost_cents : undefined,
       send_reply: sendReply || undefined,
       acknowledgement_required: false,
     });
@@ -12302,6 +12968,9 @@ async function assignHandymanToAssessmentFlow(req, btn) {
 }
 
 async function packageAndSendRecommendedVendors(req) {
+  // Phase 100 — make sure every keystroke of the call ledger is on the
+  // server before we package it into proposals.
+  await flushVendorCallPersist(req.id);
   const callState = state.chezVendorCallsByRequest?.[req.id] || {};
   const cached = state.chezAnalysisByRequest?.[req.id];
   if (!cached) {
@@ -12354,6 +13023,10 @@ async function packageAndSendRecommendedVendors(req) {
           phone: vendor.phone || vendor.formatted_phone_number,
           rating: vendor.rating,
           review_count: vendor.user_ratings_total || vendor.review_count,
+          // Phase 100 — Places identity rides the proposal so the
+          // contractor upsert on approval can stamp google_place_id
+          // (unifies the vendor across the registry).
+          place_id: vendor.google_place_id || vendor.place_id || undefined,
           // Numeric cost only when the admin clearly typed one.
           estimated_cost: useNumeric ? numericCost : undefined,
           // Range string preferred — homeowner sees "$1,000–2,500"
@@ -12375,8 +13048,11 @@ async function packageAndSendRecommendedVendors(req) {
       });
     }
     // Clear the in-memory call state so the user starts fresh after
-    // sending. Keep the analysis cached.
+    // sending. Keep the analysis cached. Server rows persist
+    // (chez_vendor_calls); clearing the hydration sentinel makes the
+    // next case open re-pull them.
     if (state.chezVendorCallsByRequest) delete state.chezVendorCallsByRequest[req.id];
+    if (state.chezVendorCallsHydrated) delete state.chezVendorCallsHydrated[req.id];
     await loadAdminData();
     await loadChezMessages(req.id);
     const refreshed = state.chezRequests.find((r) => r.id === req.id);
@@ -12831,12 +13507,15 @@ function scrollWorkspaceToStage(stage) {
   }
 }
 
-async function performChezTransition(req, toStatus) {
+async function performChezTransition(req, toStatus, outcome = null) {
   try {
     await callChezConcierge({
       action: "transition_status",
       request_id: req.id,
       to_status: toStatus,
+      // Phase 100 — structured outcome from the resolve mini-form.
+      // Optional at the API; the cockpit makes it required on resolve.
+      outcome: outcome || undefined,
     });
     await loadAdminData();
     await loadChezMessages(req.id);
@@ -19531,6 +20210,7 @@ async function renderTodayView() {
       ${urgentHtml}
       ${todayHtml}
       ${upcomingHtml}
+      ${renderOpsInsightsHtml()}
     </div>
   `;
 
@@ -19601,7 +20281,7 @@ function attachTodayHandlers() {
           await callChezConcierge({
             action: "transition_status",
             request_id: requestId,
-            status: "waiting_customer",
+            to_status: "waiting_customer",
           });
           showAdminToast?.("Snoozed — waiting on customer");
           state.today.loadedAt = 0;
