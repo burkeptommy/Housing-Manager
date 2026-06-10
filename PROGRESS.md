@@ -8,7 +8,19 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
-## Phase 70.A1 — Tasks v2 unified view (the visibility fix) (2026-05-24)
+## Phase 100 — Full-product verification + Chez Intelligence Foundation (2026-06-09/10)
+
+Founder mandate: verify the whole product (handoff pipeline, website/service model alignment, "expect old-model breakage"), build the data/model moat foundation (20:1 → 100:1 operator leverage), be skeptical and register every gap. Deliverables: `CHEZ_MISSION_GAPS.md` (repo root, the skeptical gap register + moat architecture) and `Tests/e2e/VERIFICATION_2026-06_GAPS.md` (findings log).
+
+**Verification results:** iOS builds clean (0 errors, Tom's Tasks-tab WIP untouched and intact). Full homeowner e2e suite PASSED against prod end to end including 5-task Chez delegation with correct smart routing and go-all-in. All 48 chez-concierge actions contract-match their callers. Quiz triple-implementation aligned. Both portal shells load with zero console errors.
+
+**Root cause of "stuff feels broken" found and fixed:** migration history was wedged (3 version-key collisions: 20261212 / 20261233 / 20261318 each had two files) so `db push` had been failing for ~2 weeks and late-May work was hand-applied to prod outside history. Repaired (dupes deleted, archive twin renamed to 20261319, 10 verified-live versions `migration repair`ed, `preferred_dates` pushed) — which also fixed a LIVE bug: assessment reschedules had been 500ing in prod since ~May 25. Also fixed: Today-view Snooze 400ing on every click (`status:` vs `to_status:`), duplicate Homes nav entry, cadence-notifications never having been scheduled (pickup-day pushes never fired once), stale e2e fixture (post-dedup Optimum).
+
+**Intelligence foundation shipped (migrations 20270101-20270109 + chez-sla-watch function + chez-concierge additions + service-portal wiring):** persistent vendor call ledger (was browser-memory only — the single biggest moat leak), required structured outcomes on resolve, structured visit completion (no_show / on_time / final cost = vendor reliability ground truth), cross-household vendor registry consumed by analyze_request + a "Chez network" block on the vendor sheet, operator effort telemetry + ops-metrics views + Today Insights strip, SLA watcher on pg_cron (warn at <4h, breach alerts, idempotent stamps), all four category playbooks live, merge/link/assign case UI (Phase 86B handlers finally wired), access_log immutability + invite expiry hardening.
+
+**Scope boundary recorded (founder, final): Chez does NOT do dispatch or visit execution.** Vendor-relationship management + delegated maintenance schedules only. Assessment-dispatch machinery is legacy-awaiting-decommission; no contractor portal ever (vendors get verified via vendor_applications only). The operator surface of record is the service portal (service.getchez.com); admin.html is back-of-house.
+
+**The honest numbers behind the gap register:** 5 active households, ~7 organic concierge cases ever, 0 tracked visits, 0 vendor applications, 0 outreach emails. The machine is verified; the flying hours start now.
 
 The follow-on session to Phase 70 Section B+C. Built the UI rewrite that solves the "30 tasks but I only see 5 rows" complaint. Five commits on `claude/tasks-v2` after the Section B+C work:
 
