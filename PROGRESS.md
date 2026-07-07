@@ -14,6 +14,18 @@ All four F-class data-loss bugs from PRODUCT_AUDIT_2026-07.md fixed, committed, 
 
 ---
 
+## Broken daily loops (Phase 3 of the hardening plan) — SHIPPED (2026-07-07, late night)
+
+Homeowner + operator "daily loop" bugs from PRODUCT_AUDIT_2026-07.md. A 10-agent scout workflow verified every fix site first; a follow-on adversarial-review workflow verified the fixes. **Operator (F11/F12/F13) confirmed admin.js-ONLY** — the live service portal already implements mark_read on case open and routes resolve through the outcome modal, so those defer with the admin rebuild.
+
+**Edge functions (deployed):** **F1** — cadence-notifications fully rewritten against the `routines` table (it read the DEAD household_cadences table since Phase 55.3, so pickup pushes fired against stale rows and new routines never notified). Ports the iOS RoutineOccurrenceExpander week/interval math, honors active_months, notifies only non-vendor pickup kinds, CLAIMS a per-(household,reminder_window,local-day) slot in the new `routine_reminder_sends` table (migration `20270122`) before pushing so hourly runs can't double-push; cron rescheduled hourly (fixes the Phase 100 tz flaw where Pacific never got evening pushes). Also dropped the always-erroring `properties.time_zone` query (no such column — documented America/New_York fallback). Verified live: **3 REAL households that had been getting zero pickup reminders notified correctly**, re-run deduped to 0. **F17** — receive-email completion push captures the real final inbox id via `.select("id")` and deep-links to it (was the deleted placeholder), under waitUntil. **F19** — chunked base64 extracted to `_shared/base64.ts`; process-invoice uses it (was btoa-stack-overflowing on multi-MB PDFs) and detects media by MAGIC BYTES (email-forwarded extensionless PDFs now reach Claude as PDFs).
+
+**iOS (Chez build green):** **F7** task delete actually deletes when no callback wired (4 dashboard/push presenters). **F8** all ~17 vehicle mutation callbacks force:true (the 60s freshness window swallowed refreshes); .task onAppear keeps the cache. **F9** completing an overdue vehicle alert completes the task (taskId+frequency on VehicleMaintenanceInterval; recurring re-dates, once archives) — was only writing a service record so the alert reappeared forever. **F5** routine creation synthesizes days_of_week from the start-date weekday (was failing the weekly_has_days_of_week CHECK silently) + surfaces insert errors on all 3 save paths. **F16** vendor adoption stamps CANONICAL categories + categoriesMatch task sweep across FindLocalVendorSheet / ChezDirectoryService / MaintenanceTaskDetailSheet / PropertyDetailView (Groton bug class) + surfaces errors + posts .contractorChanged. **F15** chat upload routes through InboxItemFromDocument.
+
+**Note:** the SECURITY-SMOKE-TEST fixture household is still in prod (kept for verification); tear down when convenient (also one orphaned storage object). The properties table genuinely has no timezone column — future multi-tz needs one added.
+
+---
+
 ## Security sweep (Phase 1 of the hardening plan) — SHIPPED (2026-07-07, night)
 
 Executed Phase 0 + Phase 1 of the approved hardening plan (working backlog = PRODUCT_AUDIT_2026-07.md). Everything below is committed, deployed to prod, and verified.
