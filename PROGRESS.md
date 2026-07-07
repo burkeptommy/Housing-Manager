@@ -40,6 +40,16 @@ Resilient `init(from:)` added to every externally-fed struct the audit flagged (
 
 ---
 
+## Feature-completion bug-fixes + docs (Phase 6, partial) — SHIPPED (2026-07-07, late night)
+
+Clear-defect subset of Phase 6 (the larger dead-code deletion pass + feature builds deferred — see below). **Bug fixes (Chez build green):** CoveredDriverPickerSheet — the age>=16 gate applies to children too now (a 17yo with a DOB is a legit covered driver; the blanket child-exclude ran before the DOB check so licensed teens could never be added). FamilyMemberFormView "Save & Send Invite" — captured the created member so the invite sheet no longer receives nil and silently no-ops. EditProjectSheet — insurance_claim projects preserve their type on save (Edit was coercing to .professional and destroying claim mode + orphaning sub-projects). TrustedContactDetailView — relabeled the "Send Invite" button (which sent nothing) to "Mark as reached out". **Docs:** added a drift-correction banner to CLAUDE.md (MaintenanceScheduleView is deleted but referenced ~20× as live; TTL/event-count/category-count/functions-inventory corrections) + two hard rules capturing the July 2026 hardening patterns (require-household auth doctrine, EdgeRuntime.waitUntil for post-response writes).
+
+**Deferred to future sessions (lower severity):** the mechanical dead-code deletion pass (QuoteAnalysisView + NegotiationEmailSheet chain, HandymanHubView, dead MaintenanceHubSections, MarkCompleteForm, AddContractorView, HouseholdStrip/StaffStrip, admin PORTAL_MODE, admin-vendors.html, RequestAssessmentView, .invoiceCadenceDetected wire); feature builds (expecting→born conversion, vehicle insurance renewal reminders, negotiation-email decision, upload-quote→project path, quote line-items render, vendor-inquiry history); and the remaining CLAUDE.md reference cleanups. None are data-loss or security.
+
+**Phase 7 (Ingestion Intelligence v2 — the universal mapping surface) NOT started** — it's the 2-3 week flagship (suggested_actions shape, universal review card with destination remapping, routines from ingestion, auto invoice-intelligence for email invoices, vendor auto-mapping v2, appointments + project matching). Deserves dedicated runs; see the plan file.
+
+---
+
 ## Security sweep (Phase 1 of the hardening plan) — SHIPPED (2026-07-07, night)
 
 Executed Phase 0 + Phase 1 of the approved hardening plan (working backlog = PRODUCT_AUDIT_2026-07.md). Everything below is committed, deployed to prod, and verified.
