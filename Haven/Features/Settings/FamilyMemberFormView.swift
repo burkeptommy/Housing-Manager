@@ -68,6 +68,11 @@ struct FamilyMemberFormView: View {
     @State private var isCheckingEmail = false
     @State private var emailCheckTask: Task<Void, Never>?
     @State private var showInviteAfterSave = false
+    /// July 2026 (audit): the member row created by "Save & Send Invite" for
+    /// a BRAND-NEW member. The invite sheet used to receive `existingMember`
+    /// (nil for new members), and InviteToHavenSheet.send() guards on nil —
+    /// so the invite silently never sent. Captured here at create time.
+    @State private var justCreatedMember: FamilyMemberRow?
     @State private var showLinkedDeleteWarning = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var avatarImage: UIImage?
@@ -362,7 +367,7 @@ struct FamilyMemberFormView: View {
         .tint(HavenColors.navy)
         .trackScreen(isEditing ? "FamilyMemberEditView" : "FamilyMemberAddView")
         .sheet(isPresented: $showInviteSheet) {
-            InviteToHavenSheet(familyMember: existingMember, prefillEmail: email)
+            InviteToHavenSheet(familyMember: existingMember ?? justCreatedMember, prefillEmail: email)
         }
         .confirmationDialog("Delete Family Member?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
@@ -590,6 +595,7 @@ struct FamilyMemberFormView: View {
                 )
                 let result = try await HouseholdInviteCoordinator.shared.addPersonToHousehold(coordinatorRequest)
                 let newMember = result.familyMember
+                justCreatedMember = newMember  // audit: for the Save & Send Invite path
 
                 // Patch in any fields the coordinator's slimmer insert didn't
                 // touch (avatar color, expected date, legal name, school,
