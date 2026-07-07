@@ -131,7 +131,7 @@ function downloadForRow(id) {
     uid: r.id,
     start: r.due_at,
     durationMinutes: 60,
-    summary: `${r.title || "Chez visit"} — ${r.household_name || ""}`.trim(),
+    summary: r.household_name ? `${r.title || "Chez visit"} at ${r.household_name}` : (r.title || "Chez visit"),
     location: r.household_name || "",
     description: "Scheduled through the Chez service portal.",
   });
