@@ -8,6 +8,52 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Email + document pipeline: intent layer, auto-tasks, universal ask (2026-07-07, PM2)
+
+Deep audit (3 parallel agents) + upgrade of both ingest pipelines so a vendor can safely use the household's `@alfred.getchez.com` as their primary contact and the homeowner never misses a thing. All backward compatible (free-text `type`/`action_type`, no migration). Both iOS builds green; receive-email + process-inbox-item + analyze-document redeployed; verified end-to-end against Tom's own household then restored to baseline.
+
+**What was broken (audit findings):** invoices got ZERO follow-up extraction at ingest (process-invoice never called from email); no intent layer (reminders/appointments/statements all mushed together); no-attachment reminder emails were a dead end (nothing created); ~14 upload category groups (deeds, taxes, permits, warranties, town docs) filed SILENTLY with no ask; project-context uploads did the opposite of desired (still created asks); analyze-document silently auto-created maintenance_tasks with no dedup/source (dup risk on re-forward).
+
+**The unification:** one shape (`suggested_tasks`), one creator (`_shared/task-ingest.ts` `createTasksFromSuggestions` with ±21-day title dedup + in-batch guard), one iOS renderer (follow-ups checklist), one action (`add_suggested_tasks`). Every follow-up-spotting path converges: receive-email invoice/reminder follow-ups, analyze-document `maintenance_suggestions` (converted from silent insert → ask), process-invoice `follow_up_needed`.
+
+**Intent + policy:** classifier now returns `intent` + `suggestedTasks[]` (max_tokens 1024→1536). No-doc reminder → AUTO-ADD (`source=email_reminder`) + informational `tasks_auto_added` item. Doc-attached follow-ups → ASK (separate `follow_ups` item, `action_type=review_followups`) → one tap `add_suggested_tasks`. Quote/insurance keep their own review UI. Sender→contractor match by email attributes items to the right vendor ("Follow-up spotted from {vendor}") + links the tasks.
+
+**Universal upload ask:** `InboxItemFromDocument.plan()` returns a `confirm_document_category` ask for every real category (nil only for photos); project-context uploads suppress the ask at the 3 call sites (`item.projectId`/`selectedProjectId` gate). iOS: `InboxMetadata` decodes `suggested_tasks`/`auto_added_tasks`/`matched_contractor_name`; `review_followups` renders in `InboxItemCard` (`followupsActionArea`) + `InboxItemDetailView` (`isFollowupsAction`).
+
+**Verified (curl against household ff6b50f4, then fully cleaned up):** forwarded landscaping reminder → 1 task auto-created with Claude-computed due date (Apr 30 from "before end of April") + "Added:" item; re-forward → `followup_duplicates_skipped:1` + sender→contractor match; synthetic `review_followups` → `add_suggested_tasks` created 2 tasks; cross-item re-forward of same task → `skipped_duplicates:1`. Household restored to exact baseline (121 tasks, 0 inbox).
+
+**Deferred (noted, not built):** parsed (non-iCal) appointment emails → family_events for `intent=appointment`; per-task subset selection in the review card (server supports `selected_task_titles`, iOS ships "Add all"); the rare double-ASK when an inspection report yields both body-level and PDF-level suggestions (tasks still dedup — no dup tasks, just possibly two cards).
+
+**Files:** `supabase/functions/_shared/task-ingest.ts` (new), `receive-email/index.ts`, `process-inbox-item/index.ts`, `analyze-document/index.ts`; iOS `InboxItemFromDocument.swift`, `DocumentUploadManager.swift`, `DocumentUploadViewModel.swift`, `DatabaseService.swift` (InboxMetadata), `InboxItemCard.swift`, `InboxItemDetailView.swift`.
+
+---
+
+## Full-product persona audit: personas, functions, gaps, bugs, user stories (2026-07-07, eve)
+
+Whole-app code review across the three named personas (Homeowner / CS-Concierge / Admin) via 7 parallel audit agents (backend EFs, Chez data layer + RLS, admin cockpit, maintenance views, vehicles, homeowner secondary surfaces, admin portal + deployment). Consolidated deliverable: **`PRODUCT_AUDIT_2026-07.md`** at repo root — persona inventory (5 missing personas flagged, incl. Home Manager/Staff and Vendor), function inventory, ~35 P0/P1 verified bugs with file:line, gap register, and status-tagged user stories per persona. Headlines: (1) cross-household access class in ~9 edge functions (service-role + body-trusted IDs; no shared auth guard); (2) `log_chez_activity` open SECURITY DEFINER RPC + column-unrestricted homeowner UPDATE on chez_requests + forgeable concierge_messages; (3) cadence-notifications cron reads the dead `household_cadences` table; (4) proactive-scan never scheduled or called; (5) invitation revoke hard-deletes the family member; (6) nil-omission Update-struct class means field clears never persist anywhere; (7) admin portal dark in prod + send-catalog-request links to a nonexistent surface; (8) cockpit mark_read never called + Today-view Resolve sends wrong param. No code changes made this session (report-only). Coverage holes for a follow-up pass: Tasks tab V5 view internals / House Quiz / Dashboard depth, and the new `website/service/` views.
+
+---
+
+## Maintenance-stack audit: quiz → systems → vendors → routines → calendar (2026-07-07, PM)
+
+Pre-launch hardening pass on the full maintenance funnel (3 parallel audit agents, every finding hand-verified against code before touching anything — several agent claims refuted, including the "coveredCount diverges from rows" claim and the "every chip needs a RoutineSeeder branch" invariant, which turned out to be stale doc, not a bug). Build green (`Chez` scheme); find-local-vendors redeployed + curl-verified.
+
+**Quiz fun restored:** the forwarding-email reveal (copy-to-clipboard card) had been DEAD since Phase 60.3 emptied `milestoneIndices` — it now fires once as a question-id-gated interstitial after q15b, latched via new `HouseQuizState.forwardingRevealShownAt` (resilient decode). New analytics `quizForwardingRevealShown`.
+
+**Chip → search → work wiring:** 6 Q15b chips (pool_service, solar_service, security_service, waterproofing, gutter_cleaning, painter) fell through `categoryParam` to raw chip ids — solar/security/gutter produced literal underscore Places queries. Added the 6 iOS cases + 9 lowercased canonical-key entries server-side (chimney, tree service, security system, gutter cleaning, painting, cleaning service, snow removal, mosquito & tick, pet waste); curl-verified Solar/Gutter Cleaning/Chimney return on-trade vendors for Rye NY. Waterproofing chip now creates the Crawl Space system at capture (evidence-based, chimney-rule pattern) + reconciles inline so the Crawl Space:annual bundle seeds and the vendor auto-links — previously the universally-visible chip captured a vendor with zero scheduled work. One-time healer `ensureCrawlSpaceSystemsForWaterproofingVendorsOnceIfNeeded` covers existing captures (prod check: 0 affected today).
+
+**Latent routine-hijack fixed:** `ensureVendorRoutineForCategory` deduped `.otherService` routines by KIND — a painter capture would adopt the household's smoke/CO routine and overwrite its vendor. Dedup now runs on RoutineSeeder serviceKey for `.otherService`; inserts stamp `serviceKey`. Prod check: 0 corrupted rows. Documented the two chip-wiring models (program-type via routineKindFor vs template-backed via bundles) in CLAUDE.md — RoutineSeeder solar/waterproofing branches were deliberately NOT added (would double-surface the template bundles).
+
+**Category hygiene:** invoice-created systems now canonicalize `suggestedCategory` + parentCategory at write (`InvoiceProcessingViewModel.canonicalCategory`). Fire Protection dual-role resolved: dead variant-map alias removed (registry-key match short-circuits before the variant map — documented as a canonicalizer caveat), explicit `contractorOnlyRemaps` table in `canonicalizeContractorCategoriesOnceIfNeeded` + gate bumped `_v2` (prod check: 0 legacy rows, protective).
+
+**Tasks tab:** real search shipped (magnifier toggles inline field; year-wide `searchFeed(query:)` unions the four season feeds — same pipeline, id-deduped; seasonal chrome hides while querying; months order current-month-forward). MiniHero `programCount`/`decisionCount` now season-scoped via `scopedSeasonOrNil` (was year-wide next to scoped coverage). "Add a routine" opens RoutineEditSheet directly. Em-dash sweep: 47 user-facing strings rewritten (5 quiz whyAsked + 42 across 10 files incl. 29 MaintenanceTemplates descriptions/notes) — verified zero identity-field (title/stableId/bundleId) changes so no templateKey orphaning.
+
+**Handyman decision:** KEEP as-is (Tom confirmed). The punch list is load-bearing — reconciler routes tier-4 work only into handyman_punch_items; hiding the tab would orphan ~15-20% of templated work with no alternate surface.
+
+**Data-sweep findings for a future pass (report-only, no writes):** (1) one orphaned template id in prod: `Landscaping:Grade check — drainage away from foundation` (1 active row; template no longer in library; renders fine off its stored title). (2) Legacy bundle-CHILD rows still active alongside their bundle parents (Water Heater flush/T&P ×2, Garage Door lubricate/auto-reverse ×2, Generator children, Security sensor batteries) — hidden on the Tasks tab by the Phase 70.A1 bundle-child filter but still visible in MaintenanceScheduleView buckets; the bundle backfill migrations predate these bundles. Decide: extend `backfillBundlesOnceIfNeeded` with a new gate or leave for Timeline users.
+
+---
+
 ## Data-persistence & interaction bug sweep (2026-07-07)
 
 Full-app audit for "data not saved" + cross-surface staleness bugs (3 parallel audit agents, every finding hand-verified — 8 agent claims refuted before touching code). All fixes landed same-day; both iOS builds green; receive-email redeployed.
