@@ -33,7 +33,7 @@ import { slaPill, statusPill, categoryGlyph, snapshotChips } from "../../compone
 import { fmtAgo, truncate } from "../../lib/format.js";
 
 import { renderWorkOrderZone } from "./workorder.js";
-import { renderThreadZone, scrollThreadToBottom } from "./thread.js";
+import { renderThreadZone } from "./thread.js";
 import {
   renderComposerZone, handleComposerInput, handleComposerKeydown,
   sendReply, flushDraft, resetComposerFor, pickSnippet, toggleWaiting, reopenFromComposer,
@@ -278,8 +278,22 @@ function renderTopbarZone() {
     </button>
   `);
 
+  // Household name links into its Homes workbench — the case ↔ home
+  // drill-down that keeps the surfaces seamless. The raw chez_requests
+  // row carries no household_name, so resolve it through the bundle's
+  // dossier or the queue row.
+  const bundle = state.cases[currentId];
+  const householdName = request.household_name
+    || (bundle && bundle.dossier_lite && bundle.dossier_lite.household && bundle.dossier_lite.household.name)
+    || (queueRows().find((r) => r.id === currentId) || {}).household_name
+    || "";
+  const homeLink = householdName
+    ? (request.household_id
+      ? `<a class="svc-casebar__home" href="#/homes/${encodeURIComponent(request.household_id)}" title="Open this home">${esc(householdName)}</a>`
+      : esc(householdName))
+    : "";
   const meta = [
-    esc(request.household_name || ""),
+    homeLink,
     request.created_at ? `Opened ${esc(fmtAgo(request.created_at))}` : "",
   ].filter(Boolean).join(" · ");
 
@@ -315,7 +329,11 @@ async function loadBundle(requestId, { showErrors = true } = {}) {
     callConcierge("mark_read", { request_id: requestId }).catch(() => {});
 
     invalidate(...ZONES);
-    requestAnimationFrame(scrollThreadToBottom);
+    // Land at the TOP on open: the work order is the whole point of the
+    // snapshot work — burying it below a full thread means the operator
+    // digs on every case. Scroll-to-bottom stays on send / propose /
+    // resolve, where the operator's attention IS the thread.
+    requestAnimationFrame(scrollWorkspaceToTop);
   } catch (err) {
     if (seq !== bundleSeq || currentId !== requestId) return;
     const message = err instanceof ApiError && err.status === 404
@@ -639,12 +657,21 @@ export async function enter(arg) {
   }
 
   if (state.cases[requestId] && !state.cases[requestId]._error) {
-    requestAnimationFrame(scrollThreadToBottom);
+    // Cached bundle: same top-first rule as a fresh load.
+    requestAnimationFrame(scrollWorkspaceToTop);
   }
   requestAnimationFrame(scrollAlfredToBottom);
 
   trackCaseFocus(requestId);
   await loadBundle(requestId);
+}
+
+/// Case-open scroll position: work order first. The workspace column
+/// scroller also hosts the thread, whose scroll-to-bottom is reserved
+/// for send / propose / resolve actions.
+function scrollWorkspaceToTop() {
+  const scroller = document.querySelector("[data-svc-thread-scroll]");
+  if (scroller) scroller.scrollTop = 0;
 }
 
 export function leave() {
@@ -690,7 +717,11 @@ function injectStyles() {
 /* Topbar case header */
 .svc-casebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; }
 .svc-casebar__info { min-width: 0; }
-.svc-casebar__title { font-weight: 650; font-size: 14.5px; color: var(--text, #0A0A0A); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svc-casebar__title { font-weight: 650; font-size: 14.5px; color: var(--text, #0A0A0A); display: flex; align-items: center; gap: 6px; min-width: 0; }
+/* Ellipsis must live on the flex CHILD; a flex container clips hard. */
+.svc-casebar__title > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.svc-casebar__home { color: inherit; text-decoration: none; }
+.svc-casebar__home:hover { color: var(--purple, #6938EF); text-decoration: underline; }
 .svc-casebar__meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 12px; flex-wrap: wrap; }
 .svc-casebar__actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .svc-casebar__actions .svc-btn--ghost.is-on { color: var(--purple, #6938EF); }
