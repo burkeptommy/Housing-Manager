@@ -34,6 +34,12 @@ Homeowner + operator "daily loop" bugs from PRODUCT_AUDIT_2026-07.md. A 10-agent
 
 ---
 
+## Decoders + notification wiring (Phase 5) — SHIPPED (2026-07-07, late night)
+
+Resilient `init(from:)` added to every externally-fed struct the audit flagged (CLAUDE.md hard rule / Phase 60.1 class): the whole quote-analysis tree (ProjectQuoteRow + QuoteAnalysis/Vendor/LineItem/LocalPriceRange/OverallAssessment/DiyAlternative — one drifted field no longer drops the entire quote via loadQuotes's try?; QuoteLineItem.id is now a stable per-decode UUID, was regenerating every access), ProjectFeasibility + its cost/ROI/value sub-structs, VehicleLookupResponse + DecodedVehicle + DecodedRecall (the hard `try` at the lookup success path no longer surfaces a raw decode error when NHTSA succeeded but a Claude field drifted), and CheckUserResult (a drifted optional no longer collapses to "no account" and bypasses the merge-request flow). Notification wiring: PropertyProjectsView observes .projectChanged; ArchiveVehicleSheet + EditVehicleSheet post .vehicleChanged; FamilyMemberFormView save/delete + invite revoke post .householdMemberChanged. Chez build green. (VehicleMaintenanceInterval's resilient decoder landed in the Phase 3 review pass.)
+
+---
+
 ## Security sweep (Phase 1 of the hardening plan) — SHIPPED (2026-07-07, night)
 
 Executed Phase 0 + Phase 1 of the approved hardening plan (working backlog = PRODUCT_AUDIT_2026-07.md). Everything below is committed, deployed to prod, and verified.
