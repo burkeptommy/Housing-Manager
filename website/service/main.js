@@ -20,6 +20,8 @@ import { toast } from "./components/toast.js";
 import { slaPill } from "./components/pills.js";
 import { truncate } from "./lib/format.js";
 import * as todayView from "./views/today.js";
+import * as homesView from "./views/homes.js";
+import * as visitsView from "./views/visits.js";
 
 // ── Element handles (static shell in service.html) ──────────────────────────
 
@@ -83,8 +85,8 @@ const ICONS = {
 const NAV = [
   { id: "today", label: "Today", hash: "#/today", live: true },
   { id: "cases", label: "Cases", hash: "#/cases", live: true },
-  { id: "homes", label: "Homes", hash: "#/homes", live: false },
-  { id: "visits", label: "Visits", hash: "#/visits", live: false },
+  { id: "homes", label: "Homes", hash: "#/homes", live: true },
+  { id: "visits", label: "Visits", hash: "#/visits", live: true },
   { id: "vendors", label: "Vendors", hash: "#/vendors", live: false },
   { id: "ops", label: "Ops", hash: "#/ops", live: false },
 ];
@@ -92,7 +94,10 @@ const NAV = [
 function navActiveId() {
   const hash = location.hash || "#/today";
   if (hash === "#/cases" || hash.startsWith("#/case/")) return "cases";
-  const hit = NAV.find((n) => n.hash === hash);
+  // Match on the base segment so detail routes (#/homes/:id) keep their
+  // rail item highlighted.
+  const base = "#/" + (hash.replace(/^#\//, "").split("/")[0] || "today");
+  const hit = NAV.find((n) => n.hash === base);
   return hit ? hit.id : "today";
 }
 
@@ -322,8 +327,9 @@ function startRouter() {
       { pattern: "#/today", enter: () => todayView.enter(), leave: () => todayView.leave() },
       { pattern: "#/cases", enter: () => enterCase(null), leave: () => leaveCase() },
       { pattern: "#/case/:id", enter: (p) => enterCase(p.id), leave: () => leaveCase() },
-      stubRoute("homes", "Homes"),
-      stubRoute("visits", "Visits"),
+      { pattern: "#/homes/:id", enter: (p) => homesView.enterDetail(p.id), leave: () => homesView.leave() },
+      { pattern: "#/homes", enter: () => homesView.enterList(), leave: () => homesView.leave() },
+      { pattern: "#/visits", enter: () => visitsView.enter(), leave: () => visitsView.leave() },
       stubRoute("vendors", "Vendors"),
       stubRoute("ops", "Ops"),
     ],
