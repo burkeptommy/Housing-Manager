@@ -938,6 +938,124 @@ const OUTCOME_RESOLUTION_TYPES = new Set([
   "other",
 ]);
 
+/// Wave 6 — the memory flywheel. When a Chez-coordinated job resolves
+/// with a real cost, write it back into the household's service_records
+/// (and roll it onto the linked system) so the NEXT delegation snapshot
+/// for that system/vendor is richer. Idempotent on chez_request_id, and
+/// never throws: a write-back failure must not block a resolution.
+async function writeBackServiceRecord(
+  service: ServiceClient,
+  request: ConciergeRequestRow,
+  opts: {
+    costCents: number;
+    contractorId?: string | null;
+    vendorName?: string | null;
+    description?: string | null;
+  }
+): Promise<void> {
+  try {
+    if (!(opts.costCents > 0)) return;
+
+    // Idempotency: one write-back per request, ever.
+    const { data: existing } = await service
+      .from("service_records")
+      .select("id")
+      .eq("chez_request_id", request.id)
+      .limit(1);
+    if (existing && (existing as unknown[]).length > 0) return;
+
+    const snapshot = (request as unknown as { snapshot?: Record<string, unknown> }).snapshot ?? null;
+    const context = (request.context ?? {}) as Record<string, unknown>;
+    const snapSection = (key: string): Record<string, unknown> | null => {
+      const v = snapshot?.[key];
+      return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+    };
+    const asId = (v: unknown): string | null =>
+      typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v.trim()) ? v.trim() : null;
+
+    // Resolve the property (record insert requires a non-null property_id).
+    let propertyId = asId(snapSection("property")?.id);
+    if (!propertyId) {
+      const { data: prop } = await service
+        .from("properties")
+        .select("id")
+        .eq("household_id", request.household_id)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      propertyId = asId((prop as { id?: string } | null)?.id);
+    }
+    if (!propertyId) return; // no property to hang the record on
+
+    // Resolve the linked system (optional), household-scoped.
+    let systemId = asId(snapSection("system")?.id) ?? asId(context.system_id);
+    if (systemId) {
+      const { data: sys } = await service
+        .from("home_systems")
+        .select("id, total_spent")
+        .eq("id", systemId)
+        .eq("household_id", request.household_id)
+        .maybeSingle();
+      if (!sys) systemId = null;
+      else {
+        // Roll the cost onto the system so trust math and the next
+        // snapshot see it. Read-modify-write; best-effort.
+        const today = new Date().toISOString().slice(0, 10);
+        const prevSpent = Number((sys as { total_spent?: number }).total_spent) || 0;
+        const { error: sysErr } = await service
+          .from("home_systems")
+          .update({
+            last_service_date: today,
+            total_spent: prevSpent + opts.costCents / 100,
+          })
+          .eq("id", systemId);
+        if (sysErr) console.warn("[writeback] system roll-up failed:", sysErr.message);
+      }
+    }
+
+    // Resolve the contractor, household-scoped. Prefer the explicit
+    // winning contractor; fall back to a vendor-name match.
+    let contractorId = asId(opts.contractorId);
+    if (contractorId) {
+      const { data: c } = await service
+        .from("contractors")
+        .select("id")
+        .eq("id", contractorId)
+        .eq("household_id", request.household_id)
+        .maybeSingle();
+      if (!c) contractorId = null;
+    }
+    if (!contractorId && opts.vendorName) {
+      const { data: match } = await service
+        .from("contractors")
+        .select("id")
+        .eq("household_id", request.household_id)
+        .ilike("company_name", opts.vendorName.trim())
+        .limit(1)
+        .maybeSingle();
+      contractorId = asId((match as { id?: string } | null)?.id);
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const description = (opts.description || request.summary || "Chez-coordinated service").slice(0, 300);
+    const { error: insErr } = await service.from("service_records").insert({
+      household_id: request.household_id,
+      property_id: propertyId,
+      system_id: systemId,
+      contractor_id: contractorId,
+      service_date: today,
+      service_type: "Chez coordinated",
+      description,
+      cost: opts.costCents / 100,
+      notes: "Handled by Chez.",
+      chez_request_id: request.id,
+    });
+    if (insErr) console.warn("[writeback] service_record insert failed:", insErr.message);
+  } catch (e) {
+    console.warn("[writeback] exception (non-fatal):", e);
+  }
+}
+
 /// Phase 100 — upsert the structured outcome row for a case. Shared by
 /// transition_status (resolve path) and the standalone record_outcome
 /// action (post-hoc edits). Never throws: outcome capture must not
@@ -999,6 +1117,13 @@ async function upsertRequestOutcome(
       } catch (e) {
         console.warn("[outcome] activity log failed (non-fatal):", e);
       }
+      // Wave 6 — feed the resolved job back into the household record.
+      await writeBackServiceRecord(service, request, {
+        costCents: cost,
+        contractorId: outcome.winning_contractor_id ?? null,
+        vendorName: outcome.winning_vendor_name ?? null,
+        description: outcome.summary ?? null,
+      });
     }
     return { ok: true };
   } catch (e) {
@@ -1732,7 +1857,7 @@ async function handleDelegateTask(
 interface ProposePayload {
   request_id: string;
   proposal: {
-    kind: "vendor" | "date_slot" | "cost" | "quote";
+    kind: "vendor" | "date_slot" | "cost" | "quote" | "info_request";
     [key: string]: unknown;
   };
   /// Optional textual preface that lands as the message body.
@@ -1762,8 +1887,14 @@ async function handlePropose(
   if (!requestId) return json({ error: "request_id required" }, 400);
   const proposal = payload.proposal;
   if (!proposal || !proposal.kind ||
-      !["vendor", "date_slot", "cost", "quote"].includes(proposal.kind as string)) {
+      !["vendor", "date_slot", "cost", "quote", "info_request"].includes(proposal.kind as string)) {
     return json({ error: "valid proposal.kind required" }, 400);
+  }
+  // Wave 6 — info_request needs a plain-text fallback in `content` so
+  // shipped clients that don't render the structured card still show
+  // the question.
+  if (proposal.kind === "info_request" && !compactString(payload.content ?? "")) {
+    return json({ error: "info_request requires content (plain-text question)" }, 400);
   }
   const { data: requestData, error: lookupErr } = await service
     .from("chez_requests")
@@ -1844,6 +1975,12 @@ async function handleDecideProposal(
     proposal: Record<string, unknown> | null;
   };
   if (!message.proposal) return json({ error: "not a proposal" }, 400);
+  // Wave 6 — info_request proposals are answered via answer_info_request,
+  // not the approve/decline/counter path. Guard so an old client's
+  // Approve tap can't mangle one.
+  if ((message.proposal as { kind?: string }).kind === "info_request") {
+    return json({ error: "use answer_info_request" }, 400);
+  }
   if ((message.proposal as { status?: string }).status !== "pending") {
     return json({ error: "already decided" }, 409);
   }
@@ -2242,6 +2379,9 @@ async function handleFetchDossier(
     vehiclesRes,
     routinesRes,
     pastRequestsRes,
+    documentsRes,
+    utilitiesRes,
+    projectsRes,
   ] = await Promise.all([
     safe(service.from("households").select("*").eq("id", householdId).maybeSingle(), "household"),
     safe(service.from("properties").select("*").eq("household_id", householdId), "properties"),
@@ -2266,6 +2406,27 @@ async function handleFetchDossier(
         .limit(20),
       "past_requests"
     ),
+    // Phase C/D — the operator's reference view gains documents,
+    // utilities, and projects so vendor calls never require a dig.
+    safe(
+      service.from("documents")
+        .select("id, title, filename, category, expiration_date, uploaded_at, created_at")
+        .eq("household_id", householdId)
+        .is("deleted_at", null)
+        .eq("visible_to_home_managers", true)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      "documents"
+    ),
+    safe(service.from("utility_accounts").select("*").eq("household_id", householdId), "utility_accounts"),
+    safe(
+      service.from("property_projects")
+        .select("id, name, status, entry_type, estimated_budget, created_at")
+        .eq("household_id", householdId)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      "projects"
+    ),
   ]);
 
   return json({
@@ -2279,6 +2440,9 @@ async function handleFetchDossier(
     vehicles: (vehiclesRes as { data?: unknown[] })?.data ?? [],
     routines: (routinesRes as { data?: unknown[] })?.data ?? [],
     past_requests: (pastRequestsRes as { data?: unknown[] })?.data ?? [],
+    documents: (documentsRes as { data?: unknown[] })?.data ?? [],
+    utility_accounts: (utilitiesRes as { data?: unknown[] })?.data ?? [],
+    projects: (projectsRes as { data?: unknown[] })?.data ?? [],
   });
 }
 
@@ -3029,6 +3193,7 @@ async function handleUpdateVisit(
     household_id: string;
     state: string;
     vendor_name: string;
+    contractor_id?: string | null;
   };
 
   const update: Record<string, unknown> = {};
@@ -3122,6 +3287,18 @@ async function handleUpdateVisit(
             attachments: [],
           });
         }
+      }
+
+      // Wave 6 — a completed visit with a real cost feeds the household
+      // record too (idempotent on chez_request_id, so it never
+      // double-writes with the resolve-outcome path).
+      if (payload.state === "completed" && typeof update.final_cost_cents === "number" && update.final_cost_cents > 0) {
+        await writeBackServiceRecord(service, request, {
+          costCents: update.final_cost_cents as number,
+          contractorId: visit.contractor_id ?? null,
+          vendorName: visit.vendor_name ?? null,
+          description: `Visit with ${visit.vendor_name}`,
+        });
       }
     }
   }
@@ -7098,6 +7275,294 @@ async function handleFetchVendorRegistry(
   return json({ vendors: data ?? [] });
 }
 
+// ============================================================================
+// Wave 6 — structured info requests (homeowner answers Chez's questions)
+// ============================================================================
+
+async function handleAnswerInfoRequest(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { message_id?: string; answers?: Record<string, unknown>; attachments?: AttachmentMeta[] },
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const messageId = compactString(payload.message_id);
+  if (!messageId) return json({ error: "message_id required" }, 400);
+
+  const { data: messageRow, error: lookupErr } = await service
+    .from("concierge_messages")
+    .select("*")
+    .eq("id", messageId)
+    .maybeSingle();
+  if (lookupErr || !messageRow) return json({ error: "message not found" }, 404);
+  const message = messageRow as {
+    id: string; request_id: string; household_id: string;
+    proposal: Record<string, unknown> | null;
+  };
+  if (!message.proposal || (message.proposal as { kind?: string }).kind !== "info_request") {
+    return json({ error: "not an info request" }, 400);
+  }
+  const proposalStatus = (message.proposal as { status?: string }).status;
+  if (proposalStatus && proposalStatus !== "pending") {
+    return json({ error: "already answered" }, 409);
+  }
+
+  const { data: req } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", message.request_id)
+    .maybeSingle();
+  if (!req) return json({ error: "request not found" }, 404);
+  const request = req as ConciergeRequestRow;
+  if (user.id !== request.user_id) return json({ error: "not authorized" }, 403);
+
+  // Sanitize answers into a flat string map (cap 20 keys, 2KB total).
+  const rawAnswers = (payload.answers && typeof payload.answers === "object") ? payload.answers : {};
+  const answers: Record<string, string> = {};
+  let budget = 0;
+  for (const [k, v] of Object.entries(rawAnswers)) {
+    if (Object.keys(answers).length >= 20) break;
+    const key = String(k).slice(0, 100);
+    const val = typeof v === "string" ? v.slice(0, 500) : String(v ?? "").slice(0, 500);
+    if (budget + key.length + val.length > 2048) break;
+    answers[key] = val;
+    budget += key.length + val.length;
+  }
+  const attachments = Array.isArray(payload.attachments) ? payload.attachments.slice(0, 8) : [];
+  const now = new Date().toISOString();
+
+  // Write the reply onto the proposal + flip status.
+  const updatedProposal = {
+    ...(message.proposal as Record<string, unknown>),
+    status: "answered",
+    reply: { answers, attachments, answered_at: now },
+  };
+  await service.from("concierge_messages").update({ proposal: updatedProposal }).eq("id", messageId);
+
+  // A readable user-role summary message so the thread narrates itself.
+  const fields = Array.isArray((message.proposal as { fields?: unknown }).fields)
+    ? ((message.proposal as { fields: Array<Record<string, unknown>> }).fields)
+    : [];
+  const labelFor = (id: string): string => {
+    const f = fields.find((x) => String(x.id) === id);
+    return f && typeof f.label === "string" && f.label.trim() ? String(f.label) : id;
+  };
+  const lines = Object.entries(answers)
+    .map(([id, val]) => `${labelFor(id)}: ${val || "(skipped)"}`)
+    .join("\n");
+  await service.from("concierge_messages").insert({
+    household_id: request.household_id,
+    user_id: request.user_id,
+    request_id: request.id,
+    role: "user",
+    content: `Answered Chez's questions:\n${lines}`,
+    attachments,
+  });
+
+  // Reopen for the operator + decrement the pending counter.
+  await service
+    .from("chez_requests")
+    .update({
+      status: request.status === "waiting_customer" ? "open" : request.status,
+      last_message_at: now,
+      unread_for_admin: true,
+      pending_proposal_count: Math.max(0, (request.pending_proposal_count ?? 0) - 1),
+    })
+    .eq("id", request.id);
+
+  await sendPush(
+    serviceUrl,
+    serviceRoleKey,
+    adminUserIds(),
+    "Homeowner answered your questions",
+    request.summary ?? "A homeowner replied with details.",
+    { type: "chez_admin_request", request_id: request.id }
+  );
+
+  return json({ ok: true });
+}
+
+// ============================================================================
+// Wave 6 — homeowner progress timeline (counts only, no vendor names)
+// ============================================================================
+
+async function handleFetchRequestProgress(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string }
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+
+  const { data: req } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (!req) return json({ error: "request not found" }, 404);
+  const request = req as ConciergeRequestRow & {
+    analysis_cache_at?: string | null; resolved_at?: string | null;
+  };
+  if (user.id !== request.user_id) return json({ error: "not authorized" }, 403);
+
+  const safe = async <T>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[progress] ${label}:`, e); return null; }
+  };
+  const [callsRes, proposalsRes, visitsRes] = await Promise.all([
+    safe(service.from("chez_vendor_calls").select("outcome, quoted_cost_cents, last_called_at").eq("request_id", requestId), "calls"),
+    safe(service.from("concierge_messages").select("proposal, proposal_kind, created_at").eq("request_id", requestId).not("proposal", "is", null).order("created_at", { ascending: true }), "proposals"),
+    safe(service.from("chez_visits").select("scheduled_for, state, completed_at, final_cost_cents").eq("request_id", requestId).order("created_at", { ascending: true }), "visits"),
+  ]);
+
+  const calls = (((callsRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? []);
+  const called = calls.filter((c) => c.outcome !== null && c.outcome !== undefined).length;
+  const quotes = calls.filter((c) => c.quoted_cost_cents !== null && c.quoted_cost_cents !== undefined).length;
+  const lastCalledAt = calls
+    .map((c) => (typeof c.last_called_at === "string" ? c.last_called_at : null))
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
+
+  const money = (cents: unknown): string | null => {
+    const n = Number(cents);
+    return Number.isFinite(n) && n > 0 ? `$${Math.round(n / 100).toLocaleString("en-US")}` : null;
+  };
+  const dateShort = (iso: unknown): string => {
+    const s = typeof iso === "string" ? iso : "";
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const steps: Array<{ kind: string; label: string; at: string | null }> = [];
+  steps.push({ kind: "submitted", label: "You handed this to Chez", at: request.created_at });
+  if (request.analysis_cache_at) {
+    steps.push({ kind: "research", label: "Chez lined up candidates", at: request.analysis_cache_at });
+  }
+  if (called > 0) {
+    const label = quotes > 0
+      ? `Chez called ${called} vendor${called === 1 ? "" : "s"} · ${quotes} quote${quotes === 1 ? "" : "s"} in`
+      : `Chez called ${called} vendor${called === 1 ? "" : "s"}`;
+    steps.push({ kind: "outreach", label, at: lastCalledAt });
+  }
+
+  const PROPOSAL_LABELS: Record<string, string> = {
+    vendor: "Recommendation sent", date_slot: "Dates proposed",
+    cost: "Cost approval requested", info_request: "Chez asked you a question",
+    quote: "Quote shared",
+  };
+  const STATUS_SUFFIX: Record<string, string> = {
+    approved: "approved", declined: "declined", countered: "countered", answered: "answered",
+  };
+  for (const m of (((proposalsRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? [])) {
+    const p = (m.proposal && typeof m.proposal === "object") ? m.proposal as Record<string, unknown> : {};
+    const kind = String(p.kind ?? m.proposal_kind ?? "");
+    let label = PROPOSAL_LABELS[kind] ?? "Update sent";
+    const status = String(p.status ?? "");
+    if (STATUS_SUFFIX[status]) label += ` · ${STATUS_SUFFIX[status]}`;
+    steps.push({ kind: "proposal", label, at: (typeof m.created_at === "string" ? m.created_at : null) });
+  }
+
+  for (const v of (((visitsRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? [])) {
+    if (v.state === "completed") {
+      const cost = money(v.final_cost_cents);
+      steps.push({ kind: "visit_completed", label: cost ? `Visit completed · ${cost}` : "Visit completed", at: (typeof v.completed_at === "string" ? v.completed_at : null) });
+    } else if (v.scheduled_for) {
+      const when = dateShort(v.scheduled_for);
+      steps.push({ kind: "visit_scheduled", label: when ? `Visit booked for ${when}` : "Visit booked", at: (typeof v.scheduled_for === "string" ? v.scheduled_for : null) });
+    }
+  }
+
+  if (request.resolved_at) {
+    steps.push({ kind: "resolved", label: "Wrapped up", at: request.resolved_at });
+  }
+
+  steps.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+  const capped = steps.slice(0, 30);
+  const lastMeaningful = [...capped].reverse().find((s) => s.kind !== "submitted");
+  const headline = lastMeaningful?.label ?? "Chez is on it";
+
+  return json({ steps: capped, headline, called, quotes });
+}
+
+// ============================================================================
+// Wave 3 Phase C — operator-captured homeowner availability
+// ============================================================================
+
+async function handleSaveCaseAvailability(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string; windows?: unknown }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+  const windows = payload.windows ?? null;
+  if (windows !== null && JSON.stringify(windows).length > 8192) {
+    return json({ error: "windows too large" }, 400);
+  }
+  const { data, error } = await service
+    .from("chez_requests")
+    .update({ availability_windows: windows })
+    .eq("id", requestId)
+    .select("availability_windows")
+    .maybeSingle();
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, availability_windows: (data as { availability_windows?: unknown } | null)?.availability_windows ?? null });
+}
+
+// ============================================================================
+// Wave 3 Phase D — vendor registry drilldown
+// ============================================================================
+
+async function handleFetchVendorDetail(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { vendor_key?: string }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const vendorKey = compactString(payload.vendor_key);
+  if (!vendorKey) return json({ error: "vendor_key required" }, 400);
+
+  const safe = async <T>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[vendor-detail] ${label}:`, e); return null; }
+  };
+
+  // Identity spine → the underlying (source, source_id) pairs for this key.
+  const identRes = await safe(
+    service.from("chez_vendor_identities").select("source, source_id, name, phone").eq("vendor_key", vendorKey),
+    "identities"
+  );
+  const idents = (((identRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? []);
+  const callIds = idents.filter((i) => i.source === "call").map((i) => String(i.source_id));
+  const outreachIds = idents.filter((i) => i.source === "outreach").map((i) => String(i.source_id));
+  // A display name + phone to match visits (which key by name/phone).
+  const anyName = idents.map((i) => (typeof i.name === "string" ? i.name : null)).filter(Boolean)[0] ?? null;
+  const anyPhone = idents.map((i) => (typeof i.phone === "string" ? i.phone : null)).filter(Boolean)[0] ?? null;
+
+  const [registryRes, callsRes, outreachRes, visitsRes] = await Promise.all([
+    safe(service.from("chez_vendor_registry").select("*").eq("vendor_key", vendorKey).maybeSingle(), "registry"),
+    callIds.length > 0
+      ? safe(service.from("chez_vendor_calls").select("*").in("id", callIds).order("created_at", { ascending: false }).limit(50), "calls")
+      : Promise.resolve(null),
+    outreachIds.length > 0
+      ? safe(service.from("chez_vendor_outreach").select("*").in("id", outreachIds).order("created_at", { ascending: false }).limit(50), "outreach")
+      : Promise.resolve(null),
+    anyName
+      ? safe(service.from("chez_visits").select("*").ilike("vendor_name", anyName).order("created_at", { ascending: false }).limit(50), "visits")
+      : Promise.resolve(null),
+  ]);
+
+  return json({
+    registry: (registryRes as { data?: unknown } | null)?.data ?? null,
+    calls: ((callsRes as { data?: unknown[] } | null)?.data) ?? [],
+    outreach: ((outreachRes as { data?: unknown[] } | null)?.data) ?? [],
+    visits: ((visitsRes as { data?: unknown[] } | null)?.data) ?? [],
+    matched_by: { name: anyName, phone: anyPhone },
+  });
+}
+
 async function handleFetchOpsMetrics(
   service: ServiceClient,
   user: { id: string; email?: string | null } | null
@@ -7353,6 +7818,24 @@ serve(async (req: Request) => {
           user,
           body as unknown as UpdateVisitPayload
         );
+
+      // Wave 6 — structured info requests + homeowner progress timeline
+      case "answer_info_request":
+        return handleAnswerInfoRequest(
+          service,
+          user,
+          body as { message_id?: string; answers?: Record<string, unknown>; attachments?: AttachmentMeta[] },
+          supabaseUrl,
+          serviceRoleKey
+        );
+      case "fetch_request_progress":
+        return handleFetchRequestProgress(service, user, body as { request_id?: string });
+
+      // Wave 3 Phase C/D — case availability + vendor registry drilldown
+      case "save_case_availability":
+        return handleSaveCaseAvailability(service, user, body as { request_id?: string; windows?: unknown });
+      case "fetch_vendor_detail":
+        return handleFetchVendorDetail(service, user, body as { vendor_key?: string });
 
       // Phase 100 — intelligence foundation: call ledger persistence,
       // structured outcomes, vendor registry, ops metrics, operator
