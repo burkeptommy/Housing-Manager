@@ -2795,10 +2795,46 @@ final class DatabaseService {
             .value
     }
 
+    /// July 2026 (audit F6): explicit-null raw PATCH that unlinks every task
+    /// parented to a routine. `parent_routine_id != nil` is the universal
+    /// hiding signal, so archiving without this strands the tasks invisibly.
+    /// A raw dictionary is required — Update structs omit nil fields (the F4
+    /// nil-omission class): the old RoutineGroupingEngine.unlinkTasksFromRoutine
+    /// set `update.parentRoutineId = nil` on a synthesized encoder and never
+    /// actually wrote NULL, so ALL archive paths were stranding tasks.
+    func clearTasksParentRoutine(routineId: UUID) async throws {
+        try await from("maintenance_tasks")
+            .update(["parent_routine_id": nil] as [String: String?])
+            .eq("parent_routine_id", value: routineId.uuidString)
+            .execute()
+    }
+
+    /// July 2026 (audit F4): Update structs use synthesized encoders, so nil
+    /// fields are OMITTED from the PATCH — "clear this field" silently never
+    /// persisted anywhere in the app (remove a routine's vendor, blank a
+    /// plate/phone/notes, toggle off insurance tracking…). This helper writes
+    /// explicit SQL NULLs for the columns a save path knows the user cleared.
+    /// All-nil `[String: String?]` values encode as JSON null regardless of
+    /// the column's actual type. Pair it with the struct update at each save
+    /// site; see RoutineEditSheet.save for the reference pattern.
+    func clearColumns(table: String, id: UUID, columns: [String]) async throws {
+        guard !columns.isEmpty else { return }
+        var payload: [String: String?] = [:]
+        for column in columns { payload[column] = String?.none }
+        try await from(table)
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     /// Phase 55: Soft-delete a routine via archived_at. The list
     /// fetch filters on archived_at IS NULL so the row disappears
     /// everywhere without losing history or cascading to visits.
+    /// July 2026 (audit F6): this is the single choke point for
+    /// user-initiated removal — child tasks are unlinked first so they
+    /// resurface in the flat buckets instead of vanishing.
     func archiveRoutine(id: UUID) async throws {
+        try? await clearTasksParentRoutine(routineId: id)
         var update = RoutineUpdate()
         update.archivedAt = Date()
         _ = try await updateRoutine(id: id, update)
@@ -2808,6 +2844,7 @@ final class DatabaseService {
     /// routine gone — cascades to routine_visits. Prefer archiveRoutine
     /// for user-initiated removals from the list UI.
     func deleteRoutine(id: UUID) async throws {
+        try? await clearTasksParentRoutine(routineId: id)
         try await from("routines")
             .delete()
             .eq("id", value: id.uuidString)

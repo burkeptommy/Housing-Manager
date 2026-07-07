@@ -537,6 +537,21 @@ struct FamilyMemberFormView: View {
                     isExpecting: isExpecting, legalName: legalName.isEmpty ? nil : legalName,
                     school: school.isEmpty ? nil : school, notes: notes.isEmpty ? nil : notes
                 ))
+
+                // July 2026 (audit F4): nil fields are OMITTED from the PATCH
+                // by the synthesized encoder — deleting a wrong email/phone/
+                // school/note never persisted. Explicit SQL NULLs for fields
+                // the user cleared.
+                var clearedColumns: [String] = []
+                if email.isEmpty, existing.email?.isEmpty == false { clearedColumns.append("email") }
+                if phone.isEmpty, existing.phone?.isEmpty == false { clearedColumns.append("phone") }
+                if school.isEmpty, existing.school?.isEmpty == false { clearedColumns.append("school") }
+                if notes.isEmpty, existing.notes?.isEmpty == false { clearedColumns.append("notes") }
+                if legalName.isEmpty, existing.legalName?.isEmpty == false { clearedColumns.append("legal_name") }
+                if !hasDateOfBirth, existing.dateOfBirth != nil { clearedColumns.append("date_of_birth") }
+                try? await db.clearColumns(
+                    table: "family_members", id: existing.id, columns: clearedColumns
+                )
             } else {
                 let user = try await db.fetchCurrentUser()
                 guard let householdId = user.householdId else { error = "No household found"; isSaving = false; return }

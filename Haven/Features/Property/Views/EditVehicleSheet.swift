@@ -104,6 +104,17 @@ struct EditVehicleSheet: View {
                 ownershipType: ownershipType,
                 notes: notes.isEmpty ? nil : notes
             ))
+
+            // July 2026 (audit F4): nil fields are OMITTED from the PATCH —
+            // deleting a wrong plate/color/note and saving silently kept the
+            // old value. Explicit SQL NULLs for cleared fields.
+            var clearedColumns: [String] = []
+            if color.isEmpty, vehicle.color?.isEmpty == false { clearedColumns.append("color") }
+            if licensePlate.isEmpty, vehicle.licensePlate?.isEmpty == false { clearedColumns.append("license_plate") }
+            if notes.isEmpty, vehicle.notes?.isEmpty == false { clearedColumns.append("notes") }
+            try? await DatabaseService.shared.clearColumns(
+                table: "vehicles", id: vehicle.id, columns: clearedColumns
+            )
             Haptics.success()
             onSave?()
             dismiss()

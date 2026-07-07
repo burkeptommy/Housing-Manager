@@ -3375,6 +3375,11 @@ struct HouseholdInvitationRow: Codable, Identifiable {
     let expiresAt: Date?
     let acceptedAt: Date?
     let acceptedBy: UUID?
+    /// July 2026 (audit F3): true only when the invite flow created the
+    /// family_members placeholder itself. Revoke may delete the member ONLY
+    /// when this is true — pre-migration rows decode as false, so legacy
+    /// revokes never delete.
+    let createdMember: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, role, status
@@ -3390,6 +3395,7 @@ struct HouseholdInvitationRow: Codable, Identifiable {
         case expiresAt = "expires_at"
         case acceptedAt = "accepted_at"
         case acceptedBy = "accepted_by"
+        case createdMember = "created_member"
     }
 }
 
@@ -3401,6 +3407,9 @@ struct HouseholdInvitationInsert: Codable {
     var role: String = "member"
     var familyMemberId: UUID?
     var personalMessage: String?
+    /// True only when the invite flow itself created the family_members
+    /// placeholder (addPersonToHousehold path). See HouseholdInvitationRow.
+    var createdMember: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case role
@@ -3410,6 +3419,7 @@ struct HouseholdInvitationInsert: Codable {
         case inviteCode = "invite_code"
         case familyMemberId = "family_member_id"
         case personalMessage = "personal_message"
+        case createdMember = "created_member"
     }
 }
 

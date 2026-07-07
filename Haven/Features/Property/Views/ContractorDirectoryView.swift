@@ -2264,7 +2264,27 @@ struct EditContractorSheet: View {
                 }
             }
 
-            let updated = try await DatabaseService.shared.updateContractor(id: contractor.id, update)
+            var updated = try await DatabaseService.shared.updateContractor(id: contractor.id, update)
+
+            // July 2026 (audit F4): nil fields above are OMITTED from the
+            // PATCH — deleting a wrong email/phone/website never persisted.
+            // Explicit SQL NULLs for anything the user cleared.
+            var clearedColumns: [String] = []
+            if contactName.isEmpty, contractor.contactName?.isEmpty == false { clearedColumns.append("contact_name") }
+            if email.isEmpty, contractor.email?.isEmpty == false { clearedColumns.append("email") }
+            if address.isEmpty, contractor.address?.isEmpty == false { clearedColumns.append("address") }
+            if website.isEmpty, contractor.website?.isEmpty == false { clearedColumns.append("website") }
+            if licenseNumber.isEmpty, contractor.licenseNumber?.isEmpty == false { clearedColumns.append("license_number") }
+            if notes.isEmpty, contractor.notes?.isEmpty == false { clearedColumns.append("notes") }
+            if !clearedColumns.isEmpty {
+                try? await DatabaseService.shared.clearColumns(
+                    table: "contractors", id: contractor.id, columns: clearedColumns
+                )
+                if let refreshed = try? await DatabaseService.shared.fetchContractor(id: contractor.id) {
+                    updated = refreshed
+                }
+            }
+
             Haptics.success()
             NotificationCenter.default.post(name: .contractorChanged, object: nil,
                 userInfo: ["action": "updated", "id": contractor.id.uuidString])

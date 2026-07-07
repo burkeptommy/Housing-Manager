@@ -155,7 +155,7 @@ export async function signOut() {
  * Non-2xx throws ApiError {status, body}. One silent retry on a network
  * error or a 5xx before giving up.
  */
-export async function callConcierge(action, payload = {}) {
+export async function callConcierge(action, payload = {}, opts = {}) {
   const m = mock();
   if (m) return mockCall(m, action, payload);
 
@@ -173,6 +173,9 @@ export async function callConcierge(action, payload = {}) {
         "Authorization": `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ ...payload, action }),
+      // July 2026 (audit F13): flush-on-tab-close saves must survive the
+      // page going away. Callers pass keepalive for last-chance writes.
+      ...(opts.keepalive ? { keepalive: true } : {}),
     });
 
   let resp = null;
