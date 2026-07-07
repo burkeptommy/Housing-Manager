@@ -22,6 +22,8 @@ import { truncate } from "./lib/format.js";
 import * as todayView from "./views/today.js";
 import * as homesView from "./views/homes.js";
 import * as visitsView from "./views/visits.js";
+import * as vendorsView from "./views/vendors.js";
+import * as opsView from "./views/ops.js";
 
 // ── Element handles (static shell in service.html) ──────────────────────────
 
@@ -87,8 +89,8 @@ const NAV = [
   { id: "cases", label: "Cases", hash: "#/cases", live: true },
   { id: "homes", label: "Homes", hash: "#/homes", live: true },
   { id: "visits", label: "Visits", hash: "#/visits", live: true },
-  { id: "vendors", label: "Vendors", hash: "#/vendors", live: false },
-  { id: "ops", label: "Ops", hash: "#/ops", live: false },
+  { id: "vendors", label: "Vendors", hash: "#/vendors", live: true },
+  { id: "ops", label: "Ops", hash: "#/ops", live: true },
 ];
 
 function navActiveId() {
@@ -330,8 +332,9 @@ function startRouter() {
       { pattern: "#/homes/:id", enter: (p) => homesView.enterDetail(p.id), leave: () => homesView.leave() },
       { pattern: "#/homes", enter: () => homesView.enterList(), leave: () => homesView.leave() },
       { pattern: "#/visits", enter: () => visitsView.enter(), leave: () => visitsView.leave() },
-      stubRoute("vendors", "Vendors"),
-      stubRoute("ops", "Ops"),
+      { pattern: "#/vendors/:key", enter: (p) => vendorsView.enterDetail(p.key), leave: () => vendorsView.leave() },
+      { pattern: "#/vendors", enter: () => vendorsView.enterList(), leave: () => vendorsView.leave() },
+      { pattern: "#/ops", enter: () => opsView.enter(), leave: () => opsView.leave() },
     ],
     () => router.navigate("#/today")
   );

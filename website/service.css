@@ -2226,3 +2226,33 @@ button.svc-statchip--alert:hover {
 .svc-agenda-row__title { font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--svc-ink); }
 .svc-agenda-row__sub { font-family: var(--sans); font-size: 12px; color: var(--svc-muted); margin-top: 2px; }
 .svc-agenda-row__actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* ============================================================================
+   Phase D — Vendor registry + Ops metrics
+   ============================================================================ */
+
+.svc-vendors,
+.svc-ops { padding: 28px 32px 60px; max-width: 1040px; }
+
+.svc-vendor-list { display: flex; flex-direction: column; gap: 8px; }
+.svc-vendor-row {
+  display: flex; align-items: center; gap: 16px; text-align: left; width: 100%;
+  border: 1px solid var(--svc-border); border-radius: 12px; background: var(--white);
+  padding: 14px 16px; cursor: pointer; transition: border-color .12s;
+}
+.svc-vendor-row:hover { border-color: var(--svc-border-strong); }
+.svc-vendor-row__main { flex: 1; min-width: 0; }
+.svc-vendor-row__name { font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--svc-ink); display: flex; align-items: center; gap: 8px; }
+.svc-vendor-row__cats { font-family: var(--sans); font-size: 12px; color: var(--svc-muted); margin-top: 2px; }
+.svc-vendor-row__stats { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--sans); font-size: 12px; color: var(--svc-soft); flex-shrink: 0; }
+.svc-stat-warn { color: var(--svc-amber-fg); font-weight: 600; }
+
+.svc-metric-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.svc-metric {
+  border: 1px solid var(--svc-border); border-radius: 12px; background: var(--white); padding: 14px 16px;
+}
+.svc-metric__val { font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--svc-ink); }
+.svc-metric__lbl { font-family: var(--sans); font-size: 11px; color: var(--svc-muted); margin-top: 4px; }
+
+.svc-ops-block { margin-bottom: 26px; }
+.svc-vendor-detail .svc-metric-row { margin-bottom: 20px; }
