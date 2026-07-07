@@ -1500,8 +1500,13 @@ struct FindLocalVendorSheet: View {
         )
         insert.address = vendor.address
         insert.website = vendor.website
-        insert.category = systemCategory
-        insert.specialties = [systemCategory]
+        // July 2026 (audit F16): stamp a CANONICAL category so the adopted
+        // vendor actually matches coverage. Raw sub-system keys / verbose
+        // labels locked vendors out of vendorCoverageItems (the Phase 60.6
+        // Groton bug class).
+        let canonicalCategory = SystemCategoryRegistry.canonical(category: systemCategory) ?? systemCategory
+        insert.category = canonicalCategory
+        insert.specialties = [canonicalCategory]
         // Phase X feedback: catalog rows carry their logo + brand color
         // through from the seeded `utility_providers` table — stamp them
         // on the contractor at creation time so we don't pay Brandfetch
@@ -1520,7 +1525,11 @@ struct FindLocalVendorSheet: View {
         do {
             createdContractor = try await db.createContractor(insert)
         } catch {
+            // July 2026 (audit F16): surface the failure instead of a silent
+            // print — an RLS/network error left the sheet inert with no
+            // feedback.
             print("[FindLocalVendor] Failed to create contractor: \(error)")
+            adoptError = "Couldn't add this vendor. Check your connection and try again."
             isAdding = false
             return
         }
@@ -1549,7 +1558,10 @@ struct FindLocalVendorSheet: View {
                 }
                 return false
             }
-            return system.category.lowercased() == systemCategory.lowercased()
+            // July 2026 (audit F16): canonical match, not raw lowercase
+            // equality — a "Plumbing" vendor must sweep tasks on a
+            // "Plumbing & Heating" system (the Groton bug class).
+            return SystemCategoryRegistry.categoriesMatch(system.category, systemCategory)
         }
 
         for candidate in candidates {
@@ -1561,8 +1573,12 @@ struct FindLocalVendorSheet: View {
 
         // 3. Notify everyone. The contractorAdded post fires the dashboard
         // delegation sheet for any 'either' tasks the new vendor could also
-        // take over (Phase 19l re-fire path).
+        // take over (Phase 19l re-fire path). July 2026 (audit F16): also
+        // post .contractorChanged — the Vendors tab, HouseholdSpendView, and
+        // SeasonalTasksDetailView subscribe only to it, so an adopted vendor
+        // was invisible on those surfaces until a manual refresh.
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        NotificationCenter.default.post(name: .contractorChanged, object: nil)
         NotificationCenter.default.post(
             name: .contractorAdded,
             object: nil,

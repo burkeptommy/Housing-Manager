@@ -1000,10 +1000,17 @@ struct MaintenanceTaskDetailSheet: View {
            !serviceVendor.isEmpty {
             return serviceVendor
         }
+        // July 2026 (audit F16): canonicalize so a sub-system key resolves to
+        // a registry category for both the Places search and the eventual
+        // contractor stamp. FindLocalVendorSheet also canonicalizes at stamp
+        // time as a defensive layer.
         if let systemCategory, !systemCategory.isEmpty {
-            return systemCategory
+            return SystemCategoryRegistry.canonical(category: systemCategory) ?? systemCategory
         }
-        return resolvedCategory ?? "home service"
+        if let resolvedCategory, !resolvedCategory.isEmpty {
+            return SystemCategoryRegistry.canonical(category: resolvedCategory) ?? resolvedCategory
+        }
+        return "Handyman"
     }
 
     @ViewBuilder
@@ -2917,7 +2924,21 @@ struct MaintenanceTaskDetailSheet: View {
             Button {
                 Haptics.light()
                 Analytics.track(.maintenanceTaskDeleted, ["task_id": task.id.uuidString])
-                onDeleteTask?()
+                // July 2026 (audit F7): when a presenter wires onDeleteTask
+                // it owns the delete + its own refresh. But 4 presenters
+                // (dashboard cards, the push deep-link sheet) pass no
+                // callback, so the button used to fire analytics + dismiss
+                // and delete NOTHING — the task reappeared on next load.
+                // Default to a real delete + cross-tab refresh.
+                if let onDeleteTask {
+                    onDeleteTask()
+                } else {
+                    let taskId = task.id
+                    Task {
+                        try? await db.deleteMaintenanceTask(id: taskId)
+                        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                    }
+                }
                 dismiss()
             } label: {
                 HStack {

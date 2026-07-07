@@ -324,6 +324,24 @@ final class ChatViewModel: ObservableObject {
 
                 uploadedDocumentResult = result
 
+                // July 2026 (audit F15): route through InboxItemFromDocument
+                // like the other two upload paths (DocumentUploadManager,
+                // DocumentUploadViewModel). Without this, a contractor quote
+                // attached in chat filed correctly but never produced the
+                // "New Project / Add to Project" needs-action prompt — the
+                // documented hard rule was that ALL upload paths flow through
+                // this single helper. The real category is known now
+                // (autofill already rewrote it server-side).
+                try? await InboxItemFromDocument.create(
+                    householdId: householdId,
+                    documentId: doc.id,
+                    title: autoFillResult.title,
+                    attachmentFilename: fileName,
+                    categoryValue: autoFillResult.category,
+                    analysisSummary: analysis.summary,
+                    db: db
+                )
+
                 let summaryMsg = buildSummaryMessage(result: result)
                 let assistantMsg = ChatMessage(role: .assistant, content: summaryMsg)
                 messages.append(assistantMsg)

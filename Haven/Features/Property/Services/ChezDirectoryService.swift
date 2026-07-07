@@ -54,8 +54,11 @@ final class ChezDirectoryService {
             phone: provider.phone ?? "Not provided"
         )
         insert.website = provider.website
-        insert.category = systemCategory
-        insert.specialties = [systemCategory]
+        // July 2026 (audit F16): canonical category so the adopted vendor
+        // matches coverage (Groton bug class).
+        let canonicalCategory = SystemCategoryRegistry.canonical(category: systemCategory) ?? systemCategory
+        insert.category = canonicalCategory
+        insert.specialties = [canonicalCategory]
         insert.source = "chez_field"
         insert.notes = "Chez Field workspace: \(provider.workspaceId)"
 
@@ -80,7 +83,8 @@ final class ChezDirectoryService {
                 }
                 return false
             }
-            return system.category.lowercased() == systemCategory.lowercased()
+            // July 2026 (audit F16): canonical match, not raw equality.
+            return SystemCategoryRegistry.categoriesMatch(system.category, systemCategory)
         }
 
         for candidate in candidates {
@@ -91,6 +95,7 @@ final class ChezDirectoryService {
         }
 
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        NotificationCenter.default.post(name: .contractorChanged, object: nil)
         NotificationCenter.default.post(
             name: .contractorAdded,
             object: nil,

@@ -4908,18 +4908,27 @@ struct VehicleRow: Codable, Identifiable {
 }
 
 struct VehicleMaintenanceInterval: Codable, Identifiable {
-    var id: String { type }
+    var id: String { taskId?.uuidString ?? type }
     let type: String
     let intervalMiles: Int?
     let intervalMonths: Int?
     let estimatedCost: Double?
     let description: String?
+    /// July 2026 (audit F9): the underlying maintenance_tasks row id when
+    /// this interval was built by wrapping an OVERDUE task in the vehicle
+    /// attention list. Nil for AI-schedule intervals (which aren't tasks).
+    /// Optional so all existing decode/construct sites are unaffected.
+    var taskId: UUID?
+    /// The task's frequency string, so completing an overdue recurring task
+    /// can re-date the next occurrence rather than just archiving it.
+    var frequency: String?
 
     enum CodingKeys: String, CodingKey {
-        case type, description
+        case type, description, frequency
         case intervalMiles = "interval_miles"
         case intervalMonths = "interval_months"
         case estimatedCost = "estimated_cost"
+        case taskId = "task_id"
     }
 
     var estimatedCostDisplay: String? {
