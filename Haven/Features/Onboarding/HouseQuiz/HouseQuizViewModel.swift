@@ -19,6 +19,12 @@ final class HouseQuizViewModel: ObservableObject {
     @Published var currentIndex: Int = 0
     @Published var pendingFeedback: AnswerFeedback?
     @Published var showMilestoneCard: Bool = false
+    /// July 2026 quiz-fun restore — the forwarding-email reveal used to ride
+    /// the legacy milestone system (`milestoneIndices` + `currentIndex == 17`),
+    /// which Phase 60.3 emptied when chapters took over section transitions.
+    /// It now fires as a one-off interstitial gated on the q15b question id,
+    /// with `state.forwardingRevealShownAt` as the once-only latch.
+    @Published var showForwardingReveal: Bool = false
     @Published var showSkipForeverConfirm: Bool = false
     @Published var isSaving: Bool = false
     @Published var providerCaptureForAnswerId: String?
@@ -1747,6 +1753,26 @@ final class HouseQuizViewModel: ObservableObject {
             showMilestoneCard = true
             return
         }
+
+        // July 2026 quiz-fun restore: fire the forwarding-email reveal once,
+        // right after the vendor-capture question — the moment "forward us
+        // your invoices" becomes concrete. Gated on question id (index 17
+        // went stale across the Phase 60.3/67D restructures) and latched via
+        // `forwardingRevealShownAt` so back-nav re-answers and resumes never
+        // re-fire it. If the email hasn't loaded (fetch failed or no address
+        // provisioned), skip silently — the dashboard caption covers it.
+        if currentQuestion?.id == "q15b_household_contractors",
+           state.forwardingRevealShownAt == nil,
+           cachedHouseholdEmail != nil {
+            state.forwardingRevealShownAt = Date()
+            showForwardingReveal = true
+            Analytics.track(.quizForwardingRevealShown, [:])
+            // The answer's own persist ran before advance(), so the latch
+            // needs its own write. Fire-and-forget: a failed write means the
+            // worst case is a second showing on a later device, not data loss.
+            Task { await persistState() }
+            return
+        }
         moveNext()
 
         // Build 85: after moving forward, if there are no more fresh
@@ -1765,7 +1791,14 @@ final class HouseQuizViewModel: ObservableObject {
 
     func dismissMilestoneAndContinue() {
         showMilestoneCard = false
+        showForwardingReveal = false
         moveNext()
+        // Same dead-end guard as advance(): if the reveal fired on the last
+        // fresh question and saved items remain, land on the review list
+        // instead of a misleading completion screen.
+        if currentQuestion == nil && hasUnresolvedSavedQuestions {
+            showSavedReviewScreen = true
+        }
     }
 
     /// Build 84 — Fetches the forwarding email address for the current

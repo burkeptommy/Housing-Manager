@@ -550,7 +550,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "anything_else", label: "Anything else?", icon: "plus.circle"),
             ],
             dynamicSkip: { _ in false },  // never skip — empty answers are allowed
-            whyAsked: "Adding the people already taking care of your home lets us coordinate their visits, link their invoices automatically when they email you, and stop asking you who handles what. Skip any you don't have — we'll fill the gaps later."
+            whyAsked: "Adding the people already taking care of your home lets us coordinate their visits, link their invoices automatically when they email you, and stop asking you who handles what. Skip any you don't have. We'll fill the gaps later."
         ),
     ]
 
@@ -620,7 +620,7 @@ enum HouseQuizQuestionLibrary {
                     return ["oil", "propane", "natural_gas"]
                 }
             },
-            whyAsked: "Capturing your fuel supplier lets us prefill the utility account and link future delivery receipts automatically — forward an invoice and we'll attach it to the right account. If your supplier offers an auto-pay or seasonal pricing plan, we can also surface renewal questions at the right time."
+            whyAsked: "Capturing your fuel supplier lets us prefill the utility account and link future delivery receipts automatically. Forward an invoice and we'll attach it to the right account. If your supplier offers an auto-pay or seasonal pricing plan, we can also surface renewal questions at the right time."
         ),
         HouseQuizQuestion(
             id: "q20_other_fuels",
@@ -688,7 +688,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "portable", label: "Portable", icon: "bolt.fill"),
                 AnswerOption(id: "none", label: "None", icon: "minus.circle"),
             ],
-            whyAsked: "Generators have manufacturer-specific service intervals — annual oil, spark plugs, transfer switch testing — that don't follow generic HVAC schedules. Without the type and fuel we'd either over-generalize or skip critical service. If you have one, we want to know."
+            whyAsked: "Generators have manufacturer-specific service intervals for annual oil, spark plugs, and transfer switch testing that don't follow generic HVAC schedules. Without the type and fuel we'd either over-generalize or skip critical service. If you have one, we want to know."
         ),
         // Phase 67D (A2): Q23 vehicle count dropped — count is implicit in
         // the vehicle-add flow which already supports adding multiple
@@ -700,7 +700,7 @@ enum HouseQuizQuestionLibrary {
             subtitle: "Type, scan, or upload an insurance card. You can add more vehicles later from the garage.",
             kind: .vehicleAdd,
             documentUploadCategory: .autoInsurance,
-            whyAsked: "Vehicles get the same routine-coordination layer as your home — recalls flag the moment NHTSA publishes them, oil changes and tire rotations live alongside your home maintenance, and registration and inspection renewals surface before they lapse. Skip this if you'd rather add cars later."
+            whyAsked: "Vehicles get the same routine-coordination layer as your home. Recalls flag the moment NHTSA publishes them, oil changes and tire rotations live alongside your home maintenance, and registration and inspection renewals surface before they lapse. Skip this if you'd rather add cars later."
         ),
         // Phase 67D (A8): Q25 + Q25b merged into one progressive screen.
         // Garage type chips up top; EV charger toggle revealed below when
@@ -812,7 +812,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "mixed", label: "Mix of both", icon: "person.2.fill"),
                 AnswerOption(id: "hire_out", label: "Hire it out", icon: "briefcase.fill"),
             ],
-            whyAsked: "This is the big one. Your answer routes every flippable task — anything that could go either way — between your personal to-do list and your vendor coordination queue. DIY tier keeps almost everything on your list. Hire-out tier sends almost everything to vendors. Mix routes by effort. You can change it anytime in Settings."
+            whyAsked: "This is the big one. Your answer routes every task that could go either way between your personal to-do list and your vendor coordination queue. DIY tier keeps almost everything on your list. Hire-out tier sends almost everything to vendors. Mix routes by effort. You can change it anytime in Settings."
         ),
     ]
 }

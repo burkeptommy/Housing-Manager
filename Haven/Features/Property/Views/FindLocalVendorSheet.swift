@@ -882,7 +882,7 @@ struct FindLocalVendorSheet: View {
                     Text("No matches for \"\(vendorSearchQuery)\"")
                         .font(HavenTypography.bodySmall.weight(.semibold))
                         .foregroundStyle(HavenColors.textPrimary)
-                    Text("Add them as your own vendor — Chez will track every visit and invoice.")
+                    Text("Add them as your own vendor. Chez will track every visit and invoice.")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textSecondary)
                     Button {

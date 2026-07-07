@@ -401,7 +401,7 @@ final class InboxViewModel: ObservableObject {
             } catch {
                 print("[InboxVM] Delete failed: \(error)")
                 Haptics.error()
-                self.error = "Couldn't delete that item. It's been restored — try again."
+                self.error = "Couldn't delete that item. It's been restored, so try again."
                 await load()
             }
         }

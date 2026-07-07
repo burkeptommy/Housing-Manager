@@ -348,7 +348,7 @@ class InvoiceProcessingViewModel: ObservableObject {
                     if let parentName = resolved.resolvedParentName, !parentName.isEmpty, parentName != "Independent" {
                         parentId = try await resolveOrCreateParent(
                             name: parentName,
-                            category: resolved.resolvedParentCategory ?? system.suggestedCategory ?? "Other",
+                            category: Self.canonicalCategory(resolved.resolvedParentCategory ?? system.suggestedCategory),
                             existingSystems: &existingSystems,
                             cache: &parentSystemCache,
                             db: db
@@ -360,7 +360,7 @@ class InvoiceProcessingViewModel: ObservableObject {
                     // User explicitly chose this name — don't alias-resolve to a different system
                     parentId = try await resolveOrCreateParent(
                         name: newParentName,
-                        category: system.suggestedCategory ?? "Other",
+                        category: Self.canonicalCategory(system.suggestedCategory),
                         existingSystems: &existingSystems,
                         cache: &parentSystemCache,
                         db: db,
@@ -379,7 +379,7 @@ class InvoiceProcessingViewModel: ObservableObject {
                         propertyId: propertyId,
                         householdId: householdId,
                         name: system.name,
-                        category: system.suggestedCategory ?? "Other",
+                        category: Self.canonicalCategory(system.suggestedCategory),
                         manufacturer: system.manufacturer,
                         modelNumber: system.modelNumber,
                         installDate: system.installDate,
@@ -805,6 +805,17 @@ class InvoiceProcessingViewModel: ObservableObject {
           "roof vent", "ridge vent", "ice dam", "roof membrane"],
          "Roof", "Roofing"),
     ]
+
+    /// July 2026 audit: home_systems.category must be stamped canonical at
+    /// WRITE time (codebase-wide rule). process-invoice's suggestedCategory
+    /// comes back from Claude and can be any casing / alias / free text;
+    /// exact-match read paths would silently miss non-canonical rows.
+    /// Unrecognized strings pass through unchanged so genuinely custom
+    /// categories still work.
+    private static func canonicalCategory(_ raw: String?) -> String {
+        let value = raw ?? "Other"
+        return SystemCategoryRegistry.canonical(category: value) ?? value
+    }
 
     private static func findParentGroup(for systemName: String, category: String? = nil) -> (parentName: String, parentCategory: String)? {
         let lower = systemName.lowercased()

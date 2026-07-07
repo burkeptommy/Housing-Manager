@@ -107,7 +107,7 @@ struct AssessmentDetailSheet: View {
                 detailRow(
                     icon: "checklist",
                     title: "What we'll do",
-                    body: "A 60-90 minute walk-through to capture your home's systems, vendors, manuals, and any items that need follow-up. Free of charge — no work or upsell during the visit."
+                    body: "A 60-90 minute walk-through to capture your home's systems, vendors, manuals, and any items that need follow-up. Free of charge, with no work or upsell during the visit."
                 )
                 detailRow(
                     icon: "house.fill",

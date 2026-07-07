@@ -52,7 +52,7 @@ struct SecurityReassuranceCard: View {
                 .foregroundStyle(HavenColors.creamLight)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Here's what happens when you upload — and what doesn't.")
+            Text("Here's what happens when you upload, and what doesn't.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.creamLight.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)

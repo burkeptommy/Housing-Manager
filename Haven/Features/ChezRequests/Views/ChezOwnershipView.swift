@@ -245,7 +245,7 @@ struct ChezOwnershipView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("Tap **Save** to confirm — nothing moves until you do.")
+            Text("Tap **Save** to confirm. Nothing moves until you do.")
                 .font(HavenTypography.caption)
                 .foregroundStyle(HavenColors.textTertiary)
         }

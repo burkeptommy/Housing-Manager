@@ -58,6 +58,7 @@ enum AnalyticsEvent: String {
     case quizSavedForLater = "quiz_saved_for_later"
     case quizSkippedForever = "quiz_skipped_forever"
     case quizMilestoneReached = "quiz_milestone_reached"
+    case quizForwardingRevealShown = "quiz_forwarding_reveal_shown"
     case quizCompleted = "quiz_completed"
     case quizDismissed = "quiz_dismissed"
     case quizCompletionViewMaintenanceTapped = "quiz_completion_view_maintenance_tapped"

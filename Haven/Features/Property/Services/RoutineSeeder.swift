@@ -263,6 +263,16 @@ final class RoutineSeeder {
             )
         }
 
+        // NOTE (July 2026 audit): Solar, Security System, and Crawl Space
+        // (waterproofing) intentionally have NO seeder branch. Those
+        // categories are template-backed — the reconciler seeds their
+        // annual vendor bundles (Solar:annual, Security System:annual,
+        // Crawl Space:annual) and auto-links the captured contractor, so
+        // a standing routine here would double-surface the same visit.
+        // The pre-existing "security" branch above predates the Security
+        // System:annual bundle and is kept for households already relying
+        // on it; don't extend the pattern.
+
         // Phase 1.1: Painter — annual cadence year-round. Reuses
         // .otherService for resilient-decode safety (no enum change).
         // The painter chip on Q15b maps to "Painting" via
