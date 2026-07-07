@@ -8,6 +8,12 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Data-loss fixes (Phase 2 of the hardening plan) — SHIPPED (2026-07-07, late night)
+
+All four F-class data-loss bugs from PRODUCT_AUDIT_2026-07.md fixed, committed, Chez build green. **F3:** invitation revoke deleted pre-existing family members — `household_invitations.created_member` (migration `20270121`, pushed) marks placeholder rows the invite flow created; revoke deletes only those, never linked accounts. **F4 (the nil-omission class):** Update structs omit nil fields from the PATCH, so field CLEARS never persisted app-wide. New `DatabaseService.clearColumns(table:id:columns:)` writes explicit SQL NULLs; wired into RoutineEditSheet (vendor removal also drops the routine to pending_vendor so children resurface), EditInsurance/EditVehicle sheets, contractor edit, family-member edit, trusted-contact edit. New CLAUDE.md hard rule. **F6 (worse than audited):** `RoutineGroupingEngine.unlinkTasksFromRoutine` had NEVER unlinked anything (nil-omission again) — every routine archive path stranded child tasks invisibly. `archiveRoutine`/`deleteRoutine` are now the choke points (explicit-null unlink first); prod repaired via SQL (2 stranded tasks, 1 household). **F13:** service-portal call ledger — hydration is field-level merge now (pre-hydration typing could clobber + overwrite the server row), tab-close flush uses fetch keepalive; fair-band persistence is admin.js-only → deferred with the admin rebuild.
+
+---
+
 ## Security sweep (Phase 1 of the hardening plan) — SHIPPED (2026-07-07, night)
 
 Executed Phase 0 + Phase 1 of the approved hardening plan (working backlog = PRODUCT_AUDIT_2026-07.md). Everything below is committed, deployed to prod, and verified.
