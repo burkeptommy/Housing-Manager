@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
+import { arrayBufferToBase64 } from "../_shared/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -363,23 +364,29 @@ SYSTEM IDENTIFICATION RULES:
           .download(doc.file_path);
         if (fileData) {
           const arrayBuffer = await fileData.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          // July 2026 (audit F19): chunked encoder — the old
+          // btoa(String.fromCharCode(...bytes)) stack-overflowed on
+          // multi-MB scanned PDFs and 500'd.
+          const base64 = arrayBufferToBase64(arrayBuffer);
 
-          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.file_path);
-          const isPdf = /\.pdf$/i.test(doc.file_path);
-
-          if (isPdf) {
+          // Detect the real media type from MAGIC BYTES, not the path
+          // extension. receive-email stores email-forwarded documents at
+          // extensionless paths (householdId/uuid), so extension-only
+          // detection meant email-sourced PDFs never reached Claude as PDFs
+          // and silently degraded to extracted_text.
+          const media = detectMediaType(new Uint8Array(arrayBuffer), doc.file_path);
+          if (media === "application/pdf") {
             documentSource.push({
               type: "document",
               source: { type: "base64", media_type: "application/pdf", data: base64 },
             });
-          } else if (isImage) {
-            const ext = doc.file_path.split(".").pop()?.toLowerCase();
-            const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" };
+          } else if (media && media.startsWith("image/")) {
             documentSource.push({
               type: "image",
-              source: { type: "base64", media_type: mimeMap[ext ?? "jpeg"] ?? "image/jpeg", data: base64 },
+              source: { type: "base64", media_type: media, data: base64 },
             });
+          } else {
+            console.log(`[process-invoice] Unrecognized media for ${doc.file_path}; relying on text.`);
           }
         }
       } catch (err) {
@@ -736,3 +743,35 @@ SYSTEM IDENTIFICATION RULES:
     );
   }
 });
+
+// July 2026 (audit F19): media detection by magic bytes, with a path-
+// extension fallback. Handles email-forwarded documents stored at
+// extensionless paths where extension-only detection failed.
+function detectMediaType(bytes: Uint8Array, filePath: string): string | null {
+  // %PDF
+  if (bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return "application/pdf";
+  }
+  // JPEG: FF D8 FF
+  if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return "image/jpeg";
+  }
+  // PNG: 89 50 4E 47
+  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+    return "image/png";
+  }
+  // GIF: 47 49 46 38
+  if (bytes.length >= 4 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return "image/gif";
+  }
+  // WEBP: RIFF....WEBP
+  if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+    return "image/webp";
+  }
+  // Fallback: path extension.
+  if (/\.pdf$/i.test(filePath)) return "application/pdf";
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" };
+  return ext ? (mimeMap[ext] ?? null) : null;
+}

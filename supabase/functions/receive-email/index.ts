@@ -9,6 +9,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
+import { arrayBufferToBase64 } from "../_shared/base64.ts";
 import {
   createTasksFromSuggestions,
   type SuggestedTask,
@@ -339,17 +340,8 @@ serve(async (req: Request) => {
 
     const contentType = req.headers.get("content-type") ?? "";
 
-    // Helper: encode ArrayBuffer to base64 in chunks (handles large PDFs without blowing the stack)
-    function arrayBufferToBase64(buffer: ArrayBuffer): string {
-      const bytes = new Uint8Array(buffer);
-      const chunkSize = 8192;
-      let result = "";
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-        result += String.fromCharCode(...chunk);
-      }
-      return btoa(result);
-    }
+    // July 2026 (audit F19): chunked encoder extracted to _shared/base64.ts
+    // so process-invoice uses the same stack-safe implementation.
 
     if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData();
@@ -2456,8 +2448,14 @@ Respond with ONLY valid JSON:
         baseMetadata.matched_contractor_name = matchedContractor.company_name;
       }
 
-      // Insert the final inbox item FIRST, then delete placeholder only on success
-      const { error: inboxInsertErr } = await supabase.from("inbox_items").insert({
+      // Deep-link target for the completion push (set from the insert below).
+      let completionInboxItemId = "";
+      // Insert the final inbox item FIRST, then delete placeholder only on success.
+      // July 2026 (audit F17): capture the REAL inserted id via .select("id")
+      // so the completion push deep-links to this item — the placeholder it
+      // used to reference is deleted below, so the push landed on a
+      // nonexistent row.
+      const { data: finalInboxRow, error: inboxInsertErr } = await supabase.from("inbox_items").insert({
         household_id: householdId,
         type: mainType,
         title: mainTitle,
@@ -2477,7 +2475,10 @@ Respond with ONLY valid JSON:
         family_category: classification.type === "bill_invoice" ? "bills" : (classification.type === "family" ? ((classification as any).familyCategory || "other") : null),
         family_member_name: classification.type === "family" ? ((classification as any).familyMemberName || null) : null,
         event_date: (classification as any).eventDate || null,
-      });
+      }).select("id").single();
+      // Where the completion push should deep-link: the real final item, or
+      // (on insert failure) the placeholder that gets flipped to a failure card.
+      completionInboxItemId = finalInboxRow?.id ?? placeholderId ?? "";
 
       if (inboxInsertErr) {
         console.error(`[receive-email] Final inbox item insert failed: ${inboxInsertErr.message}`);
@@ -2580,7 +2581,10 @@ Respond with ONLY valid JSON:
                   ? `Bill from ${classification.vendorName || "vendor"} has been processed`
                   : `Your ${classification.documentTitle || classification.type.replace(/_/g, " ")} is ready to review`;
 
-            fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            // July 2026 (audit F17): deep-link to the REAL final item, not the
+            // deleted placeholder; register with waitUntil so the runtime
+            // doesn't kill the fire-and-forget fetch before it lands.
+            const pushPromise = fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -2592,10 +2596,14 @@ Respond with ONLY valid JSON:
                 body: completionBody,
                 data: {
                   type: "inbox_ready",
-                  inbox_item_id: placeholderId ?? "",
+                  inbox_item_id: completionInboxItemId || (placeholderId ?? ""),
                 },
               }),
-            });
+            }).catch((e) => console.warn("[receive-email] completion push failed:", e));
+            try {
+              // @ts-ignore — EdgeRuntime is injected by the Supabase edge runtime
+              EdgeRuntime.waitUntil(pushPromise);
+            } catch (_) { /* local run — fetch already dispatched */ }
           }
         } catch {
           // Non-blocking — don't let notification failure affect the response
