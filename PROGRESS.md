@@ -26,6 +26,14 @@ Homeowner + operator "daily loop" bugs from PRODUCT_AUDIT_2026-07.md. A 10-agent
 
 ---
 
+## Scheduled intelligence + deployment hygiene (Phase 4) — SHIPPED (2026-07-07, late night)
+
+**Standing-appointment crons** — `auto-resume-standing-appointments` + `roll-forward-standing-visits` had FAILED every night since Phase 51 (built URLs from `current_setting('app.settings.*')` GUCs hosted Supabase never sets; confirmed in cron.job_run_details). Re-authored on the hardcoded-URL pattern (migration `20270123`); both verified POSTing successfully. **proactive-scan** — the advertised background-intelligence moat had NO cron + no caller, so it never ran; now scheduled weekly (Sun 06:30 UTC, `20270124`) + hardened (manual path scoped to caller's own household, header-less cron scans all/ignores body household_id, all-households bounded at 250 with a no-silent-truncation log, Claude routed through cost-discipline). INTERNAL_FN_SECRET rotated (saved in scratchpad). **F14** — send-catalog-request stopped linking to the nonexistent admin.getchez.com/system-requests/{id} + dropped the false 4-hour SLA; the email is the surface now. **F18-adjacent** — removed the dead /admin.html link from service.html. **Observability** — receive-email fires an admin backstop email (SendGrid → CHEZ_ADMIN_EMAILS) on total failure under waitUntil; hoisting toAddress/fromAddress/subject to function scope also cleared 7 pre-existing strict errors. simulate-scenario's dropped-estate_state query was already removed in Phase 1.
+
+**Deferred (noted):** the service.getchez.com subdomain root host rule (audit F18) — the getchez.com/service.html fallback works, so left for the admin rebuild; the proactive-scan cron is header-less (same posture as the other 5 crons) — fully lockable later via the internal-secret GUC once a pg_cron secret-delivery path exists.
+
+---
+
 ## Security sweep (Phase 1 of the hardening plan) — SHIPPED (2026-07-07, night)
 
 Executed Phase 0 + Phase 1 of the approved hardening plan (working backlog = PRODUCT_AUDIT_2026-07.md). Everything below is committed, deployed to prod, and verified.
