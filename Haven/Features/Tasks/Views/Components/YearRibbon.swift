@@ -8,10 +8,25 @@ import SwiftUI
 ///
 /// Tap a tile to scope the rest of the Maintenance screen to that season.
 struct YearRibbonSummary {
-    /// Total items associated with this season (programs + decisions + tasks).
+    /// Total surfaces (visits + standalones) for this season. Each bundle
+    /// parent counts as 1 — its children render inline. This is what we
+    /// render as the big tile number.
     let totalItems: Int
     /// Items requiring action (decisions + overdue + needs-vendor).
     let actionItems: Int
+    /// Phase 80 — task line-item count: bundle parents counted plus the
+    /// summed count of each bundle's resolved children for the
+    /// property's subtypes. Lets the tile show "10 visits · 24 tasks"
+    /// so the homeowner sees the actual scope of work beneath the
+    /// visit count. Falls back to `totalItems` for callers that don't
+    /// provide a separate count (legacy or non-bundle-aware code paths).
+    let taskLineItemCount: Int
+
+    init(totalItems: Int, actionItems: Int, taskLineItemCount: Int? = nil) {
+        self.totalItems = totalItems
+        self.actionItems = actionItems
+        self.taskLineItemCount = taskLineItemCount ?? totalItems
+    }
 }
 
 struct YearRibbon: View {
@@ -150,7 +165,18 @@ private struct SeasonTile: View {
     }
 
     private var actionLine: String {
-        summary.actionItems > 0 ? "\(summary.actionItems) action" : "scheduled"
+        // Phase 80 — when the bundle-expansion math gives a task count
+        // higher than the visit count, show "N tasks" alongside the
+        // action signal. Communicates the actual scope of work behind
+        // each visit. Falls back to the legacy "N action" / "scheduled"
+        // copy when there's no task expansion to render.
+        if summary.taskLineItemCount > summary.totalItems {
+            if summary.actionItems > 0 {
+                return "\(summary.taskLineItemCount) tasks · \(summary.actionItems) action"
+            }
+            return "\(summary.taskLineItemCount) tasks"
+        }
+        return summary.actionItems > 0 ? "\(summary.actionItems) action" : "scheduled"
     }
 
     private var actionColor: Color {

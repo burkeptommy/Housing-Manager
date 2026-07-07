@@ -151,6 +151,10 @@ struct ChezProposalVendor: Codable, Hashable {
     /// `estimatedWindow` mirrors the first slot for legacy clients.
     let availabilitySlots: [String]?
     let rationale: String?
+    /// Phase 101 (C1) — fair-market price context from the operator or the
+    /// cross-household Chez network. Cents.
+    let fairMarketLowCents: Int?
+    let fairMarketHighCents: Int?
 
     enum CodingKeys: String, CodingKey {
         case name, phone, rating, rationale
@@ -159,6 +163,8 @@ struct ChezProposalVendor: Codable, Hashable {
         case estimatedCostRange = "estimated_cost_range"
         case estimatedWindow = "estimated_window"
         case availabilitySlots = "availability_slots"
+        case fairMarketLowCents = "fair_market_low_cents"
+        case fairMarketHighCents = "fair_market_high_cents"
     }
 
     init(from decoder: Decoder) throws {
@@ -172,6 +178,8 @@ struct ChezProposalVendor: Codable, Hashable {
         estimatedWindow = (try? c.decodeIfPresent(String.self, forKey: .estimatedWindow)) ?? nil
         availabilitySlots = (try? c.decodeIfPresent([String].self, forKey: .availabilitySlots)) ?? nil
         rationale = (try? c.decodeIfPresent(String.self, forKey: .rationale)) ?? nil
+        fairMarketLowCents = (try? c.decodeIfPresent(Int.self, forKey: .fairMarketLowCents)) ?? nil
+        fairMarketHighCents = (try? c.decodeIfPresent(Int.self, forKey: .fairMarketHighCents)) ?? nil
     }
 }
 
@@ -223,11 +231,19 @@ struct ChezProposalQuote: Codable, Hashable {
     let vendorName: String?
     let total: Double?
     let validUntil: String?
+    /// Phase 101 (C1) — fair-market band in whole dollars.
+    let fairMarketLow: Double?
+    let fairMarketHigh: Double?
+    /// Phase 101 (C2) — the other quotes Chez gathered, so the homeowner
+    /// sees the comparison inside one card.
+    let alternatives: [ChezQuoteAlternative]?
 
     enum CodingKeys: String, CodingKey {
-        case total
+        case total, alternatives
         case vendorName = "vendor_name"
         case validUntil = "valid_until"
+        case fairMarketLow = "fair_market_low"
+        case fairMarketHigh = "fair_market_high"
     }
 
     init(from decoder: Decoder) throws {
@@ -235,5 +251,24 @@ struct ChezProposalQuote: Codable, Hashable {
         vendorName = (try? c.decodeIfPresent(String.self, forKey: .vendorName)) ?? nil
         total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? nil
         validUntil = (try? c.decodeIfPresent(String.self, forKey: .validUntil)) ?? nil
+        fairMarketLow = (try? c.decodeIfPresent(Double.self, forKey: .fairMarketLow)) ?? nil
+        fairMarketHigh = (try? c.decodeIfPresent(Double.self, forKey: .fairMarketHigh)) ?? nil
+        alternatives = (try? c.decodeIfPresent([ChezQuoteAlternative].self, forKey: .alternatives)) ?? nil
+    }
+}
+
+struct ChezQuoteAlternative: Codable, Hashable {
+    let vendorName: String?
+    let total: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case total
+        case vendorName = "vendor_name"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        vendorName = (try? c.decodeIfPresent(String.self, forKey: .vendorName)) ?? nil
+        total = (try? c.decodeIfPresent(Double.self, forKey: .total)) ?? nil
     }
 }

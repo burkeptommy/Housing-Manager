@@ -148,13 +148,28 @@ struct RoutingPreferencesView: View {
 
     private func resetAll() async {
         guard let householdId else { return }
-        let count = preferences.count
+        // Delete row-by-row and only drop the rows that actually
+        // deleted — the old version cleared the whole local array and
+        // fired a success haptic even when some deletes failed, so
+        // "reset" preferences came back on the next load.
+        var succeeded: Set<UUID> = []
+        var failedCount = 0
         for pref in preferences {
-            try? await DatabaseService.shared.deleteRoutingPreference(id: pref.id)
+            do {
+                try await DatabaseService.shared.deleteRoutingPreference(id: pref.id)
+                succeeded.insert(pref.id)
+            } catch {
+                failedCount += 1
+            }
         }
-        preferences = []
-        Haptics.success()
-        Analytics.track(.routingPreferenceResetAll, ["count": count])
+        preferences.removeAll { succeeded.contains($0.id) }
+        if failedCount == 0 {
+            Haptics.success()
+        } else {
+            Haptics.error()
+            loadError = "Couldn't reset \(failedCount) preference\(failedCount == 1 ? "" : "s"). Pull to refresh and try again."
+        }
+        Analytics.track(.routingPreferenceResetAll, ["count": succeeded.count])
         _ = householdId
     }
 }

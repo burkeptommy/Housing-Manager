@@ -215,11 +215,87 @@ enum MaintenanceTaskReconciler {
             fuelType: fuelType,
             flags: mergedFlags
         )
-        let rawTemplates = MaintenanceTemplates.essentialTemplates(
+        var rawCandidates = MaintenanceTemplates.essentialTemplates(
             for: systemCategory,
             activeSubtypes: activeSubtypes,
             regionalPack: regionalPack
         )
+
+        // Phase 80 prevention fix #6 — orphan-pass safety gate.
+        // `reconcileAll` (below) iterates a hardcoded category list
+        // (Roofing, HVAC, ..., Irrigation) and calls reconcile with
+        // `systemId: nil` for every category the property doesn't
+        // already have a system for. The intent was to clean up
+        // ORPHAN tasks (tasks whose home_system was deleted), but
+        // because `reconcile` runs both ADD and REMOVE passes,
+        // categories without a system were ALSO getting new tasks
+        // seeded. That's how Tom + Mindy ended up with Irrigation
+        // tasks despite both answering `irrigation:no` — the Q14
+        // mapper correctly skipped Irrigation home_system creation,
+        // but the orphan pass seeded the templates anyway.
+        //
+        // Fix: when called with no system AND no home_system exists
+        // for this category, empty the ADD candidate list. The REMOVE
+        // pass still runs (clean up genuinely orphan tasks); we just
+        // don't seed new tasks for a category the user has explicitly
+        // not opted into. Symmetric with the Q14 mapper's gating
+        // behavior.
+        if systemId == nil {
+            let allSystems = (try? await DatabaseService.shared.fetchHomeSystems(
+                propertyId: propertyId,
+                topLevelOnly: false
+            )) ?? []
+            let hasMatchingSystem = allSystems.contains { sys in
+                sys.category.caseInsensitiveCompare(systemCategory) == .orderedSame
+            }
+            if !hasMatchingSystem {
+                Analytics.track(.reconcileOrphanPassSkippedAdds, [
+                    "category": systemCategory
+                ])
+                rawCandidates = []
+            }
+        }
+
+        // Phase 80 (discovery study): skip templates the user has marked
+        // "Not for my home" on this property. Failures fall back to seeding
+        // everything — better to over-seed than to miss a real task.
+        let dismissedRows = (try? await DatabaseService.shared.fetchDismissedTemplates(propertyId: propertyId)) ?? []
+        let dismissedKeys = Set(dismissedRows.map { $0.templateKey })
+
+        // Phase 80 prevention fix #5: respect category-level dismissals.
+        // `dismissed_categories` is the household's "Not for my home" /
+        // "Remind me later" decision for an entire SystemCategory (e.g.
+        // they tapped Not applicable on Tree Service in the vendor
+        // coverage gap dialog). The row's `snoozedUntil` distinguishes
+        // permanent dismissals (nil) from time-bounded snoozes. A row is
+        // "currently suppressing" when permanent OR when snoozedUntil
+        // is in the future. Expired snoozes don't suppress — the row
+        // hangs around but `isActiveSnooze` returns false and the
+        // permanent-vs-snoozed branch below treats it as not-current.
+        let dismissedCategoryRows = (try? await DatabaseService.shared.fetchDismissedCategories()) ?? []
+        let now = Date()
+        let categoryIsCurrentlySuppressed = dismissedCategoryRows.contains { row in
+            guard row.category.caseInsensitiveCompare(systemCategory) == .orderedSame else { return false }
+            // Permanent dismissal — snoozedUntil is nil.
+            if row.snoozedUntil == nil { return true }
+            // Active snooze — snoozedUntil > now.
+            return row.isActiveSnooze(now: now)
+        }
+        if categoryIsCurrentlySuppressed {
+            // Skip the ADD pass entirely — user said "not for my home" or
+            // "remind me later" for this whole category. The REMOVE pass
+            // (below, gated on mode != .addOnly) still runs so stale
+            // category-mismatched tasks get cleaned up even when the
+            // category is suppressed. The Task Library surface (Phase
+            // 80) is the user-visible escape hatch — they restore the
+            // category there and the next reconcile re-seeds.
+            Analytics.track(.reconcileSkippedDismissedCategory, [
+                "category": systemCategory
+            ])
+            return .empty
+        }
+
+        let rawTemplates = rawCandidates.filter { !dismissedKeys.contains($0.templateKey) }
 
         // Phase 84.5 G28: when the handyman submits an assessment, the
         // ingestion path passes the templateKeys of recommended tasks
@@ -488,31 +564,45 @@ enum MaintenanceTaskReconciler {
             // get their Phase 67 children materialized on the next reconcile.
             for (bundleId, members) in bundleGroups {
                 let parentExists = existingTemplateIds.contains(bundleId)
-                // "Pre-bundle member exists" = some user has a legacy
-                // standalone task for one of the bundle children from
-                // before the bundle was introduced. In that case we skip
-                // parent creation to avoid a duplicate visit, but we STILL
-                // iterate children for per-member materialization below.
-                let anyPreBundleMemberExists = members.contains { (_, raw, _) in
-                    existingTemplateIds.contains(raw.templateKey)
+                // "Pre-bundle member exists" = a standalone task whose
+                // templateId matches one of the bundle children. Pre-
+                // Phase-80 these blocked parent creation, leaving the
+                // children orphaned forever (Tom's account accumulated
+                // ~15 of these — Roofing:Clean gutters / HVAC:HVAC
+                // tune-up (cooling) / Plumbing:Fixture leak walkthrough
+                // / etc. coexisting with their bundles).
+                //
+                // Phase 80 prevention fix #3 — always create the parent
+                // when the bundle is genuinely missing. The orphan
+                // standalones get auto-folded below via the
+                // bundle-children archive pass (prevention fix #2).
+                let preBundleMemberIds: [UUID] = existing.compactMap { task in
+                    guard task.isArchived != true else { return nil }
+                    guard let tid = task.templateId else { return nil }
+                    guard task.lastCompletedDate == nil,
+                          task.scheduledDate == nil else {
+                        // History or user-touched — preserve.
+                        return nil
+                    }
+                    if members.contains(where: { $0.2.templateKey == tid }) {
+                        return task.id
+                    }
+                    return nil
                 }
+                let hasPreBundleOrphans = !preBundleMemberIds.isEmpty
 
                 guard let firstMember = members.first else { continue }
                 let (_, _, firstTemplate) = firstMember
 
-                // Only create parent when it's genuinely new.
+                // Phase 80 prevention fix #3: create the parent whenever
+                // it's missing, full stop. The legacy
+                // `!anyPreBundleMemberExists` guard was the source of
+                // Tom's missing HVAC:spring / Plumbing:annual / Roofing:
+                // spring / Tree Service:annual parents.
                 //
-                // Phase 67I: never create a bundle parent task for
-                // Handyman:* bundles. The seasonal handyman visit
-                // parents were deleted in Phase 67E/F (B1) — handyman
-                // work is now single-rail on `handyman_punch_items`.
-                // Members route to the punch list directly (see the
-                // member loop below). Without this guard, the
-                // reconciler would create a confusing parent task with
-                // a child template's title since no member declares
-                // `bundleTitle` post-B1.
+                // Phase 67I still applies — Handyman:* bundles route
+                // to handyman_punch_items, never to a parent task.
                 let shouldCreateParent = !parentExists
-                    && !anyPreBundleMemberExists
                     && !bundleId.hasPrefix("Handyman:")
 
                 // Resolve the bundle title from the first member that has one.
@@ -626,7 +716,40 @@ enum MaintenanceTaskReconciler {
                                 taskId: createdParent.id
                             )
                         }
+                        // Phase 80 prevention fix #3 — analytics event
+                        // when we backfill a parent because orphan
+                        // children existed. Non-zero counts mean the
+                        // self-healing is paying off.
+                        if hasPreBundleOrphans {
+                            Analytics.track(.bundleParentBackfilled, [
+                                "bundle_id": bundleId,
+                                "orphan_count": preBundleMemberIds.count
+                            ])
+                        }
                     }
+                }
+
+                // Phase 80 prevention fix #2 — archive untouched
+                // standalone child tasks now that a parent exists for
+                // this bundle. The parent's BundleChildList surfaces
+                // these members via the template library, so the
+                // standalone row was always a duplicate.
+                //
+                // `preBundleMemberIds` was already filtered to skip
+                // touched / completed / archived rows above, so this
+                // archive call is safe — it can't blow away history or
+                // a user's deliberate reschedule.
+                if !preBundleMemberIds.isEmpty {
+                    for orphanId in preBundleMemberIds {
+                        try? await DatabaseService.shared.archiveMaintenanceTask(
+                            id: orphanId,
+                            reason: "auto_folded_into_bundle_parent_p80"
+                        )
+                    }
+                    Analytics.track(.bundleChildAutoFolded, [
+                        "bundle_id": bundleId,
+                        "child_count": preBundleMemberIds.count
+                    ])
                 }
 
                 // Phase 67: materialize each bundle MEMBER as its own
@@ -747,6 +870,16 @@ enum MaintenanceTaskReconciler {
                         reason: "subtype_mismatch:\(systemCategory):\(confirmedSubtype ?? "nil")"
                     )
                     removed.append(task.title)
+                    // Phase 80 prevention fix #4: emit analytics on every
+                    // subtype-mismatch archive so fleet-health dashboards
+                    // can spot when a release introduces a wave of stale
+                    // tasks (template renames, requiredSubtypes tightening,
+                    // subtype taxonomy changes).
+                    Analytics.track(.taskArchivedSubtypeMismatch, [
+                        "category": systemCategory,
+                        "template_id": task.templateId ?? "none",
+                        "active_subtype": confirmedSubtype ?? "nil"
+                    ])
                 } catch {
                     preserved.append(task.title)
                 }
@@ -1286,6 +1419,41 @@ enum MaintenanceTaskReconciler {
                 && $0.parentSystemId == nil
         })
 
+        // Phase 80 prevention fix #1: SUBTYPE GATE.
+        // RecommendedServicesView correctly filters by requiredSubtypes
+        // at fetch time, but `scheduleOptInTemplate` had no validation
+        // of its own. If a user reached this entry point with a
+        // template that doesn't fit their home (cached deeplink, stale
+        // UI state, future entry points like Alfred suggestions), the
+        // task got created anyway — that's how Tom's account
+        // accumulated Pool Heater Service / Mini-Split Inspection /
+        // Geothermal Loop Check on a non-pool / central-AC / boiler
+        // home. The gate below is defense-in-depth: if the template's
+        // requiredSubtypes aren't satisfied by the home, return nil
+        // and log the mismatch.
+        if !template.requiredSubtypes.isEmpty {
+            let propertyForFlags = try? await db.fetchProperty(id: propertyId)
+            let propertyFlags = (propertyForFlags?.attributes ?? [:]).reduce(into: [String: Bool]()) { acc, kv in
+                if kv.value.stringValue.lowercased() == "true" { acc[kv.key] = true }
+            }
+            let activeSubtypes = MaintenanceTemplates.activeSubtypes(
+                category: category,
+                subtype: existingSystem?.subtype,
+                fuelType: existingSystem?.catalogFuelType,
+                flags: propertyFlags
+            )
+            let required = Set(template.requiredSubtypes.map { $0.lowercased() })
+            if !required.isSubset(of: activeSubtypes) {
+                Analytics.track(.recommendedServiceScheduleBlocked, [
+                    "template_id": template.templateKey,
+                    "required_subtypes": template.requiredSubtypes.joined(separator: ","),
+                    "active_subtypes": activeSubtypes.joined(separator: ","),
+                    "category": category
+                ])
+                return nil
+            }
+        }
+
         let systemId: UUID?
         if let existingSystem {
             systemId = existingSystem.id
@@ -1611,10 +1779,40 @@ enum MaintenanceTaskReconciler {
                 picks.append(pick)
             } else if let nearest = anchorSurfaces.first(where: { $0 >= today }) {
                 picks.append(nearest)
+            } else if Self.todayIsInSeasonForAnchorMonth(anchor.month, today: today, calendar: calendar) {
+                // Phase 80 (discovery study) mid-season fix: when this year's
+                // anchor is past AND next year's is far away BUT today is
+                // still within the season's months, surface at today so the
+                // task lands in this year's seasonal tile. Otherwise the
+                // homeowner who joins in late May sees Spring=0 because every
+                // Spring task auto-advanced to 2027. Tom's specific feedback:
+                // "When someone joins mid season we should still show all
+                // spring tasks so they can tell us they already did them."
+                picks.append(today)
             }
         }
 
         return picks.isEmpty ? fallback : picks.sorted()
+    }
+
+    /// Phase 80: returns true when today falls within the season window
+    /// implied by the given anchor month. Spring anchor (March/April/May) →
+    /// season window March–May; Fall (Sep/Oct/Nov) → Sep–Nov; etc. Used
+    /// by `plannedDueDates` to keep mid-season tasks anchored to this
+    /// year rather than auto-advancing to next year.
+    private static func todayIsInSeasonForAnchorMonth(
+        _ anchorMonth: Int,
+        today: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let m = calendar.component(.month, from: today)
+        switch anchorMonth {
+        case 3, 4, 5:   return (3...5).contains(m)
+        case 6, 7, 8:   return (6...8).contains(m)
+        case 9, 10, 11: return (9...11).contains(m)
+        case 12, 1, 2:  return m == 12 || m == 1 || m == 2
+        default:        return false
+        }
     }
 
     /// Phase 70: thin wrapper for callers that only need the next

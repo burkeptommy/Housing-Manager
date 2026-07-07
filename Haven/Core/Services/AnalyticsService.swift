@@ -152,6 +152,46 @@ enum AnalyticsEvent: String {
     /// Phase 54C — Recommended for your home analytics.
     case recommendedServiceScheduled = "recommended_service_scheduled"
     case recommendedServiceDismissed = "recommended_service_dismissed"
+    /// Phase 80 prevention fix #1: fired when `scheduleOptInTemplate`
+    /// blocks a tap because the template's `requiredSubtypes` don't fit
+    /// the home. Should be rare since RecommendedServicesView filters
+    /// by subtype too; non-zero counts mean a deeplink or future caller
+    /// reached the entry point with a stale template list.
+    case recommendedServiceScheduleBlocked = "recommended_service_schedule_blocked"
+    /// Phase 80 prevention fix #2: fired when the reconciler auto-folds
+    /// a standalone bundle-child task into its existing bundle parent.
+    /// High counts suggest something upstream is still creating
+    /// standalones that should be bundle children.
+    case bundleChildAutoFolded = "bundle_child_auto_folded"
+    /// Phase 80 prevention fix #3: fired when the reconciler backfills
+    /// a missing bundle parent because pre-bundle children existed.
+    case bundleParentBackfilled = "bundle_parent_backfilled"
+    /// Phase 80 prevention fix #4: fired when the reconciler archives a
+    /// task whose template's `requiredSubtypes` no longer match the
+    /// system's current subtypes.
+    case taskArchivedSubtypeMismatch = "task_archived_subtype_mismatch"
+    /// Phase 80 prevention fix #5: fired when reconcile bails because
+    /// the user has actively dismissed (permanent or active snooze)
+    /// the entire SystemCategory. Lets us measure how often the daily
+    /// reconcile or quiz completion is correctly skipping user-rejected
+    /// work instead of force-seeding it.
+    case reconcileSkippedDismissedCategory = "reconcile_skipped_dismissed_category"
+    /// Phase 80 (Tom's prevention pass): fired when the user restores a
+    /// hidden item from the Task Library. Payload `type` distinguishes
+    /// category / template / recommendation so we can see which path
+    /// users primarily reach for.
+    case taskLibraryItemRestored = "task_library_item_restored"
+    /// Phase 80 (Tom's prevention pass): fired when the daily reconcile
+    /// tick runs at app cold start. Volume of this event tells us the
+    /// idempotent reconciler is firing reliably; spikes after a release
+    /// indicate a wave of fleet-wide self-healing.
+    case dailyReconcileFired = "daily_reconcile_fired"
+    /// Phase 80 prevention fix #6: fired when `reconcile` is invoked
+    /// with no system AND no home_system exists for the category, so
+    /// the ADD pass gets short-circuited. Non-zero counts confirm the
+    /// `reconcileAll` orphan-pass-without-system bug (Irrigation tasks
+    /// for `irrigation:no` homes) is no longer firing.
+    case reconcileOrphanPassSkippedAdds = "reconcile_orphan_pass_skipped_adds"
     /// Phase 57 — "What's New" HNW review card.
     case whatsNewPhase57Opened = "whats_new_phase57_opened"
     case whatsNewPhase57Dismissed = "whats_new_phase57_dismissed"
@@ -272,6 +312,22 @@ enum AnalyticsEvent: String {
     case homeSystemsSetupStarted = "home_systems_setup_started"
     case homeSystemsSetupCompleted = "home_systems_setup_completed"
     case specialtySystemAdded = "specialty_system_added"
+    /// Fires every time `ensureAutoCreatedSystems` decides to insert a
+    /// Chimney row. The `evidence` payload key carries the rule branch
+    /// (`q20_wood` / `q20_gas` / `q20_unknown` / `q3_fossil` / `none`)
+    /// so we can debug "why does this user have a chimney" later.
+    case chimneyAutoCreated = "chimney_auto_created"
+    /// Phase 80 (discovery study): user tapped "Not for my home" on a task
+    /// or template. Payload: `template_key` + `category` + `reason`.
+    case templateDismissed = "template_dismissed"
+    /// Phase 80: user restored a previously dismissed template via Settings
+    /// → Hidden Tasks or the Browse-all "Restore" affordance. Payload:
+    /// `template_key` + `category`.
+    case templateRestored = "template_restored"
+    /// Phase 80: user tapped "Undo" on the dismiss toast within the 5-second
+    /// window. Distinct from `templateRestored` (which is the manual restore
+    /// from Settings). Payload: `template_key`.
+    case dismissedTaskFlowUndone = "dismissed_task_flow_undone"
 
     // MARK: - Maintenance
     case maintenanceTaskViewed = "maintenance_task_viewed"
@@ -605,6 +661,32 @@ enum AnalyticsEvent: String {
     case tasksV2ProgramExpanded = "tasks_v2_program_expanded"
     /// Search icon tap on SeasonScopeBanner.
     case tasksV2SearchTapped = "tasks_v2_search_tapped"
+    /// Phase 80 (discovery study): user submitted a search in
+    /// RecommendedServicesView. Payload: `query` + `result_count` so we can
+    /// see what's searched-for-but-not-found.
+    case tasksV2SearchPerformed = "tasks_v2_search_performed"
+    /// Phase 80: user tapped "Ask Chez →" on the search empty state — they
+    /// searched for something we didn't have. Payload: `query`.
+    case tasksV2SearchAlfredHandoff = "tasks_v2_search_alfred_handoff"
+    /// Phase 80: user tapped a child row inside a `BundleParentCard` to see
+    /// the child's full detail. Payload: `bundle_id` + `child_template_key`.
+    case tasksV2BundleChildOpened = "tasks_v2_bundle_child_opened"
+
+    // MARK: - Weather card (Phase 80)
+    /// User tapped the WeatherCard's alert state to open the prep sheet.
+    /// Payload: `event_type` + `severity` + `urgency`.
+    case weatherAlertCardOpened = "weather_alert_card_opened"
+    /// The prep sheet appeared. Payload: `event_type` + `task_count`.
+    case weatherPrepSheetOpened = "weather_prep_sheet_opened"
+    /// User toggled a prep task's check state. Payload: `event_type` +
+    /// `task_id` + `checked` (bool as string).
+    case weatherPrepTaskToggled = "weather_prep_task_toggled"
+    /// User tapped "Find a pro" inside the prep sheet. Payload:
+    /// `event_type` + `category`.
+    case weatherPrepFindVendor = "weather_prep_find_vendor"
+    /// User tapped "Ask Chez to handle this" inside the prep sheet.
+    /// Payload: `event_type` + `category`.
+    case weatherPrepAskChez = "weather_prep_ask_chez"
     /// Phase F1 — time-window stats-pill filter applied. Properties:
     /// filter ("overdue|thisWeek|thisMonth|later"), season.
     case tasksV2StatsFilterApplied = "tasks_v2_stats_filter_applied"

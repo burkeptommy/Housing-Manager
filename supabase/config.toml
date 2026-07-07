@@ -420,6 +420,9 @@ verify_jwt = false
 [functions.send-push-notification]
 verify_jwt = false
 
+[functions.chez-sla-watch]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

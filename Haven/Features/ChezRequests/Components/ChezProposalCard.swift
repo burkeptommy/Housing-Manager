@@ -144,6 +144,16 @@ struct ChezProposalCard: View {
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textPrimary)
             }
+            // Phase 101 (C1) — fair-market context so the quoted price is
+            // never a bare number. Sourced from Chez network history or
+            // the operator's research.
+            if let low = proposal.vendor?.fairMarketLowCents,
+               let high = proposal.vendor?.fairMarketHighCents,
+               high >= low, low > 0 {
+                Text("Fair market: $\(low / 100) to $\(high / 100)")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
             // Phase 81.2 — Multi-slot availability list. Renders as a
             // bulleted list when the admin gave the vendor multiple
             // options. Falls back to the single estimatedWindow line
@@ -228,10 +238,38 @@ struct ChezProposalCard: View {
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textPrimary)
             }
+            // Phase 101 (C1) — price context next to the number.
+            if let low = proposal.quote?.fairMarketLow,
+               let high = proposal.quote?.fairMarketHigh,
+               high >= low, low > 0 {
+                Text("Fair market: $\(Int(low)) to $\(Int(high))")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
             if let valid = proposal.quote?.validUntil, !valid.isEmpty {
                 Text("Valid until: \(valid)")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
+            }
+            // Phase 101 (C2) — the other quotes Chez gathered, so this
+            // reads as a comparison, not a lone number.
+            if let alts = proposal.quote?.alternatives, !alts.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Also quoted:")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    ForEach(Array(alts.enumerated()), id: \.offset) { _, alt in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("•")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Text("\(alt.vendorName ?? "Vendor")\(alt.total.map { ": $\(Int($0))" } ?? "")")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                    }
+                }
+                .padding(.top, 2)
             }
         }
     }

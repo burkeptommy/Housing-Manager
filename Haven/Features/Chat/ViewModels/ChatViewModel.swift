@@ -27,6 +27,17 @@ final class ChatViewModel: ObservableObject {
     private var householdId: UUID?
     private var userId: UUID?
 
+    /// Phase 80 perf fix #5: skip the network round-trip when we
+    /// already have a fresh thread loaded. Re-fetch fires on cold
+    /// start, on explicit pull-to-refresh, on the
+    /// `.maintenanceTaskChanged` Alfred surfaces don't subscribe to,
+    /// and whenever Tom navigates to a NEW context (e.g. tap an Ask
+    /// Alfred button on a specific task). Tab-to-tab returns within
+    /// the freshness window skip entirely.
+    private var lastLoadAt: Date?
+    private var lastLoadedContextKey: String?
+    private static let chatHistoryFreshnessTTL: TimeInterval = 60
+
     let suggestedPrompts = [
         "What documents am I missing?",
         "What maintenance is overdue?",
@@ -35,6 +46,29 @@ final class ChatViewModel: ObservableObject {
     ]
 
     func loadHistory() async {
+        // Phase 80 perf fix #5: skip the round-trip when the thread
+        // was just loaded for the same context. Refreshing manually is
+        // a `refreshHistory()` call.
+        let contextKey = "\(contextType ?? "none"):\(contextId?.uuidString ?? "none")"
+        if let lastLoadAt,
+           lastLoadedContextKey == contextKey,
+           Date().timeIntervalSince(lastLoadAt) < Self.chatHistoryFreshnessTTL,
+           !messages.isEmpty {
+            return
+        }
+        await loadHistoryNetwork(contextKey: contextKey)
+    }
+
+    /// Force-fetch fresh thread state from the server. Wired to the
+    /// pull-to-refresh affordance and the "new message" socket /
+    /// notification path. Use this whenever you specifically WANT a
+    /// round-trip.
+    func refreshHistory() async {
+        let contextKey = "\(contextType ?? "none"):\(contextId?.uuidString ?? "none")"
+        await loadHistoryNetwork(contextKey: contextKey)
+    }
+
+    private func loadHistoryNetwork(contextKey: String) async {
         do {
             let user = try await db.fetchCurrentUser()
             userId = user.id
@@ -73,6 +107,10 @@ final class ChatViewModel: ObservableObject {
                 }
             }
             messages = collapsed
+            // Record freshness AFTER a successful load so an error path
+            // doesn't lock in a stale cache.
+            lastLoadAt = Date()
+            lastLoadedContextKey = contextKey
         } catch {
             self.error = error.localizedDescription
         }

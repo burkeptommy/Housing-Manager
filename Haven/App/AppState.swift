@@ -276,7 +276,24 @@ final class AppState: ObservableObject {
                         // backfill last so the reconciler has somewhere to hang templates.
                         await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
                         await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                        // Phase 80: backfill dismissed_categories →
+                        // dismissed_templates BEFORE the missing-system
+                        // backfill seeds new templates. Without this,
+                        // categories the user previously hid would
+                        // resurface tasks via the show-everything model.
+                        await Self.migrateDismissedCategoriesToTemplatesOnceIfNeeded()
                         await Self.backfillMissingSystemsOnceIfNeeded()
+                        // Evidence-based chimney cleanup. Runs after the
+                        // missing-system backfill so any chimney row newly
+                        // created by that pass (no-op on _v3 installs) gets
+                        // its subtype reconciled against the new rule too.
+                        await Self.migrateChimneyEvidenceOnceIfNeeded()
+                        // Phase 80 mid-season repair — pull back tasks
+                        // that auto-advanced to next year because the
+                        // backfill ran past this year's seasonal anchor.
+                        // Must run AFTER backfillMissingSystemsOnceIfNeeded
+                        // since that's where the bad dates got seeded.
+                        await Self.reanchorMidSeasonTasksOnceIfNeeded()
                         // Phase 54E.3: mirror existing waste haulers +
                         // service utilities to the contractors table.
                         await Self.backfillUtilityContractorMirrorOnceIfNeeded()
@@ -454,6 +471,34 @@ final class AppState: ObservableObject {
                             UserDefaults.standard.set(true, forKey: "hasSeededPhase70A1LibraryExpansion_v2")
                             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                         }
+
+                        // Phase 80 (Tom's prevention pass): daily reconcile
+                        // tick. Catches any task-structure drift that
+                        // accumulated since the last app launch — orphan
+                        // bundle children get auto-folded into their
+                        // parents, missing bundle parents get backfilled,
+                        // stale subtype-mismatched tasks get archived.
+                        // The reconciler is idempotent + respects
+                        // dismissed_categories / dismissed_templates /
+                        // dismissed_recommendations, so the daily tick
+                        // won't re-create things the user said no to.
+                        //
+                        // Gated by a per-calendar-day UserDefaults key so
+                        // multiple cold starts in the same day don't
+                        // re-fire. Resets at local midnight.
+                        if let householdId = primaryProperty?.householdId {
+                            let formatter = DateFormatter()
+                            formatter.dateFormat = "yyyy-MM-dd"
+                            let today = formatter.string(from: Date())
+                            let key = "lastDailyReconcileDate_v1"
+                            let lastRun = UserDefaults.standard.string(forKey: key)
+                            if lastRun != today {
+                                _ = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
+                                UserDefaults.standard.set(today, forKey: key)
+                                Analytics.track(.dailyReconcileFired, ["date": today])
+                                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                            }
+                        }
                     }
                     Task { await Self.archivePreQuizChoreTasksOnce() }
                     Task { await Self.backfillUniversalSystemsOnce() }
@@ -506,7 +551,18 @@ final class AppState: ObservableObject {
                         Task {
                             await MaintenanceTaskReconciler.reseedSeasonalTasksOnceIfNeeded()
                             await MaintenanceTaskReconciler.backfillBundlesOnceIfNeeded()
+                            // Phase 80: backfill dismissed_categories →
+                            // dismissed_templates before the missing-system
+                            // pass seeds new templates.
+                            await Self.migrateDismissedCategoriesToTemplatesOnceIfNeeded()
                             await Self.backfillMissingSystemsOnceIfNeeded()
+                            // Evidence-based chimney cleanup. Same order
+                            // as the cold-start path — runs after
+                            // backfillMissingSystemsOnceIfNeeded so any
+                            // newly-seeded chimney row gets reconciled.
+                            await Self.migrateChimneyEvidenceOnceIfNeeded()
+                            // Phase 80 mid-season repair (resume path).
+                            await Self.reanchorMidSeasonTasksOnceIfNeeded()
                             // Phase 58 orphan archive pass.
                             await Self.archivePhase58OrphanedTasksOnceIfNeeded()
                         }
@@ -814,17 +870,24 @@ final class AppState: ObservableObject {
     /// key so it only runs once per install.
     @MainActor
     static func backfillMissingSystemsOnceIfNeeded() async {
-        // Phase 70.A1 follow-on H4: bumped to _v3 so existing TestFlight
-        // users pick up the expanded auto-create rules — Siding/Exterior,
-        // Chimney (now unconditional), Window Cleaning, Tree Service,
-        // Deck/Outdoor, Driveway Sealcoating, Painting, Gutter Cleaning.
-        // Tom flagged "where are power washing + chimney cleaning?" —
-        // those templates lived under Siding/Exterior + Chimney but
-        // never seeded because the categories weren't auto-created.
-        // ensureAutoCreatedSystems is idempotent (dedups by category)
-        // so re-running on fully-set-up users is a no-op except for the
-        // categories that newly qualify.
-        let key = "hasRunMissingSystemBackfillP70H4_v3"
+        // Phase 80 (discovery study): bumped to _v4 so existing TestFlight
+        // users pick up the new universal-tier categories — Plumbing,
+        // Electrical, Attic & Foundation, and (NE only) Air Quality. These
+        // were registry-universal but had no auto-create rule before, which
+        // is why "Annual plumbing inspection" never fired for anyone.
+        //
+        // Phase 70.A1 follow-on H4 history: previously bumped to _v3 for
+        // Siding/Exterior, Window Cleaning, Tree Service, Driveway
+        // Sealcoating. Chimney is evidence-based (see `resolveChimneyRule`);
+        // existing false-positive chimney rows from the prior unconditional
+        // behavior get cleaned up by `migrateChimneyEvidenceOnceIfNeeded`
+        // which runs immediately after this backfill. Tom flagged "where
+        // are power washing + chimney cleaning?" — those templates lived
+        // under Siding/Exterior + Chimney but never seeded because the
+        // categories weren't auto-created. ensureAutoCreatedSystems is
+        // idempotent (dedups by category) so re-running on fully-set-up
+        // users is a no-op except for the categories that newly qualify.
+        let key = "hasRunMissingSystemBackfillP70H4_v4"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         let db = DatabaseService.shared
         let properties: [PropertyRow]
@@ -849,6 +912,254 @@ final class AppState: ObservableObject {
         }
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 80 (discovery study): one-time migration that translates
+    /// existing `dismissed_categories` rows into per-template
+    /// `dismissed_templates` rows so users who hid categories pre-Phase-80
+    /// don't see those templates resurface under the show-everything model.
+    ///
+    /// For each permanent dismissal (snoozed_until is null) in
+    /// `dismissed_categories`, walks every template in that category and
+    /// inserts a `dismissed_templates` row per (property, template_key).
+    /// Snoozes (snoozed_until is set) are left in `dismissed_categories`
+    /// untouched — they keep their auto-resurfacing behavior via the
+    /// existing snooze code path.
+    ///
+    /// Gated on `hasMigratedDismissedCategoriesToTemplatesP80_v1`.
+    @MainActor
+    static func migrateDismissedCategoriesToTemplatesOnceIfNeeded() async {
+        let key = "hasMigratedDismissedCategoriesToTemplatesP80_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+
+        let dismissals: [DismissedCategoryRow]
+        do {
+            dismissals = try await db.fetchDismissedCategories()
+        } catch {
+            return
+        }
+        // Skip snoozes (those keep their existing semantics) and walk only
+        // permanent dismissals.
+        let permanent = dismissals.filter { $0.snoozedUntil == nil }
+        guard !permanent.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        // Build a category → [templateKey] map once, walking the full
+        // template library. Category match is case-insensitive.
+        var templatesByCategory: [String: [String]] = [:]
+        for (category, templates) in MaintenanceTemplates.allTemplates {
+            let lower = category.lowercased()
+            templatesByCategory[lower, default: []].append(contentsOf: templates.map { $0.templateKey })
+        }
+
+        for dismissal in permanent {
+            let categoryLower = dismissal.category.lowercased()
+            guard let templateKeys = templatesByCategory[categoryLower] else { continue }
+            let householdProperties = properties.filter { $0.householdId == dismissal.householdId }
+            for property in householdProperties {
+                for templateKey in templateKeys {
+                    try? await db.dismissTemplate(
+                        propertyId: property.id,
+                        householdId: dismissal.householdId,
+                        templateKey: templateKey,
+                        reason: "migrated_from_dismissed_category"
+                    )
+                }
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// One-time evidence-based chimney cleanup for existing TestFlight
+    /// users. The pre-change behavior auto-created a Chimney row on
+    /// every property with subtype defaulting to "wood", which seeded
+    /// "Annual chimney sweep" tasks on households with no flue at all.
+    ///
+    /// Walks every existing Chimney `home_systems` row and re-derives
+    /// the correct subtype via `HouseQuizAnswerMapper.resolveChimneyRule`:
+    /// - If the new resolver says the row shouldn't exist
+    ///   (all-electric + no fireplace), clear the subtype so no
+    ///   templates fire. We never delete the row — preserves any
+    ///   completed sweep tasks as service history.
+    /// - If the subtype differs from what's stored, write the new one.
+    /// - In either case, re-run the reconciler so its dedup-by-templateKey
+    ///   pass archives scheduled/incomplete tasks whose `requiredSubtypes`
+    ///   no longer match. Completed tasks are untouched.
+    ///
+    /// Phase 80 (discovery study) mid-season seeding repair. The original
+    /// Phase 80 backfill ran on existing users in late May, seeding ~70
+    /// Spring tasks per property — all with `next_due_date` advanced to
+    /// 2027 because Spring 2026 anchors (April 1) were already past by
+    /// the time the user installed the build. Tom's specific feedback:
+    /// "When someone joins mid season we should still show all spring
+    /// tasks so they can tell us they already did them." The seeding
+    /// logic in `MaintenanceTaskReconciler.plannedDueDates` was fixed to
+    /// fall back to today when mid-season + past anchor, but existing
+    /// 2027-dated rows need a one-time pull-back.
+    ///
+    /// Rule: re-date any template-driven task whose `next_due_date` is
+    /// more than 6 months out AND whose `seasonal_timing` matches today's
+    /// current season AND that has NOT been user-touched (no
+    /// `last_completed_date`, no manual `scheduled_date`). Set
+    /// `next_due_date` to today so it surfaces in the current season's
+    /// tile as "due today" — the homeowner can mark done if they
+    /// already did it, or schedule for later.
+    ///
+    /// Gated on `hasReanchoredMidSeasonTasksP80_v1`.
+    @MainActor
+    static func reanchorMidSeasonTasksOnceIfNeeded() async {
+        let key = "hasReanchoredMidSeasonTasksP80_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+
+        // Determine today's season.
+        let calendar = Calendar.current
+        let now = Date()
+        let currentMonth = calendar.component(.month, from: now)
+        let currentSeasonNames: [String] = {
+            switch currentMonth {
+            case 3, 4, 5:   return ["spring", "spring/fall"]
+            case 6, 7, 8:   return ["summer"]
+            case 9, 10, 11: return ["fall", "spring/fall"]
+            case 12, 1, 2:  return ["winter"]
+            default:        return []
+            }
+        }()
+
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let todayString: String = {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            return df.string(from: now)
+        }()
+        // Threshold: tasks dated more than 6 months out qualify as
+        // auto-advanced.
+        guard let cutoff = calendar.date(byAdding: .month, value: 6, to: now) else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+        let cutoffString: String = {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            return df.string(from: cutoff)
+        }()
+
+        var totalUpdated = 0
+        for property in properties {
+            let tasks = (try? await db.fetchMaintenanceTasks(propertyId: property.id)) ?? []
+            for task in tasks {
+                guard task.isArchived != true else { continue }
+                guard task.lastCompletedDate == nil || task.lastCompletedDate?.isEmpty == true else { continue }
+                guard task.scheduledDate == nil || task.scheduledDate?.isEmpty == true else { continue }
+                guard let templateId = task.templateId, !templateId.isEmpty else { continue }
+                guard !templateId.hasPrefix("Admin:") else { continue }
+                guard let timing = task.seasonalTiming?.lowercased(),
+                      currentSeasonNames.contains(timing) else { continue }
+                guard !task.nextDueDate.isEmpty, task.nextDueDate > cutoffString else { continue }
+
+                var update = MaintenanceTaskUpdate()
+                update.nextDueDate = todayString
+                _ = try? await db.updateMaintenanceTask(id: task.id, update)
+                totalUpdated += 1
+            }
+        }
+
+        if totalUpdated > 0 {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Gated on `hasMigratedChimneyEvidence_v1`.
+    @MainActor
+    static func migrateChimneyEvidenceOnceIfNeeded() async {
+        let key = "hasMigratedChimneyEvidence_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        var anyChange = false
+        for property in properties {
+            let systems = (try? await db.fetchHomeSystems(
+                propertyId: property.id,
+                topLevelOnly: false
+            )) ?? []
+
+            let chimneyRow = systems.first {
+                $0.category.caseInsensitiveCompare("Chimney") == .orderedSame
+            }
+            guard let chimneyRow else { continue }
+
+            let fireplaceSystem = systems.first {
+                $0.category.caseInsensitiveCompare("Fireplace") == .orderedSame
+            }
+            let rule = HouseQuizAnswerMapper.resolveChimneyRule(
+                property: property,
+                fireplaceSystem: fireplaceSystem
+            )
+
+            let currentSubtype = chimneyRow.subtype
+            let targetSubtype: String? = rule.shouldCreate ? rule.subtype : nil
+            if currentSubtype == targetSubtype { continue }
+
+            // `HomeSystemUpdate.subtype = nil` would be omitted by the
+            // synthesized encoder, so we use `clearHomeSystemSubtype`
+            // for the explicit Postgres NULL case. The "set new subtype"
+            // case is fine through the normal update path.
+            if let newSubtype = targetSubtype {
+                var update = HomeSystemUpdate()
+                update.subtype = newSubtype
+                _ = try? await db.updateHomeSystem(id: chimneyRow.id, update)
+            } else {
+                try? await db.clearHomeSystemSubtype(id: chimneyRow.id)
+            }
+            anyChange = true
+
+            _ = await MaintenanceTaskReconciler.reconcileAll(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+        }
+
+        if anyChange {
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        }
         UserDefaults.standard.set(true, forKey: key)
     }
 

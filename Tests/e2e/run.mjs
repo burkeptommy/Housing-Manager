@@ -1478,8 +1478,13 @@ class E2ERunner {
     );
 
     // Q17 — internet provider
+    // The May 2026 brand-shard dedup (20261323) consolidated "Optimum
+    // Fairfield" into one national "Optimum" row, so fall back to the
+    // bare brand name like the phase-6b call already does.
     logStep("Q17 q17_internet → Optimum");
-    const internetProvider = await this.findUtilityProvider("internet_cable", "Optimum Fairfield CT");
+    const internetProvider = await this.findUtilityProvider("internet_cable", "Optimum Fairfield CT").catch(() =>
+      this.findUtilityProvider("internet_cable", "Optimum")
+    );
     await recordAnswer(
       "q17_internet",
       makeQuizAnswer("selected", {

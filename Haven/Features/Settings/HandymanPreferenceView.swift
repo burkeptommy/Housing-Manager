@@ -207,7 +207,10 @@ struct HandymanPreferenceView: View {
             if selection != .hasOne {
                 var hUpdate = HouseholdUpdate()
                 hUpdate.preferredHandymanContractorId = nil
-                _ = try? await DatabaseService.shared.updateHousehold(id: householdId, hUpdate)
+                // No `try?` here: if this write fails the old handyman
+                // stays linked as the default while the toast says
+                // "Saved" — let it propagate to the catch below instead.
+                _ = try await DatabaseService.shared.updateHousehold(id: householdId, hUpdate)
             }
 
             Haptics.success()

@@ -12,12 +12,29 @@ import SwiftUI
 /// actions menu now, where the small minority of users who want
 /// "come back later" instead of "out of view" can reach it.
 ///
-/// Behavior matches Apple Mail / Things 3:
-///   - Drag right past threshold → leading action (Complete, green)
-///   - Drag left past threshold → trailing action (Archive, gray)
+/// Phase 70.A1 follow-on F5b (Tom's accidental-archive complaint):
+/// asymmetric thresholds + iMessage-style confirmation. Tom was
+/// archiving tasks he didn't mean to because (a) vertical scrolls
+/// brushed sideways enough to register as a swipe, and (b) swipes past
+/// 80pt auto-committed with no confirm step. The fix:
+///   - `minimumDistance: 28` (was 14) so a slightly-off-vertical scroll
+///     no longer fires the drag.
+///   - `width > 1.4 * height` horizontal-dominance gate (was just `>`)
+///     so the gesture only fires for clearly-horizontal intent.
+///   - `completeThreshold: 80`, `archiveThreshold: 140` — destructive
+///     action takes a longer pull, matches Mail / Messages.
+///   - `pastThresholdResistance: 0.18` (was 0.35) — past the threshold
+///     the row visibly "locks," giving stronger commit-edge feedback.
+///   - **Archive shows a confirmationDialog on release past threshold.**
+///     The auto-commit is gone for the destructive side. Complete still
+///     auto-commits (non-destructive, undo via the existing toast).
+///   - Undo toast in the parent view extended 5s → 8s so users who do
+///     archive accidentally have more time to undo.
+///
+/// Behavior matches Apple Mail / Things 3 / Messages:
+///   - Drag right past 80pt → leading action (Complete, green, auto-commit)
+///   - Drag left past 140pt → trailing action (Archive, gray, confirm dialog)
 ///   - Below threshold on release → spring back to 0
-///   - Past threshold on release → snap to fully-revealed action +
-///     fire callback
 ///   - Light haptic on threshold cross, medium on action commit
 ///
 /// Wrap any row content with `.swipeRowActions(...)`. Tap gestures
@@ -34,16 +51,26 @@ struct SwipeActionRow<Content: View>: View {
     @State private var lastHapticDirection: HapticDirection = .none
     @State private var committedAction: CommittedAction = .none
     @State private var isAnimating = false
+    @State private var pendingArchiveConfirmation = false
 
-    /// How far the finger must drag before the action background
-    /// reveals "ready to commit." Below this, release springs back
-    /// to zero with no action. Above, release commits.
-    private let actionThreshold: CGFloat = 80
+    /// Right-swipe (Complete, non-destructive) threshold. Below this on
+    /// release → spring back. Above → auto-commit.
+    private let completeThreshold: CGFloat = 80
+    /// Left-swipe (Archive, destructive) threshold. Higher than complete
+    /// so the user has to mean it. iMessage-style: above this on
+    /// release → confirmation dialog, NOT auto-commit.
+    private let archiveThreshold: CGFloat = 140
     /// Maximum visible action width (the background fully reveals).
     private let actionRevealWidth: CGFloat = 100
     /// Resistance multiplier past threshold so the row "stops"
     /// pulling along with the finger — communicates the commit edge.
-    private let pastThresholdResistance: CGFloat = 0.35
+    /// 0.18 (was 0.35) gives a stronger "lock" feel past the line.
+    private let pastThresholdResistance: CGFloat = 0.18
+    /// Horizontal-dominance ratio. The drag's horizontal translation
+    /// must exceed `horizontalDominanceRatio × vertical translation`
+    /// for the gesture to fire. 1.4 (was 1.0) so a slightly-off-vertical
+    /// scroll still scrolls.
+    private let horizontalDominanceRatio: CGFloat = 1.4
 
     private enum HapticDirection { case none, leading, trailing }
     private enum CommittedAction { case none, complete, archive }
@@ -57,6 +84,20 @@ struct SwipeActionRow<Content: View>: View {
                 .gesture(swipeGesture)
         }
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .confirmationDialog(
+            "Archive this task?",
+            isPresented: $pendingArchiveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Archive", role: .destructive) {
+                commit(.archive)
+            }
+            Button("Cancel", role: .cancel) {
+                springBack()
+            }
+        } message: {
+            Text("You can restore archived tasks from the task detail menu.")
+        }
     }
 
     private var actionBackgrounds: some View {
@@ -96,28 +137,34 @@ struct SwipeActionRow<Content: View>: View {
     }
 
     private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 14, coordinateSpace: .local)
+        DragGesture(minimumDistance: 28, coordinateSpace: .local)
             .onChanged { value in
                 guard !isAnimating else { return }
-                // Ignore mostly-vertical drags so scroll keeps working.
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                // Strict horizontal-dominance gate. The drag's horizontal
+                // translation must beat 1.4× the vertical translation
+                // before we register as a swipe. Slightly-off-vertical
+                // scrolls keep scrolling.
+                let horizontal = abs(value.translation.width)
+                let vertical = abs(value.translation.height)
+                guard horizontal > vertical * horizontalDominanceRatio else { return }
 
                 let raw = value.translation.width
+                let threshold = raw >= 0 ? completeThreshold : archiveThreshold
                 // Past threshold: resist so the row visually "locks."
                 let bounded: CGFloat
-                if abs(raw) <= actionThreshold {
+                if abs(raw) <= threshold {
                     bounded = raw
                 } else {
-                    let over = abs(raw) - actionThreshold
-                    let dampened = actionThreshold + (over * pastThresholdResistance)
+                    let over = abs(raw) - threshold
+                    let dampened = threshold + (over * pastThresholdResistance)
                     bounded = raw < 0 ? -dampened : dampened
                 }
                 offset = bounded
 
                 // Haptic on threshold cross.
                 let direction: HapticDirection
-                if offset > actionThreshold { direction = .leading }
-                else if offset < -actionThreshold { direction = .trailing }
+                if offset > completeThreshold { direction = .leading }
+                else if offset < -archiveThreshold { direction = .trailing }
                 else { direction = .none }
                 if direction != lastHapticDirection, direction != .none {
                     Haptics.light()
@@ -126,10 +173,16 @@ struct SwipeActionRow<Content: View>: View {
             }
             .onEnded { value in
                 let final = value.translation.width
-                if final >= actionThreshold {
+                if final >= completeThreshold {
+                    // Complete auto-commits — non-destructive, undo
+                    // available via the parent's toast.
                     commit(.complete)
-                } else if final <= -actionThreshold {
-                    commit(.archive)
+                } else if final <= -archiveThreshold {
+                    // Archive shows a confirmation dialog instead of
+                    // auto-committing. The dialog's Cancel springs back;
+                    // the dialog's Archive calls commit(.archive).
+                    Haptics.medium()
+                    pendingArchiveConfirmation = true
                 } else {
                     springBack()
                 }
@@ -178,6 +231,8 @@ extension View {
     /// Phase 70.A1 follow-on F5: trailing swipe renamed Snooze→Archive
     /// to match the Apple-notification mental model. Snooze relocated
     /// to the task detail sheet's actions menu.
+    /// Phase 70.A1 follow-on F5b: archive now requires confirmation
+    /// (iMessage-style dialog) instead of auto-committing on release.
     func swipeRowActions(
         completeLabel: String = "Complete",
         archiveLabel: String = "Archive",

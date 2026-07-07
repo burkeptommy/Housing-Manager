@@ -167,7 +167,14 @@ enum SystemCategoryRegistry {
         .init(categoryKey: "Deck/Outdoor", displayName: "Deck / Outdoor Maintenance", tier: .specialty,
               displayPriority: 20, icon: "square.split.bottomrightquarter.fill", defaultCadence: "Annually",
               specialtyGroup: "Outdoor Amenities"),
-        .init(categoryKey: "Driveway Sealcoating", displayName: "Driveway Sealcoating", tier: .specialty,
+        // Phase 80: displayName changed to "Driveway" — the category
+        // houses both asphalt sealcoat AND gravel regravel + top-up
+        // templates, gated by `driveway_asphalt` / `driveway_gravel`
+        // subtypes from the HNW review sheet. The "Sealcoating" label
+        // was asphalt-only language even though the row applies to every
+        // driveway. categoryKey stays "Driveway Sealcoating" so no SQL
+        // migration, no broken category-string lookups across the app.
+        .init(categoryKey: "Driveway Sealcoating", displayName: "Driveway", tier: .specialty,
               displayPriority: 25, icon: "road.lanes", defaultCadence: "Every 3 years",
               specialtyGroup: "Outdoor Amenities"),
         .init(categoryKey: "Pressure Washing", displayName: "Pressure Washing", tier: .specialty,

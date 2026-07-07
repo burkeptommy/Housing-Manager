@@ -59,6 +59,14 @@ struct InboxView: View {
                 filter = .chez
             }
         }
+        .alert("Something went wrong", isPresented: Binding(
+            get: { viewModel.error != nil },
+            set: { if !$0 { viewModel.error = nil } }
+        )) {
+            Button("OK", role: .cancel) { viewModel.error = nil }
+        } message: {
+            Text(viewModel.error ?? "")
+        }
     }
 
     private var filterPicker: some View {
@@ -116,11 +124,7 @@ struct InboxView: View {
                                     withAnimation { viewModel.dismissItem(item) }
                                 },
                                 onDelete: {
-                                    viewModel.items.removeAll { $0.id == item.id }
-                                    Haptics.success()
-                                    Task {
-                                        try? await DatabaseService.shared.deleteInboxItem(id: item.id)
-                                    }
+                                    viewModel.deleteItem(item)
                                 }
                             )
                             .onAppear {
@@ -309,12 +313,22 @@ final class InboxViewModel: ObservableObject {
             items = loadedItems
             properties = loadedProps
             vehicles = (try? await vehiclesReq) ?? []
-            // Load active projects across ALL properties for "Add to Project" option
-            var allProjects: [PropertyProjectRow] = []
-            for prop in loadedProps {
-                if let propProjects = try? await DatabaseService.shared.fetchProjects(propertyId: prop.id) {
-                    allProjects.append(contentsOf: propProjects)
+            // Phase 80 perf fix: parallelize project fetch across all
+            // properties via a TaskGroup. Pre-Phase 80 this ran sequentially —
+            // a 3-property household took 3 round-trips back-to-back. Now
+            // every property's project list fetches in parallel so the
+            // load completes in one DB round-trip's time.
+            let allProjects = await withTaskGroup(of: [PropertyProjectRow].self) { group in
+                for prop in loadedProps {
+                    group.addTask {
+                        (try? await DatabaseService.shared.fetchProjects(propertyId: prop.id)) ?? []
+                    }
                 }
+                var collected: [PropertyProjectRow] = []
+                for await rows in group {
+                    collected.append(contentsOf: rows)
+                }
+                return collected
             }
             projects = allProjects.filter { $0.status == "planning" || $0.status == "in_progress" }
         } catch {
@@ -367,6 +381,29 @@ final class InboxViewModel: ObservableObject {
         }
         Task {
             try? await DatabaseService.shared.markInboxItemsSeen(ids: [item.id])
+        }
+    }
+
+    /// Optimistic delete mirroring `processItem`'s pattern: drop the row
+    /// immediately for a snappy feel, but restore it (via reload) and
+    /// surface the error if the database delete fails. The pre-existing
+    /// inline version removed the row + fired a success haptic BEFORE a
+    /// swallowed `try?` delete — a failed delete looked successful until
+    /// the item reappeared on the next refresh.
+    func deleteItem(_ item: DatabaseService.InboxItemRow) {
+        if let idx = items.firstIndex(where: { $0.id == item.id }) {
+            items.remove(at: idx)
+        }
+        Task {
+            do {
+                try await DatabaseService.shared.deleteInboxItem(id: item.id)
+                Haptics.success()
+            } catch {
+                print("[InboxVM] Delete failed: \(error)")
+                Haptics.error()
+                self.error = "Couldn't delete that item. It's been restored — try again."
+                await load()
+            }
         }
     }
 

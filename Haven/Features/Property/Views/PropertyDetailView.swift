@@ -151,6 +151,8 @@ struct PropertyDetailView: View {
     @State private var taskForDateEdit: MaintenanceTaskDBRow?
     @State private var taskForLastServiced: MaintenanceTaskDBRow?
     @State private var editedTaskDueDate = Date()
+    @State private var dueDateSaveError: String?
+    @State private var isSavingDueDate = false
     @State private var selectedMaintenanceTask: MaintenanceTaskDBRow?
     @AppStorage("dismissedSeasonalOverview") private var dismissedSeasonalOverview = ""
     @State private var showSeasonCompletionBanner = false
@@ -564,31 +566,55 @@ struct PropertyDetailView: View {
                     .datePickerStyle(.graphical)
                     .tint(HavenColors.navy)
 
+                if let dueDateSaveError {
+                    Text(dueDateSaveError)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.critical)
+                        .multilineTextAlignment(.center)
+                }
+
                 Spacer()
             }
             .padding()
+            .onAppear { dueDateSaveError = nil }
             .navigationTitle("Edit Due Date")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { taskForDateEdit = nil }
-                        .foregroundStyle(HavenColors.textPrimary)
+                    Button("Cancel") {
+                        dueDateSaveError = nil
+                        taskForDateEdit = nil
+                    }
+                    .foregroundStyle(HavenColors.textPrimary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button {
+                        isSavingDueDate = true
                         Task {
+                            defer { isSavingDueDate = false }
                             let formatter = DateFormatter()
                             formatter.dateFormat = "yyyy-MM-dd"
-                            _ = try? await DatabaseService.shared.updateMaintenanceTask(
-                                id: task.id,
-                                MaintenanceTaskUpdate(nextDueDate: formatter.string(from: editedTaskDueDate))
-                            )
-                            Task { await NotificationScheduler.shared.rescheduleAll() }
-                            Haptics.success()
-                            taskForDateEdit = nil
-                            await viewModel.loadProperty(id: propertyID)
+                            do {
+                                _ = try await DatabaseService.shared.updateMaintenanceTask(
+                                    id: task.id,
+                                    MaintenanceTaskUpdate(nextDueDate: formatter.string(from: editedTaskDueDate))
+                                )
+                                Task { await NotificationScheduler.shared.rescheduleAll() }
+                                Haptics.success()
+                                dueDateSaveError = nil
+                                taskForDateEdit = nil
+                                await viewModel.loadProperty(id: propertyID)
+                            } catch {
+                                // Keep the picker open so the user can retry —
+                                // closing silently reverted the date on reload.
+                                Haptics.error()
+                                dueDateSaveError = "Couldn't save the new date. Check your connection and try again."
+                            }
                         }
+                    } label: {
+                        if isSavingDueDate { ProgressView() } else { Text("Save") }
                     }
+                    .disabled(isSavingDueDate)
                     .foregroundStyle(HavenColors.textPrimary)
                     .fontWeight(.semibold)
                 }
@@ -5364,7 +5390,12 @@ struct PropertyDetailView: View {
             activeChezVendorRequests: viewModel.activeChezVendorRequests
         )
         let uncoveredKeys = Set(coverage.uncovered.compactMap { item -> String? in
-            SystemCategoryRegistry.canonical(category: item.categoryKey) ?? item.categoryKey
+            // `VendorCoverageItem.id` is the category key — constructed from
+            // `system.category` / `meta.categoryKey` at build time. Pre-existing
+            // commit 350c8cf9 (Friend feedback May 2026) referenced a non-
+            // existent `.categoryKey` member; the build never compiled this
+            // path because an earlier error short-circuited it.
+            SystemCategoryRegistry.canonical(category: item.id) ?? item.id
         })
         return candidates
             .compactMap { categoryKey -> PopularVendorEntry? in

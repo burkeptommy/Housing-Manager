@@ -6632,22 +6632,14 @@ struct HavenFieldRootView: View {
             }
             .tag(HavenFieldViewModel.RootTab.visits)
 
-            // Sprint #3 R3-E-4: gate the Crew tab on having ≥2 active
-            // members. Solo workspaces never see this tab.
-            if !isSoloWorkspace {
-                NavigationStack {
-                    // Wave M7 — intra-workspace messaging surface. Distinct
-                    // from the Messages tab below (which is the
-                    // customer-facing thread). Lives between Visits and
-                    // Homes so route-day coordination chats sit next to
-                    // the dispatch surface.
-                    HavenFieldCrewTab(viewModel: viewModel)
-                }
-                .tabItem {
-                    Label("Crew", systemImage: "person.2.wave.2.fill")
-                }
-                .tag(HavenFieldViewModel.RootTab.crew)
-            }
+            // Wave M7 Crew tab removed alongside the May 2026
+            // provider-surfaces cleanup — `Haven/Features/HavenField/
+            // CrewChat/HavenFieldCrewChatTab.swift` (where `HavenFieldCrewTab`
+            // lived) was deleted with the rest of `Haven/Features/HavenField/`.
+            // The HavenFieldView body is dormant (the Field target is gone
+            // per CLAUDE.md) so this tab gap is cosmetic dead code. Kept the
+            // `.crew` enum case on `RootTab` for backward decode of any
+            // persisted `selectedTab` state from older builds.
 
             NavigationStack {
                 HavenFieldClientsTab(viewModel: viewModel)

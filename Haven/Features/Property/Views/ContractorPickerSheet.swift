@@ -341,7 +341,7 @@ struct ContractorPickerSheet: View {
                     Image(systemName: "star.fill")
                         .font(.caption2)
                         .foregroundStyle(HavenColors.warning)
-                    Text("\(rating)")
+                    Text(String(format: "%.1f", rating))
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textSecondary)
                 }

@@ -259,32 +259,29 @@ struct HandymanTabView: View {
         .background(HavenColors.background)
         .scrollContentBackground(.hidden)
         .task {
-            if let householdId {
-                await punchListVM.load(householdId: householdId, propertyId: propertyId)
-            }
-            await maintenanceVM.loadTasks()
-            await reloadCoordination()
-            await loadProposals()
-            await loadStructuredVisitItems()
+            // Phase 80 perf fix #4: parallelize the 5 load calls. Pre-Phase 80
+            // they ran sequentially — five round-trips back-to-back on every
+            // tab appearance + every .maintenanceTaskChanged. async let fires
+            // them concurrently so the whole batch completes in one round-trip.
+            await loadHandymanBatch()
         }
         .refreshable {
-            if let householdId {
-                await punchListVM.load(householdId: householdId, propertyId: propertyId)
-            }
-            await maintenanceVM.loadTasks()
-            await reloadCoordination()
-            await loadProposals()
-            await loadStructuredVisitItems()
+            await loadHandymanBatch()
         }
         .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
+            Task { await loadHandymanBatch() }
+        }
+        // Punch-list rail changes (Realtime rows, detail-sheet adds,
+        // other surfaces) post .handymanPunchListChanged WITHOUT a
+        // task change — until this observer existed, nothing in the
+        // app listened and the Punch List section stayed stale until
+        // the next tab re-entry. Reload just the punch VM: when both
+        // notifications fire together the full batch above already ran.
+        .onReceive(NotificationCenter.default.publisher(for: .handymanPunchListChanged)) { _ in
             Task {
                 if let householdId {
                     await punchListVM.load(householdId: householdId, propertyId: propertyId)
                 }
-                await maintenanceVM.loadTasks()
-                await reloadCoordination()
-                await loadProposals()
-                await loadStructuredVisitItems()
             }
         }
         // Push notification deep-link arrived. Present the right sheet
@@ -1142,6 +1139,24 @@ struct HandymanTabView: View {
             _ = await MainActor.run { addingRecommendedIds.remove(task.id) }
         }
         _ = work
+    }
+
+    /// Phase 80 perf fix #4: parallel batch load. The five load calls
+    /// (punch list, maintenance tasks, coordination, proposals,
+    /// structured visit items) used to run sequentially. async let fires
+    /// them concurrently so the wall-clock cost is the slowest one, not
+    /// the sum.
+    private func loadHandymanBatch() async {
+        async let punchLoad: Void = {
+            if let householdId {
+                await punchListVM.load(householdId: householdId, propertyId: propertyId)
+            }
+        }()
+        async let tasksLoad: Void = maintenanceVM.loadTasks()
+        async let coordLoad: Void = reloadCoordination()
+        async let proposalsLoad: Void = loadProposals()
+        async let visitsLoad: Void = loadStructuredVisitItems()
+        _ = await (punchLoad, tasksLoad, coordLoad, proposalsLoad, visitsLoad)
     }
 
     private func reloadCoordination() async {

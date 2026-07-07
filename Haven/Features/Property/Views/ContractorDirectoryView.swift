@@ -434,9 +434,9 @@ struct ContractorDirectoryView: View {
                     if let rating = contractor.rating {
                         HStack(spacing: 2) {
                             ForEach(1...5, id: \.self) { star in
-                                Image(systemName: star <= rating ? "star.fill" : "star")
+                                Image(systemName: Double(star) <= rating ? "star.fill" : "star")
                                     .font(.caption2)
-                                    .foregroundStyle(star <= rating ? HavenColors.warning : HavenColors.textTertiary)
+                                    .foregroundStyle(Double(star) <= rating ? HavenColors.warning : HavenColors.textTertiary)
                             }
                         }
                     }
@@ -1086,7 +1086,7 @@ struct ContractorDetailView: View {
                         if let rating = contractor.rating, rating > 0 {
                             HStack(spacing: 2) {
                                 ForEach(1...5, id: \.self) { i in
-                                    Image(systemName: i <= rating ? "star.fill" : "star")
+                                    Image(systemName: Double(i) <= rating ? "star.fill" : "star")
                                         .font(.caption2)
                                         .foregroundStyle(HavenColors.navy700)
                                 }

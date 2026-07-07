@@ -14,11 +14,18 @@ import SwiftUI
 ///   so SwiftUI animates the height change smoothly
 ///
 /// Per-child visual: bullet + 1-line title + tiny `vendor` / `DIY` capsule.
-/// Children are NOT independently tappable (per Phase 54A — the bundle is
-/// the atomic completion unit). VoiceOver labels mark them as `.staticText`.
+/// Phase 80 (discovery study): children ARE now independently tappable. Tapping
+/// fires `onChildTap` so the parent can present a `BundleChildDetailSheet`
+/// with the template's full description, frequency, cost, and "Part of:"
+/// link. The bundle remains the atomic completion unit — the child sheet
+/// is read-only and explains what the bundle covers.
 struct BundleChildList: View {
     let children: [MaintenanceTemplate]
     @Binding var isExpanded: Bool
+    /// Phase 80: optional callback fired when the user taps a child row.
+    /// When nil, children render non-tappable (legacy behavior, in case any
+    /// caller still wants read-only rendering).
+    var onChildTap: ((MaintenanceTemplate) -> Void)? = nil
 
     /// Number of children shown when collapsed (Phase 70 spec: 3).
     private let collapsedCount = 3
@@ -26,7 +33,7 @@ struct BundleChildList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(visibleChildren.enumerated()), id: \.offset) { _, child in
-                ChildRow(template: child)
+                ChildRow(template: child, onTap: onChildTap.map { handler in { handler(child) } })
             }
             if shouldShowMoreRow {
                 Button {
@@ -82,8 +89,10 @@ struct BundleChildList: View {
 /// `.personal` assignment.
 private struct ChildRow: View {
     let template: MaintenanceTemplate
+    var onTap: (() -> Void)? = nil
 
-    var body: some View {
+    @ViewBuilder
+    private var rowContent: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("·")
                 .font(.system(size: 14, weight: .bold))
@@ -96,10 +105,33 @@ private struct ChildRow: View {
                 .truncationMode(.tail)
             Spacer(minLength: 4)
             childPill
+            if onTap != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(HavenColors.textTertiary)
+            }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(template.title). \(accessibilityPillLabel)")
-        .accessibilityAddTraits(.isStaticText)
+    }
+
+    var body: some View {
+        if let onTap {
+            Button {
+                Haptics.selection()
+                onTap()
+            } label: {
+                rowContent
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(template.title). \(accessibilityPillLabel) Open detail.")
+            .accessibilityAddTraits(.isButton)
+        } else {
+            rowContent
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(template.title). \(accessibilityPillLabel)")
+                .accessibilityAddTraits(.isStaticText)
+        }
     }
 
     // Tiny capsule pill on the trailing edge of each child row.

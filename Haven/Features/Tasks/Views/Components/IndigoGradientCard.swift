@@ -79,7 +79,12 @@ struct MiniHeroContent: View {
     let totalCount: Int
     let programCount: Int
     let decisionCount: Int
-    let bundleReadyCount: Int
+    /// Phase 80 — was `bundleReadyCount` (a heuristic that read as
+    /// confusing). Now the task line-item count: bundle parents + sum
+    /// of each bundle's resolved children for the property's subtypes,
+    /// plus standalones. Gives the homeowner a tangible scope-of-work
+    /// number alongside programs + decisions.
+    let taskLineItemCount: Int
 
     private var pct: Int {
         guard totalCount > 0 else { return 0 }
@@ -120,13 +125,16 @@ struct MiniHeroContent: View {
             .frame(height: 6)
             .padding(.bottom, 14)
 
-            // Stats row: 3 columns with vertical dividers
+            // Stats row: 3 columns with vertical dividers. Phase 80
+            // replaced the "bundle-ready" heuristic stat with a
+            // tangible task line-item count so the homeowner sees the
+            // actual scope of work, not just a vague readiness signal.
             HStack(spacing: 0) {
                 statColumn(value: programCount, label: "programs", isWarning: false)
                 divider
-                statColumn(value: decisionCount, label: "decisions", isWarning: true)
+                statColumn(value: taskLineItemCount, label: "tasks", isWarning: false)
                 divider
-                statColumn(value: bundleReadyCount, label: "bundle-ready", isWarning: false)
+                statColumn(value: decisionCount, label: "decisions", isWarning: true)
             }
         }
     }
@@ -369,7 +377,7 @@ struct WhatWeHandleBand: View {
                     totalCount: 16,
                     programCount: 7,
                     decisionCount: 5,
-                    bundleReadyCount: 4
+                    taskLineItemCount: 24
                 )
             }
             IndigoGradientCard(variant: .hero) {

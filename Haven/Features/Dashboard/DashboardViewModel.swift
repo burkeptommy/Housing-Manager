@@ -565,6 +565,31 @@ final class DashboardViewModel: ObservableObject {
         // Subscribe immediately so push notifications trigger inbox refresh
         // even before loadDashboard() completes
         subscribeToChanges()
+        // Phase 80 perf fix #2: synchronously hydrate from disk so the first
+        // paint shows real numbers + Up Next + coverage pill instead of a
+        // skeleton. fetchAll() will refresh in the background and overwrite
+        // any deltas. Cache failure is non-fatal — falls back to network.
+        hydrateFromCache()
+    }
+
+    /// Pull the most recent snapshot off disk on init. Mirrors the pattern
+    /// `MaintenanceViewModel.init()` uses for the Tasks tab. Only fields
+    /// that drive the FIRST PAINT region of the dashboard are cached;
+    /// everything else falls through to the network path.
+    private func hydrateFromCache() {
+        guard let payload = DashboardCacheStore.read() else { return }
+        userFirstName = payload.userFirstName
+        overdueMaintenanceTasks = payload.overdueTasks
+        dueThisWeekTasks = payload.dueThisWeekTasks
+        dueThisMonthTasks = payload.dueThisMonthTasks
+        allUpcomingTasks = payload.allUpcomingTasks
+        nextUpcomingTask = payload.nextUpcomingTask
+        coveredSystemCount = payload.coveredSystemCount
+        totalVendorSystemCount = payload.totalVendorSystemCount
+        activeVendorCount = payload.activeVendorCount
+        dueThisWeekTaskCount = payload.dueThisWeekTaskCount
+        personalTaskCount = payload.personalTaskCount
+        vendorManagedTaskCount = payload.vendorManagedTaskCount
     }
 
     /// Phase 50 (sub-phase B first-login): collapses to "no property" or
@@ -882,14 +907,25 @@ final class DashboardViewModel: ObservableObject {
             .documentChanged, .propertyChanged, .projectChanged,
             .chezRequestChanged
         ]
-        for name in names {
+        // Phase 80 perf fix #6: coalesce notifications into ONE merged
+        // stream, then debounce. Pre-Phase 80 every notification had its
+        // own 300ms debounce, so a flow that fires three notifications
+        // back-to-back (e.g. applying an invoice processor change emits
+        // .maintenanceTaskChanged + .homeSystemChanged + .contractorChanged
+        // within milliseconds) triggered three independent refreshes,
+        // each loading 16+ DB rows. With the merge, the same flow now
+        // triggers a single refresh ~300ms after the last event.
+        let publishers = names.map { name in
             NotificationCenter.default.publisher(for: name)
-                .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-                .sink { [weak self] _ in
-                    Task { [weak self] in await self?.refresh() }
-                }
-                .store(in: &cancellables)
+                .map { _ in () }
+                .eraseToAnyPublisher()
         }
+        Publishers.MergeMany(publishers)
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                Task { [weak self] in await self?.refresh() }
+            }
+            .store(in: &cancellables)
         // Inbox updates only refresh inbox items, not the whole dashboard
         NotificationCenter.default.publisher(for: .inboxItemUpdated)
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
@@ -982,6 +1018,23 @@ final class DashboardViewModel: ObservableObject {
         // Build 90: compute derived dashboard state after all data is loaded
         computeThisWeekItems()
         computeRecentActivity()
+
+        // Phase 80 perf fix #2: persist the snapshot for the next launch.
+        // Off-main-actor write — file I/O won't block the current frame.
+        DashboardCacheStore.write(
+            userFirstName: userFirstName,
+            overdueTasks: overdueMaintenanceTasks,
+            dueThisWeekTasks: dueThisWeekTasks,
+            dueThisMonthTasks: dueThisMonthTasks,
+            allUpcomingTasks: allUpcomingTasks,
+            nextUpcomingTask: nextUpcomingTask,
+            coveredSystemCount: coveredSystemCount,
+            totalVendorSystemCount: totalVendorSystemCount,
+            activeVendorCount: activeVendorCount,
+            dueThisWeekTaskCount: dueThisWeekTaskCount,
+            personalTaskCount: personalTaskCount,
+            vendorManagedTaskCount: vendorManagedTaskCount
+        )
     }
 
     private func loadUserName() async {
@@ -1293,10 +1346,75 @@ final class DashboardViewModel: ObservableObject {
 
     private func loadOverdueMaintenance() async {
         do {
-            let tasks = try await DatabaseService.shared.fetchMaintenanceTasks()
+            let rawTasks = try await DatabaseService.shared.fetchMaintenanceTasks()
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd"
             let now = Date()
+            // Phase 80 fix: compare against start-of-day instead of the
+            // raw `now` timestamp. Without this, tasks dated TODAY (e.g.
+            // post-mid-season-reanchor sets next_due_date = CURRENT_DATE)
+            // parse to midnight, and midnight < 7:36pm = true → today
+            // gets counted as overdue. Homeowner sees "17 overdue" on
+            // the Dashboard but the 17 are really "due today." Use
+            // startOfDay so the threshold is "anything strictly before
+            // today."
+            let todayStart = Calendar.current.startOfDay(for: now)
+
+            // Phase 80 fix: filter bundle children from every downstream
+            // list. Bundle children are work items rolled INSIDE a parent
+            // visit card (e.g. "Fixture leak walkthrough" and "Exercise
+            // main shutoff valve" live under "Annual Plumbing Inspection").
+            // Showing them individually in "Needs your attention" makes
+            // the homeowner see 5 cards for what's really one vendor
+            // visit. The Tasks tab's seasonFeed already filters them out;
+            // this brings the Dashboard's overdue/due-this-week lists in
+            // line so both surfaces match the "rollup to parent" model.
+            //
+            // Phase 80 defensive check: only hide children when an
+            // ALIGNED-YEAR parent exists in the same household. Some
+            // older households (Phase 58 dissolved certain bundles +
+            // Phase 70 restored them) ended up with orphan children
+            // pointing at a missing or future-year parent. Hiding the
+            // children silently makes the work disappear from both
+            // Dashboard AND Tasks tab. The defensive check keeps
+            // children visible when there's no parent to roll them
+            // into.
+            let parentDateFormatter = DateFormatter()
+            parentDateFormatter.dateFormat = "yyyy-MM-dd"
+            // Pre-index active parent tasks by templateId so the inner
+            // check is O(1) per task instead of O(n).
+            let parentsByTemplateId: [String: [MaintenanceTaskDBRow]] = {
+                var index: [String: [MaintenanceTaskDBRow]] = [:]
+                for candidate in rawTasks
+                    where candidate.isArchived != true
+                    && candidate.lastCompletedDate == nil
+                    && MaintenanceTemplates.isBundleId(candidate.templateId)
+                {
+                    guard let key = candidate.templateId else { continue }
+                    index[key, default: []].append(candidate)
+                }
+                return index
+            }()
+            let tasks = rawTasks.filter { task in
+                guard let templateKey = task.templateId,
+                      let template = MaintenanceTemplates.template(forKey: templateKey),
+                      let bundleId = template.bundleId else { return true }
+                // Look for an active parent in same household + property,
+                // dated within 90 days of the child. Children dated today
+                // with a parent dated next-Feb (~250 days out) read as
+                // orphaned — they need to surface so the homeowner can
+                // act on them.
+                guard let candidates = parentsByTemplateId[bundleId] else { return true }
+                guard let childDate = parentDateFormatter.date(from: task.nextDueDate) else { return true }
+                let hasAlignedParent = candidates.contains { parent in
+                    guard parent.householdId == task.householdId else { return false }
+                    if parent.propertyId != task.propertyId { return false }
+                    guard let parentDate = parentDateFormatter.date(from: parent.nextDueDate) else { return false }
+                    let days = Calendar.current.dateComponents([.day], from: parentDate, to: childDate).day ?? 0
+                    return abs(days) <= 90
+                }
+                return !hasAlignedParent
+            }
 
             // Phase 61: also count archived tasks for the LegacyTasksNotificationCard.
             // Separate fetch so the main list stays filtered to active rows.
@@ -1306,25 +1424,30 @@ final class DashboardViewModel: ObservableObject {
 
             overdueMaintenanceTasks = tasks.filter { task in
                 guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                return date < now
+                return date < todayStart
             }
 
             let endOfWeek = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
+            // Phase 80: include today-dated tasks in "due this week" so
+            // they surface somewhere on the Dashboard rather than falling
+            // into the gap between overdue (< startOfDay) and future
+            // (>= now-as-timestamp). Compare dates against startOfDay so
+            // a midnight-today timestamp passes the >= check.
             dueThisWeekTasks = tasks.filter { task in
                 guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                return date >= now && date <= endOfWeek
+                return date >= todayStart && date <= endOfWeek
             }
 
             let endOfMonth = Calendar.current.date(byAdding: .month, value: 1, to: now) ?? now
             dueThisMonthTasks = tasks.filter { task in
                 guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                return date >= now && date <= endOfMonth
+                return date >= todayStart && date <= endOfMonth
             }
 
             let futureTasks = tasks
                 .filter { task in
                     guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
-                    return date >= now
+                    return date >= todayStart
                 }
                 .sorted(by: { $0.nextDueDate < $1.nextDueDate })
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// V5 Maintenance screen — the focused six-section narrative that lives
 /// behind the title-switcher in `TasksHubView`. Replaces the embedded
@@ -34,6 +35,11 @@ struct MaintenanceTabView: View {
     /// heavy Phase 56.4 timeline) just to re-tap the same row from
     /// inside that view.
     @State private var detailTask: MaintenanceTaskDBRow?
+    /// Phase 80 (discovery study): read-only child detail sheet. Set when
+    /// the user taps a child line item inside a `BundleParentCard`. The
+    /// sheet shows the template's title, frequency, cost, description,
+    /// and "Part of: [Bundle Title]" link.
+    @State private var bundleChildDetail: BundleChildPresentation?
     /// Phase F3: MaintenanceScheduleView parity — duplicate banner.
     /// `DuplicateDetector` scans routines + tasks for high-confidence
     /// match pairs (same vendor + category family + title similarity);
@@ -132,6 +138,22 @@ struct MaintenanceTabView: View {
                     // own visit-history surface.
                     onShowCompleted: {
                         showCompletedSheet = true
+                    },
+                    // Phase 80 — Search + Timeline icons hoisted from
+                    // the deleted SeasonScopeBanner. Same destinations
+                    // as before (RecommendedServicesView search +
+                    // TasksTimelineSheet) but in a permanent toolbar
+                    // slot rather than a redundant pill that duplicated
+                    // the YearRibbon's season/count text.
+                    onSearch: {
+                        Analytics.track(.tasksV2SearchTapped, [:])
+                        pushTarget = .recommendedServices
+                    },
+                    onTimeline: {
+                        showYearOverview = true
+                        Analytics.track(.tasksV2YearOverviewOpened, [
+                            "season": activeSeason.rawValue
+                        ])
                     }
                 )
 
@@ -178,7 +200,10 @@ struct MaintenanceTabView: View {
 
                 yearAtAGlanceSection
 
-                seasonScopeBannerSection
+                // Phase 80 — SeasonScopeBanner removed; its search +
+                // timeline icons live in the HeaderSwitcher toolbar
+                // now, the season/count text was duplicative of the
+                // YearRibbon tiles.
 
                 statsFilterStripSection
 
@@ -202,6 +227,14 @@ struct MaintenanceTabView: View {
                 }
                 .padding(.horizontal, TasksV5.pageMargin)
                 .padding(.bottom, TasksV5.bottomTabInset)
+
+                // Phase 80 — the previous "View hidden tasks" muted
+                // link that lived here was buried beneath 1000+pt of
+                // scrollable content. Replaced by two discoverable
+                // surfaces: the "+" confirmation dialog ("View hidden
+                // tasks" entry) and Settings → Maintenance → Hidden
+                // Tasks. Same destination, both reachable from the
+                // natural thumb-reach zone.
             }
         }
         .background(HavenColors.background)
@@ -229,12 +262,31 @@ struct MaintenanceTabView: View {
         .animation(HavenTheme.animationStandard, value: lastScheduledToast)
         .animation(HavenTheme.animationStandard, value: lastSwipeToast)
         .task {
+            // Phase 80 perf fix #3: subscribe the season-feed cache to
+            // upstream data changes BEFORE the first load fires so the
+            // initial fetch's emission triggers an invalidation. Without
+            // this the cache holds the empty initial state across the
+            // first publish.
+            viewModel.bindSeasonFeedInvalidation()
+
             if let householdId {
                 await viewModel.load(householdId: householdId)
             }
             await maintenanceVM.loadTasks()
             await loadDuplicates()
             await loadYearStats()
+            // Phase 80 fix: hydrate the per-category active-subtype
+            // cache so BundleChildList resolves subtype-gated children
+            // correctly. Pre-fix this was an empty Set passed through
+            // childrenFor, silently dropping every gated child (the
+            // root cause of HVAC:spring + most other subtype bundles
+            // rendering empty).
+            if let property = appState.primaryProperty {
+                await viewModel.loadActiveSubtypes(
+                    propertyId: property.id,
+                    propertyAttributes: property.attributes ?? [:]
+                )
+            }
 
             // Phase 70.A1 (Summer/Winter library expansion v3): seed
             // the 8 new templates onto existing households once. The
@@ -261,12 +313,17 @@ struct MaintenanceTabView: View {
             await maintenanceVM.loadTasks()
         }
         .onReceive(NotificationCenter.default.publisher(for: .routineChanged)) { _ in
+            // Phase 80 perf fix #3: invalidate the season feed cache the
+            // moment we know the underlying data is stale, before the
+            // refetch lands. UI re-renders against the network result.
+            viewModel.invalidateSeasonFeedCache()
             Task {
                 if let householdId { await viewModel.load(householdId: householdId) }
                 await loadDuplicates()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .maintenanceTaskChanged)) { _ in
+            viewModel.invalidateSeasonFeedCache()
             Task {
                 await maintenanceVM.loadTasks()
                 await loadDuplicates()
@@ -399,6 +456,12 @@ struct MaintenanceTabView: View {
                 )
             }
         }
+        .sheet(item: $bundleChildDetail) { presentation in
+            BundleChildDetailSheet(
+                template: presentation.template,
+                bundleTitle: presentation.bundleTitle
+            )
+        }
         // Phase 70.A1 follow-on G3 — Completed sheet.
         .sheet(isPresented: $showCompletedSheet) {
             if let householdId {
@@ -409,6 +472,12 @@ struct MaintenanceTabView: View {
             Button("Add a routine") { pushTarget = .routinesList }
             Button("Add a one-off task") { showAddTaskSheet = true }
             Button("Browse all services") { pushTarget = .recommendedServices }
+            // Phase 80 — discoverable Task Library entry. The buried
+            // link below the BrowseBand wasn't enough; surfacing here
+            // (and in Settings) gives the user a single-tap path from
+            // anywhere on the Maintenance tab to anything they've
+            // hidden or snoozed.
+            Button("View hidden tasks") { pushTarget = .taskLibrary }
             // Phase F4: bulk-select entry. Tapping enters selection mode
             // with no rows selected. User taps rows to select then chooses
             // a bulk action from the bottom action bar.
@@ -440,7 +509,15 @@ struct MaintenanceTabView: View {
                 totalCount: viewModel.totalCount(for: activeSeason, currentSeason: currentSeason),
                 programCount: viewModel.activePrograms().count,
                 decisionCount: viewModel.pendingDecisions().count,
-                bundleReadyCount: viewModel.bundleReadyCount
+                // Phase 80 — total task line items across every visible
+                // bundle parent (counting its resolved children) plus
+                // every standalone. Computed via the same library lookup
+                // BundleChildList uses, so the count is exactly what the
+                // user will see if they expand every bundle.
+                taskLineItemCount: viewModel.taskLineItemCount(
+                    for: activeSeason,
+                    currentSeason: currentSeason
+                )
             )
         }
         .padding(.horizontal, TasksV5.pageMargin)
@@ -658,13 +735,18 @@ struct MaintenanceTabView: View {
             next30VisitCount: summary.next30VisitCount,
             next30EstimateDollars: summary.next30Estimate,
             onTap: {
-                // Future: open a focused breakdown sheet. Defer until
-                // there's enough data to make the breakdown valuable —
-                // for now the tap is a discoverability hint.
+                // Phase 80 fix: the chevron used to fire analytics-only,
+                // leaving the affordance dead. Routes through the same
+                // TasksTimelineSheet the calendar icon opens — gives
+                // the user the 18-month visit overview they were
+                // implicitly promised by the "NEXT 30 DAYS · 18 visits"
+                // chevron.
                 Analytics.track(.tasksV2YearGlanceTapped, [
                     "year_visits": summary.yearVisitCount,
                     "next_30_visits": summary.next30VisitCount
                 ])
+                Haptics.light()
+                showYearOverview = true
             }
         )
         .padding(.horizontal, TasksV5.pageMargin)
@@ -693,27 +775,6 @@ struct MaintenanceTabView: View {
             .padding(.horizontal, TasksV5.pageMargin)
             .padding(.bottom, TasksV5.sectionGap)
         }
-    }
-
-    private var seasonScopeBannerSection: some View {
-        SeasonScopeBanner(
-            season: activeSeason,
-            totalItems: activeFeed.totalItems,
-            actionItems: activeFeed.actionItems,
-            onSearch: {
-                // Search overlay ships in 70.A1.10; for now no-op so the
-                // affordance is present and discoverable but inert.
-                Analytics.track(.tasksV2SearchTapped, [:])
-            },
-            onYearOverview: {
-                showYearOverview = true
-                Analytics.track(.tasksV2YearOverviewOpened, [
-                    "season": activeSeason.rawValue
-                ])
-            }
-        )
-        .padding(.horizontal, TasksV5.pageMargin)
-        .padding(.bottom, TasksV5.sectionGap)
     }
 
     /// Phase F1: time-window filter chips between the banner and the
@@ -1004,6 +1065,20 @@ struct MaintenanceTabView: View {
                     },
                     onBookIt: {
                         quickScheduleTask = task
+                    },
+                    onChildTap: { template in
+                        // Phase 80 (discovery study): tap a bundle child →
+                        // open the child detail sheet. Bundle parent's task
+                        // is the atomic completion unit; this sheet is
+                        // read-only and surfaces the child's full info.
+                        Analytics.track(.tasksV2BundleChildOpened, [
+                            "bundle_id": task.templateId ?? "",
+                            "child_template_key": template.templateKey
+                        ])
+                        bundleChildDetail = BundleChildPresentation(
+                            template: template,
+                            bundleTitle: task.title
+                        )
                     }
                 )
                 // Phase F2 + 70.A1 follow-on F5: leading swipe = complete,
@@ -1015,15 +1090,20 @@ struct MaintenanceTabView: View {
                     archiveLabel: "Archive",
                     onComplete: {
                         Task {
-                            await maintenanceVM.completeTask(task)
-                            lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                            // Only offer Undo when the write landed — the VM
+                            // rolls the row back on failure and undoing a
+                            // never-completed task would corrupt state.
+                            if await maintenanceVM.completeTask(task) {
+                                lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                            }
                         }
                     },
                     onArchive: {
                         Analytics.track(.tasksV2SwipedArchive, ["source": "bundle_card"])
                         Task {
-                            await maintenanceVM.archiveTask(task)
-                            lastSwipeToast = SwipeToast(taskId: task.id, action: .archived, taskTitle: task.title)
+                            if await maintenanceVM.archiveTask(task) {
+                                lastSwipeToast = SwipeToast(taskId: task.id, action: .archived, taskTitle: task.title)
+                            }
                         }
                     }
                 )
@@ -1050,15 +1130,17 @@ struct MaintenanceTabView: View {
                     archiveLabel: "Archive",
                     onComplete: {
                         Task {
-                            await maintenanceVM.completeTask(task)
-                            lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                            if await maintenanceVM.completeTask(task) {
+                                lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                            }
                         }
                     },
                     onArchive: {
                         Analytics.track(.tasksV2SwipedArchive, ["source": "standalone_row"])
                         Task {
-                            await maintenanceVM.archiveTask(task)
-                            lastSwipeToast = SwipeToast(taskId: task.id, action: .archived, taskTitle: task.title)
+                            if await maintenanceVM.archiveTask(task) {
+                                lastSwipeToast = SwipeToast(taskId: task.id, action: .archived, taskTitle: task.title)
+                            }
                         }
                     }
                 )
@@ -1352,16 +1434,30 @@ struct MaintenanceTabView: View {
     /// notes were a frozen snapshot; this reads from the current template
     /// library so Section C additions surface on existing installs.
     ///
-    /// 70.A1 ships with empty activeSubtypes (universal children only).
-    /// Subtype-gated children (wood vs gas chimney, etc.) are added in
-    /// a follow-up when the home_system + property lookup wires through
-    /// to this helper.
+    /// Phase 80 fix: ALWAYS pass the property's active subtypes so
+    /// subtype-gated children (HVAC:Air duct cleaning gated on `ducted`,
+    /// HVAC tune-up cooling gated on `has_ac`, Chimney:Annual chimney
+    /// sweep gated on `wood`, etc.) actually surface. The empty-set
+    /// stub from 70.A1 silently filtered every subtype-gated child
+    /// out — which is why Tom's HVAC:spring bundle rendered as
+    /// "Spring HVAC Service" with no "Includes N things" breakdown.
+    /// `viewModel.activeSubtypes(for:)` reads from the cache populated
+    /// in `loadActiveSubtypes(propertyId:propertyAttributes:)` on
+    /// `.task` appear. Falls back to empty set (legacy behavior) when
+    /// the cache hasn't loaded yet.
     private func childrenFor(task: MaintenanceTaskDBRow) -> [MaintenanceTemplate] {
         guard let templateId = task.templateId else { return [] }
         let pack = appState.primaryProperty?.regionalPack.flatMap { RegionalPack(rawValue: $0) }
+        // Resolve the system category from the bundleId prefix so we
+        // index the cache correctly. bundleId convention is
+        // "<SystemCategory>:<token>" — e.g. "HVAC:spring", "Chimney:fall",
+        // "Plumbing:annual". Splitting on the first colon yields the
+        // category exactly as it lives on home_systems.
+        let category = templateId.components(separatedBy: ":").first ?? ""
+        let active = viewModel.activeSubtypes(for: category)
         return MaintenanceTemplates.bundleChildren(
             forTemplateId: templateId,
-            activeSubtypes: [],
+            activeSubtypes: active,
             regionalPack: pack
         )
     }
@@ -1523,7 +1619,11 @@ struct MaintenanceTabView: View {
         )
         .havenShadow(HavenTheme.shadowElevated)
         .task(id: toast.id) {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            // Phase 70.A1 follow-on F5b: bump 5s → 8s. Tom's accidental
+            // archives were getting dismissed before he noticed they'd
+            // happened; the longer window matches Apple Mail's undo
+            // affordance more closely.
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
             if lastSwipeToast?.id == toast.id {
                 lastSwipeToast = nil
             }
@@ -1987,6 +2087,18 @@ struct MaintenanceTabView: View {
         }
     }
 
+    // MARK: - Bundle child detail presentation (Phase 80)
+
+    /// Identifiable wrapper so we can drive a `.sheet(item:)` from a
+    /// MaintenanceTemplate (which isn't itself Identifiable in a way that
+    /// SwiftUI accepts cleanly). Carries the bundle title so the sheet's
+    /// "Part of:" link reads correctly.
+    struct BundleChildPresentation: Identifiable {
+        let id = UUID()
+        let template: MaintenanceTemplate
+        let bundleTitle: String?
+    }
+
     // MARK: - Navigation destinations
 
     enum MaintenancePush: Hashable, Identifiable {
@@ -1994,6 +2106,10 @@ struct MaintenanceTabView: View {
         case recommendedServices
         case vehicle(UUID)
         case routineDetail(RoutineRow, UUID)
+        /// Phase 80 (Tom's prevention pass): hidden / snoozed templates +
+        /// categories landing page. Reached from the Maintenance tab's
+        /// BrowseBand overflow + the RecommendedServicesView toolbar.
+        case taskLibrary
 
         var id: String {
             switch self {
@@ -2001,6 +2117,7 @@ struct MaintenanceTabView: View {
             case .recommendedServices: return "recommended"
             case .vehicle(let id): return "vehicle-\(id.uuidString)"
             case .routineDetail(let r, _): return "routine-\(r.id.uuidString)"
+            case .taskLibrary: return "task_library"
             }
         }
 
@@ -2021,6 +2138,10 @@ struct MaintenanceTabView: View {
         case .recommendedServices:
             if let householdId, let propertyId {
                 RecommendedServicesView(householdId: householdId, propertyId: propertyId)
+            }
+        case .taskLibrary:
+            if let householdId, let propertyId {
+                TaskLibraryView(householdId: householdId, propertyId: propertyId)
             }
         case .vehicle(let vehicleId):
             // PropertyListView's existing vehicle navigation; route via notification.
@@ -2353,6 +2474,66 @@ final class MaintenanceTabViewModel: ObservableObject {
     /// & on-demand services" copy that matches the V5 spec.
     let browseCatalogCount = 15
 
+    // MARK: - Phase 80 perf fix #3 — season feed memoization
+    //
+    // `activeFeed` and the ribbon tile counts access `seasonFeed(_:)` ~13
+    // times per body render (9 from `activeFeed` accessors + 4 from the
+    // YearRibbon `ribbonTileCount` loop). Each call re-runs the full
+    // filter + monthly grouping + decision/program/Chez split. Single-
+    // entry cache on the last computed key collapses that to one call.
+    //
+    // Invalidation is implicit: the cache key includes tasks.count plus
+    // a salt that changes whenever `.maintenanceTaskChanged` or
+    // `.routineChanged` fires — see `invalidateSeasonFeedCache()`. Cache
+    // key includes every observed input (season, propertyId, stats
+    // filter, search query, tasks salt, routines salt) so a stale hit
+    // is impossible.
+    private struct SeasonFeedCacheKey: Hashable {
+        let season: Season
+        let propertyId: UUID?
+        let activeStatsFilter: TasksStatsFilter?
+        let dataSalt: Int
+    }
+    private var lastSeasonFeedKey: SeasonFeedCacheKey?
+    private var lastSeasonFeed: SeasonFeed?
+    private var seasonFeedDataSalt: Int = 0
+    private var seasonFeedTasksSubscription: AnyCancellable?
+    private var seasonFeedRoutinesSubscription: AnyCancellable?
+
+    /// Bump the salt on every observed data change so the next
+    /// `seasonFeed(_:)` call computes fresh. Invoked from
+    /// `MaintenanceTabView`'s `.maintenanceTaskChanged` /
+    /// `.routineChanged` subscriptions and (more importantly) from the
+    /// Combine pipeline below the moment `MaintenanceViewModel.shared
+    /// .tasks` actually publishes a new value. The notification-driven
+    /// invalidation alone races the async reload — bumping on both the
+    /// notification AND the @Published emission guarantees no stale-
+    /// read window.
+    func invalidateSeasonFeedCache() {
+        seasonFeedDataSalt &+= 1
+        lastSeasonFeedKey = nil
+        lastSeasonFeed = nil
+    }
+
+    /// Wire the cache invalidator to the upstream `@Published` arrays
+    /// that drive `seasonFeed(_:)`. Called once from the View's
+    /// `.task` block. Idempotent — re-calls replace the existing
+    /// subscriptions so we don't accumulate handlers across re-renders.
+    func bindSeasonFeedInvalidation() {
+        seasonFeedTasksSubscription = MaintenanceViewModel.shared.$tasks
+            .dropFirst()  // skip the current value snapshot
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.invalidateSeasonFeedCache()
+            }
+        seasonFeedRoutinesSubscription = self.$routines
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.invalidateSeasonFeedCache()
+            }
+    }
+
     /// Bundle-ready stat for MiniHero. Computed from MaintenanceViewModel
     /// once that gains a `bundleReadyCount` published property; for now,
     /// derive from contractors who have ≥3 pending tasks (heuristic).
@@ -2365,6 +2546,19 @@ final class MaintenanceTabViewModel: ObservableObject {
         return groupedByContractor.values.filter { $0.count >= 3 }.count
     }
 
+    /// Phase 80 fix (BundleChildList empty-set bug): per-category subtype
+    /// cache, keyed by SystemCategory string (case preserved as stored on
+    /// home_systems). `MaintenanceTemplates.bundleChildren(...)` filters
+    /// children whose `requiredSubtypes` aren't satisfied by the active
+    /// set — but the View was passing an empty Set, which silently
+    /// stripped every subtype-gated child fleet-wide (HVAC:spring's
+    /// has_ac cooling tune-up + condensate flush, the wood-vs-gas
+    /// chimney children, the mini-split / geothermal / ducted bundle
+    /// members, etc.). Populated in `loadActiveSubtypes(propertyId:)`
+    /// from home_systems + property.attributes; consumed in
+    /// `MaintenanceTabView.childrenFor(_:)` via `activeSubtypes(for:)`.
+    @Published private(set) var propertyActiveSubtypes: [String: Set<String>] = [:]
+
     func load(householdId: UUID) async {
         isLoading = true
         defer { isLoading = false }
@@ -2374,6 +2568,49 @@ final class MaintenanceTabViewModel: ObservableObject {
         } catch {
             print("[MaintenanceTabViewModel] load failed: \(error)")
         }
+    }
+
+    /// Hydrate `propertyActiveSubtypes` for a property. Called from the
+    /// View's `.task` block alongside the routine + task loads. One DB
+    /// hit (fetchHomeSystems) + one in-memory pass that builds a
+    /// (category → activeSubtypes) dict via the canonical
+    /// `MaintenanceTemplates.activeSubtypes(category:subtype:fuelType:flags:)`
+    /// helper the reconciler already uses.
+    func loadActiveSubtypes(propertyId: UUID, propertyAttributes: [String: FlexibleValue]) async {
+        let systems = (try? await DatabaseService.shared.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
+        // Property-level boolean flags (has_ac / has_humidifier /
+        // has_ev_charger / has_heat_cables / mature_trees / etc.).
+        // Treated as `flags` input to activeSubtypes so HVAC + Electrical
+        // + Landscaping bundles see the property-wide signal alongside
+        // the system row's subtype.
+        let propertyFlags: [String: Bool] = propertyAttributes.reduce(into: [:]) { acc, kv in
+            if kv.value.stringValue.lowercased() == "true" { acc[kv.key] = true }
+        }
+        // Group systems by category — multiple systems can share a
+        // category (e.g. Pool/Spa parent + hot tub, or a property with
+        // separate boiler + central AC). We want the union of every
+        // system's active subtype set under that category.
+        var byCategory: [String: Set<String>] = [:]
+        for system in systems {
+            let cat = system.category
+            let sub = MaintenanceTemplates.activeSubtypes(
+                category: cat,
+                subtype: system.subtype,
+                fuelType: system.catalogFuelType,
+                flags: propertyFlags
+            )
+            byCategory[cat, default: []].formUnion(sub)
+        }
+        self.propertyActiveSubtypes = byCategory
+    }
+
+    /// Convenience accessor — returns the cached active-subtype set for a
+    /// category, or an empty set when nothing's been loaded yet (which
+    /// is the legacy pre-Phase-80 behavior, so first-paint before the
+    /// hydration completes degrades gracefully to "show universal
+    /// children only").
+    func activeSubtypes(for category: String) -> Set<String> {
+        propertyActiveSubtypes[category] ?? []
     }
 
     // MARK: Section data
@@ -2586,6 +2823,30 @@ final class MaintenanceTabViewModel: ObservableObject {
     /// routines — the v2 design merges them with a salmon Chez pill
     /// rendered inline.
     func seasonFeed(_ season: Season, propertyId: UUID? = nil) -> SeasonFeed {
+        // Phase 80 perf fix #3: single-entry memoization. `activeFeed`
+        // and the ribbon tile counts read this ~13 times per body
+        // render; without the cache each call re-ran the full filter +
+        // monthly grouping + decision/program split. Invalidated by
+        // `invalidateSeasonFeedCache()` on .maintenanceTaskChanged /
+        // .routineChanged.
+        let key = SeasonFeedCacheKey(
+            season: season,
+            propertyId: propertyId ?? self.activePropertyId,
+            activeStatsFilter: self.activeStatsFilter,
+            dataSalt: self.seasonFeedDataSalt
+        )
+        if key == lastSeasonFeedKey, let cached = lastSeasonFeed {
+            return cached
+        }
+        let result = computeSeasonFeed(season: season, propertyId: propertyId)
+        lastSeasonFeedKey = key
+        lastSeasonFeed = result
+        return result
+    }
+
+    /// The heavy compute path. Don't call directly — go through
+    /// `seasonFeed(_:propertyId:)` so the memoization fires.
+    private func computeSeasonFeed(season: Season, propertyId: UUID?) -> SeasonFeed {
         let propScope = propertyId ?? self.activePropertyId
         let calendar = Calendar.current
         let formatter = DateFormatter()
@@ -2778,9 +3039,16 @@ final class MaintenanceTabViewModel: ObservableObject {
         var result: [Season: YearRibbonSummary] = [:]
         for season in Season.allCases {
             let feed = seasonFeed(season)
+            // Phase 80 — count task line items by expanding every
+            // bundle parent's children via the template library +
+            // current activeSubtypes, then adding standalones. Tom's
+            // "Spring 10" tile now reads "10 visits · 24 tasks" so the
+            // scope of work is visible alongside the visit count.
+            let tasks = computeTaskLineItemCount(feed: feed)
             result[season] = YearRibbonSummary(
                 totalItems: feed.totalItems,
-                actionItems: feed.actionItems
+                actionItems: feed.actionItems,
+                taskLineItemCount: tasks
             )
         }
         return result
@@ -2798,6 +3066,48 @@ final class MaintenanceTabViewModel: ObservableObject {
         let activeProgs = activePrograms(scopedTo: scope).count
         let decisions = pendingDecisions(scopedTo: scope).count
         return activeProgs + decisions
+    }
+
+    /// Phase 80 — for the MiniHero `tasks` stat. Expands every bundle
+    /// parent in the season's feed into its resolved children via the
+    /// template library + property's activeSubtypes, then adds the
+    /// standalone tasks. Falls back to feed.totalItems when subtypes
+    /// haven't loaded yet (first paint).
+    func taskLineItemCount(for season: Season, currentSeason: Season) -> Int {
+        let feed = seasonFeed(season)
+        return computeTaskLineItemCount(feed: feed)
+    }
+
+    /// Shared expansion routine. Pulled out so both `seasonSummaries(...)`
+    /// (for the ribbon) and `taskLineItemCount(for:)` (for the MiniHero)
+    /// stay in sync.
+    private func computeTaskLineItemCount(feed: SeasonFeed) -> Int {
+        // monthSections contains every visible bundle parent + standalone
+        // + routine occurrence for the season. Expand bundle parents via
+        // the library lookup; standalones + routine occurrences count
+        // as 1 each.
+        var total = 0
+        for section in feed.monthSections {
+            for entry in section.entries {
+                switch entry {
+                case .bundle(let task):
+                    let templateId = task.templateId ?? ""
+                    let category = templateId.components(separatedBy: ":").first ?? ""
+                    let active = activeSubtypes(for: category)
+                    let children = MaintenanceTemplates.bundleChildren(
+                        forTemplateId: templateId,
+                        activeSubtypes: active,
+                        regionalPack: nil
+                    )
+                    total += 1 + children.count
+                case .standaloneTask:
+                    total += 1
+                case .routineOccurrence:
+                    total += 1
+                }
+            }
+        }
+        return total
     }
 
     // MARK: Internal

@@ -1610,9 +1610,12 @@ struct MaintenanceTaskDetailSheet: View {
                 )
             )
 
-            // Also update the parent system's dates if applicable
+            // Also update the parent system's dates if applicable.
+            // No `try?`: a silently failed system update leaves
+            // last_service_date stale, which skews every future
+            // due-date computed off the system override.
             if let systemId = task.systemId {
-                _ = try? await DatabaseService.shared.updateHomeSystem(
+                _ = try await DatabaseService.shared.updateHomeSystem(
                     id: systemId,
                     HomeSystemUpdate(
                         lastServiceDate: completedStr,
@@ -1887,12 +1890,19 @@ struct MaintenanceTaskDetailSheet: View {
                 preferredRoute: route,
                 preferredVendorId: route == "vendor" ? assignedContractor?.id : nil
             )
-            _ = try? await DatabaseService.shared.upsertRoutingPreference(insert)
-            Analytics.track(.routingPreferenceUpdated, [
-                "category": category,
-                "from_route": categoryPref.preferredRoute,
-                "to_route": route
-            ])
+            do {
+                _ = try await DatabaseService.shared.upsertRoutingPreference(insert)
+                Analytics.track(.routingPreferenceUpdated, [
+                    "category": category,
+                    "from_route": categoryPref.preferredRoute,
+                    "to_route": route
+                ])
+            } catch {
+                // The route itself already applied (setTaskRoute succeeded
+                // upstream) — only the remembered override was lost.
+                print("[MaintenanceTaskDetailSheet] template routing preference upsert failed: \(error)")
+                Haptics.error()
+            }
             return
         }
 
@@ -1908,7 +1918,15 @@ struct MaintenanceTaskDetailSheet: View {
                 preferredRoute: route,
                 preferredVendorId: route == "vendor" ? assignedContractor?.id : nil
             )
-            _ = try? await DatabaseService.shared.upsertRoutingPreference(insert)
+            do {
+                _ = try await DatabaseService.shared.upsertRoutingPreference(insert)
+            } catch {
+                // Don't show "we'll remember this" for a preference that
+                // never persisted — the old `try?` version toasted anyway.
+                print("[MaintenanceTaskDetailSheet] category routing preference upsert failed: \(error)")
+                Haptics.error()
+                return
+            }
             Analytics.track(.routingPreferenceSet, [
                 "category": category,
                 "route": route,
@@ -2842,6 +2860,54 @@ struct MaintenanceTaskDetailSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
                 .disabled(isDelegatingToHandyman)
+            }
+
+            // Phase 80 (discovery study): "Not for my home" — template-
+            // level dismissal. Disappears the task AND prevents future
+            // re-seeding of the same template via the reconciler. Distinct
+            // from Delete (per-instance) and Archive (per-instance, kept
+            // for history). Restore via Settings → Hidden Tasks.
+            // Only shown for template-driven tasks (has templateId).
+            if let templateKey = task.templateId, !templateKey.isEmpty,
+               let propertyId = task.propertyId {
+                Button {
+                    Haptics.light()
+                    let category = templateKey.split(separator: ":").first.map(String.init) ?? "unknown"
+                    Analytics.track(.templateDismissed, [
+                        "template_key": templateKey,
+                        "category": category,
+                        "reason": "not_applicable"
+                    ])
+                    Task {
+                        try? await DatabaseService.shared.dismissTemplate(
+                            propertyId: propertyId,
+                            householdId: task.householdId,
+                            templateKey: templateKey,
+                            reason: "not_applicable"
+                        )
+                        // Archive this task instance — the template
+                        // dismissal prevents future seeding, but the
+                        // currently-scheduled row also needs to disappear.
+                        await MaintenanceViewModel.shared.archiveTask(task)
+                        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        await MainActor.run { dismiss() }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "eye.slash")
+                        Text("Not for my home")
+                    }
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: HavenTheme.buttonHeight)
+                    .background(HavenColors.creamLight)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                            .stroke(HavenColors.beige300, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
             }
 
             Button {

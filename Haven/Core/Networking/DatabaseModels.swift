@@ -113,6 +113,28 @@ struct UserRow: Codable, Identifiable {
         case fullName = "full_name"
         case createdAt = "created_at"
     }
+
+    /// Explicit memberwise init — the custom `init(from:)` below
+    /// suppresses the synthesized one, and DatabaseService constructs
+    /// synthetic UserRows (linked-member fallback, RPC lookups).
+    init(id: UUID, householdId: UUID?, email: String, fullName: String?, role: String, createdAt: Date?) {
+        self.id = id
+        self.householdId = householdId
+        self.email = email
+        self.fullName = fullName
+        self.role = role
+        self.createdAt = createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try? c.decode(UUID.self, forKey: .householdId)
+        email = (try? c.decode(String.self, forKey: .email)) ?? ""
+        fullName = try? c.decode(String.self, forKey: .fullName)
+        role = (try? c.decode(String.self, forKey: .role)) ?? "member"
+        createdAt = try? c.decode(Date.self, forKey: .createdAt)
+    }
 }
 
 struct UserInsert: Codable {
@@ -197,6 +219,30 @@ struct FamilyMemberRow: Codable, Identifiable, Hashable {
         case createdAt = "created_at"
         case linkedUserId = "linked_user_id"
         case memberType = "member_type"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        firstName = (try? c.decode(String.self, forKey: .firstName)) ?? ""
+        lastName = (try? c.decode(String.self, forKey: .lastName)) ?? ""
+        relationship = (try? c.decode(String.self, forKey: .relationship)) ?? ""
+        dateOfBirth = try? c.decode(String.self, forKey: .dateOfBirth)
+        email = try? c.decode(String.self, forKey: .email)
+        phone = try? c.decode(String.self, forKey: .phone)
+        isMinor = try? c.decode(Bool.self, forKey: .isMinor)
+        gender = try? c.decode(String.self, forKey: .gender)
+        avatarColor = try? c.decode(String.self, forKey: .avatarColor)
+        avatarUrl = try? c.decode(String.self, forKey: .avatarUrl)
+        expectedDate = try? c.decode(String.self, forKey: .expectedDate)
+        isExpecting = try? c.decode(Bool.self, forKey: .isExpecting)
+        legalName = try? c.decode(String.self, forKey: .legalName)
+        school = try? c.decode(String.self, forKey: .school)
+        notes = try? c.decode(String.self, forKey: .notes)
+        createdAt = try? c.decode(Date.self, forKey: .createdAt)
+        linkedUserId = try? c.decode(UUID.self, forKey: .linkedUserId)
+        memberType = try? c.decode(String.self, forKey: .memberType)
     }
 }
 
@@ -402,6 +448,50 @@ struct DocumentRow: Codable, Identifiable {
         case vendorMatchConfidence = "vendor_match_confidence"
         case chezOwned = "chez_owned"
         case chezOwnedAt = "chez_owned_at"
+    }
+
+    /// Vault-critical resilience: `fetchDocuments` decodes `[DocumentRow]`,
+    /// so a single row with one malformed/renamed field would take the
+    /// entire document vault offline. Only `id` + `householdId` stay
+    /// strict; everything else degrades field-by-field.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        title = (try? c.decode(String.self, forKey: .title)) ?? "Untitled Document"
+        category = (try? c.decode(String.self, forKey: .category)) ?? "Other"
+        status = (try? c.decode(String.self, forKey: .status)) ?? "active"
+        filePath = (try? c.decode(String.self, forKey: .filePath)) ?? ""
+        thumbnailPath = try? c.decode(String.self, forKey: .thumbnailPath)
+        expirationDate = try? c.decode(String.self, forKey: .expirationDate)
+        renewalDate = try? c.decode(String.self, forKey: .renewalDate)
+        effectiveDate = try? c.decode(String.self, forKey: .effectiveDate)
+        issuingInstitution = try? c.decode(String.self, forKey: .issuingInstitution)
+        accountNumberLast4 = try? c.decode(String.self, forKey: .accountNumberLast4)
+        notes = try? c.decode(String.self, forKey: .notes)
+        tags = try? c.decode([String].self, forKey: .tags)
+        aiSummary = try? c.decode(String.self, forKey: .aiSummary)
+        aiFlags = try? c.decode([AIFlag].self, forKey: .aiFlags)
+        propertyId = try? c.decode(UUID.self, forKey: .propertyId)
+        vehicleId = try? c.decode(UUID.self, forKey: .vehicleId)
+        projectId = try? c.decode(UUID.self, forKey: .projectId)
+        uploadedAt = try? c.decode(Date.self, forKey: .uploadedAt)
+        lastReviewedAt = try? c.decode(Date.self, forKey: .lastReviewedAt)
+        vaultLocked = try? c.decode(Bool.self, forKey: .vaultLocked)
+        vaultLockIv = try? c.decode(String.self, forKey: .vaultLockIv)
+        contentHash = try? c.decode(String.self, forKey: .contentHash)
+        fileSize = try? c.decode(Int.self, forKey: .fileSize)
+        deletedAt = try? c.decode(String.self, forKey: .deletedAt)
+        metadata = try? c.decode(DocumentMetadata.self, forKey: .metadata)
+        visibleToHomeManagers = try? c.decode(Bool.self, forKey: .visibleToHomeManagers)
+        contractorId = try? c.decode(UUID.self, forKey: .contractorId)
+        invoiceAmount = try? c.decode(Double.self, forKey: .invoiceAmount)
+        invoiceDate = try? c.decode(String.self, forKey: .invoiceDate)
+        invoiceNumber = try? c.decode(String.self, forKey: .invoiceNumber)
+        invoiceLineItems = try? c.decode([InvoiceLineItem].self, forKey: .invoiceLineItems)
+        vendorMatchConfidence = try? c.decode(String.self, forKey: .vendorMatchConfidence)
+        chezOwned = try? c.decode(Bool.self, forKey: .chezOwned)
+        chezOwnedAt = try? c.decode(Date.self, forKey: .chezOwnedAt)
     }
 }
 
@@ -1244,7 +1334,11 @@ struct ContractorRow: Codable, Identifiable {
     let address: String?
     let licenseNumber: String?
     let insuranceVerified: Bool?
-    let rating: Int?
+    /// Phase 100: `contractors.rating` is numeric(2,1) since migration
+    /// 20270111 — Google Places ratings are fractional (4.6). Decoding
+    /// this as Int made ONE fractional rating fail the whole
+    /// `[ContractorRow]` array decode and blank the vendor directory.
+    let rating: Double?
     let notes: String?
     let createdAt: Date?
     /// Phase 19k: Primary category for fast reconciler lookup. Should match
@@ -1286,6 +1380,31 @@ struct ContractorRow: Codable, Identifiable {
         case chezOwned = "chez_owned"
         case chezOwnedAt = "chez_owned_at"
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        companyName = try c.decode(String.self, forKey: .companyName)
+        contactName = try? c.decode(String.self, forKey: .contactName)
+        phone = (try? c.decode(String.self, forKey: .phone)) ?? ""
+        email = try? c.decode(String.self, forKey: .email)
+        specialties = try? c.decode([String].self, forKey: .specialties)
+        address = try? c.decode(String.self, forKey: .address)
+        licenseNumber = try? c.decode(String.self, forKey: .licenseNumber)
+        insuranceVerified = try? c.decode(Bool.self, forKey: .insuranceVerified)
+        rating = try? c.decode(Double.self, forKey: .rating)
+        notes = try? c.decode(String.self, forKey: .notes)
+        createdAt = try? c.decode(Date.self, forKey: .createdAt)
+        category = try? c.decode(String.self, forKey: .category)
+        utilityProviderId = try? c.decode(UUID.self, forKey: .utilityProviderId)
+        logoUrl = try? c.decode(String.self, forKey: .logoUrl)
+        brandColor = try? c.decode(String.self, forKey: .brandColor)
+        website = try? c.decode(String.self, forKey: .website)
+        source = try? c.decode(String.self, forKey: .source)
+        chezOwned = try? c.decode(Bool.self, forKey: .chezOwned)
+        chezOwnedAt = try? c.decode(Date.self, forKey: .chezOwnedAt)
+    }
 }
 
 struct ContractorInsert: Codable {
@@ -1298,7 +1417,7 @@ struct ContractorInsert: Codable {
     var address: String?
     var licenseNumber: String?
     var insuranceVerified: Bool?
-    var rating: Int?
+    var rating: Double?
     var notes: String?
     var category: String?
     var utilityProviderId: UUID?
@@ -1329,7 +1448,7 @@ struct ContractorUpdate: Codable {
     var address: String?
     var licenseNumber: String?
     var insuranceVerified: Bool?
-    var rating: Int?
+    var rating: Double?
     var notes: String?
     var category: String?
     var utilityProviderId: UUID?
@@ -3103,6 +3222,53 @@ struct TrustedContactDocumentInsert: Codable {
 */
 
 // MARK: - Dismissed Category
+
+/// Phase 80 (discovery study): per-template "Not for my home" dismissal.
+/// Replaces the per-category `DismissedCategoryRow` for individual hide
+/// decisions while keeping `dismissed_categories` alive for snooze
+/// semantics. The reconciler reads this table and skips any template
+/// whose `templateKey` matches a row for the property. Restore via
+/// Settings → Hidden Tasks deletes the row.
+struct DismissedTemplateRow: Codable, Identifiable {
+    let id: UUID
+    let propertyId: UUID
+    let householdId: UUID
+    let templateKey: String
+    let reason: String?
+    let dismissedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, reason
+        case propertyId = "property_id"
+        case householdId = "household_id"
+        case templateKey = "template_key"
+        case dismissedAt = "dismissed_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        templateKey = try c.decode(String.self, forKey: .templateKey)
+        reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+        dismissedAt = try? c.decodeIfPresent(Date.self, forKey: .dismissedAt)
+    }
+}
+
+struct DismissedTemplateInsert: Codable {
+    let propertyId: UUID
+    let householdId: UUID
+    let templateKey: String
+    var reason: String? = "not_applicable"
+
+    enum CodingKeys: String, CodingKey {
+        case reason
+        case propertyId = "property_id"
+        case householdId = "household_id"
+        case templateKey = "template_key"
+    }
+}
 
 struct DismissedCategoryRow: Codable, Identifiable {
     let id: UUID

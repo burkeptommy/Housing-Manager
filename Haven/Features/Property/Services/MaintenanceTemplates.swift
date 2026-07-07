@@ -77,8 +77,25 @@ struct MaintenanceTemplate: Identifiable {
     /// Tags that mark this template as requiring a specific subtype.
     /// e.g. ["lawn"] means only for natural lawns, ["ducted"] means only for ducted HVAC, ["tank"] for tank water heaters.
     var requiredSubtypes: Set<String> = []
-    /// Whether this task is essential (created during setup) vs recommended (available to add later).
+    /// Phase 80 (discovery study): legacy field, no longer gates seeding.
+    /// All templates whose `requiredSubtypes` match the home now seed by
+    /// default. Field is kept for analytics + UI ("Recommended" badge) but
+    /// the reconciler no longer reads it. Default remains `true` so old
+    /// code that still references it doesn't change behavior — and so new
+    /// templates default to "shown" rather than "catalog-only."
+    /// To carve a template out of default seeding, set `isCatalogOnly: true`
+    /// instead. See the field below.
     var isEssential: Bool = true
+    /// Phase 80 (discovery study): when true, this template skips the
+    /// reconciler entirely and only surfaces via Browse-all and Handyman
+    /// punch-list intake. Use for "as needed" catalog items that are not
+    /// recurring tasks — drywall patches, fixture swaps, smart-home
+    /// installs, single-use repairs. The ~70 Handyman `routingOverride:
+    /// .diyCapable` + `frequency: "As needed"` templates carry this flag.
+    /// Recurring Handyman bundles (Handyman:spring, Handyman:fall,
+    /// Handyman:summer) and recurring standalones DO seed and do NOT
+    /// carry this flag.
+    var isCatalogOnly: Bool = false
     /// Keywords identifying which specific equipment this task applies to.
     /// When a child system matching these keywords is added, this task migrates from parent to child.
     var equipmentKeywords: [String] = []
@@ -424,17 +441,26 @@ extension MaintenanceTemplate {
 
 enum MaintenanceTemplates {
 
-    /// Returns only essential templates for setup. Non-essential tasks are available to add later.
+    /// Phase 80 (discovery study): returns every template whose subtypes
+    /// match the home, excluding catalog-only items (browse-only "as
+    /// needed" punch-list templates). The old `essentialTemplates` filter
+    /// (`isEssential: true`) is gone — under the new model, the user
+    /// sees everything that fits their home and dismisses "Not for my
+    /// home" what doesn't apply. The kept filter is `isCatalogOnly:
+    /// false` so the bottomless Handyman "as needed" catalog stays out
+    /// of the auto-seed loop (those still surface via Browse + punch list
+    /// intake). Function name kept as `essentialTemplates` for backward
+    /// compatibility with existing callers; conceptually it's now
+    /// "seedable templates."
     /// Phase 57: `regionalPack` filters out templates gated to a different
-    /// region. Nil (the default) includes universal templates only — the
-    /// same behavior callers got before Phase 57.
+    /// region. Nil (the default) includes universal templates only.
     static func essentialTemplates(
         for category: String,
         activeSubtypes: Set<String> = [],
         regionalPack: RegionalPack? = nil
     ) -> [MaintenanceTemplate] {
         templates(for: category, activeSubtypes: activeSubtypes, regionalPack: regionalPack)
-            .filter(\.isEssential)
+            .filter { !$0.isCatalogOnly && $0.frequency != "As needed" }
     }
 
     /// Builds the set of active subtype tokens for a system, given its persisted subtype string,
@@ -621,21 +647,26 @@ enum MaintenanceTemplates {
             if flags["has_leak_detector"] == true { s.insert("has_leak_detector") }
             if flags["has_whole_house_filter"] == true { s.insert("has_whole_house_filter") }
         case "chimney":
-            // Phase 60: Chimney systems are auto-created by the quiz when
-            // a user confirms they have a fireplace. The system's
-            // `subtype` captures the fuel type ("wood" / "gas"); both
-            // types need annual service but different vendors do it —
-            // wood chimneys get a chimney sweep (creosote cleaning),
-            // gas chimneys get a gas tech for burner/pilot servicing.
-            // Default to "wood" when subtype is unset so users who
-            // haven't specified still see the sweep task.
+            // Evidence-based chimney subtype. `resolveChimneyRule` in
+            // HouseQuizAnswerMapper writes one of three values based on
+            // positive evidence — never falls back to a default:
+            //   • "wood"         — wood/pellet fireplace from Q20.
+            //   • "gas"          — propane/gas fireplace from Q20.
+            //   • "furnace_flue" — no fireplace, fossil-fuel heat (oil /
+            //                      natural_gas / propane / not_sure) on Q3.
+            // When subtype is nil or unrecognized we emit nothing — the
+            // row stays inert until evidence arrives. This deliberately
+            // breaks the prior "default to wood" behavior so all-electric
+            // households with no fireplace don't see a creosote warning.
             switch sub {
             case "gas":
                 s.insert("gas")
-            case "wood", "":
+            case "wood":
                 s.insert("wood")
+            case "furnace_flue":
+                s.insert("furnace_flue")
             default:
-                s.insert("wood")
+                break
             }
         default:
             break
@@ -673,6 +704,15 @@ enum MaintenanceTemplates {
             if flags["has_asphalt_driveway"] == true { s.insert("driveway_asphalt") }
             if flags["has_concrete_driveway"] == true { s.insert("driveway_concrete") }
             if flags["has_paver_driveway"] == true { s.insert("driveway_paver") }
+        case "tree service":
+            // Phase 80: under the show-everything-by-default model, Tree
+            // Service templates need a positive signal that the property
+            // has trees worth arboring. `mature_trees` (Phase 57 HNW
+            // review flag) is the gate. Properties without it: Tree
+            // Service system row still auto-creates (so Browse-all can
+            // surface tree templates), but the bundle children don't
+            // seed automatically.
+            if flags["has_mature_trees"] == true { s.insert("mature_trees") }
         default:
             break
         }
@@ -936,6 +976,30 @@ enum MaintenanceTemplates {
             // ice-dam-risk walk-through respectively). Single-rail
             // discipline: tier-4 DIY perimeter walks belong as bundle
             // children of the existing pro visit, not standalone rows.
+            // Phase 80 (discovery study): mid-winter ice dam walkthrough.
+            // The Fall pro-vendor pass (Roofing:fall) covers prevention
+            // up front. This is the January DIY check from the ground
+            // after the first big snow + thaw cycle — looking up at the
+            // eaves for icicles forming below the gutter line, water
+            // stains on the soffit, or visible ice ridges on the roof
+            // edge. Catching it in January is the difference between
+            // calling a roofer to steam the dam off vs. discovering
+            // interior water damage in February.
+            MaintenanceTemplate(
+                systemCategory: "Roofing",
+                title: "Mid-winter ice dam walkthrough",
+                description: "After the first significant snow + thaw cycle in January, walk the perimeter from the ground and look up at every eave. Icicles are normal; icicles BELOW the gutter line forming directly on the soffit indicate an ice dam upstream. Stains on the soffit or attic ceiling also suggest a dam is melting in. Call a roofer with a steamer (not pickaxes) for immediate removal.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (DIY) or $400-1,500 (emergency removal if needed)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Best time is the morning after a thaw following a 4+ inch snowfall. Use binoculars from the ground; do NOT climb onto an icy roof or use a ladder against an ice-covered eave.",
+                assignmentType: .either,
+                diyEffortMinutes: 20,
+                regionalPack: .northeast
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1033,6 +1097,49 @@ enum MaintenanceTemplates {
                 diyEffortMinutes: 180,
                 routingOverride: .diyCapable
             ),
+            // Phase 80 (discovery study): mid-summer deck stain
+            // walkthrough. Distinct from "Deck or fence staining" (every
+            // 2-3 years full-strip + re-stain) — this is the July spot-
+            // check after enough sun + foot traffic to see where the
+            // stain has faded. Touch up bare spots with the same stain
+            // before the wood greys out.
+            MaintenanceTemplate(
+                systemCategory: "Siding/Exterior",
+                title: "Inspect deck stain and spot-treat",
+                description: "Walk the deck in July looking for spots where the stain has worn — typically high-traffic paths, the area in front of the door, and the rail tops that get full sun. Spot-stain those areas with the same product before bare wood greys out. Less work than waiting for a full re-stain.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$30-60 (stain) or $150-300 (handyman)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Test stain on an inconspicuous spot first — older stains darken with age and a fresh coat can look mis-matched. If the whole deck looks faded, schedule the every-2-3-year re-stain instead.",
+                isEssential: false,
+                assignmentType: .either,
+                diyEffortMinutes: 60,
+                routingOverride: .diyCapable
+            ),
+            // Phase 80 (discovery study): outdoor furniture deep clean
+            // + recover. Early summer task — June, before peak use.
+            // Soap-and-water deep clean for frames + cushions; spot-
+            // repair tears in vinyl / sling; replace cushion covers if
+            // needed.
+            MaintenanceTemplate(
+                systemCategory: "Siding/Exterior",
+                title: "Outdoor furniture deep clean and recover",
+                description: "Pull out the patio furniture, deep clean frames + cushions, spot-repair any tears, and re-protect cushions with fabric guard. June is the right time — gets you ready for peak outdoor season without the cushions baking in storage longer than they need to.",
+                frequency: "Annually",
+                priority: "Low",
+                estimatedCostRange: "$0-50 (DIY) or $150-400 (handyman)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Powdered Oxiclean + warm water removes most mildew on cushions. If a cushion is permanently stained, check whether the cover unzips — replacement covers are often cheaper than full cushion replacement.",
+                isEssential: false,
+                assignmentType: .either,
+                diyEffortMinutes: 120,
+                routingOverride: .diyCapable
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1104,6 +1211,29 @@ enum MaintenanceTemplates {
             // cooling tune-up. Folding the DIY duplicate eliminates an
             // orphan row that asked the homeowner to schedule what the
             // pro already does.
+            // Phase 80 (discovery study): mid-season filter swap for
+            // ducted systems. The Spring tune-up changes the filter; by
+            // July it's halfway through its life. Swapping mid-summer
+            // keeps cooling efficient through August heat waves and
+            // catches a fouled filter before it starts blowing dirty air
+            // through the registers. DIY 5-minute job, but easy to
+            // forget — hence its own template.
+            MaintenanceTemplate(
+                systemCategory: "HVAC",
+                title: "Mid-season HVAC filter swap",
+                description: "Pull the existing filter, hold it up to a light. If you can't see light through it cleanly, replace. Mid-summer is when air conditioners run hardest; a fouled filter costs efficiency and stresses the blower. 5-minute DIY swap.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$15-40 (filter cost)",
+                isDIY: true,
+                seasonalTiming: "Summer",
+                professionalRequired: false,
+                notes: "Match the size printed on the filter frame. MERV 8-11 is the sweet spot for most homes — higher MERV restricts airflow and can stress the blower.",
+                requiredSubtypes: ["ducted"],
+                assignmentType: .either,
+                diyEffortMinutes: 5,
+                routingOverride: .diyDefault
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1183,27 +1313,34 @@ enum MaintenanceTemplates {
                 stableId: "Plumbing:Fixture leak walkthrough",
                 bundleId: "Plumbing:annual"
             ),
-            MaintenanceTemplate(systemCategory: "Plumbing", title: "Drain cleaning", description: "Plumber runs a power auger or hydro-jet through the main waste line to clear accumulated grease, soap scum, hair, and root intrusion before it becomes a backup. Includes a camera scope on the cleanout if any line shows resistance. Older homes with cast-iron or clay laterals benefit most.", frequency: "Every 2 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Flexible", professionalRequired: true, notes: "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this. The same root that's slowing one drain will eventually back up the whole house.", assignmentType: .vendor, stableId: "Plumbing:Professional drain cleaning"),
+            // Phase 80 — Drain cleaning is now the lead child of the new
+            // Plumbing:winter "Winter Plumbing Visit" bundle. A plumber
+            // on-site for the winter visit can do a quick scope each
+            // year even though the full power-auger work is every 2y.
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Drain cleaning", description: "Plumber runs a power auger or hydro-jet through the main waste line to clear accumulated grease, soap scum, hair, and root intrusion before it becomes a backup. Includes a camera scope on the cleanout if any line shows resistance. Older homes with cast-iron or clay laterals benefit most.", frequency: "Every 2 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Winter", professionalRequired: true, notes: "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this. The same root that's slowing one drain will eventually back up the whole house. Light check yearly during the winter plumbing visit; full power-auger every other year.", assignmentType: .vendor, stableId: "Plumbing:Professional drain cleaning", bundleId: "Plumbing:winter", bundleTitle: "Winter Plumbing Visit"),
             // Phase 62: Sump pump battery backup test. Gated on sump_pump
             // AND has_sump_battery_backup — both subtypes must be present.
             // The has_sump_battery_backup flag comes from an enrichment
             // card that only surfaces when the household already has a
             // sump pump system, so this template stays off most libraries.
+            // Phase 80 — folded into Plumbing:winter bundle. The plumber
+            // on-site for the winter visit checks the battery backup as
+            // a 60-second test during the drain visit, eliminating the
+            // separate DIY task.
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Test sump pump battery backup",
                 description: "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years. If it doesn't hold charge, replace before spring rains.",
-                frequency: "Semi-annually",
+                frequency: "Annually",
                 priority: "High",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Spring",
+                estimatedCostRange: "$0 (part of winter plumbing visit)",
+                isDIY: false,
+                seasonalTiming: "Winter",
                 professionalRequired: false,
-                notes: "About 10 minutes DIY. Test in spring before wet season and in fall before storm season.",
+                notes: "Folded into the winter plumbing visit — the plumber tests this in 60 seconds while on-site.",
                 requiredSubtypes: ["sump_pump", "has_sump_battery_backup"],
                 assignmentType: .either,
-                diyEffortMinutes: 10,
-                routingOverride: .diyDefault
+                bundleId: "Plumbing:winter"
             ),
             // Phase 70.A1.x deleted "Outdoor faucet and hose-bib walk"
             // — the plumber checks hose bibs as part of the annual
@@ -1214,6 +1351,11 @@ enum MaintenanceTemplates {
             // active cold snaps. Northeast regional. Different from
             // the Fall winterization (which is preventive, vendor-side)
             // — this is the DIY check during the deep freeze itself.
+            // Phase 80 — kept standalone (NOT bundled into Plumbing:winter).
+            // This is the homeowner DIY check DURING a cold snap, distinct
+            // from the bundle's pre-winter vendor visit. Stays
+            // DIY-default + .either so the homeowner gets the prompt
+            // when temperatures plunge.
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Frozen pipe risk walk",
@@ -1227,6 +1369,32 @@ enum MaintenanceTemplates {
                 notes: "If you find a frozen section, open the closest faucet downstream (so any melt has somewhere to go) and apply heat gently — hair dryer, heat tape, never an open flame. Burst pipes are 4-figure repairs; catching the freeze before the burst is the goal.",
                 assignmentType: .either,
                 diyEffortMinutes: 15,
+                regionalPack: .northeast
+            ),
+            // Phase 80 (discovery study): pre-winter pipe insulation walk.
+            // Distinct from the freeze-risk walk above (which happens
+            // DURING a cold snap) — this is the preventive December check
+            // to confirm every pipe in an unheated space has foam sleeve
+            // or wrap on it. Insulation tears, drops, or gets gnawed by
+            // mice; can't tell from a glance. NE-gated since freezes are
+            // a regional concern.
+            // Phase 80 — folded into Plumbing:winter bundle. The plumber's
+            // routine winter visit catches any obvious gaps in pipe
+            // insulation during their walk-through; the homeowner no
+            // longer needs to schedule this as separate DIY work.
+            MaintenanceTemplate(
+                systemCategory: "Plumbing",
+                title: "Inspect pipe insulation in attic, crawl, and garage",
+                description: "Plumber walks every pipe in unheated spaces (attic, crawl, garage, exterior-wall closets) during the winter visit and flags any insulation gaps. Replace torn / slipped / chewed sections — mice love pipe insulation. Adds ~10 minutes to the visit; pays off the first time the temperature drops below 10°F.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0–$50 in parts",
+                isDIY: false,
+                seasonalTiming: "Winter",
+                professionalRequired: true,
+                notes: "Foam sleeve insulation is ~$2/6ft at any hardware store. Pre-slit, snaps on. Plumber typically carries spare sleeve on the truck.",
+                assignmentType: .vendor,
+                bundleId: "Plumbing:winter",
                 regionalPack: .northeast
             ),
         ]),
@@ -1610,6 +1778,30 @@ enum MaintenanceTemplates {
                 stableId: "Chimney:Re-mortar crown",
                 safetyFloor: true
             ),
+            // Furnace-flue case: fossil-fuel heat without a fireplace.
+            // Standalone, NOT in Chimney:fall — a furnace flue is a 30-
+            // second visual check by the HVAC tech already on-site for the
+            // annual tune-up. No sweep, no creosote, no separate visit.
+            // Subtype "furnace_flue" is set by `resolveChimneyRule` in
+            // HouseQuizAnswerMapper when the household has fossil-fuel
+            // heat (oil / natural_gas / propane / not_sure) and no Q20
+            // fireplace.
+            MaintenanceTemplate(
+                systemCategory: "Chimney",
+                title: "HVAC tech inspects flue during annual tune-up",
+                description: "The flue is the venting path that carries combustion gases from your furnace or boiler out of the house. The HVAC tech who handles your annual heating tune-up can confirm the flue is clear, the draft is correct, and there's no corrosion or blockage. No separate vendor visit — bundled into the tune-up you're already paying for.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$0 (part of HVAC tune-up)",
+                isDIY: false,
+                seasonalTiming: "Fall",
+                professionalRequired: true,
+                notes: "Just mention the flue check when scheduling the tune-up. If your tech finds anything off, they'll quote the repair separately.",
+                requiredSubtypes: ["furnace_flue"],
+                assignmentType: .vendor,
+                stableId: "Chimney:Furnace flue inspection",
+                safetyFloor: true
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -1883,6 +2075,26 @@ enum MaintenanceTemplates {
                 assignmentType: .vendor,
                 bundleId: "Irrigation:spring"
             ),
+            // Phase 80 (discovery study): mid-summer irrigation audit.
+            // By July, broken heads, mis-aimed sprays, and over-running
+            // zones have all surfaced. The Spring startup catches what
+            // was broken from winter; this catches what's happened
+            // since. Also right time to re-tune runtimes for peak heat
+            // — the schedule the vendor set in April is often too short
+            // for July dry-spells.
+            MaintenanceTemplate(
+                systemCategory: "Irrigation",
+                title: "Mid-summer irrigation audit",
+                description: "Irrigation tech runs each zone in turn, walks the property looking for broken heads, mis-aimed sprays watering the driveway / sidewalk, missing heads (hit by mower), and dry patches indicating poor coverage. Adjusts runtime upward if needed for July heat. Often catches 1-2 broken heads per zone that the homeowner walked past 50 times without noticing.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$75-200",
+                isDIY: false,
+                seasonalTiming: "Summer",
+                professionalRequired: true,
+                notes: "Best done in mid-July when both broken-head symptoms and dry-spell impact are visible. Some irrigation contracts include this — confirm with your vendor.",
+                assignmentType: .vendor
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -2085,6 +2297,28 @@ enum MaintenanceTemplates {
             // the Generator:annual Fall visit already covers panel
             // readout + fault-code review + fuel verification. Standby
             // generators self-test weekly without homeowner input.
+            //
+            // Phase 80 (discovery study): mid-winter load test. Different
+            // from the Fall annual service — this is a real-world load
+            // test in January, when you'd actually rely on it. Confirm
+            // fuel pressure under load (propane lines often weaken in
+            // freezing temps), automatic transfer switch engages, and
+            // the unit cycles cleanly. If anything's off, you have time
+            // to call the generator tech before the next storm.
+            MaintenanceTemplate(
+                systemCategory: "Generator",
+                title: "Mid-winter generator load test",
+                description: "Run the generator under household load for 30 minutes in deep winter. Watch for: automatic transfer switch engagement (kill grid power at the panel briefly), normal voltage / frequency on the readout, propane regulator behaving under cold (frost on the regulator is normal; ice or hesitation isn't), and no exhaust restrictions from snow drifts around the unit.",
+                frequency: "Annually",
+                priority: "High",
+                estimatedCostRange: "$0 (DIY) or $200-400 (vendor visit)",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Clear any snow within 3 feet of the generator first. Best done on a cold day so you're testing under realistic conditions. If the transfer switch hesitates or the unit cycles, call your generator tech.",
+                assignmentType: .either,
+                diyEffortMinutes: 45
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -2832,6 +3066,26 @@ enum MaintenanceTemplates {
                 notes: "Contract typically covers Nov 1 – Apr 1 in the Northeast. Lock it in before October.",
                 assignmentType: .vendor
             ),
+            // Phase 80 (discovery study): Winter content fill. Salt and
+            // ice melt run out fast during a real storm season. This is
+            // the December check that you have what you need before the
+            // first snowfall, not in February when the supply chain has
+            // already dried up.
+            MaintenanceTemplate(
+                systemCategory: "Snow Removal",
+                title: "Stock salt and ice melt",
+                description: "Walk the garage / shed and confirm you have at least 2-3 bags of ice melt or rock salt on hand before the first snow. Calcium chloride works to -25°F; rock salt only down to ~5°F. If you have pets or want to protect plantings, pick a pet-safe / plant-safe brand.",
+                frequency: "Annually",
+                priority: "Medium",
+                estimatedCostRange: "$30-80",
+                isDIY: true,
+                seasonalTiming: "Winter",
+                professionalRequired: false,
+                notes: "Mid-storm runs to the hardware store are when supplies are sold out. Stock in early December.",
+                assignmentType: .either,
+                diyEffortMinutes: 30,
+                routingOverride: .diyDefault
+            ),
         ]),
 
         // ──────────────────────────────────────────────
@@ -2900,6 +3154,7 @@ enum MaintenanceTemplates {
                 seasonalTiming: "Winter",
                 professionalRequired: true,
                 notes: "Dormant-season pruning (Dec-Mar) is safest for the trees and cheapest for you.",
+                requiredSubtypes: ["mature_trees"],
                 isEssential: false,
                 assignmentType: .vendor,
                 bundleId: "Tree Service:annual",
@@ -2918,6 +3173,7 @@ enum MaintenanceTemplates {
                 seasonalTiming: "Fall",
                 professionalRequired: true,
                 notes: "Arborist required for large trees",
+                requiredSubtypes: ["mature_trees"],
                 isEssential: false,
                 assignmentType: .vendor,
                 bundleId: "Tree Service:annual",
@@ -2984,6 +3240,7 @@ enum MaintenanceTemplates {
                 seasonalTiming: "Summer",
                 professionalRequired: true,
                 notes: "Sealer needs 80°F+ surface temps to cure properly. Mid-summer is the sweet spot in the Northeast — warm enough for the cure, ahead of the early-fall rains that can pit fresh sealer.",
+                requiredSubtypes: ["driveway_asphalt"],
                 isEssential: false,
                 assignmentType: .vendor
             ),

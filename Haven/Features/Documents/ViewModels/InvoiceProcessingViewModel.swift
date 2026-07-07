@@ -5,6 +5,12 @@ import SwiftUI
 struct ResolvedNewSystem: Identifiable {
     var id: String { original.id }
     let original: InvoiceNewSystem
+    /// Phase 101 (E5) — when the invoice's new unit looks like a REPLACEMENT
+    /// of an existing active system (same equipment family, different or
+    /// newer unit), these carry the old system so the review sheet can offer
+    /// "Replace [old]" explicitly. Never auto-archived without the toggle.
+    var replaceCandidateId: UUID?
+    var replaceCandidateName: String?
     var resolvedParentName: String?
     var resolvedParentCategory: String?
     var isAutoMatched: Bool
@@ -50,6 +56,10 @@ class InvoiceProcessingViewModel: ObservableObject {
     @Published var selectedTaskIds: Set<String> = []
     @Published var selectedNewSystemIds: Set<String> = []
     @Published var createServiceRecord = true
+    /// Phase 101 (E5) — systems the homeowner explicitly approved as
+    /// replacements: the matched old unit gets archived and its open tasks
+    /// repoint to the new system at apply time.
+    @Published var replaceApprovedIds: Set<String> = []
 
     // Resolved parent grouping for new systems
     @Published var resolvedSystems: [ResolvedNewSystem] = []
@@ -163,6 +173,32 @@ class InvoiceProcessingViewModel: ObservableObject {
             // Fetch existing top-level systems for user picker (unmatched systems) -- home invoices only
             if let propertyId {
                 existingTopLevelSystems = (try? await DatabaseService.shared.fetchHomeSystems(propertyId: propertyId, topLevelOnly: true)) ?? []
+            }
+
+            // Phase 101 (E5) — replacement detection. A discovered system that
+            // shares an equipment family with an existing active system but
+            // carries a DIFFERENT model (or the existing has none) reads as
+            // "new unit replacing old" — surface an explicit Replace toggle.
+            // An identical model stays a plain duplicate (skipped at apply).
+            for idx in resolvedSystems.indices {
+                let sys = resolvedSystems[idx].original
+                if let match = existingTopLevelSystems.first(where: { existing in
+                    guard existing.isActive ?? true else { return false }
+                    let sameFamily = Self.isLikelyDuplicate(
+                        newName: sys.name, newManufacturer: sys.manufacturer, newModel: nil,
+                        existingName: existing.name, existingManufacturer: existing.manufacturer, existingModel: nil
+                    )
+                    guard sameFamily else { return false }
+                    // Identical model = duplicate, not replacement.
+                    if let newModel = sys.modelNumber, let oldModel = existing.modelNumber,
+                       newModel.caseInsensitiveCompare(oldModel) == .orderedSame {
+                        return false
+                    }
+                    return true
+                }) {
+                    resolvedSystems[idx].replaceCandidateId = match.id
+                    resolvedSystems[idx].replaceCandidateName = match.name
+                }
             }
 
             // Resolve what each parent name will actually map to (alias matching)
@@ -282,16 +318,27 @@ class InvoiceProcessingViewModel: ObservableObject {
             for resolved in resolvedSystems where selectedNewSystemIds.contains(resolved.id) {
                 let system = resolved.original
 
-                // Duplicate check with fuzzy matching
-                let isDuplicate = existingSystems.contains { existing in
-                    Self.isLikelyDuplicate(
-                        newName: system.name, newManufacturer: system.manufacturer, newModel: system.modelNumber,
-                        existingName: existing.name, existingManufacturer: existing.manufacturer, existingModel: existing.modelNumber
-                    )
-                }
-                if isDuplicate {
-                    print("[InvoiceProcessing] Skipping duplicate: \(system.name)")
-                    continue
+                // Phase 101 (E5) — homeowner-approved replacement: the old
+                // unit archives and its open tasks repoint to the new system
+                // created below. Approval is the explicit toggle in the
+                // review sheet; nothing archives silently.
+                let approvedReplaceId: UUID? = replaceApprovedIds.contains(resolved.id)
+                    ? resolved.replaceCandidateId
+                    : nil
+
+                // Duplicate check with fuzzy matching (replacements bypass it:
+                // they are SUPPOSED to look like the old unit).
+                if approvedReplaceId == nil {
+                    let isDuplicate = existingSystems.contains { existing in
+                        Self.isLikelyDuplicate(
+                            newName: system.name, newManufacturer: system.manufacturer, newModel: system.modelNumber,
+                            existingName: existing.name, existingManufacturer: existing.manufacturer, existingModel: existing.modelNumber
+                        )
+                    }
+                    if isDuplicate {
+                        print("[InvoiceProcessing] Skipping duplicate: \(system.name)")
+                        continue
+                    }
                 }
 
                 // Resolve parent based on deterministic match or user choice
@@ -341,6 +388,19 @@ class InvoiceProcessingViewModel: ObservableObject {
                         parentSystemId: parentId
                     ))
                     existingSystems.append(newSystem)
+
+                    // Phase 101 (E5) — execute the approved replacement: open
+                    // tasks move to the new unit, then the old unit archives
+                    // (history preserved; completed tasks stay where they were).
+                    if let oldId = approvedReplaceId {
+                        do {
+                            try await db.repointTasksToSystem(from: oldId, to: newSystem.id)
+                            try await db.archiveHomeSystem(id: oldId)
+                            print("[InvoiceProcessing] Replaced system \(oldId) with \(newSystem.id)")
+                        } catch {
+                            applyWarnings.append("Added \"\(system.name)\" but couldn't archive the old unit (\(Self.friendlyReason(error)))")
+                        }
+                    }
 
                     // Migrate equipment-specific tasks from parent to this new child system
                     if let parentId {

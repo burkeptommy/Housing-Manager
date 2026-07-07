@@ -743,6 +743,20 @@ final class DatabaseService {
             .execute()
     }
 
+    /// Phase 101 (E5) — moves every maintenance task from one system to
+    /// another. Used when an invoice shows a NEW unit replacing an old one:
+    /// open tasks follow the new equipment, the old row archives, and the
+    /// completed tasks keep their history on whichever system they ran under.
+    func repointTasksToSystem(from oldSystemId: UUID, to newSystemId: UUID) async throws {
+        struct Repoint: Encodable { let system_id: String }
+        _ = try await from("maintenance_tasks")
+            .update(Repoint(system_id: newSystemId.uuidString))
+            .eq("system_id", value: oldSystemId.uuidString)
+            .is("archived_at", value: nil)
+            .is("last_completed_date", value: nil)
+            .execute()
+    }
+
     /// Reverses `archiveHomeSystem`. Reserved for a future "Hidden
     /// systems" settings list where users can restore mistakenly-
     /// removed rows.
@@ -766,6 +780,21 @@ final class DatabaseService {
             .single()
             .execute()
             .value
+    }
+
+    /// Clear the `subtype` column to NULL. Same Postgres-NULL-via-
+    /// Encodable workaround as `unarchiveHomeSystem` — synthesized
+    /// `encodeIfPresent` on `HomeSystemUpdate.subtype: String?` omits
+    /// the key when nil, so we route through a tiny encodable that the
+    /// Postgrest client serializes as a JSON null. Used by the Phase
+    /// 70-era chimney-evidence migration when a row no longer qualifies
+    /// for any subtype.
+    func clearHomeSystemSubtype(id: UUID) async throws {
+        struct ClearSubtype: Encodable { let subtype: String? = nil }
+        _ = try await from("home_systems")
+            .update(ClearSubtype())
+            .eq("id", value: id.uuidString)
+            .execute()
     }
 
     // MARK: - Utility Accounts
@@ -3238,6 +3267,18 @@ final class DatabaseService {
             .execute()
     }
 
+    /// Phase 80 (Tom's prevention pass): per-template restore for the
+    /// Task Library surface. The legacy `resetDismissedRecommendations`
+    /// is bulk-only; users need granular control to bring back one
+    /// recommendation at a time.
+    func restoreRecommendation(householdId: UUID, templateKey: String) async throws {
+        try await from("dismissed_recommendations")
+            .delete()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("template_id", value: templateKey)
+            .execute()
+    }
+
     // MARK: - Device Tokens
 
     func upsertDeviceToken(userId: UUID, token: String) async throws {
@@ -3446,6 +3487,43 @@ final class DatabaseService {
             .order("title")
             .execute()
             .value
+    }
+
+    // MARK: - Dismissed Templates (Phase 80)
+
+    func fetchDismissedTemplates(propertyId: UUID) async throws -> [DismissedTemplateRow] {
+        try await from("dismissed_templates")
+            .select()
+            .eq("property_id", value: propertyId.uuidString)
+            .execute()
+            .value
+    }
+
+    /// Upsert by (property_id, template_key). Idempotent — calling twice
+    /// on the same template no-ops the second time.
+    func dismissTemplate(
+        propertyId: UUID,
+        householdId: UUID,
+        templateKey: String,
+        reason: String = "not_applicable"
+    ) async throws {
+        let insert = DismissedTemplateInsert(
+            propertyId: propertyId,
+            householdId: householdId,
+            templateKey: templateKey,
+            reason: reason
+        )
+        try await from("dismissed_templates")
+            .upsert(insert, onConflict: "property_id,template_key")
+            .execute()
+    }
+
+    func restoreTemplate(propertyId: UUID, templateKey: String) async throws {
+        try await from("dismissed_templates")
+            .delete()
+            .eq("property_id", value: propertyId.uuidString)
+            .eq("template_key", value: templateKey)
+            .execute()
     }
 
     // MARK: - Dismissed Categories
@@ -4077,9 +4155,89 @@ final class DatabaseService {
         let quoteIdString: String?
         let invoiceIdString: String?
         let providerRequestIdString: String?
+        /// Phase 101 — quote + warranty intelligence stamped by receive-email.
+        let suggestedProject: SuggestedProjectInfo?
+        let fairMarket: FairMarketHint?
+        let warranty: WarrantyHint?
+        let specialtySystemSuggestion: InboxSpecialtySuggestion?
+
+        struct SuggestedProjectInfo: Decodable {
+            let id: String?
+            let name: String?
+            let signal: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = try? c.decodeIfPresent(String.self, forKey: .id)
+                name = try? c.decodeIfPresent(String.self, forKey: .name)
+                signal = try? c.decodeIfPresent(String.self, forKey: .signal)
+            }
+            enum CodingKeys: String, CodingKey { case id, name, signal }
+        }
+
+        struct FairMarketHint: Decodable {
+            let lowCents: Int?
+            let highCents: Int?
+            let sampleSize: Int?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                lowCents = try? c.decodeIfPresent(Int.self, forKey: .lowCents)
+                highCents = try? c.decodeIfPresent(Int.self, forKey: .highCents)
+                sampleSize = try? c.decodeIfPresent(Int.self, forKey: .sampleSize)
+            }
+            enum CodingKeys: String, CodingKey {
+                case lowCents = "low_cents"
+                case highCents = "high_cents"
+                case sampleSize = "sample_size"
+            }
+        }
+
+        struct WarrantyHint: Decodable {
+            let provider: String?
+            let coveredItem: String?
+            let warrantyType: String?
+            let startDate: String?
+            let endDate: String?
+            let matchedSystemId: String?
+            let matchedSystemName: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                provider = try? c.decodeIfPresent(String.self, forKey: .provider)
+                coveredItem = try? c.decodeIfPresent(String.self, forKey: .coveredItem)
+                warrantyType = try? c.decodeIfPresent(String.self, forKey: .warrantyType)
+                startDate = try? c.decodeIfPresent(String.self, forKey: .startDate)
+                endDate = try? c.decodeIfPresent(String.self, forKey: .endDate)
+                matchedSystemId = try? c.decodeIfPresent(String.self, forKey: .matchedSystemId)
+                matchedSystemName = try? c.decodeIfPresent(String.self, forKey: .matchedSystemName)
+            }
+            enum CodingKeys: String, CodingKey {
+                case provider
+                case coveredItem = "covered_item"
+                case warrantyType = "warranty_type"
+                case startDate = "start_date"
+                case endDate = "end_date"
+                case matchedSystemId = "matched_system_id"
+                case matchedSystemName = "matched_system_name"
+            }
+        }
+
+        struct InboxSpecialtySuggestion: Decodable {
+            let category: String?
+            let displayName: String?
+            let evidence: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                category = try? c.decodeIfPresent(String.self, forKey: .category)
+                displayName = try? c.decodeIfPresent(String.self, forKey: .displayName)
+                evidence = try? c.decodeIfPresent(String.self, forKey: .evidence)
+            }
+            enum CodingKeys: String, CodingKey {
+                case category, evidence
+                case displayName = "display_name"
+            }
+        }
 
         enum CodingKeys: String, CodingKey {
-            case subject, classification
+            case subject, classification, warranty
             case emailBody = "email_body"
             case emailHash = "email_hash"
             case utilityProvider = "utility_provider"
@@ -4096,6 +4254,9 @@ final class DatabaseService {
             case quoteIdString = "quote_id"
             case invoiceIdString = "invoice_id"
             case providerRequestIdString = "request_id"
+            case suggestedProject = "suggested_project"
+            case fairMarket = "fair_market"
+            case specialtySystemSuggestion = "specialty_system_suggestion"
         }
 
         var chezRequestIdAsUUID: UUID? {
@@ -4142,6 +4303,10 @@ final class DatabaseService {
             quoteIdString = try? c.decodeIfPresent(String.self, forKey: .quoteIdString)
             invoiceIdString = try? c.decodeIfPresent(String.self, forKey: .invoiceIdString)
             providerRequestIdString = try? c.decodeIfPresent(String.self, forKey: .providerRequestIdString)
+            suggestedProject = try? c.decodeIfPresent(SuggestedProjectInfo.self, forKey: .suggestedProject)
+            fairMarket = try? c.decodeIfPresent(FairMarketHint.self, forKey: .fairMarket)
+            warranty = try? c.decodeIfPresent(WarrantyHint.self, forKey: .warranty)
+            specialtySystemSuggestion = try? c.decodeIfPresent(InboxSpecialtySuggestion.self, forKey: .specialtySystemSuggestion)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
                 vendorName = try? classContainer.decodeIfPresent(String.self, forKey: .vendorName)
