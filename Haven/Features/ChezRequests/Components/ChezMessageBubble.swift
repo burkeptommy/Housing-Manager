@@ -101,13 +101,40 @@ struct ChezMessageBubble: View {
                 // when the message carries a `proposal` JSONB payload.
                 // Sits between the text and the timestamp so it reads
                 // as part of the same concierge message.
+                // Wave 6 — route by kind: info requests get their own
+                // input card; unknown kinds degrade to a quiet caption
+                // (the message content above is the plain-text body)
+                // with no action buttons.
                 if let proposal = message.proposal {
-                    ChezProposalCard(
-                        proposal: proposal,
-                        messageId: message.id,
-                        onCounter: onProposalCounter
-                    )
-                    .frame(maxWidth: 360, alignment: .leading)
+                    switch proposal.typedKind {
+                    case .infoRequest:
+                        ChezInfoRequestCard(
+                            proposal: proposal,
+                            messageId: message.id
+                        )
+                        .frame(maxWidth: 360, alignment: .leading)
+                    case .unknown:
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Text("Update from Chez")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule().fill(HavenColors.beige200.opacity(0.5))
+                        )
+                    case .vendor, .dateSlot, .cost, .quote:
+                        ChezProposalCard(
+                            proposal: proposal,
+                            messageId: message.id,
+                            onCounter: onProposalCounter
+                        )
+                        .frame(maxWidth: 360, alignment: .leading)
+                    }
                 }
                 Text(timestampString)
                     .font(HavenTypography.caption)

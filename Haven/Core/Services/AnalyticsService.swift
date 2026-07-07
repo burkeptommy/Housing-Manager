@@ -659,6 +659,11 @@ enum AnalyticsEvent: String {
     /// The confirm sheet's "Hand this to Chez" succeeded.
     /// Payload: kind, had_intake, had_notes.
     case chezDelegationConfirmed = "chez_delegation_confirmed"
+    /// Wave 6 — homeowner sent answers to a structured info request.
+    /// Payload: field_count.
+    case chezInfoRequestAnswered = "chez_info_request_answered"
+    /// Wave 6 — homeowner expanded the progress timeline on a request.
+    case chezProgressExpanded = "chez_progress_expanded"
 
     // MARK: - Phase 70 (Tasks v2)
     /// Tile tap on YearRibbon. Properties: season ("Spring|Summer|Fall|Winter"),

@@ -215,6 +215,58 @@ struct ChezRequestRow: Codable, Identifiable {
     }()
 }
 
+// MARK: - Wave 6 — delegation progress timeline
+
+/// Homeowner-safe progress snapshot for one request, returned by the
+/// `fetch_request_progress` Edge Function action. Steps are what Chez
+/// has done so far ("Chez called 3 vendors · 2 quotes in") without
+/// exposing vendor names from the private call ledger. Every field is
+/// optional per the Wave 6 contract — resilient decode throughout.
+struct ChezRequestProgress: Codable {
+    let steps: [ChezProgressStep]
+    let headline: String?
+    let called: Int?
+    let quotes: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case steps, headline, called, quotes
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        steps = (try? c.decodeIfPresent([ChezProgressStep].self, forKey: .steps)) ?? []
+        headline = (try? c.decodeIfPresent(String.self, forKey: .headline)) ?? nil
+        called = (try? c.decodeIfPresent(Int.self, forKey: .called)) ?? nil
+        quotes = (try? c.decodeIfPresent(Int.self, forKey: .quotes)) ?? nil
+    }
+
+    /// True when there's anything worth rendering. The strip renders
+    /// nothing otherwise (zero-noise degradation).
+    var hasContent: Bool {
+        !steps.isEmpty || !(headline ?? "").isEmpty
+    }
+}
+
+/// One step on the progress timeline. `kind` maps to an SF Symbol in
+/// `ChezProgressStrip`; unknown kinds get a muted dot so future step
+/// kinds degrade gracefully.
+struct ChezProgressStep: Codable, Hashable {
+    let kind: String?
+    let label: String?
+    let at: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, label, at
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? nil
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? nil
+        at = (try? c.decodeIfPresent(Date.self, forKey: .at)) ?? nil
+    }
+}
+
 /// Insert payload for the `submit` Edge Function action. The mirror
 /// pattern from `DelegateTaskRequest` etc. in `SupabaseClient.swift`:
 /// constant `action` field, the rest are the user-facing fields.

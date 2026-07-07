@@ -336,6 +336,75 @@ extension HavenSupabase {
         )
     }
 
+    // MARK: - Wave 6 — Info requests + progress timeline
+
+    /// Answer a structured info_request proposal. `messageId` is the
+    /// `concierge_messages.id` of the proposal-bearing message. Server
+    /// flips `proposal.status` to "answered", posts a user-role summary
+    /// message in the thread, and reopens the request for the operator.
+    /// Answer conventions: choice / date_window → the selected option
+    /// verbatim; budget_confirm → "yes" | "no"; photo → the uploaded
+    /// attachment path (empty string when skipped).
+    static func answerChezInfoRequest(
+        messageId: UUID,
+        answers: [String: String],
+        attachments: [ChezAttachmentMeta]? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let action = "answer_info_request"
+            let message_id: String
+            let answers: [String: String]
+            let attachments: [ChezAttachmentMeta]?
+        }
+        _ = try await callConciergeEdgeFunction(
+            body: Body(
+                message_id: messageId.uuidString,
+                answers: answers,
+                attachments: attachments
+            )
+        )
+    }
+
+    /// Fetch the homeowner-safe progress timeline for one request.
+    /// Labels never expose vendor names from the private call ledger.
+    /// Every field is optional server-side — decode resiliently and let
+    /// callers render nothing on failure (zero-noise degradation).
+    static func fetchChezRequestProgress(requestId: UUID) async throws -> ChezRequestProgress {
+        struct Body: Encodable {
+            let action = "fetch_request_progress"
+            let request_id: String
+        }
+        let data = try await callConciergeEdgeFunction(
+            body: Body(request_id: requestId.uuidString)
+        )
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .havenISO8601
+        return try decoder.decode(ChezRequestProgress.self, from: data)
+    }
+
+    /// Wave 6 — shared storage upload for Chez thread attachments.
+    /// Same bucket + path convention the reply composer uses
+    /// (`documents` bucket, `chez-requests/{userId}/...`), extracted so
+    /// the info-request photo answer reuses the exact pipeline.
+    static func uploadChezAttachment(
+        data: Data,
+        filename: String,
+        mimeType: String
+    ) async throws -> ChezAttachmentMeta {
+        let userId = try await HavenSupabase.client.auth.session.user.id.uuidString
+        let path = "chez-requests/\(userId)/\(UUID().uuidString.prefix(8))-\(filename)"
+        _ = try await HavenSupabase.client.storage
+            .from("documents")
+            .upload(path, data: data, options: .init(contentType: mimeType, upsert: false))
+        return ChezAttachmentMeta(
+            path: path,
+            filename: filename,
+            mimeType: mimeType,
+            sizeBytes: data.count,
+            uploadedAt: Date()
+        )
+    }
+
     // MARK: - Phase 86B — Chez activity feed
 
     /// Fetch the recent Chez activity for the requesting user's household.

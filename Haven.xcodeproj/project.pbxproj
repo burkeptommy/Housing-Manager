@@ -10,6 +10,7 @@
 		0077B95065F55144B5A57F83 /* ChezProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72099A773FF58C359B24FE2 /* ChezProfile.swift */; };
 		00A0340E512F43534C4C8B56 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26631A2D75332163B5BFE02 /* SupabaseClient.swift */; };
 		00BC4D74081CF73A03358B39 /* UnifiedAttentionList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64DDA1DC7F83423F9AE6361 /* UnifiedAttentionList.swift */; };
+		0111D27445CE4A60A04D70CC /* ChezProgressStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = F703CF85C8BE5549958DDECA /* ChezProgressStrip.swift */; };
 		01D4E57F0AA741467D0C350D /* HandymanSoftInquirySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100F6558E986D3B165D5D13F /* HandymanSoftInquirySheet.swift */; };
 		01E25C479437E1B85C451E5D /* OnboardingAddressStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8844F6AE85F1C8882770D5C5 /* OnboardingAddressStep.swift */; };
 		0257FA0A5B99C61BBE1631B8 /* NegotiationEmailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 310D7138F2DC79554232A4C5 /* NegotiationEmailSheet.swift */; };
@@ -481,6 +482,7 @@
 		EFCA2E0C48D65B2341F5031B /* ChezDelegationConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C7A20EC5A732222F372311B /* ChezDelegationConfirmSheet.swift */; };
 		F10D82D4294FDE17B11DE618 /* MaintenanceTaskIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4B2AAF58754AC8E3338EF53 /* MaintenanceTaskIcon.swift */; };
 		F237B20639CE94FF384E0A84 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518F88EE5413D96632C93167 /* NotificationService.swift */; };
+		F2C21CDC10DF285540E514BC /* ChezInfoRequestCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835C31B78C7DA169669C6690 /* ChezInfoRequestCard.swift */; };
 		F2D831C4ED1191FC151925B5 /* HandymanComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD205FB93F1848711CBFDC25 /* HandymanComponents.swift */; };
 		F32E6CEBB906D2C59D9798A4 /* PropertyProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD254FA3D98BCA417B34DD9 /* PropertyProjectsView.swift */; };
 		F363BC7D9B986E8AEC42CFCC /* ChezRequestsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF8E248ACA297AB5000C82D /* ChezRequestsListView.swift */; };
@@ -778,6 +780,7 @@
 		7F0B5112283A326974220DA2 /* TaskLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskLibraryView.swift; sourceTree = "<group>"; };
 		80692DF12B6F07485A0AA35A /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
 		81BD018DF1C202052DD92D84 /* JailbreakDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JailbreakDetection.swift; sourceTree = "<group>"; };
+		835C31B78C7DA169669C6690 /* ChezInfoRequestCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezInfoRequestCard.swift; sourceTree = "<group>"; };
 		83AADE9042AEE29A1723D203 /* DocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCard.swift; sourceTree = "<group>"; };
 		84C5AFD1BADB59224057E364 /* UIView+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIView+Extensions.swift"; sourceTree = "<group>"; };
 		84CE196AA307CE4765617762 /* ChezEntryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezEntryButton.swift; sourceTree = "<group>"; };
@@ -997,6 +1000,7 @@
 		F69721BE038945C484C8A8DF /* SmartRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartRecommendations.swift; sourceTree = "<group>"; };
 		F6C1C3312E21F2AAE74B7007 /* RecentActivityFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentActivityFeed.swift; sourceTree = "<group>"; };
 		F6DF3D198B76DB8F59AA3401 /* ScenarioDisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioDisclaimerView.swift; sourceTree = "<group>"; };
+		F703CF85C8BE5549958DDECA /* ChezProgressStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezProgressStrip.swift; sourceTree = "<group>"; };
 		F7D07CDFA8A4620D46E521CC /* VendorCoverageSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorCoverageSheet.swift; sourceTree = "<group>"; };
 		F7D9821C3BD6DE25693CA7B5 /* MaintenanceRows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceRows.swift; sourceTree = "<group>"; };
 		F85FDEA4F5E833F18CD0012A /* PauseAppointmentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseAppointmentSheet.swift; sourceTree = "<group>"; };
@@ -1207,8 +1211,10 @@
 			children = (
 				C1F759D654C14AFB402094C6 /* ChezBudgetBandPicker.swift */,
 				84CE196AA307CE4765617762 /* ChezEntryButton.swift */,
+				835C31B78C7DA169669C6690 /* ChezInfoRequestCard.swift */,
 				09E5AA8DA133D3A8254FE83D /* ChezMessageBubble.swift */,
 				BF82EF48FF699827460350F3 /* ChezOwnsToggle.swift */,
+				F703CF85C8BE5549958DDECA /* ChezProgressStrip.swift */,
 				FD30AD1C4BB9E3D9AF3B488F /* ChezProposalCard.swift */,
 				369C161B6C44E4A1318499AB /* ChezRequestRowCard.swift */,
 				E5A5DCB78F378C48E317545B /* ChezSnapshotSummaryCard.swift */,
@@ -2304,6 +2310,7 @@
 				D94934C28197EA526838B81A /* ChezEntryButton.swift in Sources */,
 				9DF30C5BE1F70AECA342366C /* ChezFieldProviderCard.swift in Sources */,
 				569C2B4CB037202E32A40075 /* ChezHandleButton.swift in Sources */,
+				F2C21CDC10DF285540E514BC /* ChezInfoRequestCard.swift in Sources */,
 				CE4066D7F55578F5831178C1 /* ChezMessage.swift in Sources */,
 				C4907CA1636270582A6FCD37 /* ChezMessageBubble.swift in Sources */,
 				40D9CAEC3129AFD7F718EFAC /* ChezOwnedPill.swift in Sources */,
@@ -2313,6 +2320,7 @@
 				0077B95065F55144B5A57F83 /* ChezProfile.swift in Sources */,
 				9885658B44DE36104BB375D2 /* ChezProfileView.swift in Sources */,
 				C93C99518366164CC4FC5215 /* ChezProfileViewModel.swift in Sources */,
+				0111D27445CE4A60A04D70CC /* ChezProgressStrip.swift in Sources */,
 				CF00A608E9E39BB7C132EC68 /* ChezProposalCard.swift in Sources */,
 				31BFCFC126FB679920EAEA06 /* ChezQuickQuestionSheet.swift in Sources */,
 				DBCD665C8F2D2DECEA6D8BD9 /* ChezQuizRequestSubmitter.swift in Sources */,
