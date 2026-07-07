@@ -116,6 +116,10 @@ struct EditVehicleSheet: View {
                 table: "vehicles", id: vehicle.id, columns: clearedColumns
             )
             Haptics.success()
+            // July 2026 (audit): notify other surfaces (garage strip,
+            // Maintenance-tab Vehicles) so edits propagate without an
+            // incidental reload.
+            NotificationCenter.default.post(name: .vehicleChanged, object: nil)
             onSave?()
             dismiss()
         } catch {

@@ -615,6 +615,10 @@ struct FamilyMemberFormView: View {
             }
             Haptics.success()
             Analytics.track(isEditing ? .familyMemberEdited : .familyMemberCreated, ["relationship": relationship])
+            // July 2026 (audit): Dashboard family surfaces observe
+            // .householdMemberChanged; only AddHouseholdStaffSheet posted it,
+            // so family-member add/edit left those surfaces stale.
+            NotificationCenter.default.post(name: .householdMemberChanged, object: nil)
             await onSave?()
 
             if showInviteAfterSave && existingUserDetected {
@@ -732,6 +736,7 @@ struct FamilyMemberFormView: View {
             }
             try await DatabaseService.shared.deleteFamilyMember(id: member.id)
             Analytics.track(.familyMemberDeleted)
+            NotificationCenter.default.post(name: .householdMemberChanged, object: nil)
             Haptics.success()
             await onSave?()
             dismiss()

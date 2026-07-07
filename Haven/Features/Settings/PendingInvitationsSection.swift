@@ -185,6 +185,7 @@ struct PendingInvitationsSection: View {
                     try? await DatabaseService.shared.deleteFamilyMember(id: familyMemberId)
                 }
             }
+            NotificationCenter.default.post(name: .householdMemberChanged, object: nil)
             await onRefreshNeeded()
             let daysPending = invitation.createdAt.map { Int(Date().timeIntervalSince($0) / 86400) } ?? 0
             Analytics.track(.inviteRevoked, [

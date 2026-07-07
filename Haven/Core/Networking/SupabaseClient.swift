@@ -1126,6 +1126,23 @@ enum HavenSupabase {
             case householdId = "household_id"
             case householdName = "household_name"
         }
+
+        // July 2026 (audit — resilient-decoder sweep): this is decoded from
+        // the merge-households check_user Edge Function. Before this, a
+        // drifted optional field (e.g. household_name as a number) threw the
+        // WHOLE decode; the caller's try? then read it as "no existing
+        // account" and silently bypassed the merge-request flow — a real
+        // spouse could be treated as a brand-new invite. `exists` stays the
+        // load-bearing field (defaults false only if genuinely absent);
+        // every optional is try? so one bad field can't sink a true match.
+        init(from decoder: Decoder) throws {
+            let c = try? decoder.container(keyedBy: CodingKeys.self)
+            exists = (try? c?.decodeIfPresent(Bool.self, forKey: .exists) ?? nil) ?? false
+            userId = try? c?.decodeIfPresent(String.self, forKey: .userId) ?? nil
+            name = try? c?.decodeIfPresent(String.self, forKey: .name) ?? nil
+            householdId = try? c?.decodeIfPresent(String.self, forKey: .householdId) ?? nil
+            householdName = try? c?.decodeIfPresent(String.self, forKey: .householdName) ?? nil
+        }
     }
 
     static func mergeHouseholdsCheckUser(email: String) async throws -> CheckUserResult? {

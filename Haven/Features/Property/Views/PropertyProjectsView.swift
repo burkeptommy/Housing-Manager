@@ -65,6 +65,13 @@ struct PropertyProjectsView: View {
         .task {
             await viewModel.loadProjects(propertyId: propertyID)
         }
+        // July 2026 (audit): reload on .projectChanged. Projects created from
+        // the Dashboard quick-entry or the inbox quote flow post this but the
+        // Property → Projects list only listened for its own add-request
+        // notification, so new projects didn't appear until a manual refresh.
+        .onReceive(NotificationCenter.default.publisher(for: .projectChanged)) { _ in
+            Task { await viewModel.loadProjects(propertyId: propertyID) }
+        }
         .sheet(isPresented: $showNewProject) {
             if let hhId = householdId {
                 NewProjectView(propertyID: propertyID, householdId: hhId, viewModel: viewModel)

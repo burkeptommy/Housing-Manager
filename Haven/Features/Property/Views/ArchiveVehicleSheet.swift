@@ -142,6 +142,10 @@ struct ArchiveVehicleSheet: View {
                 "vehicle_id": vehicle.id.uuidString,
                 "reason": selectedReason.rawValue
             ])
+            // July 2026 (audit): the garage strip + Maintenance-tab Vehicles
+            // section observe .vehicleChanged; without this an archived
+            // vehicle lingered on those surfaces until an incidental reload.
+            NotificationCenter.default.post(name: .vehicleChanged, object: nil)
             Haptics.success()
             onArchived()
         } catch {
