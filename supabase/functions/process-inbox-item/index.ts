@@ -9,6 +9,10 @@ import {
   createTasksFromSuggestions,
   type SuggestedTask,
 } from "../_shared/task-ingest.ts";
+import {
+  authFailure,
+  requireHousehold,
+} from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,6 +89,16 @@ serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+    // --- AUTH (July 2026 security sweep, audit S1) ---
+    // This function previously had NO caller verification: anyone holding
+    // an inbox item UUID could run any action against it — including
+    // creating tasks (add_suggested_tasks) and hard-deleting contractors
+    // (remove_vendor). Callers must now present the household member's JWT
+    // (iOS attaches it via HavenSupabase.callEdgeFunction), and every
+    // body-supplied row is verified against the caller's household below.
+    const auth = await requireHousehold(req);
+    if ("failure" in auth) return authFailure(auth, headers);
+
     const body = await req.json();
     const {
       inbox_item_id,
@@ -113,6 +127,37 @@ serve(async (req: Request) => {
         JSON.stringify({ error: "Inbox item not found" }),
         { status: 404, headers }
       );
+    }
+
+    if (item.household_id !== auth.householdId) {
+      return new Response(
+        JSON.stringify({ error: "Access denied: item does not belong to your household" }),
+        { status: 403, headers }
+      );
+    }
+
+    // Body-supplied targets must belong to the caller's household too —
+    // otherwise a valid member could point actions at another household's
+    // property or vehicle.
+    if (property_id) {
+      const { data: prop } = await supabase
+        .from("properties").select("household_id").eq("id", property_id).single();
+      if (!prop || prop.household_id !== auth.householdId) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: property mismatch" }),
+          { status: 403, headers }
+        );
+      }
+    }
+    if (vehicle_id) {
+      const { data: veh } = await supabase
+        .from("vehicles").select("household_id").eq("id", vehicle_id).single();
+      if (!veh || veh.household_id !== auth.householdId) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: vehicle mismatch" }),
+          { status: 403, headers }
+        );
+      }
     }
 
     const householdId = item.household_id;
