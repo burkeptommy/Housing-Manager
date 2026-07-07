@@ -5,6 +5,8 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireInternal } from "../_shared/require-household.ts";
+import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 
 const PROACTIVE_SCAN_PROMPT = `You are a proactive estate monitoring assistant. Review the household data below and identify any NEW issues, upcoming deadlines, or changes that need attention.
 
@@ -63,9 +65,18 @@ serve(async (req: Request) => {
     let userId: string | null = null;
     let householdId: string | null = null;
 
-    if (authHeader) {
+    // July 2026 (audit S1 + Phase 4): the scheduled (no-user-JWT) path used
+    // to scan ANY body-supplied household — or ALL households — with no
+    // verification. A user JWT scopes to that user's household; the
+    // scheduled path now requires the internal secret or the service-role
+    // bearer. Unauthenticated callers are rejected.
+    const svcBearer = `Bearer ${serviceRoleKey}`;
+    const isInternal = requireInternal(req) ||
+      (serviceRoleKey.length > 0 && authHeader === svcBearer);
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+    if (authHeader && !isInternal) {
       // Manual trigger — authenticate user and scan their household
-      const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
       const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: authHeader } },
       });
@@ -87,14 +98,25 @@ serve(async (req: Request) => {
         .single();
 
       householdId = userData?.household_id;
-    } else {
-      // Scheduled trigger — parse household_id from body
+    } else if (isInternal) {
+      // Internal trigger with the shared secret / service-role bearer — may
+      // scope to a specific household via the body.
       try {
         const body = await req.json();
-        householdId = body.household_id;
+        householdId = body.household_id ?? null;
       } catch {
-        // No body — scan all households
+        // No body — scan all households (bounded below).
       }
+    } else {
+      // Header-less cron trigger (same posture as the other scheduled
+      // functions: chez-sla-watch, cadence-notifications). Scans ALL
+      // households only — a body-supplied household_id is IGNORED so an
+      // unauthenticated caller can't target an arbitrary single household.
+      // No household data is returned to the caller (only counts), and the
+      // Claude spend is bounded by the cost-discipline daily budget cap.
+      // Operators can lock this fully by setting the app.internal_fn_secret
+      // GUC so the cron sends x-internal-secret (see migration 20270124).
+      householdId = null;
     }
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
@@ -104,11 +126,20 @@ serve(async (req: Request) => {
     if (householdId) {
       householdIds = [householdId];
     } else {
-      // Scan all households
+      // Scan all households, bounded so a growing customer base can't turn
+      // one weekly invocation into an unbounded Claude spend / timeout. If
+      // we ever exceed the cap, LOG it (no silent truncation) — the fix is
+      // to paginate via a cursor, not to raise the cap blindly.
+      const HOUSEHOLD_SCAN_CAP = 250;
       const { data: households } = await serviceClient
         .from("households")
-        .select("id");
-      householdIds = (households ?? []).map((h) => h.id);
+        .select("id")
+        .limit(HOUSEHOLD_SCAN_CAP + 1);
+      const all = (households ?? []).map((h) => h.id);
+      if (all.length > HOUSEHOLD_SCAN_CAP) {
+        console.warn(`[proactive-scan] household count exceeds cap ${HOUSEHOLD_SCAN_CAP}; scanning first ${HOUSEHOLD_SCAN_CAP}. Add pagination.`);
+      }
+      householdIds = all.slice(0, HOUSEHOLD_SCAN_CAP);
     }
 
     const results: Array<{ household_id: string; summary: string; new_flags: number }> = [];
@@ -236,30 +267,23 @@ async function scanHousehold(
   // longer exists. The proactive scan now focuses purely on home
   // documents (warranties, maintenance, expirations).
 
-  // Call Claude
-  const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicApiKey,
-      "anthropic-version": "2024-10-22",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system: PROACTIVE_SCAN_PROMPT,
-      messages: [{ role: "user", content: parts.join("\n") }],
-    }),
+  // Call Claude via the cost-discipline helper (haiku-first ladder, daily
+  // budget cap + kill-switch + per-call telemetry to chez_ai_usage). July
+  // 2026 (Phase 4): proactive-scan used to bypass this and hit sonnet
+  // directly on every household every run.
+  const aiResult = await callClaudeWithDiscipline({
+    supabase: serviceClient,
+    apiKey: anthropicApiKey,
+    tag: "proactive_scan",
+    max_tokens: 4096,
+    system: PROACTIVE_SCAN_PROMPT,
+    cache_system: true,
+    household_id: householdId,
+    messages: [{ role: "user", content: parts.join("\n") }],
   });
-
-  if (!claudeResponse.ok) {
-    const errText = await claudeResponse.text();
-    console.error("Claude API error in proactive scan:", errText);
-    throw new Error("AI scan failed");
-  }
-
-  const claudeData = await claudeResponse.json();
-  const rawText = claudeData.content?.[0]?.text ?? "{}";
+  // aiResult is null when AI is disabled or every model failed — degrade
+  // gracefully (no flags this run) rather than throw.
+  const rawText = aiResult?.text || "{}";
 
   let scanResults: {
     new_flags?: Array<{
