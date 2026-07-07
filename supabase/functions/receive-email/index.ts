@@ -296,6 +296,23 @@ serve(async (req: Request) => {
   try {
     console.log(`[receive-email] Request received: method=${req.method}, content-type=${req.headers.get("content-type")?.substring(0, 50)}, content-length=${req.headers.get("content-length") || "unknown"}`);
 
+    // --- WEBHOOK TOKEN (July 2026 security sweep, audit S3) ---
+    // SendGrid Inbound Parse posts to a URL we configure — append
+    // ?token=<value of SENDGRID_WEBHOOK_TOKEN> to that URL, then set the
+    // secret. Enforcement only kicks in once the secret exists, so the
+    // rollout order is: (1) deploy this, (2) add the token to the SendGrid
+    // Inbound Parse URL, (3) `supabase secrets set SENDGRID_WEBHOOK_TOKEN=…`.
+    // Until step 3, behavior is unchanged (the deny-missing-sender +
+    // allowlist gates still apply).
+    const expectedToken = Deno.env.get("SENDGRID_WEBHOOK_TOKEN");
+    if (expectedToken) {
+      const providedToken = new URL(req.url).searchParams.get("token");
+      if (providedToken !== expectedToken) {
+        console.warn("[receive-email] Rejected: bad or missing webhook token");
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers });
+      }
+    }
+
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -563,6 +580,21 @@ serve(async (req: Request) => {
       const match = fromAddress.match(/<([^>]+)>/);
       return (match ? match[1] : fromAddress).trim().toLowerCase();
     })();
+
+    // July 2026 security sweep (audit S3): a missing/unparseable sender used
+    // to SKIP the allowlist entirely — a direct POST omitting `from` walked
+    // straight past the gate. No sender → reject. Real SendGrid posts always
+    // carry `from`.
+    if (!senderEmail || !senderEmail.includes("@")) {
+      console.log(`[receive-email] Rejecting email with missing/invalid sender (raw: ${fromAddress})`);
+      if (placeholderId) {
+        await supabase.from("inbox_items").delete().eq("id", placeholderId);
+      }
+      return new Response(
+        JSON.stringify({ success: true, rejected: true, reason: "missing_sender" }),
+        { status: 200, headers }
+      );
+    }
 
     if (senderEmail) {
       const { data: allowedSender } = await supabase
