@@ -294,6 +294,14 @@ serve(async (req: Request) => {
 
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
 
+  // July 2026 (Phase 4): hoisted to function scope so the top-level catch
+  // (and the admin backstop email) can reference real values instead of
+  // out-of-scope undefined — these were declared inside the try block, so
+  // the failure card + operator alert only ever showed "unknown".
+  let toAddress = "";
+  let fromAddress = "";
+  let subject = "";
+
   try {
     console.log(`[receive-email] Request received: method=${req.method}, content-type=${req.headers.get("content-type")?.substring(0, 50)}, content-length=${req.headers.get("content-length") || "unknown"}`);
 
@@ -328,9 +336,7 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // --- PARSE INCOMING EMAIL ---
-    let toAddress = "";
-    let fromAddress = "";
-    let subject = "";
+    // (toAddress / fromAddress / subject hoisted to function scope above)
     let emailBody = "";
     let fullRawEmail = ""; // longest version of the email for "Show Original Email"
     let attachmentBase64: string | null = null;
@@ -2772,6 +2778,36 @@ Respond with ONLY valid JSON:
       }
     } catch (notifyErr) {
       console.error("[receive-email] Could not create failure notification:", notifyErr);
+    }
+
+    // July 2026 (Phase 4, minimal observability): the email pipeline had no
+    // operator signal — a broken ingest was invisible until a homeowner
+    // complained. Fire a best-effort admin backstop email on total failure.
+    try {
+      const sendgridApiKey = Deno.env.get("SENDGRID_API_KEY");
+      const adminEmails = (Deno.env.get("CHEZ_ADMIN_EMAILS") ?? "tom@getchez.com")
+        .split(",").map((e) => e.trim()).filter(Boolean);
+      if (sendgridApiKey && adminEmails.length > 0) {
+        const notify = fetch("https://api.sendgrid.com/v3/mail/send", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${sendgridApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            personalizations: [{ to: adminEmails.map((email) => ({ email })) }],
+            from: { email: "hello@getchez.com", name: "Chez Pipeline" },
+            subject: `⚠️ receive-email failed: ${subject || "unknown"}`,
+            content: [{
+              type: "text/plain",
+              value: `A forwarded email failed to process end-to-end.\n\nFrom: ${fromAddress || "unknown"}\nTo: ${toAddress || "unknown"}\nSubject: ${subject || "unknown"}\nError: ${String(err).substring(0, 500)}\n\nThe homeowner sees a "try forwarding again" card. Investigate the function logs.`,
+            }],
+          }),
+        }).catch((e) => console.error("[receive-email] admin backstop email failed:", e));
+        try {
+          // @ts-ignore — EdgeRuntime injected by the Supabase runtime
+          EdgeRuntime.waitUntil(notify);
+        } catch (_) { /* local run */ }
+      }
+    } catch (adminErr) {
+      console.error("[receive-email] admin backstop email threw:", adminErr);
     }
 
     return new Response(
