@@ -346,6 +346,14 @@ Return ONLY JSON. No markdown. No explanation.`;
     if (supabaseUrl && serviceRoleKey) {
       const svc = createClient(supabaseUrl, serviceRoleKey);
 
+      // July 2026 (audit F20): background writes MUST be registered with
+      // EdgeRuntime.waitUntil or the isolate can tear down mid-write after
+      // the response returns — intermittently losing the category +
+      // visible_to_home_managers rewrite (a security control) and the
+      // vendor/system auto-creates. Every fire-and-forget chain below
+      // pushes into this array; waitUntil is called at the end of the block.
+      const pendingWrites: PromiseLike<unknown>[] = [];
+
       // NOTE: content_hash is now set at document creation time (receive-email, process-inbox-item,
       // DocumentUploadManager). No longer computed here to avoid race conditions or hash mismatches.
 
@@ -369,25 +377,29 @@ Return ONLY JSON. No markdown. No explanation.`;
         docUpdate.property_id = analysis.property_id;
         console.log(`[analyze] Auto-linked to property: ${analysis.property_id}`);
       }
-      svc.from("documents").update(docUpdate).eq("id", document_id).then(({ error }) => {
-        if (error) console.error("[analyze] DB update failed:", error.message);
-        else console.log("[analyze] Document updated in DB");
-      });
+      pendingWrites.push(
+        svc.from("documents").update(docUpdate).eq("id", document_id).then(({ error }) => {
+          if (error) console.error("[analyze] DB update failed:", error.message);
+          else console.log("[analyze] Document updated in DB");
+        }),
+      );
 
       // Store extracted text
       const extractedText = (analysis.extracted_text as string) ?? text ?? "";
       if (extractedText.length > 0) {
-        svc.from("document_content").upsert({
-          document_id,
-          household_id,
-          extracted_text: extractedText,
-          extraction_method: text ? "text_extraction" : "ocr",
-          extracted_at: new Date().toISOString(),
-          last_ai_analysis_at: new Date().toISOString(),
-          ai_model_version: "claude-sonnet-4-6",
-        }, { onConflict: "document_id" }).then(({ error }) => {
-          if (error) console.error("[analyze] document_content upsert failed:", error.message);
-        });
+        pendingWrites.push(
+          svc.from("document_content").upsert({
+            document_id,
+            household_id,
+            extracted_text: extractedText,
+            extraction_method: text ? "text_extraction" : "ocr",
+            extracted_at: new Date().toISOString(),
+            last_ai_analysis_at: new Date().toISOString(),
+            ai_model_version: "claude-sonnet-4-6",
+          }, { onConflict: "document_id" }).then(({ error }) => {
+            if (error) console.error("[analyze] document_content upsert failed:", error.message);
+          }),
+        );
       }
 
       // Auto-create vendor if extracted
@@ -395,7 +407,8 @@ Return ONLY JSON. No markdown. No explanation.`;
       if (vendorInfo?.name && (vendorInfo?.phone || vendorInfo?.email)) {
         const vendorName = vendorInfo.name as string;
         // Check if vendor already exists
-        svc.from("contractors")
+        pendingWrites.push(
+          svc.from("contractors")
           .select("id")
           .eq("household_id", household_id)
           .ilike("company_name", `%${vendorName}%`)
@@ -417,7 +430,8 @@ Return ONLY JSON. No markdown. No explanation.`;
             } else {
               console.log(`[analyze] Vendor already exists: ${vendorName}`);
             }
-          });
+          }),
+        );
       }
 
       // --- AUTO-DETECT VINs AND LINK TO VEHICLES ---
@@ -471,16 +485,19 @@ Return ONLY JSON. No markdown. No explanation.`;
             unmatched_vins: unmatchedVins,
           };
           // Re-update the document with VIN metadata
-          svc.from("documents").update({ metadata: docUpdate.metadata }).eq("id", document_id).then(({ error }) => {
-            if (error) console.error("[analyze] VIN metadata update failed:", error.message);
-          });
+          pendingWrites.push(
+            svc.from("documents").update({ metadata: docUpdate.metadata }).eq("id", document_id).then(({ error }) => {
+              if (error) console.error("[analyze] VIN metadata update failed:", error.message);
+            }),
+          );
         }
       }
 
       // Auto-link family members from key_parties
       const keyParties = analysis.key_parties as Array<{ name: string; role: string }> | null;
       if (keyParties && keyParties.length > 0) {
-        svc.from("family_members")
+        pendingWrites.push(
+          svc.from("family_members")
           .select("id, first_name, last_name")
           .eq("household_id", household_id)
           .then(async ({ data: members }) => {
@@ -506,7 +523,8 @@ Return ONLY JSON. No markdown. No explanation.`;
                 }
               }
             }
-          });
+          }),
+        );
       }
 
       // Auto-create home systems if extracted (for inspection reports, warranty cards, etc.)
@@ -519,7 +537,8 @@ Return ONLY JSON. No markdown. No explanation.`;
       const homeSystems = analysis.home_systems as Array<Record<string, unknown>> | null;
       if (homeSystems && homeSystems.length > 0 && !isInvoice) {
         // Get property for this household
-        svc.from("properties")
+        pendingWrites.push(
+          svc.from("properties")
           .select("id")
           .eq("household_id", household_id)
           .limit(1)
@@ -554,7 +573,8 @@ Return ONLY JSON. No markdown. No explanation.`;
                 else console.log(`[analyze] Auto-created home system: ${sysName}`);
               }
             }
-          });
+          }),
+        );
       }
 
       // Follow-up tasks from document suggestions (inspection reports,
@@ -600,7 +620,8 @@ Return ONLY JSON. No markdown. No explanation.`;
       }
 
       // Log
-      svc.from("access_log").insert({
+      pendingWrites.push(
+        svc.from("access_log").insert({
         household_id,
         user_id: body.user_id ?? null,
         action: "document_ai_analyzed",
@@ -614,9 +635,10 @@ Return ONLY JSON. No markdown. No explanation.`;
           auto_created_systems: homeSystems?.length ?? 0,
           auto_created_maintenance: maintSuggestions?.length ?? 0,
         },
-      }).then(({ error }) => {
-        if (error) console.warn("[analyze] access_log insert failed:", error.message);
-      });
+        }).then(({ error }) => {
+          if (error) console.warn("[analyze] access_log insert failed:", error.message);
+        }),
+      );
 
       // Chez v1: Phase 48 estate extraction branch removed. Estate
       // management is out of v1 scope; estate_state, estate_pdf_exports,
@@ -625,6 +647,17 @@ Return ONLY JSON. No markdown. No explanation.`;
       // logging — keeping it.
       const resolvedCategory = (analysis.category_suggestion as string) ?? "";
       void resolvedCategory;
+
+      // Register every background write with the runtime so the isolate
+      // stays alive until they settle. Fall back to awaiting inline when
+      // EdgeRuntime isn't available (local `deno run`, tests).
+      const settled = Promise.allSettled(pendingWrites);
+      try {
+        // @ts-ignore — EdgeRuntime is injected by the Supabase edge runtime
+        EdgeRuntime.waitUntil(settled);
+      } catch (_) {
+        await settled;
+      }
     }
 
     return new Response(responseBody, { status: 200, headers });
