@@ -8,6 +8,24 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Security sweep (Phase 1 of the hardening plan) — SHIPPED (2026-07-07, night)
+
+Executed Phase 0 + Phase 1 of the approved hardening plan (working backlog = PRODUCT_AUDIT_2026-07.md). Everything below is committed, deployed to prod, and verified.
+
+**Phase 0:** working tree committed in 3 logical commits (maintenance-stack session / pipeline-v1 session / docs); Chez scheme build green; `analyze-document` background writes now registered with `EdgeRuntime.waitUntil` (audit F20 — the `visible_to_home_managers` rewrite can no longer be lost to isolate teardown; verified live).
+
+**Edge-function auth (S1/S2 class):** new `_shared/require-household.ts` (`requireHousehold` / `requireInternal` / `requireAdminOrInternal`) — JWT→household derivation, no service-role fallback ever, modeled on view-document. Hardened: process-inbox-item (had ZERO auth + creates tasks now), chat / gap-analysis / simulate-scenario (service-role fallback deleted; RLS-scoped context reads; body household overridden/403), process-invoice (doc/property/vehicle/contractor ownership), analyze-document (user JWT w/ doc ownership OR internal secret; internal callers send `x-internal-secret`, legacy service-key bearer accepted for deploy-order safety), send-push-notification (real JWT verification; user callers restricted to own-household recipients), check-vehicle-recalls, merge-households preview_merge party check, lookup-manual / score-property / research-project / visualize-room ownership checks. `INTERNAL_FN_SECRET` provisioned. `scripts/security-smoke.sh` = 12-check negative matrix, all passing (note: pass JSON as single args — bash brace expansion bit v1 of the script).
+
+**receive-email (S3):** missing/unparseable sender now REJECTED (the allowlist used to be skipped entirely when `from` was absent); `SENDGRID_WEBHOOK_TOKEN` gate deployed but dormant — **TOM ACTION: add `?token=<value>` to the SendGrid Inbound Parse URL, then `supabase secrets set SENDGRID_WEBHOOK_TOKEN=<value>` to activate.**
+
+**RLS migration `20270120`:** REVOKE EXECUTE on `log_chez_activity` (open SECURITY DEFINER RPC — forged-activity vector); homeowner UPDATE policy on `chez_requests` dropped (self-resolve/SLA-tamper closed; iOS has zero direct writes — verified); `concierge_messages` INSERT constrained to `role='user' AND proposal IS NULL` (Chez-voice forgery closed); `chez_reminders` admin-only; `local_vendor_results` deny-all RLS; `analysis_cache` columns codified (fresh-env break). Verified live via an isolated prod fixture (household `bbbbbbbb-…444`, user `security-smoke-test@getchez.com`) — **fixture kept for Phase 2/3 verification; tear down after** (incl. one orphaned storage object under `documents/bbbbbbbb-…444/`).
+
+**Also:** 7 catalog utilities gated on admin-JWT/internal-secret (were fully open; cron-expand-catalog + the two CLI catalog scripts updated to pass the secret — **CLI scripts now require `INTERNAL_FN_SECRET` in env**); `test-ai` (leaked key prefix) + `test-vehicle-flow` + `render-assessment-pdf` deleted from prod and `debug-research` from the repo; spending-tiers coerced to numbers server-side (stored-XSS source, S8) + admin.js display coercion (the live service portal already escaped); prompt-injection fences on receive-email (`<untrusted_email>`) + process-invoice (`<untrusted_invoice>`); simulate-scenario's dropped-`estate_state` query removed; email pipeline re-verified end-to-end post-hardening (test email w/ PDF → classification → document → analyze → follow-ups card, then cleaned to baseline).
+
+**Deferred deliberately into later phases:** `analysis_cache` relocation off the homeowner-readable row (needs coordinated chez-concierge + service-portal change; the tamper path is already closed) → operator phase; pg_cron shared-secret bodies + cadence send-stamp → Phase 3 cadence rewrite; process-invoice vehicle auto-complete behind user confirm → Phase 3 invoice work; one real PDF-forward test from Tom's phone still recommended.
+
+---
+
 ## Email + document pipeline: intent layer, auto-tasks, universal ask (2026-07-07, PM2)
 
 Deep audit (3 parallel agents) + upgrade of both ingest pipelines so a vendor can safely use the household's `@alfred.getchez.com` as their primary contact and the homeowner never misses a thing. All backward compatible (free-text `type`/`action_type`, no migration). Both iOS builds green; receive-email + process-inbox-item + analyze-document redeployed; verified end-to-end against Tom's own household then restored to baseline.
