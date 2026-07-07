@@ -782,6 +782,71 @@ struct InboxItemDetailView: View {
                         icon: "doc.fill",
                         isDisabled: isProcessing
                     )
+                } else if isFollowupsAction {
+                    // July 2026 — follow-up tasks review. The server spotted
+                    // implied follow-up work (invoice recommendations, a
+                    // service-due reminder that came with a document) and is
+                    // asking before adding anything. One tap adds them all;
+                    // each carries the evidence sentence so the homeowner
+                    // trusts what they're adding.
+                    let tasks = item.metadata?.suggestedTasks ?? []
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(tasks) { task in
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "checklist")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(HavenColors.action)
+                                    .padding(.top, 1)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(task.title)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    if let reason = task.reason, !reason.isEmpty {
+                                        Text(reason)
+                                            .font(HavenTypography.uiLabelSmall)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    if let due = task.dueDate, !due.isEmpty {
+                                        Text("Due \(due)")
+                                            .font(HavenTypography.uiLabelSmall)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(HavenTheme.spacing12)
+                            .background(HavenColors.creamWhite)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+
+                    HavenButton(
+                        title: tasks.count == 1 ? "Add this to my plan" : "Add all \(tasks.count) to my plan",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "add_suggested_tasks", nil, nil)
+                            dismiss()
+                        },
+                        icon: "plus.circle.fill",
+                        isLoading: isProcessing,
+                        isDisabled: isProcessing
+                    )
+
+                    HavenButton(
+                        title: "No thanks",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            onProcess(nil, "dismiss", nil, nil)
+                            dismiss()
+                        },
+                        style: .secondary,
+                        icon: "xmark",
+                        isDisabled: isProcessing
+                    )
                 } else if isWarrantyAction {
                     // Phase 101 (E3) — one-tap warranty save. The server
                     // extracted the coverage facts and fuzzy-matched a
@@ -1368,6 +1433,13 @@ struct InboxItemDetailView: View {
     /// Phase 101 (E3) — warranty emails get a one-tap save card.
     private var isWarrantyAction: Bool {
         (initialActionType ?? item.actionType) == "save_warranty" && item.isPending
+    }
+
+    /// July 2026 — follow-up tasks review card ("we spotted N follow-ups").
+    private var isFollowupsAction: Bool {
+        (initialActionType ?? item.actionType) == "review_followups"
+            && (item.metadata?.suggestedTasks?.isEmpty == false)
+            && item.isPending
     }
 
     private var primaryActionTitle: String {

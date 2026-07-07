@@ -5,6 +5,10 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  createTasksFromSuggestions,
+  type SuggestedTask,
+} from "../_shared/task-ingest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,6 +135,73 @@ serve(async (req: Request) => {
         .eq("id", inbox_item_id);
       return new Response(
         JSON.stringify({ success: true, action: "dismissed" }),
+        { status: 200, headers }
+      );
+    }
+
+    // --- HANDLE ADD SUGGESTED TASKS (July 2026) ---
+    // The homeowner tapped "Add these" on a follow-ups review card. The
+    // suggestions live in metadata.suggested_tasks; create them through the
+    // shared helper (same dedup guard as the auto-add path). Optionally the
+    // client passes `selected_task_titles` to add only a subset.
+    if (action === "add_suggested_tasks") {
+      const suggested = (metadata.suggested_tasks as SuggestedTask[]) || [];
+      if (suggested.length === 0) {
+        await supabase.from("inbox_items")
+          .update({ seen: true, action_completed: true })
+          .eq("id", inbox_item_id);
+        return new Response(
+          JSON.stringify({ success: true, created: 0, note: "no suggestions on item" }),
+          { status: 200, headers }
+        );
+      }
+
+      // Resolve a property: explicit param → item's matched property → the
+      // household's first property (single-property fallback).
+      let resolvedPropertyId: string | null = property_id ?? null;
+      if (!resolvedPropertyId) {
+        const { data: props } = await supabase
+          .from("properties").select("id").eq("household_id", householdId).limit(1);
+        resolvedPropertyId = props?.[0]?.id ?? null;
+      }
+      if (!resolvedPropertyId) {
+        return new Response(
+          JSON.stringify({ error: "No property to attach tasks to" }),
+          { status: 400, headers }
+        );
+      }
+
+      // Optional subset selection by title.
+      const selectedTitles: string[] | null = Array.isArray(body.selected_task_titles)
+        ? body.selected_task_titles
+        : null;
+      const toCreate = selectedTitles
+        ? suggested.filter((s) => selectedTitles.includes(s.title))
+        : suggested;
+
+      const matchedContractorId = (metadata.matched_contractor as any)?.id
+        || item.related_contractor_id
+        || null;
+
+      const res = await createTasksFromSuggestions(supabase, {
+        householdId,
+        propertyId: resolvedPropertyId,
+        contractorId: matchedContractorId,
+        source: "email_invoice_followup",
+        suggestions: toCreate,
+      });
+
+      await supabase.from("inbox_items")
+        .update({ seen: true, action_completed: true })
+        .eq("id", inbox_item_id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          created: res.created.length,
+          created_tasks: res.created,
+          skipped_duplicates: res.skippedDuplicates.length,
+        }),
         { status: 200, headers }
       );
     }

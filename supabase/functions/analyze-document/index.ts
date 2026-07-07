@@ -557,37 +557,46 @@ Return ONLY JSON. No markdown. No explanation.`;
           });
       }
 
-      // Auto-create maintenance tasks from suggestions
-      // Also skip auto-creating maintenance tasks for invoices (invoice intelligence handles this)
+      // Follow-up tasks from document suggestions (inspection reports,
+      // service reports, warranty upkeep). July 2026: this used to SILENTLY
+      // insert maintenance_tasks — which violated "always ask the homeowner"
+      // and created duplicates on re-upload (no dedup, no source). It now
+      // surfaces a "we spotted N follow-ups — add them?" inbox review card
+      // using the SAME shape the email pipeline uses. The homeowner taps
+      // "Add these" → process-inbox-item action=add_suggested_tasks creates
+      // the tasks with dedup. Skipped for invoices (process-invoice owns
+      // those follow-ups).
       const maintSuggestions = analysis.maintenance_suggestions as Array<Record<string, unknown>> | null;
       if (maintSuggestions && maintSuggestions.length > 0 && !isInvoice) {
-        svc.from("properties")
-          .select("id")
-          .eq("household_id", household_id)
-          .limit(1)
-          .then(async ({ data: props }) => {
-            const propertyId = props?.[0]?.id;
-            if (!propertyId) return;
-
-            for (const maint of maintSuggestions) {
-              const taskName = maint.task as string;
-              if (!taskName) continue;
-
-              const dueDate = (maint.dueDate as string) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-              const { error: mErr } = await svc.from("maintenance_tasks").insert({
-                household_id,
-                property_id: propertyId,
-                title: taskName,
-                service_key: "custom_seasonal_service",
-                frequency: "once",
-                next_due_date: dueDate,
-                priority: maint.urgency === "critical" ? "high" : maint.urgency === "soon" ? "medium" : "low",
-                notes: `Auto-suggested from document analysis. ${(maint.estimatedCost as string) ? `Estimated cost: ${maint.estimatedCost}` : ""}`.trim(),
-              });
-              if (mErr) console.error(`[analyze] Maintenance task creation failed for ${taskName}:`, mErr.message);
-              else console.log(`[analyze] Auto-created maintenance task: ${taskName}`);
-            }
+        const suggestedTasks = maintSuggestions
+          .filter((m) => typeof m.task === "string" && (m.task as string).trim().length > 0)
+          .slice(0, 3)
+          .map((m) => ({
+            title: (m.task as string).trim(),
+            due_date: (m.dueDate as string) || null,
+            urgency: m.urgency === "critical" ? "soon" : (m.urgency as string) || "routine",
+            reason: (m.estimatedCost as string)
+              ? `From document analysis. Estimated cost: ${m.estimatedCost}`
+              : "Recommended by the document you uploaded.",
+          }));
+        if (suggestedTasks.length > 0) {
+          const followTitle = suggestedTasks.length === 1
+            ? "Follow-up spotted in your document"
+            : `${suggestedTasks.length} follow-ups spotted in your document`;
+          const { error: followErr } = await svc.from("inbox_items").insert({
+            household_id,
+            type: "follow_ups",
+            title: followTitle,
+            summary: suggestedTasks.map((t) => `• ${t.title}`).join("\n"),
+            related_document_id: document_id,
+            needs_action: true,
+            action_type: "review_followups",
+            metadata: { suggested_tasks: suggestedTasks, source_document_id: document_id },
+            status: "ready",
           });
+          if (followErr) console.error("[analyze] follow-up review item insert failed:", followErr.message);
+          else console.log(`[analyze] Created follow-up review item (${suggestedTasks.length} tasks)`);
+        }
       }
 
       // Log

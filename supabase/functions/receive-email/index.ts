@@ -9,6 +9,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
+import {
+  createTasksFromSuggestions,
+  type SuggestedTask,
+} from "../_shared/task-ingest.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,6 +71,21 @@ function visibleToHomeManagers(category: string | null | undefined): boolean {
 interface EmailClassification {
   type: "contractor_quote" | "estate_document" | "vendor_contact" | "home_document" | "vehicle_document" | "family" | "insurance_claim" | "bill_invoice" | "other";
   confidence: "high" | "medium" | "low";
+  // July 2026 — intent layer, orthogonal to `type`. Lets the pipeline treat a
+  // "your annual tune-up is due" email (intent=reminder, no doc) differently
+  // from a filed statement (intent=statement) even though both may classify
+  // as bill_invoice or other. Drives the auto-add-vs-ask policy.
+  intent?: "action_required" | "reminder" | "appointment" | "receipt" | "statement" | "marketing" | "informational" | "unknown";
+  // Follow-up work the email implies. For invoices: what the technician
+  // flagged for next time / the recurring service due date. For reminders:
+  // the thing the vendor is asking the homeowner to schedule. Max 3, most
+  // important first. Empty when the email implies no action.
+  suggestedTasks?: Array<{
+    title: string;
+    dueDate: string | null;
+    urgency: "soon" | "routine" | "informational" | null;
+    reason: string | null;
+  }>;
   vendorName: string | null;
   vendorPhone: string | null;
   vendorEmail: string | null;
@@ -841,6 +860,35 @@ serve(async (req: Request) => {
 
     const isForwarded = subject.toLowerCase().startsWith("fwd:") || subject.toLowerCase().startsWith("fw:") || !!originalSender;
 
+    // --- SENDER → CONTRACTOR MATCH ---
+    // The keystone of "vendors can use your alfred address as their primary
+    // contact": when the ORIGINAL sender (not the forwarder) matches a
+    // contractor on file, we know exactly whose email this is — the
+    // landscaper, the HVAC company — and can title, route, and stamp
+    // accordingly. Matched by email; the original sender wins over the
+    // forwarder. Best-effort — a miss just means no vendor attribution.
+    let matchedContractor: { id: string; company_name: string; category: string | null } | null = null;
+    try {
+      const rawSender = originalSender || fromAddress || "";
+      const senderMatch = rawSender.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+      const cleanSender = senderMatch ? senderMatch[0].toLowerCase() : "";
+      if (cleanSender) {
+        const { data: contractorRows } = await supabase
+          .from("contractors")
+          .select("id, company_name, category, email")
+          .eq("household_id", householdId)
+          .not("email", "is", null);
+        matchedContractor = (contractorRows || []).find(
+          (c: any) => (c.email || "").toLowerCase().trim() === cleanSender,
+        ) ?? null;
+        if (matchedContractor) {
+          console.log(`[receive-email] Sender matched contractor: ${matchedContractor.company_name}`);
+        }
+      }
+    } catch (matchErr) {
+      console.warn("[receive-email] sender→contractor match failed (non-blocking):", matchErr);
+    }
+
     const classificationPrompt = `Analyze this email and classify it. This was forwarded to a household management app by a user.
 ${isForwarded ? `\nIMPORTANT: This is a FORWARDED email. The "FROM" below is the person who forwarded it (the app user), NOT the original sender. Look inside the email body for the actual original sender, content, and context. Ignore the forwarder's signature — focus on the forwarded content after markers like "---------- Forwarded message ---------" or "Begin forwarded message:".` : ""}
 ${originalSender ? `\nDETECTED ORIGINAL SENDER: ${originalSender}` : ""}
@@ -863,6 +911,25 @@ Classify this email into ONE of these types:
 - "home_document": A home-related document — warranty, receipt, manual, permit, inspection report, test report (radon, water quality, mold, lead, asbestos, air quality, termite, pest), home inspection, appraisal, survey, property assessment, environmental report, energy audit, or any document about the physical property/home itself
 - "family": Personal/family email — school communications, event invitations, birthday/party info, kids' activities, sports/extracurriculars, family travel, personal appointments, work/school schedules, newsletters, permission slips, report cards, medical/dental appointments, health insurance cards, medical records, prescriptions, or any personal/family life content. Also use for health/medical insurance documents.
 - "other": Anything that doesn't fit the above categories
+
+INTENT (separate from type — what does the sender want to happen?):
+- "action_required": needs the homeowner to do something specific (approve, sign, pay, schedule).
+- "reminder": a service/appointment/renewal is DUE or coming up ("time to schedule your annual HVAC tune-up", "your inspection is due next month", "gutters should be cleaned before winter"). These are the classic "vendor tells you to book something" emails.
+- "appointment": a specific date/time is already booked or proposed ("your technician arrives Tuesday 9am", "confirmed for the 14th").
+- "receipt": confirmation of a completed payment/transaction, nothing to do.
+- "statement": a periodic account statement / bill for reference.
+- "marketing": promotional, newsletter, sales.
+- "informational": FYI with no action.
+- "unknown": can't tell.
+
+SUGGESTED TASKS (the heart of this — extract follow-up work so we can offer to add it to the homeowner's plan):
+Populate "suggestedTasks" (0 to 3 items, most important first) whenever the email implies concrete future work the homeowner should track. Examples:
+- Invoice says "technician recommends replacing the flame sensor at next service" -> task "Replace furnace flame sensor".
+- Invoice/service report says "next service due in 6 months" or "filter should be changed quarterly" -> task with the computed dueDate.
+- Reminder email "your annual chimney sweep is due" -> task "Schedule annual chimney sweep".
+- Appointment "technician arrives Tuesday" -> task "Be home for {vendor} visit" with that date.
+Do NOT invent routine chores the email doesn't mention. Only extract what THIS email actually implies. If the email is a pure receipt/statement/marketing with no future action, return [].
+Each task: { "title": "action-first, <= 8 words", "dueDate": "YYYY-MM-DD or null", "urgency": "soon | routine | informational", "reason": "one short sentence quoting/paraphrasing the email evidence" }.
 
 VEHICLE vs HOME DISTINCTION:
 - If an invoice/bill mentions a VIN, vehicle make/model, or vehicle-specific services (oil change, tire rotation, brake pads, transmission, body work, car wash, emissions test, state inspection), set vehicleContext: true.
@@ -887,6 +954,8 @@ Respond with ONLY valid JSON:
   "documentTitle": "suggested title for the document or null",
   "warrantyInfo": "ONLY when the email is a warranty registration, warranty confirmation, or extended-warranty document: { \"provider\": \"company backing the warranty\", \"covered_item\": \"what is covered, e.g. 'Rheem water heater'\", \"warranty_type\": \"manufacturer | extended | home_warranty\", \"start_date\": \"YYYY-MM-DD or null\", \"end_date\": \"YYYY-MM-DD or null\" }. Otherwise null.",
   "summary": "1-2 sentence summary of what this email contains",
+  "intent": "action_required | reminder | appointment | receipt | statement | marketing | informational | unknown",
+  "suggestedTasks": "Array (0-3) of follow-up work this email implies. Each: { \"title\": \"action-first <= 8 words\", \"dueDate\": \"YYYY-MM-DD or null\", \"urgency\": \"soon | routine | informational\", \"reason\": \"short evidence sentence\" }. [] if no future action.",
   "familyCategory": "school | events | medical | activities | travel | personal | other — only if type is family, otherwise null",
   "familyMemberName": "name of the family member this relates to, or null",
   "eventDate": "ISO 8601 datetime of the FIRST event/appointment/deadline if one is mentioned (e.g. '2026-03-29T13:00:00'), or null. Extract from the forwarded content, not the forward date.",
@@ -947,7 +1016,7 @@ Respond with ONLY valid JSON:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1024,
+        max_tokens: 1536,
         messages: classMessages,
       }),
     });
@@ -2005,6 +2074,71 @@ Respond with ONLY valid JSON:
       }
     }
 
+    // --- STEP 2.7: FOLLOW-UP TASKS (intent → auto-add or ask) ---
+    // The heart of the July 2026 upgrade. The classifier extracted
+    // suggestedTasks — the follow-up work this email implies. Policy:
+    //   • NO document filed (pure reminder / appointment / service-due
+    //     email) → AUTO-ADD the tasks (Tom's rule: "if it's just reminders
+    //     we auto add those too if there is no document"). Surface an
+    //     informational "we added N reminders" item the user can undo.
+    //   • A document WAS filed (invoice, inspection report, etc.) → ASK.
+    //     Stash the same suggestions in metadata.suggested_tasks and render
+    //     a "we spotted N follow-ups — add them?" review card. Nothing is
+    //     created until the homeowner taps Add.
+    // Quote / insurance-claim flows own their own richer review UI, so we
+    // never auto-fire tasks for them here.
+    const rawSuggested = Array.isArray((classification as any).suggestedTasks)
+      ? (classification as any).suggestedTasks as Array<Record<string, unknown>>
+      : [];
+    const normalizedFollowups: SuggestedTask[] = rawSuggested
+      .filter((t) => t && typeof t.title === "string" && (t.title as string).trim().length > 0)
+      .slice(0, 3)
+      .map((t) => ({
+        title: (t.title as string).trim(),
+        due_date: (t.dueDate as string) || null,
+        urgency: (t.urgency as string) || "routine",
+        reason: (t.reason as string) || null,
+        category: matchedContractor?.category || null,
+        // When a known vendor sent this, the follow-up is a coordination
+        // item with them; otherwise leave routing to the reconciler default.
+        needs_vendor: matchedContractor ? false : null,
+      }));
+
+    const suppressFollowupsForType = classification.type === "contractor_quote"
+      || classification.type === "insurance_claim";
+    const taskPropertyId: string | null = property?.id ?? null;
+    let autoAddedTasks: Array<{ id: string; title: string }> = [];
+    let askFollowups: SuggestedTask[] = [];
+
+    if (normalizedFollowups.length > 0 && !suppressFollowupsForType) {
+      const isPureReminder = !createdDocumentId && !createdProjectId;
+      if (isPureReminder && taskPropertyId) {
+        // AUTO-ADD path. Dedup lives in the shared helper (same title within
+        // ±21 days) so a vendor re-sending the same "your service is due"
+        // note never stacks duplicate tasks.
+        try {
+          const res = await createTasksFromSuggestions(supabase, {
+            householdId,
+            propertyId: taskPropertyId,
+            contractorId: matchedContractor?.id ?? null,
+            source: "email_reminder",
+            suggestions: normalizedFollowups,
+          });
+          autoAddedTasks = res.created;
+          if (res.created.length > 0) actions.push(`auto_added_tasks:${res.created.length}`);
+          if (res.skippedDuplicates.length > 0) actions.push(`followup_duplicates_skipped:${res.skippedDuplicates.length}`);
+        } catch (taskErr) {
+          console.error("[receive-email] auto-add tasks failed (non-blocking):", taskErr);
+          // Fall back to asking so the work isn't silently lost.
+          askFollowups = normalizedFollowups;
+        }
+      } else {
+        // ASK path — a document was filed, or we couldn't resolve a property.
+        askFollowups = normalizedFollowups;
+        actions.push(`followups_pending:${normalizedFollowups.length}`);
+      }
+    }
+
     // --- STEP 3: CREATE INBOX ITEMS (smart prompts + notifications) ---
     // We create the main notification PLUS any confirmation prompts needed.
     {
@@ -2024,6 +2158,17 @@ Respond with ONLY valid JSON:
         // Phase 101 — quote intelligence (suggested_project /
         // specialty_system_suggestion / fair_market), empty for non-quotes.
         ...quoteIntel,
+        // July 2026 — follow-up tasks (ask path) + sender→vendor attribution.
+        ...(askFollowups.length > 0 ? { suggested_tasks: askFollowups } : {}),
+        ...(autoAddedTasks.length > 0 ? { auto_added_tasks: autoAddedTasks } : {}),
+        ...(matchedContractor ? {
+          matched_contractor: {
+            id: matchedContractor.id,
+            name: matchedContractor.company_name,
+            category: matchedContractor.category,
+          },
+        } : {}),
+        intent: (classification as any).intent || null,
         ...(analysisWasSkipped ? {
           analysis_skipped: true,
           analysis_skip_reason: `Unsupported file format (${skippedExt}). Document saved but could not be analyzed automatically.`,
@@ -2244,6 +2389,28 @@ Respond with ONLY valid JSON:
         }
       }
 
+      // July 2026 — auto-added reminders replace the weak "Email received"
+      // catch-all item when nothing more specific claimed the notification.
+      // The homeowner sees "Added N reminders" (with vendor attribution)
+      // instead of a generic FYI they'd ignore.
+      if (autoAddedTasks.length > 0 && !mainActionType && !createdDocumentId) {
+        mainType = "tasks_auto_added";
+        mainNeedsAction = false;
+        const vendorPrefix = matchedContractor ? `from ${matchedContractor.company_name} ` : "";
+        mainTitle = autoAddedTasks.length === 1
+          ? `Added a reminder ${vendorPrefix}${matchedContractor ? "" : ""}`.trim()
+          : `Added ${autoAddedTasks.length} reminders ${vendorPrefix}`.trim();
+        if (autoAddedTasks.length === 1) {
+          mainTitle = `Added: ${autoAddedTasks[0].title}`;
+        }
+      }
+
+      // Vendor attribution — when a known contractor sent this, say so.
+      if (matchedContractor && mainType !== "tasks_auto_added"
+          && !mainTitle.toLowerCase().includes(matchedContractor.company_name.toLowerCase())) {
+        baseMetadata.matched_contractor_name = matchedContractor.company_name;
+      }
+
       // Insert the final inbox item FIRST, then delete placeholder only on success
       const { error: inboxInsertErr } = await supabase.from("inbox_items").insert({
         household_id: householdId,
@@ -2253,7 +2420,7 @@ Respond with ONLY valid JSON:
         from_email: fromAddress,
         related_project_id: createdProjectId,
         related_document_id: createdDocumentId,
-        related_contractor_id: createdContractorId,
+        related_contractor_id: createdContractorId ?? matchedContractor?.id ?? null,
         needs_action: mainNeedsAction,
         action_type: mainActionType,
         attachment_path: attachmentStoragePath,
@@ -2290,6 +2457,41 @@ Respond with ONLY valid JSON:
         // Delete the processing placeholder now that the real item exists
         if (placeholderId) {
           await supabase.from("inbox_items").delete().eq("id", placeholderId);
+        }
+
+        // July 2026 — ASK path: a document was filed and it implies follow-up
+        // work. Insert a SEPARATE "we spotted N follow-ups" review item so the
+        // document's own confirm-category prompt stays clean. One tap in the
+        // app ("Add these") runs process-inbox-item action=add_suggested_tasks,
+        // which creates the tasks with the same dedup guard.
+        if (askFollowups.length > 0) {
+          const vendorLabel = matchedContractor?.company_name || classification.vendorName || null;
+          const followTitle = askFollowups.length === 1
+            ? `Follow-up spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
+            : `${askFollowups.length} follow-ups spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`;
+          const { error: followErr } = await supabase.from("inbox_items").insert({
+            household_id: householdId,
+            type: "follow_ups",
+            title: followTitle,
+            summary: askFollowups.map((t) => `• ${t.title}`).join("\n"),
+            from_email: fromAddress,
+            related_document_id: createdDocumentId,
+            related_contractor_id: createdContractorId ?? matchedContractor?.id ?? null,
+            needs_action: true,
+            action_type: "review_followups",
+            email_hash: emailHash,
+            metadata: {
+              suggested_tasks: askFollowups,
+              source_document_id: createdDocumentId,
+              ...(matchedContractor ? { matched_contractor: { id: matchedContractor.id, name: matchedContractor.company_name, category: matchedContractor.category } } : {}),
+            },
+            status: "ready",
+          });
+          if (followErr) {
+            console.error("[receive-email] follow-up review item insert failed:", followErr);
+          } else {
+            actions.push(`followup_review_item_created:${askFollowups.length}`);
+          }
         }
 
         // --- MULTI-EVENT EXTRACTION ---

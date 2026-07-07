@@ -195,9 +195,55 @@ struct InboxItemCard: View {
             duplicateResolutionArea
         } else if item.actionType == "confirm_vehicle_document" || item.actionType == "review_vehicle_invoice" {
             vehicleDocumentActionArea
+        } else if item.actionType == "review_followups" {
+            followupsActionArea
         } else {
             standardActionArea
         }
+    }
+
+    // MARK: - Follow-up tasks (July 2026)
+
+    /// Compact "we spotted N follow-ups" card. One tap adds them all; the
+    /// full list + per-task evidence lives in the detail view.
+    private var followupsActionArea: some View {
+        let tasks = item.metadata?.suggestedTasks ?? []
+        return VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            ForEach(tasks.prefix(3)) { task in
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "checklist")
+                        .font(.system(size: 11))
+                        .foregroundStyle(HavenColors.action)
+                        .padding(.top, 1)
+                    Text(task.title)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
+                }
+            }
+            HStack(spacing: HavenTheme.spacing8) {
+                HavenButton(
+                    title: tasks.count == 1 ? "Add it" : "Add all \(tasks.count)",
+                    action: {
+                        Haptics.medium()
+                        onProcess(nil, "add_suggested_tasks", nil, nil, nil)
+                    },
+                    icon: "plus.circle.fill"
+                )
+                Button {
+                    Haptics.light()
+                    onProcess(nil, "dismiss", nil, nil, nil)
+                } label: {
+                    Text("No thanks")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .padding(HavenTheme.spacing8)
+        .background(HavenColors.action.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
     }
 
     // MARK: - Confirm Project Match

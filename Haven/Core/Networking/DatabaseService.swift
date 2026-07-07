@@ -4160,6 +4160,43 @@ final class DatabaseService {
         let fairMarket: FairMarketHint?
         let warranty: WarrantyHint?
         let specialtySystemSuggestion: InboxSpecialtySuggestion?
+        /// July 2026 — follow-up tasks the email/document implies. Present on
+        /// `review_followups` items (ask path); the homeowner taps "Add these"
+        /// to create them. Also present as `autoAddedTasks` on
+        /// `tasks_auto_added` informational items (already created).
+        let suggestedTasks: [SuggestedTaskHint]?
+        let autoAddedTasks: [AutoAddedTask]?
+        let matchedContractorName: String?
+
+        struct SuggestedTaskHint: Decodable, Identifiable, Hashable {
+            let title: String
+            let dueDate: String?
+            let urgency: String?
+            let reason: String?
+            var id: String { title }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+                dueDate = try? c.decodeIfPresent(String.self, forKey: .dueDate)
+                urgency = try? c.decodeIfPresent(String.self, forKey: .urgency)
+                reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+            }
+            enum CodingKeys: String, CodingKey {
+                case title, urgency, reason
+                case dueDate = "due_date"
+            }
+        }
+
+        struct AutoAddedTask: Decodable, Identifiable, Hashable {
+            let id: String
+            let title: String
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+                title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+            }
+            enum CodingKeys: String, CodingKey { case id, title }
+        }
 
         struct SuggestedProjectInfo: Decodable {
             let id: String?
@@ -4257,6 +4294,9 @@ final class DatabaseService {
             case suggestedProject = "suggested_project"
             case fairMarket = "fair_market"
             case specialtySystemSuggestion = "specialty_system_suggestion"
+            case suggestedTasks = "suggested_tasks"
+            case autoAddedTasks = "auto_added_tasks"
+            case matchedContractorName = "matched_contractor_name"
         }
 
         var chezRequestIdAsUUID: UUID? {
@@ -4307,6 +4347,9 @@ final class DatabaseService {
             fairMarket = try? c.decodeIfPresent(FairMarketHint.self, forKey: .fairMarket)
             warranty = try? c.decodeIfPresent(WarrantyHint.self, forKey: .warranty)
             specialtySystemSuggestion = try? c.decodeIfPresent(InboxSpecialtySuggestion.self, forKey: .specialtySystemSuggestion)
+            suggestedTasks = try? c.decodeIfPresent([SuggestedTaskHint].self, forKey: .suggestedTasks)
+            autoAddedTasks = try? c.decodeIfPresent([AutoAddedTask].self, forKey: .autoAddedTasks)
+            matchedContractorName = try? c.decodeIfPresent(String.self, forKey: .matchedContractorName)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
                 vendorName = try? classContainer.decodeIfPresent(String.self, forKey: .vendorName)

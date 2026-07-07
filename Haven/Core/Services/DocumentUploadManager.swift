@@ -317,24 +317,31 @@ final class DocumentUploadManager: ObservableObject {
                 }
             }
 
-            // Route quotes / invoices / vehicle docs into the inbox so the
-            // user gets a needs-action prompt. The mapping lives in
+            // Route the uploaded doc into the inbox so the user gets a
+            // needs-action prompt. The mapping lives in
             // `InboxItemFromDocument` so the foreground upload path
             // (`DocumentUploadViewModel`) and this background path stay
             // in sync. Errors no longer get swallowed by `try?` — silent
             // failures here are how the Property-tab upload bug shipped.
-            do {
-                try await InboxItemFromDocument.create(
-                    householdId: householdId,
-                    documentId: doc.id,
-                    title: aiTitle,
-                    attachmentFilename: item.fileName,
-                    categoryValue: categoryValue,
-                    analysisSummary: analysis.summary,
-                    db: db
-                )
-            } catch {
-                print("[UploadManager] inbox routing failed for \(item.fileName): \(error)")
+            //
+            // July 2026 — "always ask unless uploaded within a project":
+            // suppress the ask when this upload has a project context. The
+            // doc is already being linked to the project (line ~201), so a
+            // separate inbox prompt would be redundant noise.
+            if item.projectId == nil {
+                do {
+                    try await InboxItemFromDocument.create(
+                        householdId: householdId,
+                        documentId: doc.id,
+                        title: aiTitle,
+                        attachmentFilename: item.fileName,
+                        categoryValue: categoryValue,
+                        analysisSummary: analysis.summary,
+                        db: db
+                    )
+                } catch {
+                    print("[UploadManager] inbox routing failed for \(item.fileName): \(error)")
+                }
             }
 
         } catch {
