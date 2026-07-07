@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
+import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,6 +57,38 @@ serve(async (req: Request) => {
     console.log(`[process-invoice] doc=${document_id} ${isVehicleInvoice ? `vehicle=${vehicle_id}` : `property=${property_id}`} household=${household_id}`);
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // --- AUTH (July 2026 security sweep, audit S1) ---
+    // Previously unauthenticated: any caller with a document UUID could
+    // exfiltrate the full parsed invoice, and the vehicle branch would
+    // update mileage / complete tasks / write service records on any
+    // body-supplied vehicle_id. Internal callers (future auto-run from
+    // the email pipeline) use the shared secret; user callers must own
+    // every row they reference.
+    if (!requireInternal(req)) {
+      const auth = await requireHousehold(req);
+      if ("failure" in auth) return authFailure(auth, headers);
+      if (household_id !== auth.householdId) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: household mismatch" }),
+          { status: 403, headers }
+        );
+      }
+      const checks: Array<[string, string]> = [["documents", document_id]];
+      if (property_id) checks.push(["properties", property_id]);
+      if (vehicle_id) checks.push(["vehicles", vehicle_id]);
+      if (preferred_contractor_id) checks.push(["contractors", preferred_contractor_id]);
+      for (const [table, id] of checks) {
+        const { data: row } = await supabase
+          .from(table).select("household_id").eq("id", id).single();
+        if (!row || row.household_id !== auth.householdId) {
+          return new Response(
+            JSON.stringify({ error: `Access denied: ${table} row does not belong to your household` }),
+            { status: 403, headers }
+          );
+        }
+      }
+    }
 
     // --- FETCH DOCUMENT ---
     const [docResult, contentResult, contractorsResult] = await Promise.all([

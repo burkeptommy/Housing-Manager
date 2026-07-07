@@ -1728,6 +1728,7 @@ Respond with ONLY valid JSON:
                     headers: {
                       "Content-Type": "application/json",
                       "Authorization": `Bearer ${serviceRoleKey}`,
+                      "x-internal-secret": Deno.env.get("INTERNAL_FN_SECRET") ?? "",
                     },
                     body: JSON.stringify({
                       document_id: doc.id,
@@ -1820,6 +1821,7 @@ Respond with ONLY valid JSON:
                     headers: {
                       "Content-Type": "application/json",
                       "Authorization": `Bearer ${serviceRoleKey}`,
+              "x-internal-secret": Deno.env.get("INTERNAL_FN_SECRET") ?? "",
                     },
                     body: JSON.stringify({
                       document_id: doc.id,
@@ -1943,6 +1945,7 @@ Respond with ONLY valid JSON:
                     headers: {
                       "Content-Type": "application/json",
                       "Authorization": `Bearer ${serviceRoleKey}`,
+              "x-internal-secret": Deno.env.get("INTERNAL_FN_SECRET") ?? "",
                     },
                     body: JSON.stringify({
                       document_id: doc.id,

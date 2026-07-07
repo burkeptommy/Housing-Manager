@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
+import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,7 +112,39 @@ serve(async (req: Request) => {
 
     // --- PARSE REQUEST ---
     const body = await req.json();
-    const { document_id, text, image_base64, category, household_id, document_title } = body;
+    const { document_id, text, image_base64, category, document_title } = body;
+    let household_id = body.household_id as string | undefined;
+
+    // --- AUTH (July 2026 security sweep, audit S1) ---
+    // Previously unauthenticated: any caller could rewrite any document's
+    // category — and therefore its visible_to_home_managers flag — or
+    // poison its extracted text. Three accepted caller shapes:
+    //   1. Internal secret (receive-email / process-inbox-item / crons).
+    //   2. Legacy internal: Authorization bearing the service-role key
+    //      (what the in-repo callers send today — kept so deploy order
+    //      can't break the pipeline; callers migrate to the secret).
+    //   3. A household member's JWT — document ownership verified below.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const isLegacyInternal = serviceRoleKey.length > 0 && authHeader === `Bearer ${serviceRoleKey}`;
+    const isInternal = requireInternal(req) || isLegacyInternal;
+
+    if (!isInternal) {
+      const auth = await requireHousehold(req);
+      if ("failure" in auth) return authFailure(auth, headers);
+      // The caller's JWT household always wins over the body value.
+      household_id = auth.householdId;
+      if (document_id) {
+        const ownerCheck = createClient(supabaseUrl, serviceRoleKey);
+        const { data: docRow } = await ownerCheck
+          .from("documents").select("household_id").eq("id", document_id).single();
+        if (!docRow || docRow.household_id !== auth.householdId) {
+          return new Response(
+            JSON.stringify({ error: "Access denied: document does not belong to your household" }),
+            { status: 403, headers },
+          );
+        }
+      }
+    }
 
     if (!document_id || !household_id) {
       return new Response(JSON.stringify({ error: "Missing document_id or household_id" }), { status: 400, headers });

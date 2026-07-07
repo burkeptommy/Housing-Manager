@@ -10,6 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
 import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
 
 const corsHeaders = {
@@ -119,13 +120,29 @@ serve(async (req: Request) => {
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
-    // Verify auth
+    // --- AUTH (July 2026 security sweep, audit S2) ---
+    // The old check only verified an Authorization header EXISTED — any
+    // string passed, making this a push-spam/phishing vector to arbitrary
+    // user ids. Now: internal callers (other edge functions, crons)
+    // authenticate via the shared secret or the service-role bearer they
+    // already send; user-JWT callers are verified and their recipients
+    // restricted to their own household below.
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
         status: 401,
         headers,
       });
+    }
+    const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const isInternal = requireInternal(req) ||
+      (svcKey.length > 0 && authHeader === `Bearer ${svcKey}`);
+
+    let callerHouseholdId: string | null = null;
+    if (!isInternal) {
+      const auth = await requireHousehold(req);
+      if ("failure" in auth) return authFailure(auth, headers);
+      callerHouseholdId = auth.householdId;
     }
 
     // Check required secrets
@@ -153,11 +170,28 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // User-JWT callers may only push to members of their own household.
+    let allowedRecipients = recipient_user_ids;
+    if (callerHouseholdId) {
+      const { data: householdUsers } = await supabase
+        .from("users")
+        .select("id")
+        .eq("household_id", callerHouseholdId)
+        .in("id", recipient_user_ids);
+      allowedRecipients = (householdUsers ?? []).map((u: { id: string }) => u.id);
+      if (allowedRecipients.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: no recipients in your household" }),
+          { status: 403, headers }
+        );
+      }
+    }
+
     // Look up device tokens for all recipients
     const { data: tokens, error: tokenError } = await supabase
       .from("device_tokens")
       .select("token, user_id")
-      .in("user_id", recipient_user_ids);
+      .in("user_id", allowedRecipients);
 
     if (tokenError) {
       console.error("[Push] Token lookup error:", tokenError);
