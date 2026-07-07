@@ -1522,3 +1522,626 @@ button.svc-statchip--alert:hover {
 .svc-palette ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── Phase B: vendor engine + docked proposal builder ─────────────────────
+ * Composed by views/case/vendors.js and views/case/propose.js. Namespaces:
+ * svc-ve (engine card, brief, candidates, ledger form, manual add),
+ * svc-fitmeter (success-tier fill pattern; green is the only loud tier),
+ * svc-seg (outcome segmented control), svc-propose (docked panel).
+ * Purple stays reserved for primary CTAs + the active proposal chip. */
+
+.svc-ve {
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.svc-ve__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.svc-ve__title {
+  font-size: 14.5px;
+  font-weight: 650;
+  color: var(--svc-ink);
+}
+
+.svc-ve__sub {
+  font-size: 12px;
+  color: var(--svc-muted);
+  margin-top: 2px;
+}
+
+.svc-ve__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.svc-ve-thin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.svc-ve-thin__chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2.5px 9px;
+  background: var(--svc-amber-bg);
+  color: var(--svc-amber-fg);
+  white-space: nowrap;
+}
+
+/* Analysis brief */
+
+.svc-ve__brief {
+  border: 1px solid var(--svc-border);
+  border-radius: 10px;
+  background: var(--pearl);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.svc-ve__brief--empty {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.svc-ve__brief-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--svc-ink);
+}
+
+.svc-ve__summary {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--svc-ink);
+  line-height: 1.45;
+}
+
+.svc-ve__block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.svc-ve__prose {
+  font-size: 13px;
+  color: var(--svc-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.svc-ve__copy {
+  border: 1px solid var(--svc-border-strong);
+  background: var(--white);
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--svc-muted);
+  padding: 1px 9px;
+  margin-left: 6px;
+  cursor: pointer;
+  vertical-align: 1px;
+}
+
+.svc-ve__copy:hover {
+  background: var(--svc-hover);
+  color: var(--svc-ink);
+}
+
+.svc-ve__script {
+  font-size: 13px;
+  color: var(--svc-ink);
+  line-height: 1.55;
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-left: 3px solid var(--svc-border-strong);
+  border-radius: 8px;
+  padding: 9px 12px;
+  white-space: pre-wrap;
+}
+
+/* Candidate cards */
+
+.svc-ve__cands {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.svc-ve__nocands {
+  padding: 6px 2px;
+}
+
+.svc-ve-cand {
+  border: 1px solid var(--svc-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--white);
+}
+
+.svc-ve-cand.is-recommended {
+  border-color: #bfdccb;
+  background: #fbfdfc;
+}
+
+.svc-ve-cand__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.svc-ve-cand__rank {
+  flex: 0 0 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--pill-neutral-bg);
+  color: var(--svc-muted);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svc-ve-cand__id {
+  flex: 1;
+  min-width: 0;
+}
+
+.svc-ve-cand__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  color: var(--svc-ink);
+}
+
+.svc-ve-cand__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--svc-muted);
+}
+
+.svc-ve-cand__tel {
+  color: var(--svc-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.svc-ve-cand__tel:hover {
+  color: var(--svc-ink);
+}
+
+.svc-ve-cand__fit {
+  flex: 0 0 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.svc-ve-cand__fitnum {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--svc-muted);
+  white-space: nowrap;
+}
+
+.svc-fitmeter {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--neutral-200);
+  overflow: hidden;
+}
+
+.svc-fitmeter__fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.svc-fitmeter__fill--success {
+  background: var(--svc-green-fg);
+}
+
+.svc-fitmeter__fill--warning {
+  background: var(--svc-amber-fg);
+}
+
+.svc-fitmeter__fill--muted {
+  background: var(--neutral-400);
+}
+
+.svc-ve-cand__cta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.svc-ve-cand__notes {
+  font-size: 12.5px;
+  padding-left: 34px;
+}
+
+/* Source + stage chips */
+
+.svc-ve-src {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 1.5px 7px;
+  white-space: nowrap;
+}
+
+.svc-ve-src--existing {
+  background: var(--pill-neutral-bg);
+  color: var(--svc-ink);
+  border: 1px solid var(--svc-border-strong);
+}
+
+.svc-ve-src--places {
+  background: var(--pill-neutral-bg);
+  color: var(--pill-neutral-fg);
+}
+
+.svc-ve-src--manual {
+  background: transparent;
+  color: var(--pill-neutral-fg);
+  border: 1px dashed var(--svc-border-strong);
+}
+
+.svc-ve-stage {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 650;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.svc-ve-stage--muted {
+  background: var(--pill-neutral-bg);
+  color: var(--pill-neutral-fg);
+}
+
+.svc-ve-stage--neutral {
+  background: var(--white);
+  color: var(--svc-ink);
+  border: 1px solid var(--svc-border-strong);
+}
+
+.svc-ve-stage--ok {
+  background: var(--svc-green-bg);
+  color: var(--svc-green-fg);
+}
+
+.svc-ve-stage--dark {
+  background: var(--svc-ink);
+  color: var(--white);
+}
+
+/* Call-ledger form */
+
+.svc-ve__form {
+  border-top: 1px solid var(--svc-border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.svc-ve__form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.svc-ve__form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--svc-muted);
+}
+
+.svc-seg {
+  display: inline-flex;
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.svc-seg__btn {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--svc-muted);
+  background: var(--white);
+  border: none;
+  border-right: 1px solid var(--svc-border);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.svc-seg__btn:last-child {
+  border-right: none;
+}
+
+.svc-seg__btn:hover {
+  background: var(--svc-hover);
+  color: var(--svc-ink);
+}
+
+.svc-seg__btn.is-on {
+  background: var(--svc-ink);
+  color: var(--white);
+}
+
+.svc-ve__form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+
+.svc-ve__form-costcol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* .svc-field sets display:flex, which outranks the UA [hidden] rule; the
+ * custom-cost row toggles via the hidden attribute, so pin it down. */
+.svc-ve__form [hidden] {
+  display: none !important;
+}
+
+.svc-ve__form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.svc-ve__recommend {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--svc-muted);
+  background: var(--white);
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 999px;
+  padding: 5px 13px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.svc-ve__recommend:hover {
+  background: var(--svc-hover);
+  color: var(--svc-ink);
+}
+
+.svc-ve__recommend.is-on {
+  background: var(--svc-green-bg);
+  border-color: #bfdccb;
+  color: var(--svc-green-fg);
+}
+
+/* Manual add */
+
+.svc-ve__addmanual {
+  align-self: flex-start;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--svc-muted);
+  background: transparent;
+  border: 1px dashed var(--svc-border-strong);
+  border-radius: 10px;
+  padding: 7px 13px;
+  cursor: pointer;
+}
+
+.svc-ve__addmanual:hover {
+  color: var(--svc-ink);
+  background: var(--svc-hover);
+}
+
+.svc-ve__manual {
+  border: 1px solid var(--svc-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--pearl);
+}
+
+.svc-ve__manual-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr;
+  gap: 10px;
+}
+
+.svc-ve__manual-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Docked proposal builder (top of the thread zone) */
+
+.svc-propose {
+  background: var(--white);
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 12px;
+  padding: 14px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow);
+  animation: svc-propose-in 0.22s ease;
+  transform-origin: top center;
+}
+
+@keyframes svc-propose-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.svc-propose__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.svc-propose__title {
+  font-size: 14.5px;
+  font-weight: 650;
+  color: var(--svc-ink);
+}
+
+.svc-propose__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.svc-propose__chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 999px;
+  background: var(--white);
+  overflow: hidden;
+}
+
+.svc-propose__chip.is-active {
+  border-color: var(--purple);
+  background: var(--purple-pale);
+}
+
+.svc-propose__chip.is-excluded {
+  opacity: 0.5;
+}
+
+.svc-propose__chipname {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--svc-muted);
+  background: transparent;
+  border: none;
+  padding: 5px 4px 5px 12px;
+  cursor: pointer;
+}
+
+.svc-propose__chip.is-active .svc-propose__chipname {
+  color: var(--purple);
+}
+
+.svc-propose__chipx {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--svc-soft);
+  background: transparent;
+  border: none;
+  padding: 5px 9px 5px 4px;
+  cursor: pointer;
+}
+
+.svc-propose__chipx:hover {
+  color: var(--svc-ink);
+}
+
+.svc-propose__labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.svc-propose__polish {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--svc-muted);
+  background: var(--white);
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 999px;
+  padding: 3px 11px;
+  cursor: pointer;
+}
+
+.svc-propose__polish:hover {
+  background: var(--svc-hover);
+  color: var(--svc-ink);
+}
+
+.svc-propose__polish:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.svc-propose__grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 12px 14px;
+}
+
+.svc-propose__slots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.svc-propose__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--svc-border);
+  padding-top: 12px;
+}

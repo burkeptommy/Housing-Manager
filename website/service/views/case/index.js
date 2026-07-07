@@ -43,10 +43,22 @@ import {
   renderAlfredZone, handleAlfredInput, handleAlfredKeydown,
   sendFromInput, askAlfred, clearAlfredChat, resetAlfredFor, scrollAlfredToBottom,
 } from "./alfred.js";
+import {
+  renderVendorsZone, syncVendorsFromBundle, resetVendorsFor,
+  handleVendorsInput, handleVendorsFocusout, flushVendorDrafts,
+  toggleCandidateForm, setOutcome, toggleRecommended, runAnalysis,
+  copyCallScript, openManualForm, cancelManualForm, saveManualCandidate,
+  askForBudgetAndTiming, sendableRecommendedKeys,
+} from "./vendors.js";
+import {
+  renderProposeZone, resetProposeFor, openProposeFor, closePropose,
+  activateChip, removeChip, polishFraming, sendProposals, handleProposeInput,
+} from "./propose.js";
 
 const ZONES = [
   "case-queue-head", "case-queue-list", "case-topbar",
-  "case-workorder", "case-thread", "case-composer", "case-alfred",
+  "case-workorder", "case-vendors", "case-propose",
+  "case-thread", "case-composer", "case-alfred",
 ];
 
 const QUEUE_FILTERS = [
@@ -294,6 +306,9 @@ async function loadBundle(requestId, { showErrors = true } = {}) {
 
     if (bundle && bundle.request) bundle.request.unread_for_admin = false;
     setState({ cases: { ...state.cases, [requestId]: bundle } });
+    // Vendor engine: hydrate the call-ledger form model from the bundle's
+    // vendor_calls rows (drafts included; local unsaved edits win).
+    syncVendorsFromBundle(requestId, bundle);
 
     const row = queueRows().find((r) => r.id === requestId);
     if (row && row.unread_for_admin) row.unread_for_admin = false;
@@ -354,7 +369,41 @@ const ACTIONS = {
   "alfred-send": () => { sendFromInput(); },
   "alfred-suggest": (el) => { askAlfred(el.dataset.q || ""); },
   "alfred-clear": () => { clearAlfredChat(); },
+
+  // Vendor engine (Phase B). Candidate-scoped actions resolve their key
+  // from the enclosing [data-ve-key] card.
+  "ve-run-analysis": () => { runAnalysis(); },
+  "ve-refresh-analysis": () => { runAnalysis({ force: true }); },
+  "ve-copy-script": (el) => { copyCallScript(el); },
+  "ve-toggle-form": (el) => { toggleCandidateForm(veKey(el)); },
+  "ve-outcome": (el) => { setOutcome(veKey(el), el.dataset.outcome); },
+  "ve-recommend": (el) => { toggleRecommended(veKey(el)); },
+  "ve-propose": (el) => {
+    const key = veKey(el);
+    if (currentId && key) openProposeFor(currentId, [key]);
+  },
+  "ve-send-recommended": () => {
+    if (!currentId) return;
+    const keys = sendableRecommendedKeys(currentId);
+    if (keys.length > 0) openProposeFor(currentId, keys);
+  },
+  "ve-add-manual": () => { openManualForm(); },
+  "ve-manual-save": () => { saveManualCandidate(); },
+  "ve-manual-cancel": () => { cancelManualForm(); },
+  "ve-thin-ask": () => { askForBudgetAndTiming(); },
+
+  // Docked proposal builder.
+  "propose-chip": (el) => { activateChip(el.dataset.key); },
+  "propose-chip-remove": (el) => { removeChip(el.dataset.key); },
+  "propose-polish": () => { polishFraming(); },
+  "propose-send": () => { sendProposals(); },
+  "propose-close": () => { closePropose(); },
 };
+
+function veKey(el) {
+  const card = el.closest("[data-ve-key]");
+  return card ? card.getAttribute("data-ve-key") : null;
+}
 
 // ---------------------------------------------------------------------------
 // Delegated input / keydown wiring (attached to the shell, which is
@@ -377,6 +426,15 @@ function onShellInput(e) {
   }
   handleComposerInput(target);
   handleAlfredInput(target);
+  handleVendorsInput(target);
+  handleProposeInput(target);
+}
+
+/// Vendor call-ledger rows persist on blur (draft: true, single-row batch).
+function onShellFocusout(e) {
+  const target = e.target;
+  if (!(target instanceof Element)) return;
+  handleVendorsFocusout(target);
 }
 
 function onShellKeydown(e) {
@@ -429,7 +487,10 @@ function shortcutMap() {
 }
 
 function onVisibilityChange() {
-  if (document.visibilityState === "hidden") flushCaseEvents();
+  if (document.visibilityState === "hidden") {
+    flushVendorDrafts();
+    flushCaseEvents();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -461,6 +522,8 @@ function scaffoldHtml() {
       <div data-zone="case-topbar"></div>
       <div class="svc-scroll svc-case-scroll" data-svc-thread-scroll>
         <div data-zone="case-workorder"></div>
+        <div data-zone="case-vendors"></div>
+        <div data-zone="case-propose"></div>
         <div data-zone="case-thread"></div>
       </div>
       <div data-zone="case-composer"></div>
@@ -475,6 +538,8 @@ function registerZones() {
   zone("case-queue-list", byName("case-queue-list"), renderQueueListZone);
   zone("case-topbar", byName("case-topbar"), renderTopbarZone);
   zone("case-workorder", byName("case-workorder"), renderWorkOrderZone);
+  zone("case-vendors", byName("case-vendors"), renderVendorsZone);
+  zone("case-propose", byName("case-propose"), renderProposeZone);
   zone("case-thread", byName("case-thread"), renderThreadZone);
   zone("case-composer", byName("case-composer"), renderComposerZone);
   zone("case-alfred", byName("case-alfred"), renderAlfredZone);
@@ -493,6 +558,7 @@ function mountShell() {
   disposeKeys = bindShortcuts(shortcutMap());
   shellEl.addEventListener("input", onShellInput);
   shellEl.addEventListener("keydown", onShellKeydown);
+  shellEl.addEventListener("focusout", onShellFocusout);
   document.addEventListener("visibilitychange", onVisibilityChange);
   cleanupFns.push(() => document.removeEventListener("visibilitychange", onVisibilityChange));
 
@@ -549,9 +615,11 @@ export async function enter(arg) {
   }
 
   // Switching cases (or entering fresh) while mounted: persist the
-  // outgoing draft, then rebuild the shell so listeners never stack.
+  // outgoing draft + any pending vendor-ledger rows, then rebuild the
+  // shell so listeners never stack.
   if (mounted) {
     if (currentId) flushDraft(currentId);
+    flushVendorDrafts();
     teardown();
   }
 
@@ -560,6 +628,8 @@ export async function enter(arg) {
   queueCursor = requestId || filteredQueue()[0]?.id || null;
   resetComposerFor();
   resetAlfredFor();
+  resetVendorsFor();
+  resetProposeFor();
   mountShell();
 
   if (!requestId) {
@@ -579,6 +649,7 @@ export async function enter(arg) {
 
 export function leave() {
   if (currentId) flushDraft(currentId);
+  flushVendorDrafts();
   trackCaseFocus(null);
   flushCaseEvents();
   teardown();
