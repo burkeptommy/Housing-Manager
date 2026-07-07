@@ -56,6 +56,18 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
+import {
+  attachSnapshotToRequest,
+  buildDelegationSnapshot,
+  inferSnapshotKindFromContext,
+  isSnapshotKind,
+  SnapshotAuthError,
+  snapshotDigest,
+  snapshotReadiness,
+  suggestedBudgetFor,
+  type DelegationSnapshot,
+  type SnapshotKind,
+} from "./snapshot.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -380,12 +392,37 @@ async function handleSubmit(
     console.error("[chez-concierge] submit message failed:", msgErr);
   }
 
+  // Wave 1 — server-assembled delegation snapshot. iOS entry points pass
+  // entity ids in `context`; the server assembles the full household
+  // truth (system details, warranties, service history, cost references)
+  // so the operator and the AI brief act without follow-up questions.
+  // Best-effort: a snapshot failure never sinks the submit. Runs BEFORE
+  // the playbook so runAnalysisCore sees the attached snapshot.
+  const requestId = (request as ConciergeRequestRow).id;
+  let submitDigest = "";
+  try {
+    const inferred = inferSnapshotKindFromContext(
+      (payload.context ?? {}) as Record<string, unknown>
+    );
+    const snapshot = await buildDelegationSnapshot(service, {
+      kind: inferred?.kind ?? "general",
+      entityId: inferred?.entityId,
+      householdId,
+      propertyId: inferred?.propertyId,
+    });
+    if (snapshot) {
+      await attachSnapshotToRequest(service, requestId, snapshot);
+      submitDigest = snapshotDigest(snapshot);
+    }
+  } catch (e) {
+    console.warn("[snapshot] submit build failed:", e);
+  }
+
   // Phase 86D — kick off the category playbook. Each playbook drops a
   // first-touch system message in the thread ("Chez is on it…") and
   // optionally fires server-side work (AI research, follow-up reminders).
   // Best-effort: failure here doesn't sink the submit. Runs in parallel
   // with the admin notification fan-out below.
-  const requestId = (request as ConciergeRequestRow).id;
   const playbookPromise = runChezPlaybookForRequest({
     service,
     user,
@@ -411,12 +448,12 @@ async function handleSubmit(
     sendAdminEmail(
       adminEmails(),
       `[Chez] New ${category}: ${summary.slice(0, 60)}`,
-      `${emailIntro}\n\nRequest body:\n${description}\n\nOpen the portal:\n${portalUrl}`,
+      `${emailIntro}\n\nRequest body:\n${description}${submitDigest ? `\n\n${submitDigest}` : ""}\n\nOpen the portal:\n${portalUrl}`,
       emailBody({
         preview: `New Chez request: ${summary}`,
         heading: "New Chez request",
         intro: emailIntro,
-        bodyText: description,
+        bodyText: submitDigest ? `${description}\n\n${submitDigest}` : description,
         ctaLabel: "Open in admin portal",
         ctaUrl: portalUrl,
       })
@@ -1242,13 +1279,31 @@ async function handleDelegateRoutine(
       .single();
     if (req) {
       const r = req as { id: string };
+
+      // Wave 1 — server-assembled snapshot: full routine cadence,
+      // linked vendor + history, cost references. Best-effort.
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: "routine",
+          entityId: routineId,
+          householdId,
+        });
+        if (snapshot) {
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn("[snapshot] delegate_routine build failed:", e);
+      }
+
       // System message in the new thread.
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        content: `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
 
@@ -1277,12 +1332,12 @@ async function handleDelegateRoutine(
         sendAdminEmail(
           adminEmails(),
           `[Chez] New standing engagement: ${(routine as { label: string }).label}`,
-          `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.\n\n${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
           emailBody({
             preview: "Customer handed off a recurring routine to Chez.",
             heading: "New standing engagement",
             intro: `The customer wants Chez to own scheduling for "${(routine as { label: string }).label}" from now on.`,
-            bodyText: payload.notes ?? "(no additional notes)",
+            bodyText: `${payload.notes ?? "(no additional notes)"}${digest ? `\n\n${digest}` : ""}`,
             ctaLabel: "Open in admin portal",
             ctaUrl: adminPortalUrl(r.id),
           })
@@ -1355,12 +1410,30 @@ async function handleDelegateContractor(
       .single();
     if (req) {
       const r = req as { id: string };
+
+      // Wave 1 — server-assembled snapshot: vendor contact details,
+      // per-vendor service history + stats, cost references. Best-effort.
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: "contractor",
+          entityId: contractorId,
+          householdId,
+        });
+        if (snapshot) {
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn("[snapshot] delegate_contractor build failed:", e);
+      }
+
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `Customer set Chez as point of contact for ${c.company_name}. From now on, you handle scheduling and follow-ups directly with this vendor.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        content: `Customer set Chez as point of contact for ${c.company_name}. From now on, you handle scheduling and follow-ups directly with this vendor.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
 
@@ -1387,12 +1460,12 @@ async function handleDelegateContractor(
         sendAdminEmail(
           adminEmails(),
           `[Chez] New standing engagement: ${c.company_name}`,
-          `Customer set Chez as point of contact for ${c.company_name}.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          `Customer set Chez as point of contact for ${c.company_name}.\n\n${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
           emailBody({
             preview: `Customer made Chez point of contact for ${c.company_name}.`,
             heading: "New standing engagement",
             intro: `The customer wants Chez to be point of contact for ${c.company_name} from now on.`,
-            bodyText: payload.notes ?? "(no additional notes)",
+            bodyText: `${payload.notes ?? "(no additional notes)"}${digest ? `\n\n${digest}` : ""}`,
             ctaLabel: "Open in admin portal",
             ctaUrl: adminPortalUrl(r.id),
           })
@@ -1535,6 +1608,25 @@ async function handleDelegateTask(
     })
     .eq("id", taskId);
 
+  // Wave 1 — server-assembled snapshot: the linked system's full
+  // details (make/model/warranties), service history, vendor history,
+  // cost references. Best-effort; runs before the playbook fires so
+  // runAnalysisCore sees it.
+  let taskDigest = "";
+  try {
+    const snapshot = await buildDelegationSnapshot(service, {
+      kind: "task",
+      entityId: taskId,
+      householdId,
+    });
+    if (snapshot) {
+      await attachSnapshotToRequest(service, r.id, snapshot);
+      taskDigest = snapshotDigest(snapshot);
+    }
+  } catch (e) {
+    console.warn("[snapshot] delegate_task build failed:", e);
+  }
+
   // System message: explicit + actionable so Chez knows the routing.
   const description = task.description?.trim() ?? "";
   const customerNotes = payload.notes?.trim() ?? "";
@@ -1547,6 +1639,7 @@ async function handleDelegateTask(
   }
   if (description) systemBody += `\n\nWhat the task involves:\n${description}`;
   if (customerNotes) systemBody += `\n\nCustomer notes:\n${customerNotes}`;
+  if (taskDigest) systemBody += `\n\n${taskDigest}`;
 
   await service.from("concierge_messages").insert({
     household_id: householdId,
@@ -1594,7 +1687,7 @@ async function handleDelegateTask(
         intro: hasVendor
           ? `Customer delegated this task to Chez. Vendor on file: ${vendorRow?.company_name ?? "unknown"}.`
           : "Customer asked Chez to find a vendor for this task and own coordination end-to-end.",
-        bodyText: customerNotes || description || "(no additional notes)",
+        bodyText: `${customerNotes || description || "(no additional notes)"}${taskDigest ? `\n\n${taskDigest}` : ""}`,
         ctaLabel: "Open in admin portal",
         ctaUrl: adminPortalUrl(r.id),
       })
@@ -2163,6 +2256,54 @@ async function handleFetchDossier(
 }
 
 // ============================================================================
+// Wave 1 — Snapshot preview (composer v2's "What Chez already knows")
+// ============================================================================
+// Homeowner-callable dry run of the delegation snapshot. iOS renders the
+// returned snapshot as the pre-submit summary card, the readiness gaps as
+// amber inline hints, and the suggested budget as the pre-selected band.
+// Entity ownership is enforced inside the builder (SnapshotAuthError →
+// 403), so a caller can never preview another household's data.
+
+interface PreviewSnapshotPayload {
+  kind?: string;
+  entity_id?: string;
+  property_id?: string;
+  group?: string;
+  household_id?: string;   // admin-only pass-through (resolveHouseholdId)
+}
+
+async function handlePreviewSnapshot(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: PreviewSnapshotPayload
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const householdId = await resolveHouseholdId(service, user, payload.household_id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const kind = isSnapshotKind(payload.kind) ? payload.kind : "general";
+  try {
+    const snapshot = await buildDelegationSnapshot(service, {
+      kind,
+      entityId: compactString(payload.entity_id) || undefined,
+      householdId,
+      propertyId: compactString(payload.property_id) || undefined,
+      group: compactString(payload.group) || undefined,
+    });
+    if (!snapshot) return json({ error: "entity not found" }, 404);
+    return json({
+      snapshot,
+      readiness: snapshotReadiness(snapshot),
+      suggested_budget: suggestedBudgetFor(snapshot),
+    });
+  } catch (e) {
+    if (e instanceof SnapshotAuthError) return json({ error: "not authorized" }, 403);
+    console.error("[snapshot] preview failed:", e);
+    return json({ error: "snapshot failed" }, 500);
+  }
+}
+
+// ============================================================================
 // Phase 81 — AI framing helper for vendor proposals
 // ============================================================================
 // When Tom is proposing a vendor, he wants context-tailored framing —
@@ -2445,6 +2586,23 @@ async function runAnalysisCore(
       }
     }
 
+    // Wave 1 — the server-assembled delegation snapshot (when present)
+    // gives the analysis model numbers, warranty state, service history,
+    // and cost references it previously never saw. Rendered as the same
+    // compact digest the operator reads.
+    let snapshotBlock = "";
+    try {
+      const snap = (requestRow as Record<string, unknown>).snapshot;
+      if (snap && typeof snap === "object") {
+        const digest = snapshotDigest(snap as DelegationSnapshot);
+        if (digest) {
+          snapshotBlock = `\n## Delegation snapshot (server-assembled household truth)\n${digest}\n`;
+        }
+      }
+    } catch (e) {
+      console.warn("[analyze] snapshot digest failed (non-fatal):", e);
+    }
+
     const modeTask =
       mode === "coordinate_task"
         ? "The homeowner already has this vendor or task on file: the job is COORDINATION, not sourcing. The call_script should open a call to the homeowner's OWN vendor (warm, references the relationship), not a cold call."
@@ -2469,7 +2627,7 @@ async function runAnalysisCore(
 Category: ${request.category}
 Summary: ${request.summary}
 Context payload: ${JSON.stringify(request.context ?? {}, null, 2)}
-
+${snapshotBlock}
 ## Property
 ${propertyContext}
 
@@ -3273,12 +3431,34 @@ async function handleDelegateEntity(
     if (req) {
       const r = req as { id: string };
       const instruction = ENTITY_INSTRUCTION[entityType] ?? "Customer delegated this entity to Chez.";
+
+      // Wave 1 — server-assembled snapshot. Before this, delegate_entity
+      // sent an EMPTY context and the operator had to dig for everything.
+      // The entity_type maps 1:1 onto a snapshot kind; insurance gets the
+      // common household + property sections only (the policy lives as a
+      // JSONB key, not a row).
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: entityType as SnapshotKind,
+          entityId: entityType === "insurance" ? undefined : entityId,
+          householdId,
+          propertyId: compactString(payload.property_id || "") || undefined,
+        });
+        if (snapshot) {
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn(`[snapshot] delegate_entity (${entityType}) build failed:`, e);
+      }
+
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `${instruction}${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        content: `${instruction}${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
 
@@ -3310,12 +3490,12 @@ async function handleDelegateEntity(
         sendAdminEmail(
           adminEmails(),
           `[Chez] New standing engagement: ${labelForThread}`,
-          `${instruction}\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          `${instruction}\n\n${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
           emailBody({
             preview: `Customer handed off a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez.`,
             heading: "New standing engagement",
             intro: `The customer wants Chez to own management of "${labelForThread}" from now on.`,
-            bodyText: payload.notes ?? "(no additional notes)",
+            bodyText: `${payload.notes ?? "(no additional notes)"}${digest ? `\n\n${digest}` : ""}`,
             ctaLabel: "Open in admin portal",
             ctaUrl: adminPortalUrl(r.id),
           })
@@ -3707,12 +3887,31 @@ async function handleSetOwnershipGroup(
       .single();
     if (req) {
       const r = req as { id: string };
+
+      // Wave 1 — grouped snapshot: enumerates every entity in the
+      // category (labels, cadences, vendors, est monthly spend) so the
+      // operator sees exactly what was handed off, not just a count.
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: "group",
+          householdId,
+          group,
+        });
+        if (snapshot) {
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn("[snapshot] set_ownership_group build failed:", e);
+      }
+
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `Customer asked Chez to take over ${friendly[group] ?? group} (${backfillCount} item${backfillCount === 1 ? "" : "s"} now owned). New entries in this category will auto-delegate going forward.${payload.notes ? `\n\nNotes:\n${payload.notes}` : ""}`,
+        content: `Customer asked Chez to take over ${friendly[group] ?? group} (${backfillCount} item${backfillCount === 1 ? "" : "s"} now owned). New entries in this category will auto-delegate going forward.${payload.notes ? `\n\nNotes:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
       await sendPush(
@@ -3726,12 +3925,12 @@ async function handleSetOwnershipGroup(
       await sendAdminEmail(
         adminEmails(),
         `[Chez] New group delegation: ${friendly[group] ?? group}`,
-        `Customer flipped on ${friendly[group] ?? group}. ${backfillCount} existing items now owned by Chez.\n\n${adminPortalUrl(r.id)}`,
+        `Customer flipped on ${friendly[group] ?? group}. ${backfillCount} existing items now owned by Chez.${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
         emailBody({
           preview: `${backfillCount} ${friendly[group] ?? group} now Chez-owned.`,
           heading: "New group delegation",
           intro: `The customer wants Chez to own ${friendly[group] ?? group} from now on.`,
-          bodyText: `${backfillCount} existing items stamped owned. ${payload.notes ?? ""}`,
+          bodyText: `${backfillCount} existing items stamped owned. ${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}`,
           ctaLabel: "Open in admin portal",
           ctaUrl: adminPortalUrl(r.id),
         })
@@ -6734,6 +6933,15 @@ serve(async (req: Request) => {
           body as unknown as DelegateTaskPayload,
           supabaseUrl,
           serviceRoleKey
+        );
+
+      // Wave 1 — homeowner dry run of the delegation snapshot (composer
+      // v2 renders "What Chez already knows" + readiness + budget hint)
+      case "preview_snapshot":
+        return handlePreviewSnapshot(
+          service,
+          user,
+          body as unknown as PreviewSnapshotPayload
         );
 
       // Phase 80.1 — structured proposals (Chez proposes vendor / date /
