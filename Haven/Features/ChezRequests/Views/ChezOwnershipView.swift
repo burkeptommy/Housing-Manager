@@ -26,6 +26,12 @@ import SwiftUI
 struct ChezOwnershipView: View {
     @StateObject private var viewModel = ChezOwnershipViewModel()
     @Environment(\.dismiss) private var dismiss
+    /// Wave 4 — flipping a group toggle ON (server currently OFF) routes
+    /// through the delegation confirm sheet: one snapshot preview + one
+    /// intake for the whole category. Confirming commits that single
+    /// group immediately (matching ChezOwnsToggle's semantics); OFF flips
+    /// and the DIY / Full mode pills keep the staged Save-bar flow.
+    @State private var confirmingGroup: ChezOwnershipGroup?
 
     var body: some View {
         ScrollView {
@@ -68,6 +74,22 @@ struct ChezOwnershipView: View {
         // the workload preview before tapping Save.
         .onReceive(NotificationCenter.default.publisher(for: .triggerChezFullMode)) { _ in
             viewModel.stageFullMode()
+        }
+        // Wave 4 — group-mode delegation confirm sheet. One intake for
+        // the whole category; the snapshot enumerates what the handoff
+        // covers ("Blue Fox Lawn, Renata Cleaning, and 4 more").
+        .sheet(item: $confirmingGroup) { group in
+            ChezDelegationConfirmSheet(
+                target: ChezDelegationConfirmSheet.Target(
+                    kind: .group,
+                    group: group.rawValue,
+                    displayLabel: group.title,
+                    contextCaption: group.subtitle(isOn: false)
+                ),
+                onConfirm: { intake, notes in
+                    await viewModel.commitGroupDelegation(group, notes: notes, intake: intake)
+                }
+            )
         }
         .trackScreen("ChezOwnershipView")
     }
@@ -382,9 +404,18 @@ struct ChezOwnershipView: View {
             // local pending state only. The actual write happens on
             // Save. While `isSaving` is true we disable further flips
             // so the user can't restart pending mid-commit.
+            // Wave 4: a genuine new delegation (ON while the server says
+            // OFF) detours through the confirm sheet for the category
+            // intake; reverts and OFF flips stay staged.
             Toggle("", isOn: Binding(
                 get: { effective },
-                set: { _ in viewModel.toggleGroupLocally(group) }
+                set: { newVal in
+                    if newVal && !viewModel.isGroupOn(group) {
+                        confirmingGroup = group
+                    } else {
+                        viewModel.toggleGroupLocally(group)
+                    }
+                }
             ))
             .labelsHidden()
             .tint(HavenColors.action)
@@ -557,7 +588,9 @@ struct ChezOwnershipView: View {
 
 /// Phase 84 — eight categories the homeowner can flip on/off as a unit.
 /// Names match the keys in `households.chez_ownership_groups`.
-enum ChezOwnershipGroup: String, CaseIterable {
+enum ChezOwnershipGroup: String, CaseIterable, Identifiable {
+    var id: String { rawValue }
+
     case allRoutines = "all_routines"
     case allSystems = "all_systems"
     case allVendors = "all_vendors"
@@ -808,6 +841,36 @@ final class ChezOwnershipViewModel: ObservableObject {
     func discardPending() {
         pendingGroupToggles.removeAll()
         Haptics.light()
+    }
+
+    /// Wave 4 — commits a single group ON immediately from the delegation
+    /// confirm sheet, with the collected intake riding the
+    /// `set_ownership_group` payload. Bypasses the staged Save bar on
+    /// purpose: the confirm sheet IS the review step for a new
+    /// delegation, and matching ChezOwnsToggle's commit-on-confirm
+    /// semantics keeps every "Hand this to Chez" CTA truthful. Any other
+    /// staged (pending) toggles are left untouched.
+    func commitGroupDelegation(
+        _ group: ChezOwnershipGroup,
+        notes: String?,
+        intake: ChezDelegationIntake?
+    ) async -> Bool {
+        do {
+            _ = try await HavenSupabase.setChezOwnershipGroup(
+                group: group.rawValue,
+                on: true,
+                notes: notes,
+                intake: intake
+            )
+            pendingGroupToggles.removeValue(forKey: group)
+            NotificationCenter.default.post(name: .chezOwnershipGroupsChanged, object: nil)
+            NotificationCenter.default.post(name: .chezDelegationChanged, object: nil)
+            await load()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     /// Commit every pending group toggle in parallel. Clears pending

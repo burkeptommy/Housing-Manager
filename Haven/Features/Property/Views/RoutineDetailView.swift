@@ -27,6 +27,11 @@ struct RoutineDetailView: View {
     /// Phase 95 audit (Wave 5c) — drives the "Request a window" sheet
     /// for Chez-owned routines.
     @State private var showRequestSlotSheet = false
+    /// Wave 4 — drives the delegation confirm sheet (snapshot preview +
+    /// budget / urgency / windows intake) for non-owned routines. The
+    /// confirmed handoff flips `routines.chez_owned` via delegate_routine
+    /// instead of the old composer round-trip.
+    @State private var showDelegationConfirmSheet = false
 
     private let db = DatabaseService.shared
 
@@ -132,6 +137,51 @@ struct RoutineDetailView: View {
                     showRequestSlotSheet = false
                 }
             )
+        }
+        // Wave 4 — delegation confirm sheet. Shows what Chez already
+        // knows about this routine, collects the homeowner-only intake,
+        // then flips `chez_owned` with the intake riding along.
+        .sheet(isPresented: $showDelegationConfirmSheet) {
+            ChezDelegationConfirmSheet(
+                target: ChezDelegationConfirmSheet.Target(
+                    kind: .routine,
+                    entityId: routine.id.uuidString,
+                    propertyId: routine.propertyId?.uuidString,
+                    displayLabel: routine.presentationLabel,
+                    contextCaption: "Chez will own scheduling for this routine from now on."
+                ),
+                onConfirm: { intake, notes in
+                    await delegateRoutine(notes: notes, intake: intake)
+                }
+            )
+        }
+    }
+
+    /// Wave 4 — performs the routine handoff from the confirm sheet.
+    /// Same service call + notification fan-out as ChezOwnsToggle's
+    /// routine path so every surface refreshes identically.
+    @MainActor
+    private func delegateRoutine(notes: String?, intake: ChezDelegationIntake?) async -> Bool {
+        do {
+            try await HavenSupabase.delegateRoutineToChez(
+                routineId: routine.id,
+                delegated: true,
+                notes: notes,
+                intake: intake
+            )
+            Analytics.track(.chezDelegationToggled, [
+                "target": "routine",
+                "delegated": "true",
+                "had_notes": String(notes != nil),
+                "had_intake": String(intake != nil),
+            ])
+            NotificationCenter.default.post(name: .chezDelegationChanged, object: nil)
+            NotificationCenter.default.post(name: .chezRequestChanged, object: nil)
+            NotificationCenter.default.post(name: .routineChanged, object: nil)
+            await load()
+            return true
+        } catch {
+            return false
         }
     }
 
@@ -446,14 +496,21 @@ struct RoutineDetailView: View {
                     .tint(HavenColors.action)
                 }
 
-                ChezEntryButton(
-                    category: .coordinateTask,
-                    label: routine.chezOwned ? "Ask Chez about this routine" : "Have Chez handle this routine",
-                    caption: routine.chezOwned
-                        ? "Send notes or follow-up context for this standing routine."
-                        : "Chez coordinates scheduling, vendor follow-up, and reminders.",
-                    context: chezRoutineContext
-                )
+                if routine.chezOwned {
+                    ChezEntryButton(
+                        category: .coordinateTask,
+                        label: "Ask Chez about this routine",
+                        caption: "Send notes or follow-up context for this standing routine.",
+                        context: chezRoutineContext
+                    )
+                } else {
+                    // Wave 4 — direct handoff through the delegation
+                    // confirm sheet (snapshot + intake) instead of the
+                    // composer round-trip. The confirmed handoff flips
+                    // `chez_owned` so the routine lands on the standing
+                    // engagements surface, not just a one-off thread.
+                    chezHandoffButton
+                }
 
                 // Use HavenButton so Edit + Archive match the rest of
                 // the app's secondary / destructive button treatment
@@ -488,6 +545,52 @@ struct RoutineDetailView: View {
                 Text("Archiving \(routine.presentationLabel) hides its schedule and unlinks any vendor tasks. You can restore it later from the archived routines list.")
             }
         }
+    }
+
+    /// Wave 4 — mirrors ChezEntryButton's card treatment but presents
+    /// the delegation confirm sheet instead of posting the composer
+    /// notification. Copy matches the pre-Wave-4 entry so the surface
+    /// reads identically; only the destination changed.
+    private var chezHandoffButton: some View {
+        Button {
+            Haptics.light()
+            showDelegationConfirmSheet = true
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(HavenColors.action.opacity(0.14))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "person.fill.questionmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HavenColors.action)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Have Chez handle this routine")
+                        .font(HavenTypography.uiButton)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Chez coordinates scheduling, vendor follow-up, and reminders.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(HavenColors.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Row Builders

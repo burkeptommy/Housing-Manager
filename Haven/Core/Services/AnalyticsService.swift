@@ -648,6 +648,17 @@ enum AnalyticsEvent: String {
     case chezProfileSaved = "chez_profile_saved"
     case chezDelegationToggled = "chez_delegation_toggled"
     case chezProposalDecided = "chez_proposal_decided"
+    // Wave 4 — delegation composer v2
+    /// preview_snapshot rendered on a confirm sheet or the composer.
+    /// Payload: kind, source ("confirm_sheet" | "composer"),
+    /// has_suggested_budget.
+    case chezSnapshotPreviewShown = "chez_snapshot_preview_shown"
+    /// Homeowner picked a budget band on the intake form.
+    /// Payload: band, source.
+    case chezIntakeBudgetSelected = "chez_intake_budget_selected"
+    /// The confirm sheet's "Hand this to Chez" succeeded.
+    /// Payload: kind, had_intake, had_notes.
+    case chezDelegationConfirmed = "chez_delegation_confirmed"
 
     // MARK: - Phase 70 (Tasks v2)
     /// Tile tap on YearRibbon. Properties: season ("Spring|Summer|Fall|Winter"),

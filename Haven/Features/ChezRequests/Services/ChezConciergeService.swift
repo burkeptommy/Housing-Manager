@@ -66,15 +66,44 @@ extension DatabaseService {
 
 extension HavenSupabase {
 
+    /// Wave 4 — Fetch the "What Chez already knows" preview for one
+    /// entity (or ownership group) before the homeowner delegates it.
+    /// `kind` is the contract discriminator (task / routine / contractor /
+    /// system / project / vehicle / document / utility / insurance /
+    /// property / group / general). Group previews pass `group` (e.g.
+    /// "all_routines") instead of `entityId`.
+    static func previewChezSnapshot(
+        kind: String,
+        entityId: String? = nil,
+        propertyId: String? = nil,
+        group: String? = nil
+    ) async throws -> ChezSnapshotPreview {
+        struct Body: Encodable {
+            let action = "preview_snapshot"
+            let kind: String
+            let entity_id: String?
+            let property_id: String?
+            let group: String?
+        }
+        let data = try await callConciergeEdgeFunction(
+            body: Body(kind: kind, entity_id: entityId, property_id: propertyId, group: group)
+        )
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .havenISO8601
+        return try decoder.decode(ChezSnapshotPreview.self, from: data)
+    }
+
     /// Submit a new request. Goes through the chez-concierge Edge
     /// Function so the SLA + admin push + admin email all fire
-    /// atomically server-side.
+    /// atomically server-side. Wave 4: `intake` carries the homeowner's
+    /// budget / urgency / windows / access-note answers when provided.
     static func submitChezRequest(
         category: ChezCategory,
         summary: String,
         description: String,
         context: [String: String]? = nil,
-        attachments: [ChezAttachmentMeta]? = nil
+        attachments: [ChezAttachmentMeta]? = nil,
+        intake: ChezDelegationIntake? = nil
     ) async throws -> ChezRequestRow {
         struct Wrapper: Decodable {
             let request: ChezRequestRow
@@ -84,7 +113,8 @@ extension HavenSupabase {
             summary: summary,
             description: description,
             context: context,
-            attachments: attachments
+            attachments: attachments,
+            intake: intake
         )
         let data = try await callConciergeEdgeFunction(body: payload)
         let decoder = JSONDecoder()
@@ -162,16 +192,18 @@ extension HavenSupabase {
     static func delegateRoutineToChez(
         routineId: UUID,
         delegated: Bool,
-        notes: String? = nil
+        notes: String? = nil,
+        intake: ChezDelegationIntake? = nil
     ) async throws {
         struct Body: Encodable {
             let action = "delegate_routine"
             let routine_id: String
             let delegated: Bool
             let notes: String?
+            let intake: ChezDelegationIntake?
         }
         _ = try await callConciergeEdgeFunction(
-            body: Body(routine_id: routineId.uuidString, delegated: delegated, notes: notes)
+            body: Body(routine_id: routineId.uuidString, delegated: delegated, notes: notes, intake: intake)
         )
     }
 
@@ -179,16 +211,18 @@ extension HavenSupabase {
     static func delegateContractorToChez(
         contractorId: UUID,
         delegated: Bool,
-        notes: String? = nil
+        notes: String? = nil,
+        intake: ChezDelegationIntake? = nil
     ) async throws {
         struct Body: Encodable {
             let action = "delegate_contractor"
             let contractor_id: String
             let delegated: Bool
             let notes: String?
+            let intake: ChezDelegationIntake?
         }
         _ = try await callConciergeEdgeFunction(
-            body: Body(contractor_id: contractorId.uuidString, delegated: delegated, notes: notes)
+            body: Body(contractor_id: contractorId.uuidString, delegated: delegated, notes: notes, intake: intake)
         )
     }
 
@@ -200,16 +234,18 @@ extension HavenSupabase {
     static func delegateTaskToChez(
         taskId: UUID,
         delegated: Bool,
-        notes: String? = nil
+        notes: String? = nil,
+        intake: ChezDelegationIntake? = nil
     ) async throws {
         struct Body: Encodable {
             let action = "delegate_task"
             let task_id: String
             let delegated: Bool
             let notes: String?
+            let intake: ChezDelegationIntake?
         }
         _ = try await callConciergeEdgeFunction(
-            body: Body(task_id: taskId.uuidString, delegated: delegated, notes: notes)
+            body: Body(task_id: taskId.uuidString, delegated: delegated, notes: notes, intake: intake)
         )
     }
 
@@ -223,7 +259,8 @@ extension HavenSupabase {
         entityId: String,
         delegated: Bool,
         notes: String? = nil,
-        propertyId: String? = nil
+        propertyId: String? = nil,
+        intake: ChezDelegationIntake? = nil
     ) async throws {
         struct Body: Encodable {
             let action = "delegate_entity"
@@ -232,6 +269,7 @@ extension HavenSupabase {
             let delegated: Bool
             let notes: String?
             let property_id: String?
+            let intake: ChezDelegationIntake?
         }
         _ = try await callConciergeEdgeFunction(
             body: Body(
@@ -239,7 +277,8 @@ extension HavenSupabase {
                 entity_id: entityId,
                 delegated: delegated,
                 notes: notes,
-                property_id: propertyId
+                property_id: propertyId,
+                intake: intake
             )
         )
     }
@@ -252,20 +291,22 @@ extension HavenSupabase {
     static func setChezOwnershipGroup(
         group: String,
         on: Bool,
-        notes: String? = nil
+        notes: String? = nil,
+        intake: ChezDelegationIntake? = nil
     ) async throws -> Int {
         struct Body: Encodable {
             let action = "set_ownership_group"
             let group: String
             let on: Bool
             let notes: String?
+            let intake: ChezDelegationIntake?
         }
         struct Response: Decodable {
             let ok: Bool?
             let backfill_count: Int?
         }
         let data = try await callConciergeEdgeFunction(
-            body: Body(group: group, on: on, notes: notes)
+            body: Body(group: group, on: on, notes: notes, intake: intake)
         )
         let parsed = (try? JSONDecoder().decode(Response.self, from: data)) ?? Response(ok: nil, backfill_count: nil)
         return parsed.backfill_count ?? 0

@@ -2182,8 +2182,12 @@ struct MaintenanceTaskDetailSheet: View {
             c["due"] = task.nextDueDate
         }
         if let notes = task.notes, !notes.isEmpty {
-            // Truncate to keep the context dict tidy server-side.
-            c["notes"] = String(notes.prefix(400))
+            // Wave 4: no truncation. The old 400-char cap silently
+            // dropped bundle checklists and vendor follow-up context;
+            // the preview_snapshot pipeline carries full truth now and
+            // the composer's "Re:" card renders an allowlisted subset,
+            // so the full notes ride along for Chez's triage.
+            c["notes"] = notes
         }
         return c
     }

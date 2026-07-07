@@ -225,6 +225,11 @@ struct ChezRequestSubmitPayload: Encodable {
     let description: String
     let context: [String: String]?
     let attachments: [ChezAttachmentMeta]?
+    /// Wave 4 — optional homeowner intake (budget / urgency / windows /
+    /// access-note override). Server stores it at
+    /// `snapshot.homeowner_intake` and mirrors display strings into
+    /// `context.budget` + `context.timing`.
+    var intake: ChezDelegationIntake? = nil
 }
 
 /// Reply payload — homeowner OR admin (admin path goes through the

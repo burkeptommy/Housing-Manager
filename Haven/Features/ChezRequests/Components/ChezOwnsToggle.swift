@@ -43,6 +43,10 @@ struct ChezOwnsToggle: View {
     @State private var errorMessage: String?
     @State private var showNotesPrompt: Bool = false
     @State private var showRevokeConfirm: Bool = false
+    /// Wave 4 — task / routine / contractor targets route the tap-on flow
+    /// through `ChezDelegationConfirmSheet` (snapshot preview + budget /
+    /// urgency / windows intake) instead of the bare notes alert.
+    @State private var showConfirmSheet: Bool = false
     @State private var pendingNotes: String = ""
     /// Phase 95 — transient confirmation flash so the user gets visible
     /// feedback after a successful flip (haptic alone is too quiet on
@@ -138,15 +142,22 @@ struct ChezOwnsToggle: View {
                     Toggle("", isOn: Binding(
                         get: { isOwned },
                         set: { newVal in
-                            // Tap-on flow: prompt for one-line context
-                            // before kicking off so Chez has a starting
-                            // point. Tap-off flow: confirm before revoke
-                            // (Round E Wave E-2 finding — revoking active
-                            // Chez engagement mid-flight should not be a
-                            // one-tap action; mirrors the C-1 REDO
-                            // Archive routine confirmation pattern).
+                            // Tap-on flow: task / routine / contractor
+                            // targets open the Wave 4 confirm sheet
+                            // (snapshot + intake); other entity targets
+                            // keep the one-line notes alert so Chez has
+                            // a starting point. Tap-off flow: confirm
+                            // before revoke (Round E Wave E-2 finding —
+                            // revoking active Chez engagement mid-flight
+                            // should not be a one-tap action; mirrors
+                            // the C-1 REDO Archive routine confirmation
+                            // pattern).
                             if newVal {
-                                showNotesPrompt = true
+                                if confirmSheetTarget != nil {
+                                    showConfirmSheet = true
+                                } else {
+                                    showNotesPrompt = true
+                                }
                             } else {
                                 showRevokeConfirm = true
                             }
@@ -215,6 +226,13 @@ struct ChezOwnsToggle: View {
                 Text("Chez will manage your \(label). Claims, coverage audits, renewal shopping.")
             }
         }
+        .sheet(isPresented: $showConfirmSheet) {
+            if let sheetTarget = confirmSheetTarget {
+                ChezDelegationConfirmSheet(target: sheetTarget) { intake, notes in
+                    await commit(delegated: true, notes: notes, intake: intake)
+                }
+            }
+        }
         .confirmationDialog(
             "Hand this back to you?",
             isPresented: $showRevokeConfirm,
@@ -248,8 +266,44 @@ struct ChezOwnsToggle: View {
         }
     }
 
+    /// Wave 4 — maps the task / routine / contractor targets onto the
+    /// confirm sheet's target shape. Nil for the entity targets that
+    /// keep the legacy notes alert.
+    private var confirmSheetTarget: ChezDelegationConfirmSheet.Target? {
+        switch target {
+        case .task(let id, let title, let hasVendor):
+            return ChezDelegationConfirmSheet.Target(
+                kind: .task,
+                entityId: id.uuidString,
+                displayLabel: title,
+                contextCaption: hasVendor
+                    ? "Chez will coordinate with your vendor and schedule this task."
+                    : "Chez will find a vetted vendor for this task and own coordination."
+            )
+        case .routine(let id, let routineLabel):
+            return ChezDelegationConfirmSheet.Target(
+                kind: .routine,
+                entityId: id.uuidString,
+                displayLabel: routineLabel,
+                contextCaption: "Chez will own scheduling for this routine from now on."
+            )
+        case .contractor(let id, let name):
+            return ChezDelegationConfirmSheet.Target(
+                kind: .contractor,
+                entityId: id.uuidString,
+                displayLabel: name,
+                contextCaption: "Chez will be your point of contact for \(name) from now on."
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// Returns true on success so the Wave 4 confirm sheet can decide
+    /// whether to dismiss. The legacy alert paths ignore the result.
     @MainActor
-    private func commit(delegated: Bool, notes: String?) async {
+    @discardableResult
+    private func commit(delegated: Bool, notes: String?, intake: ChezDelegationIntake? = nil) async -> Bool {
         isUpdating = true
         errorMessage = nil
         defer { isUpdating = false }
@@ -258,15 +312,15 @@ struct ChezOwnsToggle: View {
             switch target {
             case .routine(let id, _):
                 try await HavenSupabase.delegateRoutineToChez(
-                    routineId: id, delegated: delegated, notes: trimmedNotes
+                    routineId: id, delegated: delegated, notes: trimmedNotes, intake: intake
                 )
             case .contractor(let id, _):
                 try await HavenSupabase.delegateContractorToChez(
-                    contractorId: id, delegated: delegated, notes: trimmedNotes
+                    contractorId: id, delegated: delegated, notes: trimmedNotes, intake: intake
                 )
             case .task(let id, _, _):
                 try await HavenSupabase.delegateTaskToChez(
-                    taskId: id, delegated: delegated, notes: trimmedNotes
+                    taskId: id, delegated: delegated, notes: trimmedNotes, intake: intake
                 )
             case .system(let id, _):
                 try await HavenSupabase.delegateEntityToChez(
@@ -310,6 +364,7 @@ struct ChezOwnsToggle: View {
                 "target": targetKindKey,
                 "delegated": String(delegated),
                 "had_notes": String(trimmedNotes != nil),
+                "had_intake": String(intake != nil),
             ])
             NotificationCenter.default.post(name: .chezDelegationChanged, object: nil)
             NotificationCenter.default.post(name: .chezRequestChanged, object: nil)
@@ -334,9 +389,11 @@ struct ChezOwnsToggle: View {
             default: break
             }
             onChange?(delegated)
+            return true
         } catch {
             errorMessage = error.localizedDescription
             Haptics.error()
+            return false
         }
     }
 
