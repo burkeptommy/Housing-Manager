@@ -4931,6 +4931,34 @@ struct VehicleMaintenanceInterval: Codable, Identifiable {
         case taskId = "task_id"
     }
 
+    // Standard memberwise init retained for the in-app construction site
+    // (VehicleDetailView.buildAttentionItems wraps overdue tasks).
+    init(type: String, intervalMiles: Int?, intervalMonths: Int?, estimatedCost: Double?,
+         description: String?, taskId: UUID? = nil, frequency: String? = nil) {
+        self.type = type
+        self.intervalMiles = intervalMiles
+        self.intervalMonths = intervalMonths
+        self.estimatedCost = estimatedCost
+        self.description = description
+        self.taskId = taskId
+        self.frequency = frequency
+    }
+
+    // July 2026: resilient decoder (CLAUDE.md hard rule) — this struct is
+    // decoded from vehicle-lookup Edge Function passthrough JSON. A single
+    // malformed interval (e.g. estimated_cost as a string) must not take
+    // down the whole maintenance_schedule array. Every field is try?.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = (try? c.decodeIfPresent(String.self, forKey: .type)) ?? ""
+        intervalMiles = try? c.decodeIfPresent(Int.self, forKey: .intervalMiles) ?? nil
+        intervalMonths = try? c.decodeIfPresent(Int.self, forKey: .intervalMonths) ?? nil
+        estimatedCost = try? c.decodeIfPresent(Double.self, forKey: .estimatedCost) ?? nil
+        description = try? c.decodeIfPresent(String.self, forKey: .description) ?? nil
+        frequency = try? c.decodeIfPresent(String.self, forKey: .frequency) ?? nil
+        taskId = try? c.decodeIfPresent(UUID.self, forKey: .taskId) ?? nil
+    }
+
     var estimatedCostDisplay: String? {
         estimatedCost.map { "$\(Int($0))" }
     }

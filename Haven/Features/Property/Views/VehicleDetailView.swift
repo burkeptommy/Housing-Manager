@@ -2493,7 +2493,12 @@ struct VehicleAlertDetailSheet: View {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        let today = formatter.string(from: Date())
+        // Single completion instant — the "today" string and the recurring
+        // next-due calc (F9) must derive from the SAME moment, or a
+        // completion near midnight can put next-due a day off from the
+        // recorded last-completed date.
+        let completedAt = Date()
+        let today = formatter.string(from: completedAt)
 
         do {
             switch alert.type {
@@ -2525,7 +2530,7 @@ struct VehicleAlertDetailSheet: View {
                     var update = MaintenanceTaskUpdate()
                     update.lastCompletedDate = today
                     if isRecurring {
-                        let next = Self.nextVehicleTaskDueDate(frequency: freq, from: Date())
+                        let next = Self.nextVehicleTaskDueDate(frequency: freq, from: completedAt)
                         update.nextDueDate = formatter.string(from: next)
                     } else {
                         update.isArchived = true
