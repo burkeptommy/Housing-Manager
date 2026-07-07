@@ -60,7 +60,9 @@ import {
   attachSnapshotToRequest,
   buildDelegationSnapshot,
   inferSnapshotKindFromContext,
+  intakeContextMirrors,
   isSnapshotKind,
+  sanitizeHomeownerIntake,
   SnapshotAuthError,
   snapshotDigest,
   snapshotReadiness,
@@ -327,6 +329,10 @@ interface SubmitPayload {
   description: string;
   context?: Record<string, unknown>;
   attachments?: AttachmentMeta[];
+  /// Wave 4 — what only the homeowner can tell Chez (budget band,
+  /// timing, preferred windows, access override). Optional; sanitized
+  /// server-side.
+  intake?: unknown;
 }
 
 async function handleSubmit(
@@ -345,6 +351,14 @@ async function handleSubmit(
   if (!summary || !description) {
     return json({ error: "summary and description required" }, 400);
   }
+
+  // Wave 4 — homeowner intake: validated, mirrored into the flat context
+  // (display strings only), and stored on the snapshot below.
+  const intake = sanitizeHomeownerIntake(payload.intake);
+  const submitContext = {
+    ...(payload.context || {}),
+    ...intakeContextMirrors(intake),
+  };
 
   // Compute SLA via the SQL helper.
   const { data: slaRow, error: slaErr } = await service
@@ -365,7 +379,7 @@ async function handleSubmit(
       user_id: user.id,
       category,
       summary,
-      context: payload.context || {},
+      context: submitContext,
       status: "open",
       sla_due_at,
       last_message_at: new Date().toISOString(),
@@ -411,6 +425,7 @@ async function handleSubmit(
       propertyId: inferred?.propertyId,
     });
     if (snapshot) {
+      if (intake) snapshot.homeowner_intake = intake;
       await attachSnapshotToRequest(service, requestId, snapshot);
       submitDigest = snapshotDigest(snapshot);
     }
@@ -1208,12 +1223,14 @@ interface DelegateRoutinePayload {
   routine_id: string;
   delegated: boolean;       // true to hand off, false to revoke
   notes?: string;           // optional one-line context for Chez
+  intake?: unknown;         // Wave 4 — budget/timing/access from the confirm sheet
 }
 
 interface DelegateContractorPayload {
   contractor_id: string;
   delegated: boolean;
   notes?: string;
+  intake?: unknown;
 }
 
 async function handleDelegateRoutine(
@@ -1255,6 +1272,7 @@ async function handleDelegateRoutine(
   // so it has a thread + push hook to Tom. Title says "Standing
   // engagement" so it visually distinguishes from one-shot requests.
   if (payload.delegated) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const summary = `Standing engagement: ${(routine as { label: string }).label}`;
     const slaDueAt = await businessHoursDue(service);
     const { data: req } = await service
@@ -1268,6 +1286,7 @@ async function handleDelegateRoutine(
           _kind: "standing_engagement_routine",
           routine_id: routineId,
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -1290,6 +1309,7 @@ async function handleDelegateRoutine(
           householdId,
         });
         if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
           await attachSnapshotToRequest(service, r.id, snapshot);
           digest = snapshotDigest(snapshot);
         }
@@ -1384,6 +1404,7 @@ async function handleDelegateContractor(
   if (updateErr) return json({ error: updateErr.message }, 500);
 
   if (payload.delegated) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const c = contractor as { company_name: string; category: string | null };
     const summary = `Standing engagement: ${c.company_name}`;
     const slaDueAt = await businessHoursDue(service);
@@ -1399,6 +1420,7 @@ async function handleDelegateContractor(
           contractor_id: contractorId,
           contractor_category: c.category ?? "",
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -1421,6 +1443,7 @@ async function handleDelegateContractor(
           householdId,
         });
         if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
           await attachSnapshotToRequest(service, r.id, snapshot);
           digest = snapshotDigest(snapshot);
         }
@@ -1485,6 +1508,7 @@ interface DelegateTaskPayload {
   task_id: string;
   delegated: boolean;
   notes?: string;
+  intake?: unknown;         // Wave 4 — budget/timing/access from the confirm sheet
 }
 
 async function handleDelegateTask(
@@ -1563,6 +1587,7 @@ async function handleDelegateTask(
     vendorRow = vendor as typeof vendorRow;
   }
 
+  const intake = sanitizeHomeownerIntake(payload.intake);
   const category = hasVendor ? "coordinate_task" : "find_vendor";
   const summary = hasVendor
     ? `Schedule + manage: ${task.title}`
@@ -1586,6 +1611,7 @@ async function handleDelegateTask(
         next_due_date: task.next_due_date ?? "",
         frequency: task.frequency ?? "",
         notes: payload.notes ?? "",
+        ...intakeContextMirrors(intake),
       },
       status: "open",
       sla_due_at: slaDueAt,
@@ -1620,6 +1646,7 @@ async function handleDelegateTask(
       householdId,
     });
     if (snapshot) {
+      if (intake) snapshot.homeowner_intake = intake;
       await attachSnapshotToRequest(service, r.id, snapshot);
       taskDigest = snapshotDigest(snapshot);
     }
@@ -3287,6 +3314,7 @@ interface DelegateEntityPayload {
   notes?: string;
   property_id?: string;                       // required for "insurance" since insurance lives on properties
   household_id?: string;                      // admin-only — workbench operators pass this explicitly since they aren't tied to any household. task / routine / contractor have their own delegate_* actions.
+  intake?: unknown;                           // Wave 4 — budget/timing/access from the confirm sheet
 }
 
 const ENTITY_TABLES: Record<string, { table: string; idCol: string; labelCol?: string; categoryCol?: string }> = {
@@ -3404,6 +3432,7 @@ async function handleDelegateEntity(
   // Create a parent chez_request only when delegating ON. Revoking
   // doesn't spawn a thread — it just flips the flag.
   if (payload.delegated) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const summary = `Standing engagement: ${labelForThread}`;
     const slaDueAt = await businessHoursDue(service);
     const { data: req } = await service
@@ -3417,8 +3446,11 @@ async function handleDelegateEntity(
           _kind: `standing_engagement_${entityType}`,
           entity_type: entityType,
           entity_id: entityId,
-          property_id: payload.property_id ?? null,
+          // Empty string, not JSON null — iOS decodes context as
+          // [String: String] and one non-string value fails the whole dict.
+          property_id: payload.property_id ?? "",
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -3446,6 +3478,7 @@ async function handleDelegateEntity(
           propertyId: compactString(payload.property_id || "") || undefined,
         });
         if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
           await attachSnapshotToRequest(service, r.id, snapshot);
           digest = snapshotDigest(snapshot);
         }
@@ -3775,6 +3808,7 @@ interface SetOwnershipGroupPayload {
   group: string;        // one of the keys above OR "all_insurance"
   on: boolean;
   notes?: string;
+  intake?: unknown;     // Wave 4 — one budget/timing confirmation for the whole category
 }
 
 async function handleSetOwnershipGroup(
@@ -3852,6 +3886,7 @@ async function handleSetOwnershipGroup(
 
   // 3. Single summary chez_request — not one per entity.
   if (payload.on) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const friendly: Record<string, string> = {
       all_routines: "all routines",
       all_systems: "all home systems",
@@ -3874,8 +3909,11 @@ async function handleSetOwnershipGroup(
         context: {
           _kind: "standing_engagement_group",
           group,
-          backfill_count: backfillCount,
+          // Stringified — iOS decodes context as [String: String] and a
+          // single non-string value fails the whole dict.
+          backfill_count: String(backfillCount),
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -3899,6 +3937,7 @@ async function handleSetOwnershipGroup(
           group,
         });
         if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
           await attachSnapshotToRequest(service, r.id, snapshot);
           digest = snapshotDigest(snapshot);
         }
@@ -5233,7 +5272,14 @@ async function handleFetchTodayBrief(
   user: { id: string; email?: string | null } | null
 ) {
   if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  return json(await buildTodayBrief(service));
+}
 
+// Wave 3 Phase A — the brief internals live in a shared builder so the
+// legacy admin cockpit (fetch_today_brief) and the service portal boot
+// (fetch_service_boot → boot.today) render the exact same payload and
+// can never drift.
+async function buildTodayBrief(service: ServiceClient): Promise<Record<string, unknown>> {
   const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
     try { return await p; } catch (e) { console.warn(`[today_brief] ${label} failed:`, e); return null; }
   };
@@ -5423,7 +5469,7 @@ async function handleFetchTodayBrief(
   const slaDueSoon = urgentCases.filter((u) => u.severity === "due_soon").length;
   const homesUnderManagement = new Set([...requests.map((r) => r.household_id), ...visits.map((v) => v.household_id)]).size;
 
-  return json({
+  return {
     urgent_cases: urgentCases,
     todays_visits: todaysVisits,
     upcoming_visits: upcomingVisits,
@@ -5437,6 +5483,297 @@ async function handleFetchTodayBrief(
       homes_under_management: homesUnderManagement,
     },
     fetched_at: now.toISOString(),
+  };
+}
+
+// ============================================================================
+// Wave 3 Phase A — Service portal v2 (service.getchez.com)
+// ============================================================================
+// Two single-round-trip reads powering the rebuilt operator portal:
+//
+//   fetch_service_boot — everything the portal shell needs at login:
+//     the Today brief (shared builder, identical payload to
+//     fetch_today_brief), the case queue (non-resolved plus resolved in
+//     the last 48h) with server-derived snapshot chips, tag definitions,
+//     and the operator's snippets.
+//
+//   fetch_case_bundle — everything the case workspace needs on open:
+//     the full request row, the thread, vendor calls, visits, related
+//     cases, open reminders, and a slim dossier (household + first
+//     property + family + the specific entities the snapshot references).
+//
+// Both are admin-only and use the same safe() posture as
+// handleFetchDossier — one surprise query never kills the boot.
+
+/// Display strings for the homeowner-intake budget bands (Wave 4 composer
+/// chips: under $250 / $250 to $750 / $750 to $2,000 / $2,000+ / show me
+/// options). Unknown raw values pass through as-is so a future band
+/// addition degrades to showing the raw token instead of hiding the chip.
+const SERVICE_BUDGET_BAND_DISPLAY: Record<string, string> = {
+  under_250: "Under $250",
+  "250_750": "$250 to $750",
+  "750_2000": "$750 to $2,000",
+  "2000_plus": "$2,000 plus",
+  // Same label the iOS chips and the digest use — one string everywhere.
+  options_first: "Show me options first",
+  open: "Show me options first",
+  options: "Show me options first",
+  show_options: "Show me options first",
+  show_me_options: "Show me options first",
+};
+
+/// Display strings for homeowner-intake urgency (Wave 4 timing chips:
+/// ASAP / this week / two weeks / flexible).
+const SERVICE_URGENCY_DISPLAY: Record<string, string> = {
+  asap: "ASAP",
+  this_week: "This week",
+  two_weeks: "Within 2 weeks",
+  within_2_weeks: "Within 2 weeks",
+  flexible: "Flexible",
+};
+
+/// Queue chips derived server-side so the portal renders budget/timing/
+/// readiness without shipping every row's full snapshot blob down the
+/// wire. snapshot.homeowner_intake is null until Wave 4 lands — the
+/// context fallback covers rows where iOS mirrored display-safe
+/// budget/timing strings into context, and everything else nulls out.
+function deriveServiceQueueChips(
+  snapshot: Record<string, unknown> | null,
+  context: Record<string, unknown>
+): { budget: string | null; timing: string | null; has_snapshot: boolean; kind: string | null } {
+  const intake =
+    snapshot && typeof snapshot.homeowner_intake === "object" && snapshot.homeowner_intake !== null
+      ? (snapshot.homeowner_intake as Record<string, unknown>)
+      : null;
+
+  const displayFor = (raw: unknown, table: Record<string, string>): string | null => {
+    if (typeof raw !== "string") return null;
+    const t = raw.trim();
+    if (!t) return null;
+    return table[t.toLowerCase()] ?? t;
+  };
+  const ctxString = (key: string): string | null => {
+    const v = context[key];
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    return t.length > 0 ? t : null;
+  };
+
+  return {
+    budget: displayFor(intake?.budget_band, SERVICE_BUDGET_BAND_DISPLAY) ?? ctxString("budget"),
+    timing: displayFor(intake?.urgency, SERVICE_URGENCY_DISPLAY) ?? ctxString("timing"),
+    has_snapshot: !!snapshot,
+    kind: ctxString("_kind"),
+  };
+}
+
+async function handleFetchServiceBoot(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[service_boot] ${label} failed:`, e); return null; }
+  };
+
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  const [todayRes, queueRes, tagsRes, snippetsRes] = await Promise.all([
+    safe(buildTodayBrief(service), "today"),
+    // Case queue: everything not resolved, plus anything resolved in the
+    // last 48h (so a just-closed case doesn't vanish mid-shift). Unread
+    // homeowner replies float to the top, then soonest SLA.
+    safe(
+      service.from("chez_requests")
+        .select("id, household_id, category, summary, status, sla_due_at, last_message_at, created_at, unread_for_admin, pending_proposal_count, admin_initiated, assigned_to_user_id, resolved_at, snapshot, context")
+        .or(`status.neq.resolved,resolved_at.gte.${fortyEightHoursAgo}`)
+        .order("unread_for_admin", { ascending: false, nullsFirst: false })
+        .order("sla_due_at", { ascending: true })
+        .limit(100),
+      "queue"
+    ),
+    // Same rows list_tag_definitions returns.
+    safe(
+      service.from("chez_tag_definitions")
+        .select("*")
+        .is("archived_at", null)
+        .order("label", { ascending: true }),
+      "tag_definitions"
+    ),
+    // Same rows list_snippets returns (personal + org-shared + seed).
+    safe(
+      service.from("chez_snippets")
+        .select("*")
+        .or(`owner_user_id.eq.${user.id},shared_with_org.eq.true,owner_user_id.is.null`)
+        .order("use_count", { ascending: false })
+        .order("label", { ascending: true }),
+      "snippets"
+    ),
+  ]);
+
+  type ServiceQueueRow = {
+    id: string;
+    household_id: string;
+    category: string | null;
+    summary: string | null;
+    status: string | null;
+    sla_due_at: string | null;
+    last_message_at: string | null;
+    created_at: string | null;
+    unread_for_admin: boolean | null;
+    pending_proposal_count: number | null;
+    admin_initiated: boolean | null;
+    assigned_to_user_id: string | null;
+    resolved_at: string | null;
+    snapshot: Record<string, unknown> | null;
+    context: Record<string, unknown> | null;
+  };
+  const queueRows = (((queueRes as { data?: ServiceQueueRow[] } | null)?.data) ?? []) as ServiceQueueRow[];
+
+  // household_name resolved via ONE households query over the distinct ids.
+  const householdIds = [...new Set(queueRows.map((r) => r.household_id).filter(Boolean))];
+  const householdName = new Map<string, string>();
+  if (householdIds.length > 0) {
+    const hhRes = await safe(
+      service.from("households").select("id, name").in("id", householdIds),
+      "queue households"
+    );
+    for (const h of (((hhRes as { data?: Array<{ id: string; name: string | null }> } | null)?.data) ?? [])) {
+      if (h.name) householdName.set(h.id, h.name);
+    }
+  }
+
+  const queue = queueRows.map((r) => ({
+    id: r.id,
+    summary: r.summary,
+    category: r.category,
+    status: r.status,
+    sla_due_at: r.sla_due_at,
+    last_message_at: r.last_message_at,
+    created_at: r.created_at,
+    unread_for_admin: r.unread_for_admin === true,
+    pending_proposal_count: r.pending_proposal_count ?? 0,
+    household_id: r.household_id,
+    household_name: householdName.get(r.household_id) ?? null,
+    admin_initiated: r.admin_initiated === true,
+    assigned_to_user_id: r.assigned_to_user_id ?? null,
+    chips: deriveServiceQueueChips(
+      (r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null) as Record<string, unknown> | null,
+      (r.context && typeof r.context === "object" ? r.context : {}) as Record<string, unknown>
+    ),
+  }));
+
+  return json({
+    today: (todayRes as Record<string, unknown> | null) ?? null,
+    queue,
+    tag_definitions: ((tagsRes as { data?: unknown[] } | null)?.data) ?? [],
+    snippets: ((snippetsRes as { data?: unknown[] } | null)?.data) ?? [],
+  });
+}
+
+interface FetchCaseBundlePayload {
+  request_id?: string;
+}
+
+async function handleFetchCaseBundle(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: FetchCaseBundlePayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[case_bundle] ${label} failed:`, e); return null; }
+  };
+
+  // The request row is the one required read — everything else degrades
+  // to null/[] via safe() so a surprise never kills the case open.
+  const { data: requestRow, error: reqErr } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
+
+  const request = requestRow as {
+    id: string;
+    household_id: string;
+    related_case_ids?: string[] | null;
+    snapshot?: Record<string, unknown> | null;
+    context?: Record<string, unknown> | null;
+  };
+  const householdId = String(request.household_id);
+  const snapshot = (request.snapshot && typeof request.snapshot === "object" ? request.snapshot : null) as Record<string, unknown> | null;
+  const context = (request.context && typeof request.context === "object" ? request.context : {}) as Record<string, unknown>;
+
+  const isUuid = (v: unknown): v is string =>
+    typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.trim());
+
+  // Referenced entity ids: snapshot sections win (they carry the id the
+  // snapshot was built from); context keys are the fallback for legacy
+  // rows that predate Wave 1 snapshots and only have string context.
+  const sectionId = (section: unknown): string | null => {
+    if (!section || typeof section !== "object") return null;
+    const id = (section as Record<string, unknown>).id;
+    return isUuid(id) ? id.trim() : null;
+  };
+  const contextId = (key: string): string | null => {
+    const v = context[key];
+    return isUuid(v) ? v.trim() : null;
+  };
+  const systemId = sectionId(snapshot?.system) ?? contextId("system_id");
+  const routineId = sectionId(snapshot?.routine) ?? contextId("routine_id");
+  const contractorId = sectionId(snapshot?.vendor) ?? contextId("contractor_id");
+  const taskId = sectionId(snapshot?.task) ?? contextId("task_id");
+
+  const relatedIds = (Array.isArray(request.related_case_ids) ? request.related_case_ids : []).filter(isUuid);
+
+  const none = Promise.resolve(null);
+  const [
+    messagesRes, vendorCallsRes, visitsRes, relatedRes, remindersRes,
+    householdRes, propertyRes, familyRes,
+    systemRes, routineRes, contractorRes, taskRes,
+  ] = await Promise.all([
+    // Newest 300, then reversed to ascending below — a capped ascending
+    // query would keep the OLDEST rows and silently drop the homeowner's
+    // latest reply on long-lived standing-engagement threads.
+    safe(service.from("concierge_messages").select("*").eq("request_id", requestId).order("created_at", { ascending: false }).limit(300), "messages"),
+    safe(service.from("chez_vendor_calls").select("*").eq("request_id", requestId).order("created_at", { ascending: true }), "vendor_calls"),
+    safe(service.from("chez_visits").select("*").eq("request_id", requestId).order("created_at", { ascending: true }), "visits"),
+    relatedIds.length > 0
+      ? safe(service.from("chez_requests").select("id, summary, status").in("id", relatedIds), "related_cases")
+      : none,
+    safe(service.from("chez_reminders").select("*").eq("request_id", requestId).is("completed_at", null).order("due_at", { ascending: true }), "reminders"),
+    safe(service.from("households").select("id, name, chez_profile").eq("id", householdId).maybeSingle(), "household"),
+    safe(service.from("properties").select("*").eq("household_id", householdId).order("created_at", { ascending: true }).limit(1), "property"),
+    safe(service.from("family_members").select("id, first_name, last_name, member_type").eq("household_id", householdId), "family_members"),
+    systemId ? safe(service.from("home_systems").select("*").eq("id", systemId).eq("household_id", householdId).maybeSingle(), "referenced system") : none,
+    routineId ? safe(service.from("routines").select("*").eq("id", routineId).eq("household_id", householdId).maybeSingle(), "referenced routine") : none,
+    contractorId ? safe(service.from("contractors").select("*").eq("id", contractorId).eq("household_id", householdId).maybeSingle(), "referenced contractor") : none,
+    taskId ? safe(service.from("maintenance_tasks").select("*").eq("id", taskId).eq("household_id", householdId).maybeSingle(), "referenced task") : none,
+  ]);
+
+  return json({
+    request: requestRow,
+    messages: (((messagesRes as { data?: unknown[] } | null)?.data) ?? []).slice().reverse(),
+    vendor_calls: ((vendorCallsRes as { data?: unknown[] } | null)?.data) ?? [],
+    visits: ((visitsRes as { data?: unknown[] } | null)?.data) ?? [],
+    related_cases: ((relatedRes as { data?: unknown[] } | null)?.data) ?? [],
+    reminders: ((remindersRes as { data?: unknown[] } | null)?.data) ?? [],
+    dossier_lite: {
+      household: ((householdRes as { data?: unknown } | null)?.data) ?? null,
+      property: (((propertyRes as { data?: unknown[] } | null)?.data) ?? [])[0] ?? null,
+      family_members: ((familyRes as { data?: unknown[] } | null)?.data) ?? [],
+      referenced: {
+        system: ((systemRes as { data?: unknown } | null)?.data) ?? null,
+        routine: ((routineRes as { data?: unknown } | null)?.data) ?? null,
+        contractor: ((contractorRes as { data?: unknown } | null)?.data) ?? null,
+        task: ((taskRes as { data?: unknown } | null)?.data) ?? null,
+      },
+    },
   });
 }
 
@@ -6564,6 +6901,13 @@ async function handleAssignHandymanToAssessment(
 
 interface SaveVendorCallsPayload {
   request_id: string;
+  /// Wave 3 Phase B — server-side drafts. true = the operator is still
+  /// typing (portal saves per-row on blur): the row lands with
+  /// is_draft=true, no call-history stamping, and the aggregate views
+  /// ignore it. A row with an outcome always finalizes regardless.
+  /// Legacy callers omit this and keep the original finalize-on-save
+  /// behavior.
+  draft?: boolean;
   calls: Array<{
     candidate_key: string;
     source?: "existing" | "places" | "manual";
@@ -6629,12 +6973,17 @@ async function handleSaveVendorCalls(
   const householdId = (requestRow as { household_id: string }).household_id;
 
   const nowIso = new Date().toISOString();
+  const draftMode = payload.draft === true;
   const rows = payload.calls
     .filter((c) => compactString(c.candidate_key))
     .slice(0, 40)
     .map((c) => {
       const hasOutcome = !!compactString(c.outcome ?? undefined);
       return {
+        // An outcome always finalizes the row, even inside a draft batch —
+        // matches the aggregate views' (NOT is_draft OR outcome IS NOT NULL).
+        is_draft: draftMode && !hasOutcome,
+        draft_updated_at: draftMode && !hasOutcome ? nowIso : null,
         request_id: requestId,
         household_id: householdId,
         candidate_key: String(c.candidate_key).slice(0, 300),
@@ -6669,6 +7018,7 @@ async function handleSaveVendorCalls(
 
   // first_called_at: stamp once for rows that now have an outcome but no
   // first_called_at yet. Separate cheap update keeps the upsert simple.
+  // Runs in draft mode too — an outcome-bearing row finalizes either way.
   try {
     await service
       .from("chez_vendor_calls")
@@ -6680,7 +7030,7 @@ async function handleSaveVendorCalls(
     console.warn("[vendor-calls] first_called_at stamp failed:", e);
   }
 
-  return json({ ok: true, saved: rows.length });
+  return json({ ok: true, saved: rows.length, draft: draftMode });
 }
 
 async function handleFetchVendorCalls(
@@ -7133,6 +7483,19 @@ serve(async (req: Request) => {
       // landing with a customer-service surface.
       case "fetch_today_brief":
         return handleFetchTodayBrief(service, user);
+
+      // Wave 3 Phase A — service portal v2 (service.getchez.com). Two
+      // single-round-trip reads: portal boot (Today brief + case queue +
+      // tag definitions + snippets) and the case workspace bundle.
+      // Admin-only.
+      case "fetch_service_boot":
+        return handleFetchServiceBoot(service, user);
+      case "fetch_case_bundle":
+        return handleFetchCaseBundle(
+          service,
+          user,
+          body as unknown as FetchCaseBundlePayload
+        );
 
       // Phase 84 PR 4 — project negotiation tracking. Each call appends
       // one turn to project_quotes.negotiation_history. Admin-only;

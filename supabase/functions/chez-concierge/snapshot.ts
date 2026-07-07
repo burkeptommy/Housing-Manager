@@ -1140,6 +1140,10 @@ export function snapshotDigest(snapshot: DelegationSnapshot): string {
     if (entities.length > 12) lines.push(`- and ${entities.length - 12} more`);
   }
 
+  for (const line of intakeDigestLines((snapshot.homeowner_intake ?? null) as Row | null)) {
+    lines.push(line);
+  }
+
   const costRef = (snapshot.cost_reference ?? null) as Row | null;
   if (costRef && (num(costRef.sample) ?? 0) >= 2) {
     const scopeLabel = str(costRef.category)
@@ -1228,6 +1232,112 @@ export function snapshotReadiness(snapshot: DelegationSnapshot): { score: number
 
   const score = Math.max(20, Math.min(100, 100 - missing.length * 15));
   return { score, missing };
+}
+
+// ---------------------------------------------------------------------------
+// Wave 4 — homeowner intake (what only the homeowner can tell Chez).
+// iOS sends `intake` on every delegation; it lands at
+// snapshot.homeowner_intake, and display-safe string mirrors go into the
+// flat `context` map so shipped clients' [String: String] decode keeps
+// working.
+// ---------------------------------------------------------------------------
+
+const INTAKE_BUDGET_BANDS = new Set([
+  "under_250", "250_750", "750_2000", "2000_plus", "options_first",
+]);
+const INTAKE_URGENCIES = new Set(["asap", "this_week", "two_weeks", "flexible"]);
+const INTAKE_WINDOWS = new Set(["weekday_am", "weekday_pm", "weekend"]);
+
+const INTAKE_BUDGET_DISPLAY: Record<string, string> = {
+  under_250: "Under $250",
+  "250_750": "$250 to $750",
+  "750_2000": "$750 to $2,000",
+  "2000_plus": "$2,000 plus",
+  options_first: "Show me options first",
+};
+const INTAKE_URGENCY_DISPLAY: Record<string, string> = {
+  asap: "As soon as possible",
+  this_week: "This week",
+  two_weeks: "Within two weeks",
+  flexible: "Flexible",
+};
+const INTAKE_WINDOW_DISPLAY: Record<string, string> = {
+  weekday_am: "Weekday mornings",
+  weekday_pm: "Weekday afternoons",
+  weekend: "Weekends",
+};
+
+/// Validates + normalizes the raw intake payload from iOS. Unknown enum
+/// values and junk fields are dropped rather than rejected — a client a
+/// version ahead should degrade, not fail. Returns null when nothing
+/// usable was sent.
+export function sanitizeHomeownerIntake(raw: unknown): Row | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Row;
+  const out: Row = {};
+
+  const band = str(r.budget_band)?.toLowerCase();
+  if (band && INTAKE_BUDGET_BANDS.has(band)) out.budget_band = band;
+
+  const low = num(r.budget_low_cents);
+  const high = num(r.budget_high_cents);
+  if (low !== null && low >= 0) out.budget_low_cents = Math.round(low);
+  if (high !== null && high >= 0) out.budget_high_cents = Math.round(high);
+
+  const urgency = str(r.urgency)?.toLowerCase();
+  if (urgency && INTAKE_URGENCIES.has(urgency)) out.urgency = urgency;
+
+  if (Array.isArray(r.preferred_windows)) {
+    const windows = r.preferred_windows
+      .map((w) => (typeof w === "string" ? w.trim().toLowerCase() : ""))
+      .filter((w) => INTAKE_WINDOWS.has(w));
+    if (windows.length > 0) out.preferred_windows = [...new Set(windows)];
+  }
+
+  const accessNote = capText(r.access_note_override, 500);
+  if (accessNote) out.access_note_override = accessNote;
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/// Display-safe string mirrors for the flat context map ("budget" /
+/// "timing" keys — added to iOS displayContextKeys in Wave 4).
+export function intakeContextMirrors(intake: Row | null): Record<string, string> {
+  if (!intake) return {};
+  const out: Record<string, string> = {};
+  const band = str(intake.budget_band);
+  if (band && INTAKE_BUDGET_DISPLAY[band]) out.budget = INTAKE_BUDGET_DISPLAY[band];
+  const urgency = str(intake.urgency);
+  if (urgency && INTAKE_URGENCY_DISPLAY[urgency]) out.timing = INTAKE_URGENCY_DISPLAY[urgency];
+  return out;
+}
+
+function intakeDigestLines(intake: Row | null): string[] {
+  if (!intake) return [];
+  const lines: string[] = [];
+  const band = str(intake.budget_band);
+  const low = num(intake.budget_low_cents);
+  const high = num(intake.budget_high_cents);
+  const budgetLabel = band ? INTAKE_BUDGET_DISPLAY[band] ?? null : null;
+  const range = low !== null && high !== null
+    ? `${fmtMoney(low / 100)} to ${fmtMoney(high / 100)}`
+    : null;
+  if (budgetLabel || range) {
+    lines.push(`Homeowner budget: ${[budgetLabel, range && budgetLabel !== range ? `(${range})` : null].filter(Boolean).join(" ")}`);
+  }
+  const urgency = str(intake.urgency);
+  if (urgency && INTAKE_URGENCY_DISPLAY[urgency]) {
+    lines.push(`Timing: ${INTAKE_URGENCY_DISPLAY[urgency]}`);
+  }
+  if (Array.isArray(intake.preferred_windows) && intake.preferred_windows.length > 0) {
+    const windows = (intake.preferred_windows as unknown[])
+      .map((w) => INTAKE_WINDOW_DISPLAY[str(w) ?? ""] ?? null)
+      .filter(Boolean);
+    if (windows.length > 0) lines.push(`Preferred windows: ${windows.join(", ")}`);
+  }
+  const accessNote = str(intake.access_note_override);
+  if (accessNote) lines.push(`Access for this job: ${accessNote}`);
+  return lines;
 }
 
 // ---------------------------------------------------------------------------
