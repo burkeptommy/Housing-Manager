@@ -1,372 +1,1524 @@
-/*
- * Chez Service Desk — cosmetic deltas on top of admin.css.
+/* service.css — Chez service portal (operator desk), Wave 3 Phase A.
  *
- * The service desk shares admin.html's layout (sidebar + topbar + main),
- * the Phase 83 4-pane concierge cockpit, and every JS surface in
- * admin.js. Both portals share the brand purple + white + black token
- * system in chez.css. This file adds the service-portal flourishes:
+ * Ground-up rewrite. Imports /chez.css for brand tokens and layers the
+ * svc-* namespace on top. Desktop-first (designed at 1200px+).
  *
- *   1. The sidebar brand says "chez service" instead of "chez admin"
- *      (markup lives in service.html).
- *   2. The sidebar wordmark and topbar eyebrow use brand purple so the
- *      operator's eye lands on the title bar slightly faster than on
- *      admin lab.
- *   3. New queue card affordances for delegations and "just in" cases
- *      (the data flows from chez_requests rows; CSS lives here so the
- *      admin portal renders the same cards in its existing neutral
- *      treatment without inheriting the priority highlights).
+ * DISCIPLINE
+ *   Purple (--purple #6938EF) appears ONLY as: primary CTA, active accents
+ *   (nav item, selected/active rows, focus rings), and the SLA-critical
+ *   pill. Everything else is neutral pearl/white/ink chrome.
+ *   Serif (--serif) is reserved for headings 18px+; body is 13-14px sans.
  *
- * Keep cross-portal styling in admin.css. This file is service-only.
+ * PRIMITIVES SHARED WITH views/case/* (the case agent composes these;
+ * keep names stable):
+ *   Buttons   .svc-btn (+--primary, --danger, --ghost, --small, --block)
+ *   Forms     .svc-field, .svc-input, .svc-textarea, .svc-select, .svc-check
+ *   Cards     .svc-card, .svc-empty, .svc-banner (+--amber), .svc-keyhint
+ *   Pills     .svc-pill (+--sla-overdue, --sla-soon, --sla-ok, --muted,
+ *             --open, --resolved, --unread)
+ *   Chips     .svc-chips > .svc-chip (+--cat, --ready, --gap), .svc-attach-chip
+ *   Rows      .svc-rowlist > .svc-row (+.is-selected, --static), .svc-dayhead
+ *   Tables    .svc-table;  Key-values  .svc-kv > .svc-kv__k / .svc-kv__v
+ *   Sections  .svc-section-label, .svc-section, .svc-section__head/__count
+ *   Case shell .svc-case (grid 300px | 1fr | 340px; +.is-alfred-closed),
+ *             .svc-case__queue / __work / __alfred, .svc-topbar,
+ *             .svc-scroll (generic scroll area)
+ *   Queue     .svc-queue-search, .svc-filterchips > .svc-filterchip
+ *             (+.is-active), .svc-queue-list > .svc-queue-item
+ *             (+.is-active purple left accent, +.is-unread dot)
+ *   Thread    .svc-thread > .svc-msg (+--user, --concierge, --system),
+ *             .svc-msg__bubble, .svc-msg__meta, .svc-proposal
+ *   Composer  .svc-composer, .svc-composer__bar
  */
 
-/* ============================================================
- * TOPBAR + SIDEBAR — brand accent
- * ============================================================ */
+@import url("/chez.css");
 
-body[data-portal-mode="service"] .admin-topbar > div > .admin-eyebrow {
-  position: relative;
-  display: inline-block;
-  padding-bottom: 2px;
-  color: var(--salmon, #6938EF);
-}
-body[data-portal-mode="service"] .admin-topbar > div > .admin-eyebrow::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -1px;
-  width: 24px;
-  height: 2px;
-  background: var(--salmon, #6938EF);
-  border-radius: 1px;
+/* ── Portal-scoped tokens ─────────────────────────────────────────────── */
+
+:root {
+  --svc-border: var(--neutral-200);
+  --svc-border-strong: var(--neutral-300);
+  --svc-hover: #f5f5f7;
+  --svc-row-hover: #f8f8fa;
+  --svc-ink: var(--text);
+  --svc-muted: var(--text-muted);
+  --svc-soft: var(--text-soft);
+  --svc-amber-bg: #fdf3e3;
+  --svc-amber-fg: #92580a;
+  --svc-green-bg: #ebf5ee;
+  --svc-green-fg: #23713a;
+  --svc-red-fg: #b42318;
+  --svc-focus-ring: rgba(105, 56, 239, 0.18);
+  --svc-rail-w: 224px;
 }
 
-/* Brand subtitle: "service" reads in brand purple to distinguish from
-   admin's neutral "admin" label. */
-body[data-portal-mode="service"] .admin-sidebar__brand span {
-  color: var(--salmon, #6938EF);
+html, body {
+  height: 100%;
+}
+
+body {
+  font-size: 14px;
+  overflow: hidden; /* the portal is a fixed shell; views own their scrolling */
+}
+
+.svc-root {
+  height: 100vh;
+}
+
+body.svc-modal-open {
+  overflow: hidden;
+}
+
+/* Reset chez.css's marketing-scale paragraph sizing inside the portal. */
+.svc-root p,
+.svc-root li,
+.svc-modal p,
+.svc-palette p {
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+/* ── Wordmark + eyebrow ───────────────────────────────────────────────── */
+
+.svc-wordmark {
+  font-family: var(--serif);
+  font-size: 26px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
+  letter-spacing: -0.02em;
+  color: var(--svc-ink);
+  line-height: 1;
 }
 
-/* ============================================================
- * QUEUE CARD — delegation badge + "just in" pill
- * ============================================================
- *
- * The cockpit queue card markup (rendered by renderConciergeQueueCard
- * in admin.js) emits two optional spans we light up here:
- *
- *   .cockpit-queue__case-tag--standing  — homeowner toggled
- *      "Have Chez own this" on a routine / contractor / system /
- *      project / vehicle / document / utility. Surfaces as a solid
- *      purple pill so the operator sees standing engagements at a
- *      glance vs one-off questions.
- *
- *   .cockpit-queue__case-tag--just-in  — request landed in the last
- *      2 hours and the operator hasn't read it yet. Surfaces as a
- *      black pill with a soft pulse so genuinely new submissions
- *      don't get buried behind older unread threads.
- *
- * Both pills are subordinate to the existing SLA pill on the right
- * edge of each card — they communicate ownership/freshness, not
- * SLA risk.
- */
+.svc-wordmark--rail {
+  font-size: 21px;
+}
 
-body[data-portal-mode="service"] .cockpit-queue__case-tag--standing {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.svc-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  border-radius: 999px;
-  background: var(--purple, #6938EF);
-  color: #fff;
-  white-space: nowrap;
-}
-body[data-portal-mode="service"] .cockpit-queue__case-tag--standing::before {
-  content: "•";
-  font-size: 12px;
-  line-height: 0;
-  position: relative;
-  top: 1px;
+  color: var(--svc-soft);
+  margin: 0 0 4px;
 }
 
-body[data-portal-mode="service"] .cockpit-queue__case-tag--just-in {
-  display: inline-flex;
+/* ── Boot spinner ─────────────────────────────────────────────────────── */
+
+.svc-loading {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  border-radius: 999px;
-  background: #0A0A0A;
-  color: #fff;
-  white-space: nowrap;
-  animation: justInPulse 2.6s ease-in-out infinite;
+  justify-content: center;
+  gap: 18px;
+  background: var(--pearl);
 }
 
-@keyframes justInPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(10, 10, 10, 0); }
-  50%      { box-shadow: 0 0 0 4px rgba(10, 10, 10, 0.12); }
+.svc-loading[hidden] {
+  display: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  body[data-portal-mode="service"] .cockpit-queue__case-tag--just-in {
-    animation: none;
-  }
+.svc-loading__text {
+  color: var(--svc-muted);
+  font-size: 13px;
 }
 
-/* ============================================================
- * QUEUE FILTER CHIP — "Standing engagements"
- * ============================================================
- *
- * Sits inside the queue rail's filter row alongside All / Mine /
- * Urgent. Active state uses solid purple to mirror the standing
- * pill on each card.
- */
-
-body[data-portal-mode="service"] .cockpit-queue__filter--standing.is-active {
-  background: var(--purple, #6938EF);
-  color: #fff;
-  border-color: var(--purple, #6938EF);
-}
-body[data-portal-mode="service"] .cockpit-queue__filter--standing.is-active:hover {
-  background: var(--purple-pressed, #5025D1);
-  border-color: var(--purple-pressed, #5025D1);
+.svc-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--svc-border-strong);
+  border-top-color: var(--purple);
+  animation: svc-spin 0.8s linear infinite;
 }
 
-/* ============================================================
- * VENDOR PIPELINE BOARD — case workspace kanban
- * ============================================================
- *
- * Renders inside the case workspace ABOVE the existing vendor
- * sheet. Surfaces chez_vendor_outreach + chez_visits rows as
- * stage-grouped cards so the operator can see at a glance which
- * candidates are in which step of the coordination loop.
- *
- * Stages (5 columns):
- *   1. Researching        — operator considering this vendor
- *   2. Contacted          — outreach sent (email/call/text)
- *   3. Awaiting dates     — vendor needs homeowner availability
- *   4. Homeowner picked   — homeowner chose dates; back to vendor
- *   5. Locked             — visit confirmed
- *
- * Each card shows vendor name + last action + next action +
- * one-tap shortcuts (Log call · Ask homeowner for dates · Send
- * to homeowner · Mark locked).
- */
-
-body[data-portal-mode="service"] .vendor-pipeline {
-  margin: 0 0 24px 0;
-  padding: 18px 20px;
-  background: #fff;
-  border: 1px solid var(--neutral-200, #EDEEF0);
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(15, 10, 40, 0.04);
+@keyframes svc-spin {
+  to { transform: rotate(360deg); }
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__head {
+/* ── Gate cards (login / denied / boot error) ─────────────────────────── */
+
+.svc-gatewrap {
+  height: 100vh;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  gap: 12px;
+  justify-content: center;
+  background: var(--pearl);
+  padding: 24px;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__title {
-  font-family: var(--serif, Georgia);
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text, #0A0A0A);
-  letter-spacing: -0.01em;
+.svc-gatewrap[hidden] {
+  display: none;
+}
+
+.svc-gatecard {
+  width: 100%;
+  max-width: 420px;
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 40px 40px 32px;
+}
+
+.svc-gatecard .svc-wordmark {
+  display: block;
+  margin-bottom: 22px;
+}
+
+.svc-gatecard__title {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  margin: 2px 0 10px;
+}
+
+.svc-gatecard__title--gate {
+  font-size: 24px;
+}
+
+.svc-gatecard__lede {
+  color: var(--svc-muted);
+  margin-bottom: 24px;
+}
+
+.svc-gatecard__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.svc-gatecard__feedback {
+  min-height: 18px;
+  font-size: 12.5px;
+  color: var(--svc-red-fg);
+  margin: 2px 0 0;
+}
+
+.svc-gatecard__feedback:empty {
   margin: 0;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__sub {
+.svc-gatecard__footnote {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--svc-border);
+  font-size: 12.5px;
+  color: var(--svc-soft);
+}
+
+.svc-gatecard__footnote a {
+  color: var(--svc-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.svc-gatecard__footnote a:hover {
+  color: var(--svc-ink);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.svc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--svc-ink);
+  background: var(--white);
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.svc-btn:hover {
+  background: var(--svc-hover);
+}
+
+.svc-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.svc-btn--primary {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: var(--white);
+}
+
+.svc-btn--primary:hover {
+  background: var(--purple-pressed);
+  border-color: var(--purple-pressed);
+}
+
+.svc-btn--danger {
+  color: var(--svc-red-fg);
+  border-color: #ecc8c5;
+}
+
+.svc-btn--danger:hover {
+  background: #fdf3f2;
+}
+
+.svc-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--svc-muted);
+}
+
+.svc-btn--ghost:hover {
+  background: var(--svc-hover);
+  color: var(--svc-ink);
+}
+
+.svc-btn--small {
   font-size: 12px;
-  color: var(--text-muted, #6B6B7B);
-  margin-top: 2px;
+  padding: 5px 10px;
+  border-radius: 8px;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__board {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.svc-btn--block {
+  width: 100%;
+  padding: 11px 14px;
+}
+
+/* ── Form controls ────────────────────────────────────────────────────── */
+
+.svc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.svc-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--svc-muted);
+}
+
+.svc-input,
+.svc-textarea,
+.svc-select {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--svc-ink);
+  background: var(--white);
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 10px;
+  padding: 9px 12px;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.svc-textarea {
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
+}
+
+.svc-input:focus,
+.svc-textarea:focus,
+.svc-select:focus {
+  outline: none;
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px var(--svc-focus-ring);
+}
+
+.svc-input::placeholder,
+.svc-textarea::placeholder {
+  color: var(--svc-soft);
+}
+
+.svc-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--svc-muted);
+  cursor: pointer;
+}
+
+.svc-check input {
+  accent-color: var(--purple);
+  width: 15px;
+  height: 15px;
+}
+
+/* ── App shell ────────────────────────────────────────────────────────── */
+
+.svc-app {
+  display: flex;
+  height: 100vh;
+  background: var(--pearl);
+  min-width: 1080px;
+}
+
+.svc-app[hidden] {
+  display: none;
+}
+
+.svc-rail {
+  width: var(--svc-rail-w);
+  flex: 0 0 var(--svc-rail-w);
+  background: var(--white);
+  border-right: 1px solid var(--svc-border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px 16px;
+}
+
+.svc-rail__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 10px 18px;
+}
+
+.svc-rail__brand-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--svc-soft);
+}
+
+.svc-rail__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.svc-rail__item {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--svc-muted);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-@media (max-width: 1280px) {
-  body[data-portal-mode="service"] .vendor-pipeline__board {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+.svc-rail__item:hover {
+  background: var(--svc-hover);
+  color: var(--svc-ink);
 }
 
-@media (max-width: 900px) {
-  body[data-portal-mode="service"] .vendor-pipeline__board {
-    grid-template-columns: 1fr;
-  }
+.svc-rail__item.is-active {
+  background: var(--purple-pale);
+  color: var(--purple);
+  font-weight: 600;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__col {
-  background: var(--pearl, #FAFAFC);
-  border: 1px solid var(--neutral-200, #EDEEF0);
-  border-radius: 12px;
-  padding: 10px;
-  min-height: 130px;
+.svc-rail__icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+}
+
+.svc-rail__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.svc-rail__label {
+  flex: 1;
+}
+
+.svc-rail__badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--white);
+  background: var(--svc-ink);
+  border-radius: 999px;
+  padding: 1px 7px;
+  line-height: 1.5;
+}
+
+.svc-rail__item.is-active .svc-rail__badge {
+  background: var(--purple);
+}
+
+.svc-rail__soon {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--svc-soft);
+  background: var(--pill-neutral-bg);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.svc-rail__divider {
+  height: 1px;
+  background: var(--svc-border);
+  margin: 10px 10px;
+}
+
+.svc-rail__footer {
+  border-top: 1px solid var(--svc-border);
+  padding: 12px 10px 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__col-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted, #6B6B7B);
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--neutral-200, #EDEEF0);
-}
-
-body[data-portal-mode="service"] .vendor-pipeline__col-count {
-  background: var(--neutral-200, #EDEEF0);
-  color: var(--text, #0A0A0A);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 999px;
-  min-width: 18px;
-  text-align: center;
-}
-
-/* Active column (the next-action stage) gets a purple accent so the
-   operator knows which column to look at first. JS computes this by
-   stage priority: Awaiting dates > Researching > Contacted > Picked > Locked. */
-body[data-portal-mode="service"] .vendor-pipeline__col--active {
-  border-color: var(--purple, #6938EF);
-  background: rgba(105, 56, 239, 0.04);
-}
-body[data-portal-mode="service"] .vendor-pipeline__col--active .vendor-pipeline__col-count {
-  background: var(--purple, #6938EF);
-  color: #fff;
-}
-
-body[data-portal-mode="service"] .vendor-pipeline__card {
-  background: #fff;
-  border: 1px solid var(--neutral-200, #EDEEF0);
-  border-radius: 10px;
-  padding: 10px 11px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.svc-rail__email {
   font-size: 12px;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-body[data-portal-mode="service"] .vendor-pipeline__card:hover {
-  border-color: var(--purple, #6938EF);
-  box-shadow: 0 2px 6px rgba(105, 56, 239, 0.10);
-}
-
-body[data-portal-mode="service"] .vendor-pipeline__card-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text, #0A0A0A);
-  line-height: 1.3;
+  color: var(--svc-soft);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__card-meta {
-  font-size: 11px;
-  color: var(--text-muted, #6B6B7B);
-  line-height: 1.4;
+.svc-rail__footer .svc-btn {
+  align-self: flex-start;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__card-next {
-  font-size: 11px;
-  color: var(--purple, #6938EF);
-  font-weight: 600;
-  margin-top: 2px;
-}
-
-body[data-portal-mode="service"] .vendor-pipeline__card-actions {
+.svc-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  gap: 4px;
-  margin-top: 4px;
-  flex-wrap: wrap;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__btn {
-  flex: 1 0 auto;
-  min-height: 26px;
-  padding: 4px 8px;
-  font-size: 10.5px;
+.svc-view {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden; /* views bring their own scroll containers */
+}
+
+/* ── Pills ────────────────────────────────────────────────────────────── */
+
+.svc-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
   font-weight: 600;
-  border-radius: 7px;
-  border: 1px solid var(--neutral-200, #EDEEF0);
-  background: #fff;
-  color: var(--text, #0A0A0A);
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  border-radius: 999px;
+  padding: 2.5px 9px;
+  line-height: 1.5;
   white-space: nowrap;
 }
-body[data-portal-mode="service"] .vendor-pipeline__btn:hover {
-  background: var(--purple-pale, #EFEAFE);
-  border-color: var(--purple, #6938EF);
-  color: var(--purple, #6938EF);
-}
-body[data-portal-mode="service"] .vendor-pipeline__btn--primary {
-  background: var(--purple, #6938EF);
-  border-color: var(--purple, #6938EF);
-  color: #fff;
-}
-body[data-portal-mode="service"] .vendor-pipeline__btn--primary:hover {
-  background: var(--purple-pressed, #5025D1);
-  border-color: var(--purple-pressed, #5025D1);
-  color: #fff;
+
+.svc-pill--sla-overdue {
+  background: var(--purple);
+  color: var(--white);
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__empty {
+.svc-pill--sla-soon {
+  background: var(--svc-amber-bg);
+  color: var(--svc-amber-fg);
+}
+
+.svc-pill--sla-ok {
+  background: var(--svc-green-bg);
+  color: var(--svc-green-fg);
+}
+
+.svc-pill--muted {
+  background: var(--pill-neutral-bg);
+  color: var(--pill-neutral-fg);
+}
+
+.svc-pill--open {
+  background: var(--white);
+  color: var(--svc-ink);
+  border: 1px solid var(--svc-border-strong);
+}
+
+.svc-pill--resolved {
+  background: var(--svc-green-bg);
+  color: var(--svc-green-fg);
+}
+
+.svc-pill--unread {
+  background: var(--svc-ink);
+  color: var(--white);
+}
+
+/* ── Chips ────────────────────────────────────────────────────────────── */
+
+.svc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.svc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--svc-muted);
+  background: var(--pill-neutral-bg);
+  border-radius: 7px;
+  padding: 2.5px 8px;
+  white-space: nowrap;
+}
+
+.svc-chip--cat {
+  background: transparent;
+  border: 1px solid var(--svc-border);
+  color: var(--svc-muted);
+}
+
+.svc-chip__glyph {
   font-size: 11px;
-  color: var(--text-soft, #A1A1AC);
-  font-style: italic;
-  padding: 6px 4px;
+  line-height: 1;
+}
+
+.svc-chip--ready {
+  background: var(--svc-green-bg);
+  color: var(--svc-green-fg);
+}
+
+.svc-chip--gap {
+  background: var(--svc-amber-bg);
+  color: var(--svc-amber-fg);
+}
+
+.svc-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--svc-muted);
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Cards, banners, section labels, empties ──────────────────────────── */
+
+.svc-card {
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.svc-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--pill-neutral-bg);
+  color: var(--svc-muted);
+}
+
+.svc-banner--amber {
+  background: var(--svc-amber-bg);
+  color: var(--svc-amber-fg);
+}
+
+.svc-section {
+  margin-top: 28px;
+}
+
+.svc-section__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.svc-section-label {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--svc-muted);
+}
+
+.svc-section__count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--svc-soft);
+}
+
+.svc-empty {
+  color: var(--svc-soft);
+  font-size: 13px;
+  padding: 28px 4px;
   text-align: center;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__intro-cta {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.svc-keyhint {
+  margin: 26px 2px 0;
+  font-size: 11px;
+  color: var(--svc-soft);
+  text-align: center;
 }
 
-body[data-portal-mode="service"] .vendor-pipeline__intro-btn {
-  height: 32px;
-  padding: 0 12px;
+/* ── Key-value + table primitives (work order etc.) ───────────────────── */
+
+.svc-kv {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--svc-border);
+}
+
+.svc-kv:last-child {
+  border-bottom: none;
+}
+
+.svc-kv__k {
+  width: 148px;
+  flex: 0 0 148px;
+  color: var(--svc-soft);
+}
+
+.svc-kv__v {
+  color: var(--svc-ink);
+  min-width: 0;
+}
+
+.svc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.svc-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--svc-soft);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--svc-border);
+}
+
+.svc-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--svc-border);
+  color: var(--svc-muted);
+}
+
+.svc-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Row lists (Today + anywhere a triage list renders) ───────────────── */
+
+.svc-rowlist {
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.svc-row {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f1f3;
+  transition: background 0.12s ease;
+}
+
+.svc-row:last-child {
+  border-bottom: none;
+}
+
+.svc-row[data-action] {
+  cursor: pointer;
+}
+
+.svc-row[data-action]:hover {
+  background: var(--svc-row-hover);
+}
+
+.svc-row.is-selected {
+  background: #fbfaff;
+  box-shadow: inset 3px 0 0 var(--purple);
+}
+
+.svc-row--static {
+  cursor: default;
+}
+
+.svc-row__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.svc-row__who {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--svc-ink);
+  white-space: nowrap;
+}
+
+.svc-row__where {
+  font-size: 12px;
+  color: var(--svc-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svc-row__time {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--svc-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.svc-row__spacer {
+  flex: 1;
+}
+
+.svc-row__ago {
+  font-size: 11.5px;
+  color: var(--svc-soft);
+  white-space: nowrap;
+}
+
+.svc-row__sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  min-width: 0;
+}
+
+.svc-row__summary {
+  font-size: 13px;
+  color: var(--svc-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svc-row__excerpt {
+  margin: 7px 0 0;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--svc-muted);
+  background: var(--pearl);
+  border-left: 2px solid var(--svc-border-strong);
+  border-radius: 0 8px 8px 0;
+}
+
+.svc-row__nolink {
+  font-size: 11.5px;
+  color: var(--svc-soft);
+}
+
+.svc-dayhead {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--svc-soft);
+  background: var(--pearl);
+  padding: 6px 16px;
+  border-bottom: 1px solid #f1f1f3;
+}
+
+/* ── Today view ───────────────────────────────────────────────────────── */
+
+.svc-today {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.svc-today__col {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 36px 72px;
+}
+
+.svc-hero__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.svc-hero__title {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 2px 0 6px;
+}
+
+.svc-hero__sub {
+  font-size: 14px;
+  color: var(--svc-muted);
+}
+
+.svc-hero__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.svc-hero__updated {
+  font-size: 11px;
+  color: var(--svc-soft);
+}
+
+.svc-hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.svc-statchip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--svc-muted);
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: 999px;
+  padding: 6px 13px;
+}
+
+.svc-statchip strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--svc-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+button.svc-statchip {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.svc-statchip:hover {
+  background: var(--svc-hover);
+  border-color: var(--svc-border-strong);
+}
+
+.svc-statchip--alert {
+  background: var(--purple-pale);
+  border-color: transparent;
+  color: var(--purple);
+}
+
+.svc-statchip--alert strong {
+  color: var(--purple);
+}
+
+button.svc-statchip--alert:hover {
+  background: var(--indigo-100);
+  border-color: transparent;
+}
+
+.svc-statchip--zero {
+  opacity: 0.6;
+}
+
+.svc-allclear {
+  margin-top: 40px;
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: 16px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.svc-allclear__mark {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--svc-green-bg);
+  color: var(--svc-green-fg);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.svc-allclear__title {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.svc-allclear__sub {
+  color: var(--svc-muted);
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+/* ── Stub views (next-phase capability gates) ─────────────────────────── */
+
+.svc-stub {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.svc-stub__card {
+  max-width: 420px;
+  text-align: center;
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  border-radius: 16px;
+  padding: 44px 40px;
+}
+
+.svc-stub__title {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+  margin: 4px 0 8px;
+}
+
+.svc-stub__body {
+  color: var(--svc-muted);
+  margin-bottom: 14px;
+}
+
+.svc-stub__note {
+  font-size: 12.5px;
+  color: var(--svc-soft);
+}
+
+.svc-stub__note a {
+  color: var(--svc-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.svc-stub__note a:hover {
+  color: var(--svc-ink);
+}
+
+/* ── Case-view scaffolding (composed by views/case/*) ─────────────────── */
+
+.svc-case {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 340px;
+  height: 100%;
+}
+
+.svc-case.is-alfred-closed {
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+.svc-case.is-alfred-closed .svc-case__alfred {
+  display: none;
+}
+
+.svc-case__queue {
+  border-right: 1px solid var(--svc-border);
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.svc-case__work {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--pearl);
+}
+
+.svc-case__alfred {
+  border-left: 1px solid var(--svc-border);
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.svc-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--svc-border);
+}
+
+.svc-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 16px;
+}
+
+/* Queue rail */
+
+.svc-queue-search {
+  padding: 12px 12px 8px;
+}
+
+.svc-filterchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid var(--svc-border);
+}
+
+.svc-filterchip {
+  font-family: var(--sans);
   font-size: 12px;
   font-weight: 600;
-  border-radius: 8px;
-  border: 1px solid var(--purple, #6938EF);
-  background: var(--purple, #6938EF);
-  color: #fff;
+  color: var(--svc-muted);
+  background: var(--pill-neutral-bg);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 4px 11px;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-body[data-portal-mode="service"] .vendor-pipeline__intro-btn:hover {
-  background: var(--purple-pressed, #5025D1);
+
+.svc-filterchip:hover {
+  background: var(--neutral-200);
+  color: var(--svc-ink);
 }
-body[data-portal-mode="service"] .vendor-pipeline__intro-btn--ghost {
-  background: #fff;
-  color: var(--purple, #6938EF);
+
+.svc-filterchip.is-active {
+  background: var(--svc-ink);
+  color: var(--white);
 }
-body[data-portal-mode="service"] .vendor-pipeline__intro-btn--ghost:hover {
-  background: var(--purple-pale, #EFEAFE);
+
+.svc-queue-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.svc-queue-item {
+  padding: 11px 14px 11px 16px;
+  border-bottom: 1px solid #f1f1f3;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  position: relative;
+}
+
+.svc-queue-item:hover {
+  background: var(--svc-row-hover);
+}
+
+.svc-queue-item.is-active {
+  background: #fbfaff;
+  box-shadow: inset 3px 0 0 var(--purple);
+}
+
+.svc-queue-item.is-unread::after {
+  content: "";
+  position: absolute;
+  top: 15px;
+  right: 13px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--purple);
+}
+
+/* Thread */
+
+.svc-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.svc-msg {
+  max-width: 78%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.svc-msg--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.svc-msg--concierge {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.svc-msg--system {
+  align-self: center;
+  align-items: center;
+  max-width: 90%;
+}
+
+.svc-msg__bubble {
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 9px 13px;
+  border-radius: 14px;
+  background: var(--white);
+  border: 1px solid var(--svc-border);
+  color: var(--svc-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.svc-msg--user .svc-msg__bubble {
+  background: var(--purple-pale);
+  border-color: transparent;
+}
+
+.svc-msg--system .svc-msg__bubble {
+  background: transparent;
+  border: none;
+  color: var(--svc-soft);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+  padding: 2px 8px;
+}
+
+.svc-msg__meta {
+  font-size: 11px;
+  color: var(--svc-soft);
+  padding: 0 4px;
+}
+
+.svc-proposal {
+  border: 1px solid var(--svc-border-strong);
+  border-radius: 12px;
+  background: var(--white);
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.svc-proposal__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--svc-ink);
+  margin-bottom: 8px;
+}
+
+/* Composer */
+
+.svc-composer {
+  border-top: 1px solid var(--svc-border);
+  background: var(--white);
+  padding: 12px 16px;
+}
+
+.svc-composer__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.svc-composer__bar .svc-btn--primary {
+  margin-left: auto;
+}
+
+/* ── Toasts ───────────────────────────────────────────────────────────── */
+
+.svc-toasts {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.svc-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--white);
+  background: var(--svc-ink);
+  border-radius: 12px;
+  padding: 10px 15px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: auto;
+  max-width: 380px;
+}
+
+.svc-toast.is-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.svc-toast.is-out {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.svc-toast::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 7px;
+  background: var(--svc-soft);
+}
+
+.svc-toast--success::before {
+  background: #4ade80;
+}
+
+.svc-toast--error::before {
+  background: #f87171;
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────── */
+
+.svc-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 900;
+}
+
+.svc-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.svc-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px 12px;
+}
+
+.svc-modal__title {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.svc-modal__x {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--svc-soft);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.svc-modal__x:hover {
+  background: var(--svc-hover);
+  color: var(--svc-ink);
+}
+
+.svc-modal__body {
+  padding: 4px 20px 16px;
+  overflow-y: auto;
+  font-size: 13.5px;
+  color: var(--svc-muted);
+}
+
+.svc-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--svc-border);
+}
+
+/* ── Command palette (⌘K) ─────────────────────────────────────────────── */
+
+.svc-palette {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+}
+
+.svc-palette__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.35);
+}
+
+.svc-palette__panel {
+  position: relative;
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  margin: 14vh auto 0;
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.svc-palette__input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--svc-border);
+  font-family: var(--sans);
+  font-size: 15px;
+  padding: 15px 18px;
+  color: var(--svc-ink);
+}
+
+.svc-palette__input:focus {
+  outline: none;
+}
+
+.svc-palette__results {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.svc-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #f4f4f6;
+}
+
+.svc-palette__item:last-child {
+  border-bottom: none;
+}
+
+.svc-palette__item:hover {
+  background: var(--svc-row-hover);
+}
+
+.svc-palette__item.is-active {
+  background: var(--purple-pale);
+}
+
+.svc-palette__who {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--svc-ink);
+  white-space: nowrap;
+}
+
+.svc-palette__what {
+  font-size: 12.5px;
+  color: var(--svc-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svc-palette__spacer {
+  flex: 1;
+}
+
+.svc-palette__empty {
+  padding: 22px 18px;
+  color: var(--svc-soft);
+  font-size: 13px;
+  text-align: center;
+}
+
+.svc-palette__hint {
+  padding: 8px 18px 10px;
+  border-top: 1px solid var(--svc-border);
+  font-size: 11px;
+  color: var(--svc-soft);
+}
+
+/* ── Density (imported from the legacy cockpit prefs) ─────────────────── */
+
+.svc-app[data-density="compact"] .svc-row {
+  padding: 8px 16px;
+}
+
+.svc-app[data-density="compact"] .svc-queue-item {
+  padding: 8px 14px 8px 16px;
+}
+
+/* ── Focus + scrollbars ───────────────────────────────────────────────── */
+
+.svc-root :focus-visible,
+.svc-modal :focus-visible,
+.svc-palette :focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+
+.svc-root ::-webkit-scrollbar,
+.svc-modal ::-webkit-scrollbar,
+.svc-palette ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.svc-root ::-webkit-scrollbar-thumb,
+.svc-modal ::-webkit-scrollbar-thumb,
+.svc-palette ::-webkit-scrollbar-thumb {
+  background: var(--svc-border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.svc-root ::-webkit-scrollbar-track,
+.svc-modal ::-webkit-scrollbar-track,
+.svc-palette ::-webkit-scrollbar-track {
+  background: transparent;
 }
