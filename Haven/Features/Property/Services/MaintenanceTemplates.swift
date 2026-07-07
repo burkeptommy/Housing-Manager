@@ -1313,27 +1313,34 @@ enum MaintenanceTemplates {
                 stableId: "Plumbing:Fixture leak walkthrough",
                 bundleId: "Plumbing:annual"
             ),
-            MaintenanceTemplate(systemCategory: "Plumbing", title: "Drain cleaning", description: "Plumber runs a power auger or hydro-jet through the main waste line to clear accumulated grease, soap scum, hair, and root intrusion before it becomes a backup. Includes a camera scope on the cleanout if any line shows resistance. Older homes with cast-iron or clay laterals benefit most.", frequency: "Every 2 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Flexible", professionalRequired: true, notes: "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this. The same root that's slowing one drain will eventually back up the whole house.", assignmentType: .vendor, stableId: "Plumbing:Professional drain cleaning"),
+            // Phase 80 — Drain cleaning is now the lead child of the new
+            // Plumbing:winter "Winter Plumbing Visit" bundle. A plumber
+            // on-site for the winter visit can do a quick scope each
+            // year even though the full power-auger work is every 2y.
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Drain cleaning", description: "Plumber runs a power auger or hydro-jet through the main waste line to clear accumulated grease, soap scum, hair, and root intrusion before it becomes a backup. Includes a camera scope on the cleanout if any line shows resistance. Older homes with cast-iron or clay laterals benefit most.", frequency: "Every 2 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Winter", professionalRequired: true, notes: "Houses with mature trees out front are highest-risk for root intrusion. If you've had a slow drain in any fixture in the last 6 months, prioritize this. The same root that's slowing one drain will eventually back up the whole house. Light check yearly during the winter plumbing visit; full power-auger every other year.", assignmentType: .vendor, stableId: "Plumbing:Professional drain cleaning", bundleId: "Plumbing:winter", bundleTitle: "Winter Plumbing Visit"),
             // Phase 62: Sump pump battery backup test. Gated on sump_pump
             // AND has_sump_battery_backup — both subtypes must be present.
             // The has_sump_battery_backup flag comes from an enrichment
             // card that only surfaces when the household already has a
             // sump pump system, so this template stays off most libraries.
+            // Phase 80 — folded into Plumbing:winter bundle. The plumber
+            // on-site for the winter visit checks the battery backup as
+            // a 60-second test during the drain visit, eliminating the
+            // separate DIY task.
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Test sump pump battery backup",
                 description: "Unplug the primary sump pump to verify the battery backup engages and can move water. Most backup batteries last 5-7 years. If it doesn't hold charge, replace before spring rains.",
-                frequency: "Semi-annually",
+                frequency: "Annually",
                 priority: "High",
-                estimatedCostRange: "$0 (DIY)",
-                isDIY: true,
-                seasonalTiming: "Spring",
+                estimatedCostRange: "$0 (part of winter plumbing visit)",
+                isDIY: false,
+                seasonalTiming: "Winter",
                 professionalRequired: false,
-                notes: "About 10 minutes DIY. Test in spring before wet season and in fall before storm season.",
+                notes: "Folded into the winter plumbing visit — the plumber tests this in 60 seconds while on-site.",
                 requiredSubtypes: ["sump_pump", "has_sump_battery_backup"],
                 assignmentType: .either,
-                diyEffortMinutes: 10,
-                routingOverride: .diyDefault
+                bundleId: "Plumbing:winter"
             ),
             // Phase 70.A1.x deleted "Outdoor faucet and hose-bib walk"
             // — the plumber checks hose bibs as part of the annual
@@ -1344,6 +1351,11 @@ enum MaintenanceTemplates {
             // active cold snaps. Northeast regional. Different from
             // the Fall winterization (which is preventive, vendor-side)
             // — this is the DIY check during the deep freeze itself.
+            // Phase 80 — kept standalone (NOT bundled into Plumbing:winter).
+            // This is the homeowner DIY check DURING a cold snap, distinct
+            // from the bundle's pre-winter vendor visit. Stays
+            // DIY-default + .either so the homeowner gets the prompt
+            // when temperatures plunge.
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Frozen pipe risk walk",
@@ -1366,20 +1378,23 @@ enum MaintenanceTemplates {
             // or wrap on it. Insulation tears, drops, or gets gnawed by
             // mice; can't tell from a glance. NE-gated since freezes are
             // a regional concern.
+            // Phase 80 — folded into Plumbing:winter bundle. The plumber's
+            // routine winter visit catches any obvious gaps in pipe
+            // insulation during their walk-through; the homeowner no
+            // longer needs to schedule this as separate DIY work.
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Inspect pipe insulation in attic, crawl, and garage",
-                description: "Walk every pipe in unheated spaces (attic, crawl, garage, exterior-wall closets) and confirm intact foam-sleeve insulation. Replace any sections that have torn, slipped, or been chewed. Mice love pipe insulation. The 30 minutes you spend here pays off the first time the temperature drops below 10°F.",
+                description: "Plumber walks every pipe in unheated spaces (attic, crawl, garage, exterior-wall closets) during the winter visit and flags any insulation gaps. Replace torn / slipped / chewed sections — mice love pipe insulation. Adds ~10 minutes to the visit; pays off the first time the temperature drops below 10°F.",
                 frequency: "Annually",
                 priority: "Medium",
-                estimatedCostRange: "$0–$50 (DIY) or $100–$200 (handyman)",
-                isDIY: true,
+                estimatedCostRange: "$0–$50 in parts",
+                isDIY: false,
                 seasonalTiming: "Winter",
-                professionalRequired: false,
-                notes: "Foam sleeve insulation is at hardware stores for ~$2/6ft. Pre-slit, just snap on. Time it for early December before any deep cold arrives.",
-                assignmentType: .either,
-                diyEffortMinutes: 30,
-                routingOverride: .diyDefault,
+                professionalRequired: true,
+                notes: "Foam sleeve insulation is ~$2/6ft at any hardware store. Pre-slit, snaps on. Plumber typically carries spare sleeve on the truck.",
+                assignmentType: .vendor,
+                bundleId: "Plumbing:winter",
                 regionalPack: .northeast
             ),
         ]),

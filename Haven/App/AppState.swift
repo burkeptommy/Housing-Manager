@@ -471,6 +471,34 @@ final class AppState: ObservableObject {
                             UserDefaults.standard.set(true, forKey: "hasSeededPhase70A1LibraryExpansion_v2")
                             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                         }
+
+                        // Phase 80 (Tom's prevention pass): daily reconcile
+                        // tick. Catches any task-structure drift that
+                        // accumulated since the last app launch — orphan
+                        // bundle children get auto-folded into their
+                        // parents, missing bundle parents get backfilled,
+                        // stale subtype-mismatched tasks get archived.
+                        // The reconciler is idempotent + respects
+                        // dismissed_categories / dismissed_templates /
+                        // dismissed_recommendations, so the daily tick
+                        // won't re-create things the user said no to.
+                        //
+                        // Gated by a per-calendar-day UserDefaults key so
+                        // multiple cold starts in the same day don't
+                        // re-fire. Resets at local midnight.
+                        if let householdId = primaryProperty?.householdId {
+                            let formatter = DateFormatter()
+                            formatter.dateFormat = "yyyy-MM-dd"
+                            let today = formatter.string(from: Date())
+                            let key = "lastDailyReconcileDate_v1"
+                            let lastRun = UserDefaults.standard.string(forKey: key)
+                            if lastRun != today {
+                                _ = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
+                                UserDefaults.standard.set(today, forKey: key)
+                                Analytics.track(.dailyReconcileFired, ["date": today])
+                                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                            }
+                        }
                     }
                     Task { await Self.archivePreQuizChoreTasksOnce() }
                     Task { await Self.backfillUniversalSystemsOnce() }

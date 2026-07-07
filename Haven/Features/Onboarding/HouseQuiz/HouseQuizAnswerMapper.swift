@@ -2278,18 +2278,33 @@ final class HouseQuizAnswerMapper {
     /// between the live quiz-completion path and the one-time
     /// migration in `AppState.migrateChimneyEvidenceOnceIfNeeded`.
     ///
-    /// Precedence (Q20 fireplace evidence beats Q3 fuel evidence):
+    /// Precedence (Q20 fireplace evidence beats attribute evidence beats Q3 fuel evidence):
     ///   1. Fireplace row, name contains "wood"/"pellet" → `wood`
     ///   2. Fireplace row, name contains "propane"/"gas"  → `gas`
     ///   3. Fireplace row, name unclassifiable            → `wood` (defensive)
-    ///   4. No fireplace, fossil-fuel heat
+    ///   4. Property attributes `has_wood_fireplace=true` → `wood` (Phase 80
+    ///      — PropertyRecapCard + UpdateHomeDetailsSheet write this flag
+    ///      when ATTOM missed the fireplace OR the user answered Q20
+    ///      ambiguously)
+    ///   5. Property attributes `has_gas_fireplace=true`  → `gas`
+    ///   6. No fireplace, fossil-fuel heat
     ///      (natural_gas / oil / propane / not_sure)      → `furnace_flue`
-    ///   5. Otherwise (electric, heat pump, geothermal,
+    ///   7. Otherwise (electric, heat pump, geothermal,
     ///      electric baseboard, nil)                      → don't create
     ///
     /// `not_sure` on Q3 is treated as fossil because the NE TestFlight
     /// cohort overwhelmingly skews oil/gas. Worst case for the wrong
     /// guess: one harmless fall flue-inspection task the user dismisses.
+    ///
+    /// Phase 80 background: Tom hit this rule with `furnace_flue` despite
+    /// having 2 wood-burning fireplaces because (a) ATTOM didn't return
+    /// fireplace data for his Westchester address, and (b) Q20's
+    /// "Any other fuel sources?" wording read to him as "do you use
+    /// other fuels for HEAT?" → he selected "none" → no Fireplace row
+    /// → fell through to `furnace_flue`. Adding the attribute check as
+    /// a second source of truth lets the new PropertyRecapCard prompt
+    /// (and the HNW review sheet) write directly to attributes and
+    /// have it flow through here, bypassing the Q20 ambiguity.
     static func resolveChimneyRule(
         property: PropertyRow?,
         fireplaceSystem: HomeSystemRow?
@@ -2308,7 +2323,23 @@ final class HouseQuizAnswerMapper {
             return ChimneyRule(shouldCreate: true, subtype: "wood", evidence: "q20_unknown")
         }
 
-        let heatingFuel = property?.attributes?["heating_fuel"]?.stringValue.lowercased()
+        // Phase 80 — attribute-based override. The recap card / HNW
+        // review sheet write `has_wood_fireplace` / `has_gas_fireplace`
+        // directly to property attributes when the user confirms they
+        // have a fireplace outside the Q20 path. Reading these here
+        // makes attribute writes the canonical signal regardless of
+        // whether a Fireplace home_system was ever created.
+        let attrs = property?.attributes
+        let hasWoodAttr = attrs?["has_wood_fireplace"]?.stringValue.lowercased() == "true"
+        let hasGasAttr = attrs?["has_gas_fireplace"]?.stringValue.lowercased() == "true"
+        if hasWoodAttr {
+            return ChimneyRule(shouldCreate: true, subtype: "wood", evidence: "attr_wood")
+        }
+        if hasGasAttr {
+            return ChimneyRule(shouldCreate: true, subtype: "gas", evidence: "attr_gas")
+        }
+
+        let heatingFuel = attrs?["heating_fuel"]?.stringValue.lowercased()
         let fossilFuels: Set<String> = ["natural_gas", "oil", "propane", "not_sure"]
         if let fuel = heatingFuel, fossilFuels.contains(fuel) {
             return ChimneyRule(shouldCreate: true, subtype: "furnace_flue", evidence: "q3_fossil")

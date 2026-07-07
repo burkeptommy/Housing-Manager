@@ -26,6 +26,13 @@ struct HeaderSwitcher: View {
     /// HandymanTabView (which has its own punch-list completion UI) stays
     /// clean. Hidden during bulk-select mode for the same reason "+" is.
     var onShowCompleted: (() -> Void)? = nil
+    /// Phase 80 — search + timeline icons hoisted from the deleted
+    /// SeasonScopeBanner row. Magnifier routes to RecommendedServicesView's
+    /// library search; calendar.day.timeline.leading opens the 18-month
+    /// TasksTimelineSheet. Optional so HandymanTabView's HeaderSwitcher
+    /// stays icon-free (those affordances don't apply to handyman).
+    var onSearch: (() -> Void)? = nil
+    var onTimeline: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
@@ -37,8 +44,23 @@ struct HeaderSwitcher: View {
             centerLabel
                 .frame(maxWidth: .infinity)
 
-            // Right cluster: Completed icon (optional) + "+" / "Done".
+            // Right cluster: Search + Timeline (Phase 80 hoisted from
+            // SeasonScopeBanner) + Completed (optional) + "+" / "Done".
             HStack(spacing: 6) {
+                if !selectionMode, let onSearch {
+                    iconButton(
+                        systemName: "magnifyingglass",
+                        accessibilityLabel: "Search services",
+                        action: onSearch
+                    )
+                }
+                if !selectionMode, let onTimeline {
+                    iconButton(
+                        systemName: "calendar.day.timeline.leading",
+                        accessibilityLabel: "Open year timeline",
+                        action: onTimeline
+                    )
+                }
                 if !selectionMode, let onShowCompleted {
                     completedButton(action: onShowCompleted)
                 }
@@ -48,6 +70,35 @@ struct HeaderSwitcher: View {
         .padding(.horizontal, TasksV5.pageMargin)
         .padding(.top, TasksV5.headerTopInset)
         .padding(.bottom, 14)
+    }
+
+    /// Shared 40×40 white circular icon button. Used by the Search +
+    /// Timeline trailing icons. Visual treatment matches the "+" and
+    /// Completed buttons so the row reads as a cohesive cluster.
+    private func iconButton(
+        systemName: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(HavenColors.navy800)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(HavenColors.surface))
+                .overlay(Circle().stroke(HavenColors.beige200, lineWidth: 1))
+                .shadow(
+                    color: TasksV5.headerPlusShadowColor,
+                    radius: TasksV5.headerPlusShadowRadius,
+                    x: 0,
+                    y: TasksV5.headerPlusShadowY
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func completedButton(action: @escaping () -> Void) -> some View {

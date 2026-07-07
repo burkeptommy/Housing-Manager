@@ -35,6 +35,18 @@ struct PropertyRecapCard: View {
         case bathrooms
         case lotSize
         case purchaseDate
+        /// Phase 80 — fireplace count + type capture. Backed by
+        /// `properties.attributes['has_wood_fireplace']`,
+        /// `['wood_fireplace_count']`, and `['has_gas_fireplace']`.
+        /// `HouseQuizAnswerMapper.resolveChimneyRule` reads these
+        /// attributes as a second source of truth so the user can
+        /// correct an ATTOM miss OR an ambiguous Q20 answer without
+        /// retaking the quiz. Tom hit this — ATTOM didn't return
+        /// fireplace data for 146 Putnam, Q20 read as "fuel SOURCES"
+        /// not "do you have fireplaces", his chimney got tagged
+        /// `furnace_flue` and the sweep / creosote / spring wood
+        /// inspection tasks silently went missing.
+        case fireplaces
 
         var id: String { rawValue }
     }
@@ -61,15 +73,37 @@ struct PropertyRecapCard: View {
                         Haptics.medium()
                         onConfirm()
                     },
-                    icon: "arrow.right"
+                    icon: "arrow.right",
+                    // Phase 80 — block the CTA until the user has
+                    // explicitly answered the fireplaces row. The
+                    // `.missing` accent on the row is a strong visual
+                    // nudge, but Tom flagged that we need a hard gate
+                    // here because his missed fireplaces were the
+                    // root cause of his chimney sweep being silently
+                    // dropped. Cheap insurance: one extra tap to
+                    // confirm "None / Wood / Gas" before quiz starts.
+                    isDisabled: !fireplacesAnswered
                 )
                 .padding(.top, HavenTheme.spacing8)
 
-                Text("You can change any of this later from your property detail page.")
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(HavenColors.textTertiary)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 4)
+                if !fireplacesAnswered {
+                    // Phase 80 — explanatory caption replacing the
+                    // generic "change later" line until the user
+                    // resolves the fireplaces row. Salmon-accent so
+                    // it draws the eye in the same way the row itself
+                    // does.
+                    Text("Tap the Fireplaces row above to confirm. Wood-burning fireplaces need a chimney sweep that we'd otherwise miss.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.action)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
+                } else {
+                    Text("You can change any of this later from your property detail page.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
+                }
 
                 Spacer(minLength: HavenTheme.spacing24)
             }
@@ -237,7 +271,65 @@ struct PropertyRecapCard: View {
                 accent: property.purchaseDate == nil ? .missing : .normal,
                 field: .purchaseDate
             )
+            // Phase 80 — fireplace prompt. The Q20 fuel-sources question
+            // is ambiguous and ATTOM misses fireplaces for many suburban
+            // NE addresses (this is how Tom's 2 wood-burning fireplaces
+            // got missed). Surfacing it as a recap row gives every new
+            // homeowner an explicit confirmation step before the quiz.
+            factRow(
+                label: "Fireplaces",
+                value: fireplacesDisplay,
+                accent: fireplacesAccent,
+                field: .fireplaces
+            )
         }
+    }
+
+    /// Phase 80 — formatted display for the fireplaces row. Reads three
+    /// attributes set by `PropertyRecapEditSheet`'s fireplace editor:
+    /// `has_wood_fireplace`, `wood_fireplace_count`, `has_gas_fireplace`.
+    /// Returns the most-specific summary available; falls through to a
+    /// "tap to confirm" prompt when nothing's on file.
+    private var fireplacesDisplay: String {
+        let attrs = property.attributes ?? [:]
+        let hasWood = attrs["has_wood_fireplace"]?.stringValue.lowercased() == "true"
+        let hasGas = attrs["has_gas_fireplace"]?.stringValue.lowercased() == "true"
+        let count = Int(attrs["wood_fireplace_count"]?.stringValue ?? "")
+        if hasWood, let count, count > 0 {
+            return count == 1
+                ? "1 wood-burning fireplace"
+                : "\(count) wood-burning fireplaces"
+        }
+        if hasWood { return "Wood-burning fireplace" }
+        if hasGas { return "Gas fireplace" }
+        // Explicit "no fireplace" answer captured (different from
+        // missing). The picker writes `has_wood_fireplace=false` +
+        // `has_gas_fireplace=false` when the user picks "None".
+        let answeredNo = attrs["has_wood_fireplace"]?.stringValue.lowercased() == "false"
+            && attrs["has_gas_fireplace"]?.stringValue.lowercased() == "false"
+        if answeredNo { return "None" }
+        return "Tap to confirm"
+    }
+
+    private var fireplacesAccent: FactAccent {
+        fireplacesAnswered ? .normal : .missing
+    }
+
+    /// Phase 80 — bool gate for the "start the quiz" CTA. True when
+    /// the user has explicitly resolved the fireplaces row (either
+    /// answered wood, gas, or "None"). False when nothing's on file —
+    /// blocks the CTA so the homeowner can't bypass the prompt and
+    /// land in the same chimney-sweep-missing hole Tom did.
+    private var fireplacesAnswered: Bool {
+        let attrs = property.attributes ?? [:]
+        let wood = attrs["has_wood_fireplace"]?.stringValue.lowercased()
+        let gas = attrs["has_gas_fireplace"]?.stringValue.lowercased()
+        // "true" on either OR explicit "false" on both (the "None"
+        // selection) — both count as answered. Anything else is
+        // missing.
+        if wood == "true" || gas == "true" { return true }
+        if wood == "false" && gas == "false" { return true }
+        return false
     }
 
     private var purchaseDateDisplay: String {

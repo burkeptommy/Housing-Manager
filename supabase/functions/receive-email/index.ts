@@ -434,22 +434,31 @@ serve(async (req: Request) => {
         .slice(0, 280);
       const vendorLabel = outboundRow.vendor_name || senderEmailRaw;
       const sysContent = `${vendorLabel} replied: "${excerpt}${(emailBody || "").length > 280 ? "…" : ""}"`;
-      await supabase.from("concierge_messages").insert({
+      // Log-and-continue on failure: the inbound row above is already
+      // committed, and a 500 here would make SendGrid retry the whole
+      // email and duplicate it. The thread just misses the excerpt.
+      const { error: sysMsgErr } = await supabase.from("concierge_messages").insert({
         request_id: outboundRow.request_id,
         role: "system",
         content: sysContent,
       });
+      if (sysMsgErr) {
+        console.error(`[receive-email] vendor-reply system message insert failed for case ${outboundRow.request_id}:`, sysMsgErr);
+      }
 
       // Mark the case unread for admin (Tom needs to read + act on the
       // vendor reply). Last-message timestamp also bumps so the case
       // floats to the top of the operator queue.
-      await supabase
+      const { error: unreadErr } = await supabase
         .from("chez_requests")
         .update({
           unread_for_admin: true,
           last_message_at: new Date().toISOString(),
         })
         .eq("id", outboundRow.request_id);
+      if (unreadErr) {
+        console.error(`[receive-email] vendor-reply unread bump failed for case ${outboundRow.request_id}:`, unreadErr);
+      }
 
       console.log(`[receive-email] Vendor reply routed to case ${outboundRow.request_id} (inbound row ${inboundRow?.id})`);
       return new Response(JSON.stringify({
@@ -561,15 +570,14 @@ serve(async (req: Request) => {
           .limit(1);
         isHouseholdMember = !!memberUser && memberUser.length > 0;
         if (isHouseholdMember) {
-          try {
-            await supabase.from("household_allowed_senders").insert({
-              household_id: householdId,
-              email: senderEmail,
-              label: "Household member",
-              is_auto_added: true,
-            });
-          } catch (e) {
-            console.warn("[receive-email] member auto-add to allowed senders failed (non-fatal):", e);
+          const { error: allowErr } = await supabase.from("household_allowed_senders").insert({
+            household_id: householdId,
+            email: senderEmail,
+            label: "Household member",
+            is_auto_added: true,
+          });
+          if (allowErr) {
+            console.warn("[receive-email] member auto-add to allowed senders failed (non-fatal):", allowErr);
           }
         }
       }
@@ -578,13 +586,16 @@ serve(async (req: Request) => {
         console.log(`[receive-email] Sender not whitelisted: ${senderEmail} (raw: ${fromAddress}) for household ${householdId}`);
         // Update placeholder to show rejection reason instead of silently returning
         if (placeholderId) {
-          await supabase.from("inbox_items").update({
+          const { error: rejErr } = await supabase.from("inbox_items").update({
             type: "other",
             title: `Email not processed: sender not recognized`,
             summary: `An email from ${senderEmail} was received but not processed because this sender is not in your allowed senders list. You can add them in Settings → Allowed Senders.`,
             status: "ready",
             needs_action: false,
           }).eq("id", placeholderId);
+          if (rejErr) {
+            console.error(`[receive-email] rejection placeholder update failed (item stuck in processing):`, rejErr);
+          }
         }
         return new Response(
           JSON.stringify({ success: true, rejected: true, reason: "sender_not_whitelisted" }),
@@ -640,8 +651,12 @@ serve(async (req: Request) => {
         const events = parseICalEvents(icalSource);
         if (events.length > 0) {
           console.log(`[receive-email] Parsed ${events.length} calendar event(s)`);
+          // supabase-js reports DB failures via { error }, not throws —
+          // track what actually landed so the placeholder + push don't
+          // claim success for events that never persisted.
+          const insertedEvents: typeof events = [];
           for (const event of events) {
-            await supabase.from("family_events").insert({
+            const { error: eventErr } = await supabase.from("family_events").insert({
               household_id: householdId,
               title: event.summary || subject || "Calendar Event",
               start_date: event.dtstart,
@@ -652,10 +667,20 @@ serve(async (req: Request) => {
               source: "email_invite",
               recurrence_rule: event.rrule || null,
             });
+            if (eventErr) {
+              console.error(`[receive-email] family_events insert failed for "${event.summary}":`, eventErr);
+            } else {
+              insertedEvents.push(event);
+            }
+          }
+          if (insertedEvents.length === 0) {
+            // Every insert failed — fall through to the normal email
+            // pipeline instead of claiming calendar success.
+            throw new Error("all family_events inserts failed");
           }
 
           // Update placeholder to show the imported events
-          const eventTitles = events.map(e => e.summary || "Untitled").join(", ");
+          const eventTitles = insertedEvents.map(e => e.summary || "Untitled").join(", ");
           if (placeholderId) {
             await supabase.from("inbox_items").update({
               type: "family",
@@ -1548,8 +1573,12 @@ Respond with ONLY valid JSON:
                     vendorUpdates.specialties = [projectType];
                   }
                   if (Object.keys(vendorUpdates).length > 0) {
-                    await supabase.from("contractors").update(vendorUpdates).eq("id", createdContractorId);
-                    actions.push("enriched_vendor_from_quote");
+                    const { error: enrichErr } = await supabase.from("contractors").update(vendorUpdates).eq("id", createdContractorId);
+                    if (enrichErr) {
+                      console.error(`[receive-email] vendor enrichment update failed for ${createdContractorId}:`, enrichErr);
+                    } else {
+                      actions.push("enriched_vendor_from_quote");
+                    }
                   }
                 }
               }
@@ -1893,11 +1922,20 @@ Respond with ONLY valid JSON:
         try {
           const filePath = `${householdId}/family/${crypto.randomUUID()}_${att.filename}`;
           const fileBuffer = Uint8Array.from(atob(att.base64), c => c.charCodeAt(0));
-          await supabase.storage.from("inbox-attachments").upload(filePath, fileBuffer, { contentType: att.contentType || "application/octet-stream" });
+          // storage-js and supabase-js surface failures via { error },
+          // not throws — the surrounding catch never sees them. A failed
+          // upload must skip the insert (or the item points at a file
+          // that doesn't exist); a failed insert must be logged (or the
+          // stored attachment is invisible to the user).
+          const { error: attUpErr } = await supabase.storage.from("inbox-attachments").upload(filePath, fileBuffer, { contentType: att.contentType || "application/octet-stream" });
+          if (attUpErr) {
+            console.error(`[receive-email] family attachment upload failed (${att.filename}):`, attUpErr);
+            continue;
+          }
           // Generate descriptive title instead of raw filename
           const docTitle = classification.documentTitle || subject || "Document";
           const attachTitle = totalAttachments > 1 ? `${docTitle} (${i + 2} of ${totalAttachments})` : docTitle;
-          await supabase.from("inbox_items").insert({
+          const { error: attInsertErr } = await supabase.from("inbox_items").insert({
             household_id: householdId,
             type: "family",
             title: attachTitle,
@@ -1909,6 +1947,10 @@ Respond with ONLY valid JSON:
             family_category: classification.type === "bill_invoice" ? "bills" : ((classification as any).familyCategory || "other"),
             status: "ready",
           });
+          if (attInsertErr) {
+            console.error(`[receive-email] family attachment inbox insert failed (${att.filename}):`, attInsertErr);
+            continue;
+          }
           actions.push(`saved_additional_attachment:${att.filename}`);
         } catch (err) {
           console.error(`[receive-email] Failed to save family attachment: ${err}`);
@@ -1929,7 +1971,7 @@ Respond with ONLY valid JSON:
           if (!upErr) {
             const docTitle = att.filename || `Attachment from ${fromAddress}`;
             const attachmentCategory = classification.documentCategory || "Other";
-            const { data: doc } = await supabase.from("documents").insert({
+            const { data: doc, error: docInsertErr } = await supabase.from("documents").insert({
               household_id: householdId,
               property_id: property.id,
               title: docTitle,
@@ -1942,6 +1984,9 @@ Respond with ONLY valid JSON:
               // Phase 58: carry vendor FK through to additional attachments.
               ...(createdContractorId ? { contractor_id: createdContractorId } : {}),
             }).select("id").single();
+            if (docInsertErr) {
+              console.error(`[receive-email] additional-attachment document insert failed (${att.filename}):`, docInsertErr);
+            }
             if (doc) {
               actions.push(`stored_additional_attachment:${att.filename}`);
               // Trigger AI analysis
@@ -2252,23 +2297,25 @@ Respond with ONLY valid JSON:
         const extractedEvents: Array<{ title: string; date: string; endDate?: string; allDay?: boolean; location?: string }> = (classification as any).events || [];
         if (extractedEvents.length > 1 && classification.type === "family") {
           console.log(`[receive-email] Multi-event email: creating ${extractedEvents.length} family_events`);
+          let multiEventInserted = 0;
           for (const evt of extractedEvents) {
             if (!evt.date) continue;
-            try {
-              await supabase.from("family_events").insert({
-                household_id: householdId,
-                title: evt.title || subject || "Event",
-                start_date: evt.date,
-                end_date: evt.endDate || null,
-                all_day: evt.allDay || false,
-                location: evt.location || null,
-                source: "email_parsed",
-              });
-            } catch (evtErr) {
-              console.error(`[receive-email] Failed to insert family_event: ${evtErr}`);
+            const { error: evtErr } = await supabase.from("family_events").insert({
+              household_id: householdId,
+              title: evt.title || subject || "Event",
+              start_date: evt.date,
+              end_date: evt.endDate || null,
+              all_day: evt.allDay || false,
+              location: evt.location || null,
+              source: "email_parsed",
+            });
+            if (evtErr) {
+              console.error(`[receive-email] Failed to insert family_event "${evt.title}":`, evtErr);
+            } else {
+              multiEventInserted++;
             }
           }
-          actions.push(`created_${extractedEvents.length}_family_events`);
+          actions.push(`created_${multiEventInserted}_family_events`);
         }
       }
 

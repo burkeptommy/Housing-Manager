@@ -206,6 +206,7 @@
 		6A3BA639D0AB7F87D934FAE5 /* IconTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32699B80B8FD02163046904B /* IconTile.swift */; };
 		6BA6FB3C8E8DE4E1ABE2C343 /* SeasonTasksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A955FF9D764D006FB078B6A /* SeasonTasksSheet.swift */; };
 		6C046691D730EF83B0A6166C /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7DFCE2761EABE541A267A3 /* InboxView.swift */; };
+		6C79B58BFF11C60635EEE001 /* TaskLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F0B5112283A326974220DA2 /* TaskLibraryView.swift */; };
 		6CB14A10DD299E021578F8CE /* FamilyReferenceBinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF2B9B2B3198D8B628F2951 /* FamilyReferenceBinder.swift */; };
 		6D50A7014DD8B536A8C0A88D /* DuplicateDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449C50A49E65B3D830136ADC /* DuplicateDetector.swift */; };
 		6DFCB34E539CF179E2E9DB5C /* OnboardingModeForkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FC52489911DAC6E057713BA /* OnboardingModeForkView.swift */; };
@@ -411,6 +412,7 @@
 		D33558FD1981F3125CB84A14 /* ScenarioStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */; };
 		D3439DE6767AE24F1815E62A /* HandymanPunchItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20E0892F8ED6544A58AEA63 /* HandymanPunchItem.swift */; };
 		D3AD0D8ED98087983442E27C /* QuizCaretakerInlineForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */; };
+		D44DCB5AB767B72AC721FF33 /* DashboardCacheStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B39AE3CFEB2614EA6D4CC0EA /* DashboardCacheStore.swift */; };
 		D4C367F578C66AB771CE8828 /* TasksHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8A006D8F0C0ADE1B32F948 /* TasksHubView.swift */; };
 		D5711621B588C7695CA4E7A2 /* ContractorDirectoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */; };
 		D5D4315942EDA973A2572D78 /* InboxItemFromDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB84F8671B68B8326A1A52D /* InboxItemFromDocument.swift */; };
@@ -768,6 +770,7 @@
 		7D01DDF4F64847EE3ACA4603 /* HookContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookContent.swift; sourceTree = "<group>"; };
 		7D8D097C2BF6F956A8DA7876 /* AssessmentPendingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssessmentPendingCard.swift; sourceTree = "<group>"; };
 		7EE222CAEC72CDB421341443 /* ScenarioLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioLoadingView.swift; sourceTree = "<group>"; };
+		7F0B5112283A326974220DA2 /* TaskLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskLibraryView.swift; sourceTree = "<group>"; };
 		80692DF12B6F07485A0AA35A /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
 		81BD018DF1C202052DD92D84 /* JailbreakDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JailbreakDetection.swift; sourceTree = "<group>"; };
 		83AADE9042AEE29A1723D203 /* DocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCard.swift; sourceTree = "<group>"; };
@@ -859,6 +862,7 @@
 		B24C0E6329241C25D1BA73D6 /* MonthSubheader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthSubheader.swift; sourceTree = "<group>"; };
 		B2C817E777D24E732912FBCA /* ScreenshotPrevention.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotPrevention.swift; sourceTree = "<group>"; };
 		B31B7C57764591968933F9EF /* ProcessingBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingBanner.swift; sourceTree = "<group>"; };
+		B39AE3CFEB2614EA6D4CC0EA /* DashboardCacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCacheStore.swift; sourceTree = "<group>"; };
 		B409D6403804C601F92361B9 /* UtilityProviderSearchPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityProviderSearchPicker.swift; sourceTree = "<group>"; };
 		B5CB7D3968D655AD81168BCE /* MaintenanceReorganizedCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceReorganizedCard.swift; sourceTree = "<group>"; };
 		B5DA027D43AA40A410184EC1 /* WeatherCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherCard.swift; sourceTree = "<group>"; };
@@ -1861,6 +1865,7 @@
 				9EBAFED62E0CAC6F191166BA /* SystemDetailView.swift */,
 				2E439AEF8C499A45C6D1C722 /* SystemGroupListView.swift */,
 				52DFF252E761E38911656477 /* SystemSubtypePicker.swift */,
+				7F0B5112283A326974220DA2 /* TaskLibraryView.swift */,
 				9A01411F71C6512A63FA44FC /* UpdateHomeDetailsSheet.swift */,
 				6DF7A5BC749EE76956FF9449 /* UtilityAccountsSection.swift */,
 				C97D2B0FAFB54FF91648CA17 /* VehicleDetailView.swift */,
@@ -1995,6 +2000,7 @@
 			isa = PBXGroup;
 			children = (
 				52C5FEDC0CF120BB8C30FC54 /* CacheManager.swift */,
+				B39AE3CFEB2614EA6D4CC0EA /* DashboardCacheStore.swift */,
 				7B4CEAEAAB9A80F3874FB94C /* EncryptionService.swift */,
 				70D797793DCD875D5112602E /* MaintenanceCacheStore.swift */,
 				CEEB86217778DF5F0F55AB58 /* SecureStorageService.swift */,
@@ -2319,6 +2325,7 @@
 				1F39207381ECD6E8E904428C /* CostTierView.swift in Sources */,
 				03ECBB6E3A8B2572B479EFCF /* CoverageView.swift in Sources */,
 				E33BB6002DCDC5BE5B6682F0 /* CoveredDriverPickerSheet.swift in Sources */,
+				D44DCB5AB767B72AC721FF33 /* DashboardCacheStore.swift in Sources */,
 				0481BDDFE4978139AC4B4263 /* DashboardView.swift in Sources */,
 				18E8E8B52A410592926204CA /* DashboardViewModel.swift in Sources */,
 				20CFC3DA10A920D8C4DB37CD /* DatabaseModels.swift in Sources */,
@@ -2638,6 +2645,7 @@
 				2D23E4305E1F50B1A2F75E0A /* SystemProfileAudit.swift in Sources */,
 				EE1C365370EBE0A3147C8F0D /* SystemStatusIndicator.swift in Sources */,
 				9C9F18A6F3E1A26A1E9B6465 /* SystemSubtypePicker.swift in Sources */,
+				6C79B58BFF11C60635EEE001 /* TaskLibraryView.swift in Sources */,
 				7ABECB7847B769DA380C004E /* TaskRoutingPicker.swift in Sources */,
 				D4C367F578C66AB771CE8828 /* TasksHubView.swift in Sources */,
 				09E0D130C530AF2761D36E0F /* TasksTimelineSheet.swift in Sources */,

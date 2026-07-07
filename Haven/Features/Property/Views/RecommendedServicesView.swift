@@ -41,6 +41,21 @@ struct RecommendedServicesView: View {
             .background(HavenColors.background)
             .navigationTitle("Recommended for You")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink {
+                        // Phase 80 (Tom's prevention pass): the canonical
+                        // entry to the hidden-tasks library. Reachable from
+                        // every RecommendedServicesView surface so users
+                        // who hit "Not for my home" can find their way back.
+                        TaskLibraryView(householdId: householdId, propertyId: propertyId)
+                    } label: {
+                        Image(systemName: "eye.slash")
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                    .accessibilityLabel("View hidden tasks")
+                }
+            }
             .searchable(text: $searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search services")
             .onSubmit(of: .search) {
                 let count = filteredGroups.reduce(0) { $0 + $1.items.count }

@@ -181,6 +181,12 @@ struct HandymanPunchListView: View {
         .task {
             await viewModel.load(householdId: householdId, propertyId: propertyId)
         }
+        // Other surfaces (task detail sheet, Realtime, Tasks tab) mutate
+        // the punch-list rail and post .handymanPunchListChanged — keep
+        // this list in sync while it's on screen.
+        .onReceive(NotificationCenter.default.publisher(for: .handymanPunchListChanged)) { _ in
+            Task { await viewModel.load(householdId: householdId, propertyId: propertyId) }
+        }
         .trackScreen("HandymanPunchListView")
     }
 

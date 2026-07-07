@@ -8,6 +8,24 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Data-persistence & interaction bug sweep (2026-07-07)
+
+Full-app audit for "data not saved" + cross-surface staleness bugs (3 parallel audit agents, every finding hand-verified — 8 agent claims refuted before touching code). All fixes landed same-day; both iOS builds green; receive-email redeployed.
+
+**P0 — LIVE prod bug fixed:** `contractors.rating` went numeric(2,1) in migration 20270111 but `ContractorRow` still decoded `Int?` with a synthesized decoder — one fractional rating (the real "Sweep Final Electric" 4.7 row) failed the entire `[ContractorRow]` fetch, blanking that household's vendor directory + coverage + reconciler matching. Fixed: `rating: Double?` across Row/Insert/Update, resilient `init(from:)` on ContractorRow (per the mandatory-decoder rule), display sites updated (`%.1f` + `Double(star)` star loops). Decode-smoke vs the actual prod JSON: old struct fails, new decodes 4.7; legacy whole numbers still decode.
+
+**P1 — 7 silent save failures fixed** (pattern: `try?` on user write + success haptic + dismiss regardless): UtilityDetailSheet save + delete (do/catch, error alert, `isSaving` reset, dismiss only on success), InboxView item delete (was remove-from-UI-then-fire-and-forget; now optimistic + restore-on-failure via new `InboxViewModel.deleteItem`, plus an alert finally rendering the long-published-but-never-shown `viewModel.error`), HandymanPreferenceView household-FK clear (`try?` → `try`), PropertyDetailView inline due-date save (error text + keep picker open), RoutingPreferencesView resetAll (per-row success tracking), MaintenanceTaskDetailSheet routing-preference upserts ×2 (no more "we'll remember this" toast on failed writes) + log-service-date system update (`try?` → `try`).
+
+**P2 — wiring gaps:** `.handymanPunchListChanged` was posted from 6+ sites (incl. RealtimeService) with ZERO observers — added observers to HandymanTabView + HandymanPunchListView. Swipe toast honesty: `completeTask`/`archiveTask` now return `@discardableResult Bool`, MaintenanceTabView gates its undo toasts on success, premature `Haptics.success()` moved after the write in archiveTask/snoozeTask.
+
+**P3 — decoder hardening (rule compliance):** resilient `init(from:)` added to DocumentRow (vault-critical), FamilyMemberRow, UserRow, and all 11 process-invoice response structs in InvoiceProcessingModels.swift. UserRow + SpecialtySystemSuggestion got explicit memberwise inits (custom `init(from:)` suppresses the synthesized one; DatabaseService + preview code construct them directly). DashboardCacheStore got the version-bump policy comment.
+
+**P4 — receive-email unchecked writes** (supabase-js returns `{error}`, doesn't throw — several try/catches were decorative): vendor-reply system message + unread bump, calendar-invite family_events inserts (now count successes; all-fail falls through to normal pipeline instead of claiming success), family-attachment storage upload + inbox insert (failed upload no longer creates an item pointing at a missing file), additional-attachment document insert, vendor quote enrichment, multi-event inserts (action label now reports actual inserted count), allowed-senders auto-add, rejection placeholder. Deployed with `--no-verify-jwt`.
+
+**Verified non-bugs worth remembering:** MaintenanceTaskInsert lacking `chez_request_id` / RoutineInsert·Update lacking `chez_owned` is intentional (chez-concierge stamps server-side; absence also protects from clobbering). `.homeSystemChanged`/`.projectChanged` are observed via DashboardViewModel's MERGED publisher (grep for `publisher(for:` misses it). ChezOwnsToggle flips state only after network success.
+
+---
+
 ## Phase 100 — Full-product verification + Chez Intelligence Foundation (2026-06-09/10)
 
 Founder mandate: verify the whole product (handoff pipeline, website/service model alignment, "expect old-model breakage"), build the data/model moat foundation (20:1 → 100:1 operator leverage), be skeptical and register every gap. Deliverables: `CHEZ_MISSION_GAPS.md` (repo root, the skeptical gap register + moat architecture) and `Tests/e2e/VERIFICATION_2026-06_GAPS.md` (findings log).

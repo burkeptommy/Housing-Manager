@@ -630,17 +630,29 @@ enum HouseQuizQuestionLibrary {
             // which is a structural home fact, not a vendor-service
             // question.
             chapter: .yourHome,
-            title: "Any other fuel sources?",
+            // Phase 80 — rephrased from "Any other fuel sources?" which
+            // Tom and Mindy both read as "do you use other fuels for
+            // HEAT?" (their oil boiler is the heat source; the
+            // fireplaces are decorative). Both selected "None" and the
+            // chimney detection fell through to `furnace_flue`,
+            // dropping the chimney sweep + creosote + spring wood
+            // inspection tasks. New wording is direct about what we're
+            // actually asking — fireplaces and stoves, not heating
+            // fuel — so the answer can't be misread.
+            title: "Any fireplaces, wood stoves, or pellet stoves?",
             // Phase 19i: generator moved to Q22's dedicated inline form so
             // we can capture its fuel type and provider separately. Q20 now
             // covers fireplace + stove + wood + pellets only.
-            subtitle: "Propane for the fireplace or stove? Wood or pellets? If it's only for a generator, skip it here, we'll ask next.",
+            // Phase 80 — also rephrased: emphasizes "even if decorative"
+            // so users with non-primary-heat fireplaces (the common
+            // HNW case) actually flag them.
+            subtitle: "Include any that are decorative, not just primary heat. Wood-burning fireplaces need annual chimney sweeps + creosote checks; gas fireplaces need an annual service.",
             kind: .multiSelect,
             answerOptions: [
-                AnswerOption(id: "propane_fireplace", label: "Propane (fireplace)"),
-                AnswerOption(id: "propane_stove", label: "Propane (stove)"),
-                AnswerOption(id: "wood_logs", label: "Wood (cordwood)"),
-                AnswerOption(id: "wood_pellets", label: "Wood pellets"),
+                AnswerOption(id: "wood_logs", label: "Wood-burning fireplace"),
+                AnswerOption(id: "wood_pellets", label: "Pellet stove"),
+                AnswerOption(id: "propane_fireplace", label: "Gas / propane fireplace"),
+                AnswerOption(id: "propane_stove", label: "Gas / propane stove"),
                 AnswerOption(id: "none", label: "None"),
             ]
         ),

@@ -561,8 +561,11 @@ final class MaintenanceViewModel: ObservableObject {
     /// `is_archived = true / archived_at = NOW() / archived_reason`
     /// per the Phase 17b schema. Reason stamped so future activity-log
     /// surfaces can filter on origin.
-    func archiveTask(_ task: MaintenanceTaskDBRow) async {
-        Haptics.success()
+    /// Returns whether the archive actually landed so callers can gate
+    /// their undo toast — showing "Archived · Undo" for a failed write
+    /// left users undoing an archive that never happened.
+    @discardableResult
+    func archiveTask(_ task: MaintenanceTaskDBRow) async -> Bool {
         do {
             try await db.archiveMaintenanceTask(
                 id: task.id,
@@ -572,10 +575,14 @@ final class MaintenanceViewModel: ObservableObject {
             // disappearance even before `.maintenanceTaskChanged`
             // listeners refresh their lists.
             tasks.removeAll { $0.id == task.id }
+            Haptics.success()
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            return true
         } catch {
             print("[MaintenanceViewModel] archiveTask failed: \(error)")
+            self.error = error.localizedDescription
             Haptics.error()
+            return false
         }
     }
 
@@ -592,7 +599,6 @@ final class MaintenanceViewModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let newDate = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
-        Haptics.success()
         do {
             let updated = try await db.updateMaintenanceTask(
                 id: task.id,
@@ -601,14 +607,20 @@ final class MaintenanceViewModel: ObservableObject {
             if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
                 tasks[idx] = updated
             }
+            Haptics.success()
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         } catch {
             print("[MaintenanceViewModel] snoozeTask failed: \(error)")
+            self.error = error.localizedDescription
             Haptics.error()
         }
     }
 
-    func completeTask(_ task: MaintenanceTaskDBRow) async {
+    /// Returns whether the completion write landed. The optimistic
+    /// remove + rollback stays internal; callers use the Bool to gate
+    /// their own undo toasts.
+    @discardableResult
+    func completeTask(_ task: MaintenanceTaskDBRow) async -> Bool {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let todayString = formatter.string(from: Date())
@@ -780,6 +792,7 @@ final class MaintenanceViewModel: ObservableObject {
                     taskId: task.id
                 )
             }
+            return true
         } catch {
             // Phase 70.A1 follow-on G1 — rollback the optimistic remove
             // by re-inserting the task at its prior position. Failure
@@ -793,6 +806,7 @@ final class MaintenanceViewModel: ObservableObject {
             completionToast = nil
             self.error = error.localizedDescription
             Haptics.error()
+            return false
         }
     }
 

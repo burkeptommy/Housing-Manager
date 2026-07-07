@@ -42,6 +42,15 @@ struct UpdateHomeDetailsSheet: View {
     // Phase 70.A1.x: gravel driveway. Drives Regravel (every 3y, Summer)
     // and Top up gravel (annual, Spring) templates.
     @State private var hasGravelDriveway = false
+    // Phase 80 — fireplace flags. The toggle pair (wood + gas) lets
+    // users correct an ATTOM miss or an ambiguous Q20 answer without
+    // retaking the quiz. Flipping `has_wood_fireplace` on flows
+    // through `HouseQuizAnswerMapper.resolveChimneyRule` (Phase 80
+    // attribute-source-of-truth extension) on the next reconcile so
+    // the chimney row's subtype updates to `wood` and the sweep /
+    // creosote / spring wood inspection tasks seed.
+    @State private var hasWoodFireplace = false
+    @State private var hasGasFireplace = false
 
     /// Snapshot of every flag at load time. Used to compute the diff on save
     /// so the confirmation sheet only shows what actually changed.
@@ -196,6 +205,24 @@ struct UpdateHomeDetailsSheet: View {
                     toggleRow(title: "Gravel driveway",
                               subtitle: "Adds a 3-year regravel task and an annual spring top-up.",
                               isOn: $hasGravelDriveway)
+                    Divider()
+                    // Phase 80 — wood + gas fireplace toggles. Public
+                    // records (ATTOM) miss fireplaces for many suburban
+                    // NE addresses, and the Q20 fuel-sources question
+                    // reads ambiguously when fireplaces are decorative
+                    // not heat sources. Surfacing here lets users
+                    // correct without retaking the quiz. Flipping
+                    // either ON triggers HouseQuizAnswerMapper's
+                    // `resolveChimneyRule` to re-evaluate the chimney
+                    // subtype + seeds sweep / creosote / spring wood
+                    // inspection (wood) or annual gas service (gas).
+                    toggleRow(title: "Wood-burning fireplace",
+                              subtitle: "Adds annual chimney sweep + creosote check + spring wood inspection. NE homes overwhelmingly have wood when fireplaces are present.",
+                              isOn: $hasWoodFireplace)
+                    Divider()
+                    toggleRow(title: "Gas fireplace",
+                              subtitle: "Adds an annual gas-line service + cap/crown inspection.",
+                              isOn: $hasGasFireplace)
                 }
             }
         }
@@ -340,6 +367,8 @@ struct UpdateHomeDetailsSheet: View {
         hasHeatCables = readFlag("has_heat_cables")
         hasDehumidifier = readFlag("has_dehumidifier")
         hasGravelDriveway = readFlag("has_gravel_driveway")
+        hasWoodFireplace = readFlag("has_wood_fireplace")
+        hasGasFireplace = readFlag("has_gas_fireplace")
 
         initialFlags = [
             "has_humidifier": hasHumidifier,
@@ -354,7 +383,9 @@ struct UpdateHomeDetailsSheet: View {
             "has_scheduled_valuables": hasScheduledValuables,
             "has_heat_cables": hasHeatCables,
             "has_dehumidifier": hasDehumidifier,
-            "has_gravel_driveway": hasGravelDriveway
+            "has_gravel_driveway": hasGravelDriveway,
+            "has_wood_fireplace": hasWoodFireplace,
+            "has_gas_fireplace": hasGasFireplace
         ]
     }
 
@@ -392,7 +423,9 @@ struct UpdateHomeDetailsSheet: View {
             "has_scheduled_valuables": hasScheduledValuables,
             "has_heat_cables": hasHeatCables,
             "has_dehumidifier": hasDehumidifier,
-            "has_gravel_driveway": hasGravelDriveway
+            "has_gravel_driveway": hasGravelDriveway,
+            "has_wood_fireplace": hasWoodFireplace,
+            "has_gas_fireplace": hasGasFireplace
         ]
     }
 

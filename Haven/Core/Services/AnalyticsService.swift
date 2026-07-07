@@ -152,6 +152,46 @@ enum AnalyticsEvent: String {
     /// Phase 54C — Recommended for your home analytics.
     case recommendedServiceScheduled = "recommended_service_scheduled"
     case recommendedServiceDismissed = "recommended_service_dismissed"
+    /// Phase 80 prevention fix #1: fired when `scheduleOptInTemplate`
+    /// blocks a tap because the template's `requiredSubtypes` don't fit
+    /// the home. Should be rare since RecommendedServicesView filters
+    /// by subtype too; non-zero counts mean a deeplink or future caller
+    /// reached the entry point with a stale template list.
+    case recommendedServiceScheduleBlocked = "recommended_service_schedule_blocked"
+    /// Phase 80 prevention fix #2: fired when the reconciler auto-folds
+    /// a standalone bundle-child task into its existing bundle parent.
+    /// High counts suggest something upstream is still creating
+    /// standalones that should be bundle children.
+    case bundleChildAutoFolded = "bundle_child_auto_folded"
+    /// Phase 80 prevention fix #3: fired when the reconciler backfills
+    /// a missing bundle parent because pre-bundle children existed.
+    case bundleParentBackfilled = "bundle_parent_backfilled"
+    /// Phase 80 prevention fix #4: fired when the reconciler archives a
+    /// task whose template's `requiredSubtypes` no longer match the
+    /// system's current subtypes.
+    case taskArchivedSubtypeMismatch = "task_archived_subtype_mismatch"
+    /// Phase 80 prevention fix #5: fired when reconcile bails because
+    /// the user has actively dismissed (permanent or active snooze)
+    /// the entire SystemCategory. Lets us measure how often the daily
+    /// reconcile or quiz completion is correctly skipping user-rejected
+    /// work instead of force-seeding it.
+    case reconcileSkippedDismissedCategory = "reconcile_skipped_dismissed_category"
+    /// Phase 80 (Tom's prevention pass): fired when the user restores a
+    /// hidden item from the Task Library. Payload `type` distinguishes
+    /// category / template / recommendation so we can see which path
+    /// users primarily reach for.
+    case taskLibraryItemRestored = "task_library_item_restored"
+    /// Phase 80 (Tom's prevention pass): fired when the daily reconcile
+    /// tick runs at app cold start. Volume of this event tells us the
+    /// idempotent reconciler is firing reliably; spikes after a release
+    /// indicate a wave of fleet-wide self-healing.
+    case dailyReconcileFired = "daily_reconcile_fired"
+    /// Phase 80 prevention fix #6: fired when `reconcile` is invoked
+    /// with no system AND no home_system exists for the category, so
+    /// the ADD pass gets short-circuited. Non-zero counts confirm the
+    /// `reconcileAll` orphan-pass-without-system bug (Irrigation tasks
+    /// for `irrigation:no` homes) is no longer firing.
+    case reconcileOrphanPassSkippedAdds = "reconcile_orphan_pass_skipped_adds"
     /// Phase 57 — "What's New" HNW review card.
     case whatsNewPhase57Opened = "whats_new_phase57_opened"
     case whatsNewPhase57Dismissed = "whats_new_phase57_dismissed"

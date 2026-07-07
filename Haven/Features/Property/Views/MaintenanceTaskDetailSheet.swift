@@ -1610,9 +1610,12 @@ struct MaintenanceTaskDetailSheet: View {
                 )
             )
 
-            // Also update the parent system's dates if applicable
+            // Also update the parent system's dates if applicable.
+            // No `try?`: a silently failed system update leaves
+            // last_service_date stale, which skews every future
+            // due-date computed off the system override.
             if let systemId = task.systemId {
-                _ = try? await DatabaseService.shared.updateHomeSystem(
+                _ = try await DatabaseService.shared.updateHomeSystem(
                     id: systemId,
                     HomeSystemUpdate(
                         lastServiceDate: completedStr,
@@ -1887,12 +1890,19 @@ struct MaintenanceTaskDetailSheet: View {
                 preferredRoute: route,
                 preferredVendorId: route == "vendor" ? assignedContractor?.id : nil
             )
-            _ = try? await DatabaseService.shared.upsertRoutingPreference(insert)
-            Analytics.track(.routingPreferenceUpdated, [
-                "category": category,
-                "from_route": categoryPref.preferredRoute,
-                "to_route": route
-            ])
+            do {
+                _ = try await DatabaseService.shared.upsertRoutingPreference(insert)
+                Analytics.track(.routingPreferenceUpdated, [
+                    "category": category,
+                    "from_route": categoryPref.preferredRoute,
+                    "to_route": route
+                ])
+            } catch {
+                // The route itself already applied (setTaskRoute succeeded
+                // upstream) — only the remembered override was lost.
+                print("[MaintenanceTaskDetailSheet] template routing preference upsert failed: \(error)")
+                Haptics.error()
+            }
             return
         }
 
@@ -1908,7 +1918,15 @@ struct MaintenanceTaskDetailSheet: View {
                 preferredRoute: route,
                 preferredVendorId: route == "vendor" ? assignedContractor?.id : nil
             )
-            _ = try? await DatabaseService.shared.upsertRoutingPreference(insert)
+            do {
+                _ = try await DatabaseService.shared.upsertRoutingPreference(insert)
+            } catch {
+                // Don't show "we'll remember this" for a preference that
+                // never persisted — the old `try?` version toasted anyway.
+                print("[MaintenanceTaskDetailSheet] category routing preference upsert failed: \(error)")
+                Haptics.error()
+                return
+            }
             Analytics.track(.routingPreferenceSet, [
                 "category": category,
                 "route": route,

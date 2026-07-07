@@ -25,8 +25,34 @@ struct PropertyRecapEditSheet: View {
     /// so the picker lands somewhere sensible for users who weren't
     /// prefilled by ATTOM.
     @State private var draftPurchaseDate: Date = Calendar.current.date(byAdding: .year, value: -5, to: Date()) ?? Date()
+    /// Phase 80 — fireplace editor state. Three buckets users can pick:
+    /// none, gas-only, or wood-burning (with a count). The save path
+    /// writes `has_wood_fireplace` + `wood_fireplace_count` +
+    /// `has_gas_fireplace` directly to `property.attributes` so
+    /// `HouseQuizAnswerMapper.resolveChimneyRule` picks them up as a
+    /// second source of truth (works even when no Fireplace
+    /// home_system was created — the common case for users whose
+    /// ATTOM lookup didn't return fireplace data).
+    @State private var draftFireplaceChoice: FireplaceChoice = .none
+    @State private var draftWoodFireplaceCount: Int = 1
     @State private var isSaving: Bool = false
     @State private var errorMessage: String?
+
+    /// Phase 80 — discriminator for the fireplace picker. The
+    /// `wood` case carries a count (1, 2, or 3+).
+    enum FireplaceChoice: String, CaseIterable, Identifiable {
+        case none
+        case wood
+        case gas
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .none: return "None"
+            case .wood: return "Wood-burning"
+            case .gas: return "Gas"
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -77,6 +103,7 @@ struct PropertyRecapEditSheet: View {
         case .bathrooms:       return "Bathrooms"
         case .lotSize:         return "Lot size"
         case .purchaseDate:    return "Purchase date"
+        case .fireplaces:      return "Fireplaces"
         }
     }
 
@@ -102,6 +129,8 @@ struct PropertyRecapEditSheet: View {
             return property.purchaseDate == nil
                 ? "When did you take ownership? Even an approximate year helps us tell you when systems are getting close to replacement."
                 : "If the date pulled from public records is wrong, correct it here."
+        case .fireplaces:
+            return "Wood-burning fireplaces need annual chimney sweeps + creosote checks; gas fireplaces need an annual gas-line service. Public records often miss this, so we ask directly."
         }
     }
 
@@ -192,6 +221,33 @@ struct PropertyRecapEditSheet: View {
             .datePickerStyle(.graphical)
             .labelsHidden()
             .frame(maxWidth: .infinity)
+
+        case .fireplaces:
+            // Phase 80 — three-choice picker. The user picks one of
+            // None / Wood-burning / Gas. When Wood-burning is active,
+            // a stepper reveals for the count. The picker is one tap
+            // for the common case (no fireplace OR one wood fireplace).
+            VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                Picker("Fireplace type", selection: $draftFireplaceChoice) {
+                    ForEach(FireplaceChoice.allCases) { choice in
+                        Text(choice.label).tag(choice)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if draftFireplaceChoice == .wood {
+                    Text("How many?")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    PropertyRecapEditors.stepperEditor(
+                        label: draftWoodFireplaceCount == 1 ? "fireplace" : "fireplaces",
+                        value: draftWoodFireplaceCount,
+                        range: 1...10,
+                        onCommit: { draftWoodFireplaceCount = $0 }
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -223,6 +279,23 @@ struct PropertyRecapEditSheet: View {
         // DatabaseModels — coerce to Date for the picker.
         if let raw = property.purchaseDate, let parsed = Self.purchaseDateFormatter.date(from: raw) {
             draftPurchaseDate = parsed
+        }
+        // Phase 80 — seed fireplace draft from attributes. Three-way
+        // resolution: wood beats gas beats none; explicit "false" on
+        // both means user previously answered "none" and we preserve
+        // that choice rather than re-prompting.
+        let attrs = property.attributes ?? [:]
+        let hasWood = attrs["has_wood_fireplace"]?.stringValue.lowercased() == "true"
+        let hasGas = attrs["has_gas_fireplace"]?.stringValue.lowercased() == "true"
+        if hasWood {
+            draftFireplaceChoice = .wood
+            if let raw = attrs["wood_fireplace_count"]?.stringValue, let n = Int(raw), n > 0 {
+                draftWoodFireplaceCount = n
+            }
+        } else if hasGas {
+            draftFireplaceChoice = .gas
+        } else {
+            draftFireplaceChoice = .none
         }
     }
 
@@ -274,6 +347,29 @@ struct PropertyRecapEditSheet: View {
             // `mergedAttributes` to avoid a doubled "_source_source" key.
             var attrs = property.attributes ?? [:]
             attrs["purchase_date_source"] = .string("manual")
+            update.attributes = attrs
+        case .fireplaces:
+            // Phase 80 — write three explicit attributes so
+            // `resolveChimneyRule` can read them as a second source of
+            // truth. We intentionally write "false" (not null) when the
+            // user picks "None" so subsequent recap renders show "None"
+            // instead of re-prompting "Tap to confirm".
+            var attrs = property.attributes ?? [:]
+            switch draftFireplaceChoice {
+            case .wood:
+                attrs["has_wood_fireplace"] = .string("true")
+                attrs["has_gas_fireplace"] = .string("false")
+                attrs["wood_fireplace_count"] = .string(String(draftWoodFireplaceCount))
+            case .gas:
+                attrs["has_wood_fireplace"] = .string("false")
+                attrs["has_gas_fireplace"] = .string("true")
+                attrs["wood_fireplace_count"] = .string("0")
+            case .none:
+                attrs["has_wood_fireplace"] = .string("false")
+                attrs["has_gas_fireplace"] = .string("false")
+                attrs["wood_fireplace_count"] = .string("0")
+            }
+            attrs["fireplace_source"] = .string("manual")
             update.attributes = attrs
         }
 

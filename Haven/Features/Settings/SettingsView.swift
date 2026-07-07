@@ -261,6 +261,19 @@ struct SettingsView: View {
                         .font(HavenTypography.body)
                 }
 
+                // Phase 80 — discoverable Hidden Tasks entry per the
+                // original Phase 80 plan Part 2.4. Single tap from
+                // Settings to the Task Library so users who muscle-
+                // memory their way to Settings → Maintenance can find
+                // anything they've dismissed or snoozed without
+                // scrolling the Maintenance tab.
+                NavigationLink {
+                    TaskLibrarySettingsLoader()
+                } label: {
+                    Label("Hidden Tasks", systemImage: "eye.slash")
+                        .font(HavenTypography.body)
+                }
+
                 // Phase 63: handyman-specific preference, distinct from the
                 // global vendor tier. Captured at Q15b, editable here.
                 NavigationLink {

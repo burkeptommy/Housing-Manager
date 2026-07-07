@@ -736,6 +736,8 @@ struct UtilityDetailSheet: View {
     @State private var phone: String
     @State private var website: String
     @State private var isSaving = false
+    @State private var isDeleting = false
+    @State private var errorMessage: String?
     /// Phase 84 — local mirror for ChezOwnsToggle's Binding. Seeded
     /// from the account on init; flips immediately on toggle, network
     /// call follows.
@@ -807,18 +809,30 @@ struct UtilityDetailSheet: View {
 
                 Section {
                     Button(role: .destructive) {
+                        isDeleting = true
                         Task {
-                            try? await DatabaseService.shared.deleteUtilityAccount(id: account.id)
-                            onDelete?()
-                            dismiss()
+                            defer { isDeleting = false }
+                            do {
+                                try await DatabaseService.shared.deleteUtilityAccount(id: account.id)
+                                onDelete?()
+                                dismiss()
+                            } catch {
+                                Haptics.error()
+                                errorMessage = "Couldn't remove this utility. Check your connection and try again."
+                            }
                         }
                     } label: {
                         HStack {
                             Spacer()
-                            Label("Remove Utility", systemImage: "trash")
+                            if isDeleting {
+                                ProgressView()
+                            } else {
+                                Label("Remove Utility", systemImage: "trash")
+                            }
                             Spacer()
                         }
                     }
+                    .disabled(isDeleting)
                 }
             }
             .navigationTitle(account.typeLabel)
@@ -838,11 +852,20 @@ struct UtilityDetailSheet: View {
             }
         }
         .presentationDetents([.large])
+        .alert("Something went wrong", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
 
     private func save() {
         isSaving = true
         Task {
+            defer { isSaving = false }
             var updates: [String: String] = [:]
             updates["account_number"] = accountNumber.isEmpty ? "" : accountNumber
             updates["plan_name"] = planName.isEmpty ? "" : planName
@@ -851,10 +874,15 @@ struct UtilityDetailSheet: View {
             if let cost = Double(monthlyCost) {
                 updates["monthly_cost"] = String(cost)
             }
-            try? await DatabaseService.shared.updateUtilityAccount(id: account.id, updates)
-            onUpdate?()
-            Haptics.success()
-            dismiss()
+            do {
+                try await DatabaseService.shared.updateUtilityAccount(id: account.id, updates)
+                onUpdate?()
+                Haptics.success()
+                dismiss()
+            } catch {
+                Haptics.error()
+                errorMessage = "Couldn't save your changes. Check your connection and try again."
+            }
         }
     }
 }

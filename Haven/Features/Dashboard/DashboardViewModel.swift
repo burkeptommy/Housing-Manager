@@ -565,6 +565,31 @@ final class DashboardViewModel: ObservableObject {
         // Subscribe immediately so push notifications trigger inbox refresh
         // even before loadDashboard() completes
         subscribeToChanges()
+        // Phase 80 perf fix #2: synchronously hydrate from disk so the first
+        // paint shows real numbers + Up Next + coverage pill instead of a
+        // skeleton. fetchAll() will refresh in the background and overwrite
+        // any deltas. Cache failure is non-fatal — falls back to network.
+        hydrateFromCache()
+    }
+
+    /// Pull the most recent snapshot off disk on init. Mirrors the pattern
+    /// `MaintenanceViewModel.init()` uses for the Tasks tab. Only fields
+    /// that drive the FIRST PAINT region of the dashboard are cached;
+    /// everything else falls through to the network path.
+    private func hydrateFromCache() {
+        guard let payload = DashboardCacheStore.read() else { return }
+        userFirstName = payload.userFirstName
+        overdueMaintenanceTasks = payload.overdueTasks
+        dueThisWeekTasks = payload.dueThisWeekTasks
+        dueThisMonthTasks = payload.dueThisMonthTasks
+        allUpcomingTasks = payload.allUpcomingTasks
+        nextUpcomingTask = payload.nextUpcomingTask
+        coveredSystemCount = payload.coveredSystemCount
+        totalVendorSystemCount = payload.totalVendorSystemCount
+        activeVendorCount = payload.activeVendorCount
+        dueThisWeekTaskCount = payload.dueThisWeekTaskCount
+        personalTaskCount = payload.personalTaskCount
+        vendorManagedTaskCount = payload.vendorManagedTaskCount
     }
 
     /// Phase 50 (sub-phase B first-login): collapses to "no property" or
@@ -882,14 +907,25 @@ final class DashboardViewModel: ObservableObject {
             .documentChanged, .propertyChanged, .projectChanged,
             .chezRequestChanged
         ]
-        for name in names {
+        // Phase 80 perf fix #6: coalesce notifications into ONE merged
+        // stream, then debounce. Pre-Phase 80 every notification had its
+        // own 300ms debounce, so a flow that fires three notifications
+        // back-to-back (e.g. applying an invoice processor change emits
+        // .maintenanceTaskChanged + .homeSystemChanged + .contractorChanged
+        // within milliseconds) triggered three independent refreshes,
+        // each loading 16+ DB rows. With the merge, the same flow now
+        // triggers a single refresh ~300ms after the last event.
+        let publishers = names.map { name in
             NotificationCenter.default.publisher(for: name)
-                .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-                .sink { [weak self] _ in
-                    Task { [weak self] in await self?.refresh() }
-                }
-                .store(in: &cancellables)
+                .map { _ in () }
+                .eraseToAnyPublisher()
         }
+        Publishers.MergeMany(publishers)
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                Task { [weak self] in await self?.refresh() }
+            }
+            .store(in: &cancellables)
         // Inbox updates only refresh inbox items, not the whole dashboard
         NotificationCenter.default.publisher(for: .inboxItemUpdated)
             .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
@@ -982,6 +1018,23 @@ final class DashboardViewModel: ObservableObject {
         // Build 90: compute derived dashboard state after all data is loaded
         computeThisWeekItems()
         computeRecentActivity()
+
+        // Phase 80 perf fix #2: persist the snapshot for the next launch.
+        // Off-main-actor write — file I/O won't block the current frame.
+        DashboardCacheStore.write(
+            userFirstName: userFirstName,
+            overdueTasks: overdueMaintenanceTasks,
+            dueThisWeekTasks: dueThisWeekTasks,
+            dueThisMonthTasks: dueThisMonthTasks,
+            allUpcomingTasks: allUpcomingTasks,
+            nextUpcomingTask: nextUpcomingTask,
+            coveredSystemCount: coveredSystemCount,
+            totalVendorSystemCount: totalVendorSystemCount,
+            activeVendorCount: activeVendorCount,
+            dueThisWeekTaskCount: dueThisWeekTaskCount,
+            personalTaskCount: personalTaskCount,
+            vendorManagedTaskCount: vendorManagedTaskCount
+        )
     }
 
     private func loadUserName() async {
