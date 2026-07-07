@@ -70,6 +70,13 @@ import {
   type DelegationSnapshot,
   type SnapshotKind,
 } from "./snapshot.ts";
+import {
+  confirmApprovedCharge,
+  handleConfirmPaymentMethod,
+  handleCreateSetupIntent,
+  handleDetachPaymentMethod,
+  paymentsConfigured,
+} from "./payments.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -2133,6 +2140,21 @@ async function handleDecideProposal(
   if (decision === "approved") {
     const propBlob = (message.proposal as Record<string, unknown>) ?? {};
     const kind = String(propBlob.kind ?? "");
+    // Wave 5 — a cost proposal that carries an above-tier charge gets
+    // confirmed against the card on file when the homeowner approves.
+    // Best-effort: a charge failure doesn't unwind the approval (the
+    // failed charge row + admin visibility handle retry).
+    if (kind === "cost" && paymentsConfigured()) {
+      const chargeId = compactString(propBlob.charge_id);
+      if (chargeId) {
+        try {
+          const res = await confirmApprovedCharge(service, chargeId);
+          if (!res.ok) console.warn("[payments] approved-charge confirm failed:", res.error);
+        } catch (e) {
+          console.warn("[payments] approved-charge confirm exception:", e);
+        }
+      }
+    }
     if (kind === "vendor") {
       const vendorBlob = (propBlob.vendor as Record<string, unknown>) ?? {};
       const vendorName = String(vendorBlob.name ?? "").trim() || "(unnamed vendor)";
@@ -7830,6 +7852,34 @@ serve(async (req: Request) => {
         );
       case "fetch_request_progress":
         return handleFetchRequestProgress(service, user, body as { request_id?: string });
+
+      // Wave 5 — Stripe card-on-file (homeowner). Inert until
+      // STRIPE_SECRET_KEY is set; each handler returns a clean 503 so the
+      // iOS payment surfaces stay capability-gated until go-live.
+      case "payments_status":
+        return json({ configured: paymentsConfigured() });
+      case "create_setup_intent": {
+        if (!user) return json({ error: "auth required" }, 401);
+        const hid = await householdIdForUser(service, user.id);
+        if (!hid) return json({ error: "no household" }, 404);
+        return handleCreateSetupIntent(service, hid);
+      }
+      case "confirm_payment_method": {
+        if (!user) return json({ error: "auth required" }, 401);
+        const hid = await householdIdForUser(service, user.id);
+        if (!hid) return json({ error: "no household" }, 404);
+        const setupIntentId = compactString((body as { setup_intent_id?: string }).setup_intent_id);
+        if (!setupIntentId) return json({ error: "setup_intent_id required" }, 400);
+        return handleConfirmPaymentMethod(service, hid, setupIntentId);
+      }
+      case "detach_payment_method": {
+        if (!user) return json({ error: "auth required" }, 401);
+        const hid = await householdIdForUser(service, user.id);
+        if (!hid) return json({ error: "no household" }, 404);
+        const pmId = compactString((body as { payment_method_id?: string }).payment_method_id);
+        if (!pmId) return json({ error: "payment_method_id required" }, 400);
+        return handleDetachPaymentMethod(service, hid, pmId);
+      }
 
       // Wave 3 Phase C/D — case availability + vendor registry drilldown
       case "save_case_availability":
