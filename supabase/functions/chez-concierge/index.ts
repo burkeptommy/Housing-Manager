@@ -1302,6 +1302,20 @@ async function handleUpdateProfile(
       ?.chez_profile ?? {};
     nextProfile = deepMergeProfile(current, incoming);
   }
+  // July 2026 security sweep (audit S8): spending tiers render into the
+  // operator portal DOM. They are dollar amounts — coerce to numbers at
+  // write time so a tampered client can never plant HTML/script that
+  // executes in the operator's session. Non-numeric values are dropped.
+  const tiers = nextProfile.spending_tiers as Record<string, unknown> | undefined;
+  if (tiers && typeof tiers === "object" && !Array.isArray(tiers)) {
+    const cleaned: Record<string, number> = {};
+    for (const [k, v] of Object.entries(tiers)) {
+      const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.]/g, ""));
+      if (Number.isFinite(n)) cleaned[k] = n;
+    }
+    nextProfile.spending_tiers = cleaned;
+  }
+
   // Stamp completion timestamp on first non-empty fill.
   const completion = (nextProfile._completion as Record<string, unknown> | undefined) ?? {};
   if (!completion.filled_at && Object.keys(nextProfile).filter((k) => k !== "_completion").length > 0) {

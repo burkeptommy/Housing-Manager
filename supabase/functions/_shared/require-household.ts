@@ -112,6 +112,36 @@ export function requireInternal(req: Request): boolean {
 }
 
 /**
+ * True when the request is trusted for ADMIN/BATCH work: the internal
+ * secret, the service-role key as bearer, or a verified JWT whose email is
+ * on the CHEZ_ADMIN_EMAILS allowlist (same list chez-concierge uses).
+ * Used by the catalog utilities (upload-manual, expand-catalog, …), which
+ * were previously fully unauthenticated.
+ */
+export async function requireAdminOrInternal(req: Request): Promise<boolean> {
+  if (requireInternal(req)) return true;
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const svcKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (svcKey.length > 0 && authHeader === `Bearer ${svcKey}`) return true;
+
+  if (!authHeader) return false;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) return false;
+  const client = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error } = await client.auth.getUser();
+  if (error || !user?.email) return false;
+  const allowlist = (Deno.env.get("CHEZ_ADMIN_EMAILS") ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return allowlist.includes(user.email.toLowerCase());
+}
+
+/**
  * Convenience: 403 unless the body-supplied household matches the caller's.
  * Pass the body value ONLY for backward compatibility with clients that
  * still send household_id — the caller's JWT household always wins.

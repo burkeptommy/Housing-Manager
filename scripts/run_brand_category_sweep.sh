@@ -44,6 +44,7 @@ sweep_one() {
   response=$(curl -sS -X POST "$SUPABASE_URL/functions/v1/expand-brand-categories" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+    -H "x-internal-secret: ${INTERNAL_FN_SECRET:?set INTERNAL_FN_SECRET (supabase secrets) to run gated catalog functions}" \
     --max-time 90 \
     -d "{\"manufacturer_slug\":\"$slug\"}" 2>&1)
   echo "[$(date)] $slug → $response" >> "$LOG_FILE"
