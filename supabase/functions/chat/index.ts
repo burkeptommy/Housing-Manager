@@ -84,7 +84,7 @@ async function executeAlfredTool(
     householdId: string;
     userId: string | null;
   }
-): Promise<{ text: string; isError?: boolean }> {
+): Promise<{ text: string; isError?: boolean; createdRequestId?: string }> {
   if (name !== "submit_concierge_request") {
     return { text: `Unknown tool: ${name}`, isError: true };
   }
@@ -162,6 +162,9 @@ async function executeAlfredTool(
       text: requestId
         ? `Concierge request submitted. Reference: ${requestId}. Tell the homeowner it's been sent and they'll hear from the team within 24 business hours.`
         : "Concierge request submitted. Tell the homeowner it's been sent and they'll hear from the team within 24 business hours.",
+      // Photo-to-case (2026-07-08): surfaced on the chat response so iOS
+      // can attach any photos from this chat session to the new case.
+      createdRequestId: requestId ?? undefined,
     };
   } catch (e) {
     console.warn("[chat] tool execution exception:", e);
@@ -188,6 +191,7 @@ interface ChatRequest {
 
 interface ChatResponse {
   reply: string;
+  created_request_id?: string;
   context_type: string;
 }
 
@@ -323,6 +327,7 @@ serve(async (req: Request) => {
     }
 
     let toolLoopIterations = 0;
+    let createdRequestId: string | null = null;
     while (aiResult && aiResult.stop_reason === "tool_use" && toolLoopIterations < 3) {
       toolLoopIterations += 1;
       const toolUses = (aiResult.content_blocks ?? []).filter(
@@ -338,6 +343,7 @@ serve(async (req: Request) => {
         role: "assistant",
         content: aiResult.content_blocks,
       });
+      // (createdRequestId declared before the loop below)
 
       const toolResults: any[] = [];
       for (const tu of toolUses) {
@@ -352,6 +358,7 @@ serve(async (req: Request) => {
             userId,
           }
         );
+        if (result.createdRequestId) createdRequestId = result.createdRequestId;
         toolResults.push({
           type: "tool_result",
           tool_use_id: tu.id,
@@ -444,6 +451,9 @@ serve(async (req: Request) => {
     const response: ChatResponse = {
       reply,
       context_type: body.context_type ?? "general",
+      // Photo-to-case (2026-07-08): set when Alfred filed a concierge
+      // request this turn; iOS attaches session photos to it.
+      ...(createdRequestId ? { created_request_id: createdRequestId } : {}),
     };
 
     return new Response(JSON.stringify(response), {

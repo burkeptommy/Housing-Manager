@@ -40,6 +40,17 @@ The final Ingestion Intelligence v2 milestone. All five milestones (M1 foundatio
 
 ---
 
+## Photo-to-case: snap a broken thing, it becomes a Chez case (2026-07-08, morning)
+
+Tom's "fallen branch" flows, closing the seams around the existing Chez Concierge machinery (compose sheet + cockpit sourcing/bidding/proposals were already built):
+
+- **Chat photos ride into cases.** The chat function's `submit_concierge_request` tool result now carries the created request id up through the chat response (`created_request_id`); ChatViewModel keeps the session's photos (last 3, raw JPEG — the vault copy is AES-encrypted and useless to the cockpit) and, on seeing the id, uploads them through the chez attachment rails + replies to the new case with them. Verified live: explicit "have Chez find a tree service" chat → tool fired → `created_request_id` returned (iOS attach path build-verified; on-device tap remains).
+- **Camera-first capture.** NEW `CameraCaptureView` (UIImagePickerController .camera). The dashboard's Ask Chez quick action now asks "Snap a photo of the problem / Describe it instead"; snap → `ChezRequestComposeSheet(initialImageData:)` with the photo pre-staged. The compose sheet's attachment tray also gains a Camera button alongside Photos/File.
+- **Open-cases strip.** Dashboard shows "Chez is working N open cases →" (pushes `ChezRequestsListView`) whenever any case is unresolved — cases no longer live only behind Inbox → Chez.
+- Item 3a from the plan (outreach milestones in the customer thread) turned out to already exist — `send-chez-vendor-email` drops a homeowner-visible system message per outreach.
+
+---
+
 ## Go-live: webhook token activated + household address reset (2026-07-08, morning)
 
 **SENDGRID_WEBHOOK_TOKEN is LIVE.** Tom recreated every Inbound Parse entry (canonical + legacy hosts) with `?token=` appended; the secret is set. Verified both ways: token-less POST → 401; with-token → processes. The receive-email webhook can no longer be posted to by anyone but SendGrid (and the internal quarantine replay, which reads the same secret).

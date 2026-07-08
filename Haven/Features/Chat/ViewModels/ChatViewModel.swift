@@ -151,13 +151,24 @@ final class ChatViewModel: ObservableObject {
             )
 
             let responseText: String
+            var createdRequestId: UUID?
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let reply = json["reply"] as? String {
                 responseText = reply
+                if let ridStr = json["created_request_id"] as? String {
+                    createdRequestId = UUID(uuidString: ridStr)
+                }
             } else if let str = String(data: data, encoding: .utf8) {
                 responseText = str
             } else {
                 responseText = "I received your message but couldn't generate a response. Please try again."
+            }
+
+            // Photo-to-case: Alfred filed a concierge request this turn —
+            // attach the photos from this chat session so the operator
+            // sees the fallen branch, not just a description of it.
+            if let requestId = createdRequestId, !sessionPhotos.isEmpty {
+                await attachSessionPhotosToChezRequest(requestId)
             }
 
             let assistantMsg = ChatMessage(role: .assistant, content: responseText)
@@ -174,6 +185,39 @@ final class ChatViewModel: ObservableObject {
             Haptics.error()
         }
         isTyping = false
+    }
+
+    /// Uploads this session's chat photos through the chez attachment
+    /// rails and replies to the just-created request with them. Best
+    /// effort: a failure leaves the case intact (text-only) and logs.
+    private func attachSessionPhotosToChezRequest(_ requestId: UUID) async {
+        let photos = sessionPhotos
+        sessionPhotos.removeAll()
+        var metas: [ChezAttachmentMeta] = []
+        for photo in photos {
+            do {
+                let meta = try await HavenSupabase.uploadChezAttachment(
+                    data: photo.data,
+                    filename: photo.filename,
+                    mimeType: photo.mimeType
+                )
+                metas.append(meta)
+            } catch {
+                print("[Chat] chez attachment upload failed: \(error)")
+            }
+        }
+        guard !metas.isEmpty else { return }
+        do {
+            _ = try await HavenSupabase.replyToChezRequest(
+                requestId: requestId,
+                content: metas.count == 1 ? "Photo from our chat." : "Photos from our chat.",
+                attachments: metas
+            )
+            NotificationCenter.default.post(name: .chezRequestChanged, object: nil)
+            Analytics.track(.chatPhotosAttachedToCase, ["count": metas.count])
+        } catch {
+            print("[Chat] attaching chat photos to request failed: \(error)")
+        }
     }
 
     func sendSuggestedPrompt(_ prompt: String) async {
@@ -226,12 +270,23 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Document Upload + AI Analysis
 
+    /// Photo-to-case (2026-07-08): raw images sent in THIS chat session,
+    /// kept so that when Alfred files a concierge request mid-conversation
+    /// the photos ride along as case attachments (the vault copy is
+    /// AES-encrypted and unusable by the operator cockpit; the chez
+    /// attachment rails are the operator-visible path). Capped at 3.
+    private var sessionPhotos: [(data: Data, filename: String, mimeType: String)] = []
+
     func uploadAndAnalyzeDocument(
         data: Data,
         fileName: String,
         contentType: String,
         previewImage: UIImage?
     ) async {
+        if contentType.hasPrefix("image/") {
+            sessionPhotos.append((data: data, filename: fileName, mimeType: contentType))
+            if sessionPhotos.count > 3 { sessionPhotos.removeFirst(sessionPhotos.count - 3) }
+        }
         guard let householdId else {
             let errorMsg = ChatMessage(role: .assistant, content: "Unable to upload: no household found. Please complete onboarding first.")
             messages.append(errorMsg)

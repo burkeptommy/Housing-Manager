@@ -476,6 +476,9 @@ final class DashboardViewModel: ObservableObject {
 
     // Getting Started tracking
     @Published var hasProperty = false
+    /// Photo-to-case (2026-07-08): open (non-resolved) Chez cases for the
+    /// dashboard's at-a-glance strip.
+    @Published var openChezCaseCount = 0
     @Published var hasDocuments = false
     @Published var hasUsedAlfred = false
     @Published var documentCount: Int = 0
@@ -998,6 +1001,7 @@ final class DashboardViewModel: ObservableObject {
             let phase2: [() async -> Void] = [
                 loadHandymanPunchCount,
                 loadHandymanSeasonalReminder,
+                loadOpenChezCaseCount,
                 // Phase 85 — "This week with Chez" digest powering the
                 // Dashboard ChezActivityCard. Empty for DIY-default
                 // users; populated as ingestion + chez_owned task
@@ -1084,6 +1088,20 @@ final class DashboardViewModel: ObservableObject {
             handymanPunchItemCount = items.count
         } catch {
             handymanPunchItemCount = 0
+        }
+    }
+
+    /// Photo-to-case (2026-07-08): open-case count for the dashboard strip.
+    private func loadOpenChezCaseCount() async {
+        guard let householdId = primaryHouseholdId else {
+            openChezCaseCount = 0
+            return
+        }
+        do {
+            let requests = try await DatabaseService.shared.fetchChezRequests(householdId: householdId)
+            openChezCaseCount = requests.filter { $0.status != "resolved" }.count
+        } catch {
+            openChezCaseCount = 0
         }
     }
 

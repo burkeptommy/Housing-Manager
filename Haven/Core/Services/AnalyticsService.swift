@@ -68,6 +68,8 @@ enum AnalyticsEvent: String {
     case suggestedActionRemapped = "suggested_action_remapped"
     case scheduleStampUndone = "schedule_stamp_undone"
     case shareChezContactShown = "share_chez_contact_shown"
+    case chatPhotosAttachedToCase = "chat_photos_attached_to_case"
+    case quickCaptureOpened = "quick_capture_opened"
     case quizCompleted = "quiz_completed"
     case quizDismissed = "quiz_dismissed"
     case quizCompletionViewMaintenanceTapped = "quiz_completion_view_maintenance_tapped"

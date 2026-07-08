@@ -38,6 +38,7 @@
 		0A441E02F39F6D06941C05DC /* DocumentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A49265B02B1FE4943D13DEE /* DocumentDetailView.swift */; };
 		0A5F3A80CFAB939A2BE0AC5B /* HouseQuizValueMeter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BD48C672798798C77079E4B /* HouseQuizValueMeter.swift */; };
 		0A735469150BB0CDF4FBFD10 /* ChezRequestsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C724A88EE4BA3F249BABCFE1 /* ChezRequestsViewModel.swift */; };
+		0AF0088B65C792032DBE5E2D /* CameraCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DB3BD9719BE9BA7C183CC44 /* CameraCaptureView.swift */; };
 		0C952ADEE8CECACC2AE14384 /* PickupDayBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A74778C203DC3788BCBE65C /* PickupDayBanner.swift */; };
 		0E1B140D96F6075D860380D5 /* BrandColors.json in Resources */ = {isa = PBXBuildFile; fileRef = 7A4D29A1CB91EBA42DFC0519 /* BrandColors.json */; };
 		0E71FADFFA9696BBA2485BDC /* Font+Haven.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E819F4A1BD46D5CE48E9E1A /* Font+Haven.swift */; };
@@ -836,6 +837,7 @@
 		9C82F8F17DB61DE2C6A48C79 /* HouseholdStaffView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdStaffView.swift; sourceTree = "<group>"; };
 		9CFFBCDCDA9F773F07AC5C25 /* HomeCoverageHero.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCoverageHero.swift; sourceTree = "<group>"; };
 		9D44F4D6FC19F4CE5475D905 /* VehicleLookupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleLookupService.swift; sourceTree = "<group>"; };
+		9DB3BD9719BE9BA7C183CC44 /* CameraCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCaptureView.swift; sourceTree = "<group>"; };
 		9E0C215834C24160D4CF4FB7 /* SecurityDashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityDashboardViewModel.swift; sourceTree = "<group>"; };
 		9EBAFED62E0CAC6F191166BA /* SystemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemDetailView.swift; sourceTree = "<group>"; };
 		9EF6A66BC91FF4036AF43285 /* ChezRequestDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezRequestDetailView.swift; sourceTree = "<group>"; };
@@ -2078,6 +2080,7 @@
 				6D454019B1D9DF0E175C34AB /* AddressAutocompleteField.swift */,
 				68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */,
 				15DC7665829C027EA8937D17 /* AlfredMark.swift */,
+				9DB3BD9719BE9BA7C183CC44 /* CameraCaptureView.swift */,
 				8E9458FC278D2F9489C69773 /* ChezHandleButton.swift */,
 				04F53D8A260D374B26EE6DF6 /* CompactCadenceEditor.swift */,
 				7C6B830964C31D665D3E5876 /* ContractorLogoView.swift */,
@@ -2301,6 +2304,7 @@
 				9FA9138AAE3C8B240365C0CC /* BundledInsuranceSuggestionCard.swift in Sources */,
 				6E703FB67F5863AA6CC772B2 /* CacheManager.swift in Sources */,
 				1516D115C64B710332C47AAE /* CadenceSuggestionCard.swift in Sources */,
+				0AF0088B65C792032DBE5E2D /* CameraCaptureView.swift in Sources */,
 				7B45A6304E471551A5BD3BD9 /* CategoryPickerSheet.swift in Sources */,
 				A7CD1D35E7229CC1883016AF /* CategoryProgress.swift in Sources */,
 				94CCD34E65CA07E27E2BCD8E /* CertificatePinning.swift in Sources */,

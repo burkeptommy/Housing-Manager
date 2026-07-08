@@ -28,6 +28,11 @@ struct DashboardView: View {
     /// BUG-022 fix: dashboard "Add Vendor" chip should open AddVendorSheet
     /// directly instead of silently switching to the Property tab.
     @State private var showDashboardAddVendor = false
+    // Photo-to-case (2026-07-08)
+    @State private var showChezHelpDialog = false
+    @State private var showQuickCaptureCamera = false
+    @State private var quickCaptureImageData: Data?
+    @State private var showQuickCaptureCompose = false
     @State private var navigationPath = NavigationPath()
     @State private var showScenarioStudio = false
     @State private var hasAppeared = false
@@ -406,7 +411,11 @@ struct DashboardView: View {
                 .presentationDetents([.medium, .large])
             }
             .navigationDestination(for: String.self) { destination in
-                dashboardDestinationView(for: destination)
+                if destination == "chez_cases" {
+                    ChezRequestsListView()
+                } else {
+                    dashboardDestinationView(for: destination)
+                }
             }
     }
 
@@ -1164,14 +1173,24 @@ struct DashboardView: View {
                     showUploadDocument = true
                 },
                 onAskChez: {
-                    // Dashboard noise audit (May 2026): "Plan ahead"
-                    // tile replaced with Chez compose. Scenario Studio
-                    // is still reachable via the floating What-If
-                    // button on every tab. Posting
-                    // `.openChezRequestComposer` lets MainTabView
-                    // present the compose sheet globally; that
-                    // handler also tracks `chezEntryButtonTapped`.
+                    // Photo-to-case (2026-07-08): the Chez slot now asks
+                    // HOW — "snap it" (camera-first, the fallen-branch
+                    // flow) or "describe it" (the classic composer).
                     Haptics.light()
+                    showChezHelpDialog = true
+                },
+                onAddVendor: {
+                    showDashboardAddVendor = true
+                }
+            )
+            .confirmationDialog("How can Chez help?", isPresented: $showChezHelpDialog, titleVisibility: .visible) {
+                if CameraCaptureView.isAvailable {
+                    Button("Snap a photo of the problem") {
+                        Analytics.track(.quickCaptureOpened, ["source": "dashboard"])
+                        showQuickCaptureCamera = true
+                    }
+                }
+                Button("Describe it instead") {
                     NotificationCenter.default.post(
                         name: .openChezRequestComposer,
                         object: nil,
@@ -1184,11 +1203,58 @@ struct DashboardView: View {
                             ],
                         ]
                     )
-                },
-                onAddVendor: {
-                    showDashboardAddVendor = true
                 }
-            )
+                Button("Cancel", role: .cancel) {}
+            }
+            .fullScreenCover(isPresented: $showQuickCaptureCamera) {
+                CameraCaptureView { image in
+                    quickCaptureImageData = image.jpegData(compressionQuality: 0.8)
+                }
+                .ignoresSafeArea()
+            }
+            .onChange(of: quickCaptureImageData) { _, data in
+                if data != nil { showQuickCaptureCompose = true }
+            }
+            .sheet(isPresented: $showQuickCaptureCompose, onDismiss: { quickCaptureImageData = nil }) {
+                ChezRequestComposeSheet(
+                    category: .general,
+                    contextHints: [
+                        "_source": "quick_capture",
+                        "source_entity_type": "dashboard",
+                        "source_entity_label": "Photo capture",
+                    ],
+                    isCategoryFixed: false,
+                    initialImageData: quickCaptureImageData
+                )
+            }
+        }
+
+        // Photo-to-case (2026-07-08): open cases at a glance — cases
+        // otherwise only live behind Inbox → Chez.
+        if viewModel.openChezCaseCount > 0 {
+            Button {
+                Haptics.light()
+                navigationPath.append("chez_cases")
+            } label: {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "person.crop.circle.badge.clock")
+                        .font(.system(size: 15))
+                        .foregroundStyle(HavenColors.navy800)
+                    Text(viewModel.openChezCaseCount == 1
+                         ? "Chez is working 1 open case"
+                         : "Chez is working \(viewModel.openChezCaseCount) open cases")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            }
+            .buttonStyle(.plain)
         }
     }
 
