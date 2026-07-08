@@ -2566,7 +2566,10 @@ Respond with ONLY valid JSON:
             related_contractor_id: createdContractorId ?? matchedContractor?.id ?? null,
             needs_action: true,
             action_type: pickActionType(unifiedActions),
-            email_hash: emailHash,
+            // Suffixed like the ":vendor" / ":match" / ":address" sibling
+            // items — the bare hash is taken by the main item and the
+            // unique (household_id, email_hash) index rejects a second row.
+            email_hash: emailHash + ":followups",
             metadata: {
               suggested_tasks: askFollowups,
               suggested_actions: unifiedActions,

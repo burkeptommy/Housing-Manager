@@ -8,6 +8,22 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 7 M1 — Ingestion Intelligence v2 foundation — SHIPPED (2026-07-08, overnight)
+
+The unified suggested-actions shape + universal review card + retry-safe apply spine, per the approved Phase 7 plan (this file's companion: the "suggested_actions pipeline" section now in CLAUDE.md is the canonical reference).
+
+**Server (deployed):** NEW `_shared/suggested-actions.ts` (shape, `assignIds`, `toLegacySuggestedTasks`, `pickActionType`, kind builders — routine payloads evidence-only). receive-email + analyze-document write `metadata.suggested_actions` alongside legacy `suggested_tasks` on every follow-ups review item (+ Chez lane row on all, project lane wired but dormant until M5 — `suggested_project` only exists for quotes, which suppress follow-ups). process-inbox-item gains `apply_suggested_actions` (server-side task/event/project apply, per-row applied/duplicate/failed, self-records into the ledger) + `record_applied_actions` (server-owned `metadata.applied_actions` merge, never-downgrade, `done:true` completes). Security-smoke suite +2 checks (14 total, all pass).
+
+**iOS (Chez build green):** `InboxMetadata.SuggestedAction`/`AppliedAction` resilient decode (unknown kinds hidden); NEW `SuggestedActionApplyEngine` (server batch → iOS kinds punch_item/chez_request → ledger call); NEW `SuggestedActionsReviewCard` (.compact in InboxItemCard, .full in InboxItemDetailView; checkboxes seeded from `recommended`, Task/Handyman/Chez destination remapping, inline due-date edit, ledger-aware "already in your plan" states). Legacy Add-all-N card renders verbatim for pre-M1 rows.
+
+**Two real bugs the fixture verification caught (both fixed + deployed):** (1) the follow-ups review item had NEVER been created since its July birth — its insert reused the email's bare hash and the UNIQUE `(household_id, email_hash)` index silently rejected it (main item holds the bare hash; companions must suffix — now `:followups`, matching `:vendor`/`:match`/`:address`); (2) exact-title task dedup missed classifier rephrasings across runs ("Replace water softener UV lamp" vs "Replace UV lamp on water softener system" both created tasks) — task-ingest dedup now also matches on content-token Jaccard ≥ 0.6.
+
+**Verified live against the SECURITY-SMOKE-TEST fixture household (restored to baseline after, storage orphans cleaned):** invoice+PDF forward → review item with a1/a2 task rows + a3 Chez row, `review_followups`; apply subset with due-date override → task lands at override date, ledger partial, item open; re-apply → `duplicate` preserving the original ledger entry; apply rest + record skipped/done → `recorded:3, completed:true`; re-forward with body nonce → fresh item whose rows all return `duplicate`; text-only reminder → auto-add path unchanged (no review card). Fixture household still in prod for M2-M5 verification.
+
+**Next:** M2 routines from ingestion (founder priority) → M3 invoice auto-run → M4 vendor ladder → M5 appointments/projects.
+
+---
+
 ## Data-loss fixes (Phase 2 of the hardening plan) — SHIPPED (2026-07-07, late night)
 
 All four F-class data-loss bugs from PRODUCT_AUDIT_2026-07.md fixed, committed, Chez build green. **F3:** invitation revoke deleted pre-existing family members — `household_invitations.created_member` (migration `20270121`, pushed) marks placeholder rows the invite flow created; revoke deletes only those, never linked accounts. **F4 (the nil-omission class):** Update structs omit nil fields from the PATCH, so field CLEARS never persisted app-wide. New `DatabaseService.clearColumns(table:id:columns:)` writes explicit SQL NULLs; wired into RoutineEditSheet (vendor removal also drops the routine to pending_vendor so children resurface), EditInsurance/EditVehicle sheets, contractor edit, family-member edit, trusted-contact edit. New CLAUDE.md hard rule. **F6 (worse than audited):** `RoutineGroupingEngine.unlinkTasksFromRoutine` had NEVER unlinked anything (nil-omission again) — every routine archive path stranded child tasks invisibly. `archiveRoutine`/`deleteRoutine` are now the choke points (explicit-null unlink first); prod repaired via SQL (2 stranded tasks, 1 household). **F13:** service-portal call ledger — hydration is field-level merge now (pre-hydration typing could clobber + overwrite the server row), tab-close flush uses fetch keepalive; fair-band persistence is admin.js-only → deferred with the admin rebuild.

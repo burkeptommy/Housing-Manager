@@ -96,6 +96,43 @@ function normalizeTitle(title: string): string {
     .trim();
 }
 
+// Phase 7 M1 verification finding: the classifier phrases the same
+// recommendation differently across runs ("Replace water softener UV lamp"
+// vs "Replace UV lamp on water softener system"), so exact-title dedup
+// misses re-forwards. Token-overlap (Jaccard on content words, mirroring
+// the Swift DuplicateDetector's approach) catches rephrasings without
+// merging genuinely distinct work.
+const TITLE_STOP_WORDS = new Set([
+  "the", "a", "an", "on", "in", "of", "for", "to", "and", "or", "with",
+  "your", "this", "that", "system", "unit", "up", "out",
+  "schedule", "check", "inspect", "replace", "service", "repair", "clean",
+]);
+
+function contentTokens(normTitle: string): Set<string> {
+  const tokens = new Set<string>();
+  for (const raw of normTitle.split(/[^a-z0-9]+/)) {
+    if (raw.length < 3 || TITLE_STOP_WORDS.has(raw)) continue;
+    // Light stemming so plurals/gerunds collapse ("filters" → "filter").
+    let t = raw;
+    if (t.length > 5 && t.endsWith("ing")) t = t.slice(0, -3);
+    else if (t.length > 4 && t.endsWith("ed")) t = t.slice(0, -2);
+    else if (t.length > 3 && t.endsWith("s")) t = t.slice(0, -1);
+    tokens.add(t);
+  }
+  return tokens;
+}
+
+function titlesMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  const ta = contentTokens(a);
+  const tb = contentTokens(b);
+  if (ta.size === 0 || tb.size === 0) return false;
+  let overlap = 0;
+  for (const t of ta) if (tb.has(t)) overlap++;
+  const union = ta.size + tb.size - overlap;
+  return union > 0 && overlap / union >= 0.6;
+}
+
 /**
  * Create maintenance tasks from AI suggestions, skipping duplicates.
  * Returns the created rows so the caller can build an informational inbox
@@ -134,10 +171,10 @@ export async function createTasksFromSuggestions(
     const dueDate = s.due_date || fallbackDue;
     const normTitle = normalizeTitle(rawTitle);
 
-    // Dedup: same normalized title within a ±21-day window (annual services
-    // legitimately recur, but not within three weeks).
+    // Dedup: same (or token-equivalent) title within a ±21-day window
+    // (annual services legitimately recur, but not within three weeks).
     const isDuplicate = existing.some((e) => {
-      if (e.title !== normTitle) return false;
+      if (!titlesMatch(e.title, normTitle)) return false;
       if (!e.due || !dueDate) return true; // title match, one side undated → treat as dup
       const diffDays = Math.abs(
         (new Date(e.due).getTime() - new Date(dueDate).getTime()) / (24 * 60 * 60 * 1000),
