@@ -46,7 +46,7 @@ The final Ingestion Intelligence v2 milestone. All five milestones (M1 foundatio
 
 **Fresh-start address reset (Tom's call):** all 254 `household_email_addresses` regenerated server-side — old local part + 4 fresh hex chars (alphanumeric-only, matching the resolver regex). Old addresses 404 immediately ("Unknown email address" — verified); new addresses route (verified). The app fetches the address dynamically everywhere (dashboard caption, quiz reveal, Share button), so every household simply sees their new address at next login — no client change, no build dependency. Old values snapshotted in `household_email_addresses_backup_20260708` for "what was my old address" recovery; drop the table once the transition settles. Smoke-fixture household's new address: `securitysmoketest95e0@alfred.getchez.com` (future fixture runs must look it up).
 
-**Latent bug noted, not yet fixed:** the iOS generator's failsafe format (`burke-ab12@`) contains a hyphen, but the receive-email resolver regex only captures `[a-z0-9]+` before the `@` — a hyphenated address would resolve to the wrong local part and 404. No current rows are hyphenated (all 254 clean). Fix the regex (or the generator) before anyone lands on the failsafe path.
+**Latent bug found AND fixed in the same pass:** the iOS generator's failsafe format (`burke-ab12@`) contains a hyphen, but the receive-email resolver regex only captured `[a-z0-9]+` before the `@` — a hyphenated address mis-resolved and 404ed. Regex widened to `[a-z0-9][a-z0-9-]*`, deployed, and verified live (temporarily renamed the fixture household to a hyphenated address → routed correctly → restored).
 
 ---
 

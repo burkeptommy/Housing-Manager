@@ -522,7 +522,10 @@ serve(async (req: Request) => {
     // --- LOOK UP HOUSEHOLD ---
     // Match alfred.getchez.com (canonical) plus legacy alfred.havenhome.dev /
     // projects.havenhome.dev so old forwards keep working post-cutover.
-    const emailMatch = toAddress.match(/([a-z0-9]+)@(?:alfred\.getchez\.com|(?:alfred|projects)\.havenhome\.dev)/i);
+    // Hyphens allowed: the iOS generator's failsafe format is
+    // "burke-ab12@..." and the old [a-z0-9]+ pattern mis-captured it
+    // (matched only "ab12"), which would 404 a valid household.
+    const emailMatch = toAddress.match(/([a-z0-9][a-z0-9-]*)@(?:alfred\.getchez\.com|(?:alfred|projects)\.havenhome\.dev)/i);
     if (!emailMatch) {
       console.log(`[receive-email] No matching haven address in: ${toAddress}`);
       return new Response(
