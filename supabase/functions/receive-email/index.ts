@@ -353,6 +353,7 @@ serve(async (req: Request) => {
     let emailBody = "";
     let fullRawEmail = ""; // longest version of the email for "Show Original Email"
     let attachmentBase64: string | null = null;
+    let rawEmailHeaders = "";
     let attachmentContentType: string | null = null;
     let attachmentFilename: string | null = null;
     let additionalAttachments: Array<{ base64: string; contentType: string; filename: string }> = [];
@@ -364,6 +365,7 @@ serve(async (req: Request) => {
 
     if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData();
+      rawEmailHeaders = (formData.get("headers") as string) ?? "";
       toAddress = (formData.get("to") as string) ?? "";
       fromAddress = (formData.get("from") as string) ?? "";
       subject = (formData.get("subject") as string) ?? "";
@@ -405,6 +407,7 @@ serve(async (req: Request) => {
       console.log(`[receive-email] Extracted ${allAttachments.length} attachment(s)`);
     } else {
       const body = await req.json();
+      rawEmailHeaders = body.headers ?? "";
       toAddress = body.to ?? "";
       fromAddress = body.from ?? "";
       subject = body.subject ?? "";
@@ -1051,6 +1054,60 @@ serve(async (req: Request) => {
     // Documents still file; the auto-stamp still fires (it's an auto
     // action, not an ask).
     const routeToChez = matchedContractor?.chez_owned === true;
+
+    // --- Phase 8.5: THREAD RESOLUTION ---
+    // Real headers first (References / In-Reply-To inherit the parent's
+    // key), then a vendor-scoped normalized-subject fallback (14-day
+    // window). NEVER cross-vendor: the fallback requires the same matched
+    // vendor, and bare generic subjects without a vendor never group.
+    const headerValue = (name: string): string | null => {
+      const m = rawEmailHeaders.match(new RegExp(`^${name}:\\s*(.+)$`, "im"));
+      return m ? m[1].trim() : null;
+    };
+    const parseMsgIds = (raw: string | null): string[] =>
+      raw ? (raw.match(/<[^>]+>/g) || []) : [];
+    const emailMessageId = parseMsgIds(headerValue("Message-ID"))[0] ?? null;
+    const threadRefs = [
+      ...parseMsgIds(headerValue("In-Reply-To")),
+      ...parseMsgIds(headerValue("References")),
+    ];
+    const normalizedThreadSubject = (subject || "")
+      .toLowerCase()
+      .replace(/^((re|fwd?|fw)\s*:\s*)+/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    let threadKey: string | null = null;
+    try {
+      if (threadRefs.length > 0) {
+        const { data: parentRows } = await supabase
+          .from("inbox_items")
+          .select("metadata")
+          .eq("household_id", householdId)
+          .in("metadata->>message_id", threadRefs)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        const parentMeta = parentRows?.[0]?.metadata as Record<string, unknown> | undefined;
+        threadKey = (parentMeta?.thread_key as string | undefined)
+          ?? (parentMeta?.message_id as string | undefined)
+          ?? null;
+      }
+      if (!threadKey && matchedContractor && normalizedThreadSubject.length > 4) {
+        const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: sibRows } = await supabase
+          .from("inbox_items")
+          .select("metadata")
+          .eq("household_id", householdId)
+          .eq("metadata->>thread_vendor", matchedContractor.id)
+          .eq("metadata->>thread_subject", normalizedThreadSubject)
+          .gte("created_at", twoWeeksAgo)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        threadKey = ((sibRows?.[0]?.metadata as Record<string, unknown> | undefined)?.thread_key as string | undefined) ?? null;
+      }
+    } catch (threadErr) {
+      console.warn("[receive-email] thread resolution failed (non-blocking):", threadErr);
+    }
+    if (!threadKey) threadKey = emailMessageId ?? `t_${emailHash.substring(0, 24)}`;
 
     // Phase 8.1 — adoption nudge: the FIRST time a known vendor emails the
     // household's address DIRECTLY (no forward markers), celebrate it once
@@ -2420,20 +2477,48 @@ Respond with ONLY valid JSON:
     // is skipped in that case — process-invoice owns invoice follow-ups
     // (same rule analyze-document already applies). Vehicle bills keep
     // the manual flow this milestone.
+    // Phase 8.4 — vehicle bills join the auto-run. Resolution: exactly one
+    // household vehicle, or a VIN in the email matching one. Ambiguous →
+    // manual flow (the homeowner picks in InvoiceChoiceSheet).
+    const isVehicleBill = (classification as any).vehicleContext === true;
+    let vehicleForInvoice: string | null = null;
+    if (classification.type === "bill_invoice" && isVehicleBill && createdDocumentId) {
+      try {
+        const { data: hhVehicles } = await supabase
+          .from("vehicles")
+          .select("id, vin")
+          .eq("household_id", householdId);
+        const vehicles = (hhVehicles || []) as Array<{ id: string; vin: string | null }>;
+        if (vehicles.length === 1) {
+          vehicleForInvoice = vehicles[0].id;
+        } else if (vehicles.length > 1) {
+          const emailVins: string[] = emailBody.toUpperCase().match(/\b[A-HJ-NPR-Z0-9]{17}\b/g) || [];
+          const hit = vehicles.find((v) => v.vin && emailVins.includes(v.vin.toUpperCase()));
+          if (hit) vehicleForInvoice = hit.id;
+        }
+      } catch (vErr) {
+        console.warn("[receive-email] vehicle resolution failed (manual flow):", vErr);
+      }
+    }
+
     const willAutoRunInvoice = classification.type === "bill_invoice"
-      && (classification as any).vehicleContext !== true
-      && !!taskPropertyId
       && !!createdDocumentId
       && !routeToChez
-      && propertyResolutionConfident
-      && isAnalyzableContentType(attachmentContentType);
+      && isAnalyzableContentType(attachmentContentType)
+      && (isVehicleBill
+        ? !!vehicleForInvoice
+        : (!!taskPropertyId && propertyResolutionConfident));
 
     // Phase 8.2 — reply lane: the vendor is asking the HOMEOWNER something
     // (choose a slot, approve a change) and the app has no outbound reply.
     // The review card fires with the Chez lane as the recommended default.
+    // Quotes/claims own richer response flows — the reply lane would
+    // double-prompt (fixture finding: every quote email spawned a
+    // "needs a reply" item next to the quote prompt).
     const needsChezReply = (classification as any).intent === "action_required"
       && !!matchedContractor
-      && !routeToChez;
+      && !routeToChez
+      && !suppressFollowupsForType;
 
     let autoAddedTasks: Array<{ id: string; title: string }> = [];
     let askFollowups: SuggestedTask[] = [];
@@ -2574,6 +2659,12 @@ Respond with ONLY valid JSON:
         original_actions: actions.filter(a => a !== "inbox_item_created"),
         email_hash: emailHash,
         high_confidence: classification.confidence === "high",
+        // Phase 8.5 — thread grouping. Main item only (companion items
+        // have their own purpose and would double-count in the collapse).
+        ...(emailMessageId ? { message_id: emailMessageId } : {}),
+        thread_key: threadKey,
+        ...(normalizedThreadSubject ? { thread_subject: normalizedThreadSubject } : {}),
+        ...(matchedContractor ? { thread_vendor: matchedContractor.id } : {}),
         suggested_category: classification.documentCategory || null,
         document_title: classification.documentTitle || null,
         // Phase 101 — quote intelligence (suggested_project /
@@ -3108,8 +3199,12 @@ ${baseSummary}` : "");
                 body: JSON.stringify({
                   document_id: autoRunDocId,
                   household_id: householdId,
-                  property_id: taskPropertyId,
                   auto_run: true,
+                  // 8.4 — vehicle bills defer completions to the review card
+                  // (no silent completion from an unattended email).
+                  ...(isVehicleBill
+                    ? { vehicle_id: vehicleForInvoice, defer_completions: true }
+                    : { property_id: taskPropertyId }),
                   // STEP-1 exact-email match is high confidence; the fuzzy
                   // ladder lands in M4.
                   ...(matchedContractor ? { preferred_contractor_id: matchedContractor.id } : {}),
@@ -3166,6 +3261,7 @@ ${baseSummary}` : "");
               // standing-arrangement rows when the invoice had no cadence.
               const cadence = invoice.cadence_detected as { interval_days?: number | null; confidence?: number; quoted_text?: string | null } | null;
               const cadenceRoutines = (cadence
+                  && !isVehicleBill
                   && typeof cadence.interval_days === "number" && cadence.interval_days > 0
                   && (cadence.confidence ?? 0) > 0.8
                   && matchedContractor?.category)
@@ -3194,7 +3290,7 @@ ${baseSummary}` : "");
               // Spend source of truth stays documents.invoice_amount (the
               // Phase 59 writeback) + routine_visits — never service_records.
               let visitRows: ReturnType<typeof visitLogAction>[] = [];
-              if (matchedContractor && invoiceDate) {
+              if (matchedContractor && invoiceDate && !isVehicleBill) {
                 const { data: liveRoutines } = await supabase
                   .from("routines")
                   .select("id")

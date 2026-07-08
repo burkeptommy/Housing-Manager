@@ -125,7 +125,7 @@ serve(async (req: Request) => {
       const [vehicleResult, vTasksResult, vServiceResult] = await Promise.all([
         supabase.from("vehicles").select("*").eq("id", vehicle_id).single(),
         supabase.from("maintenance_tasks").select("id, title, description, frequency, last_completed_date, next_due_date, priority, template_id").eq("vehicle_id", vehicle_id),
-        supabase.from("vehicle_service_records").select("id, service_date, service_type, description, mileage_at, cost").eq("vehicle_id", vehicle_id).order("service_date", { ascending: false }).limit(10),
+        supabase.from("vehicle_service_records").select("id, service_date, service_type, description, mileage_at_service, cost").eq("vehicle_id", vehicle_id).order("service_date", { ascending: false }).limit(10),
       ]);
 
       const vehicle = vehicleResult.data;
@@ -143,7 +143,7 @@ serve(async (req: Request) => {
         : "No maintenance tasks currently tracked for this vehicle.";
 
       const serviceContext = vServiceRecords.length > 0
-        ? vServiceRecords.map((s: any) => `- ${s.description ?? s.service_type} on ${s.service_date}${s.mileage_at ? ` at ${s.mileage_at.toLocaleString()} mi` : ""}${s.cost ? ` ($${s.cost})` : ""}`).join("\n")
+        ? vServiceRecords.map((s: any) => `- ${s.description ?? s.service_type} on ${s.service_date}${s.mileage_at_service ? ` at ${s.mileage_at_service.toLocaleString()} mi` : ""}${s.cost ? ` ($${s.cost})` : ""}`).join("\n")
         : "No service history recorded.";
 
       const contractorsContext = contractors.length > 0
@@ -522,44 +522,59 @@ SYSTEM IDENTIFICATION RULES:
           .single();
 
         if (!currentVehicle?.current_mileage || mileage > currentVehicle.current_mileage) {
-          await supabase
+          // 8.4 fixture-caught: mileage_updated_at doesn't exist on vehicles
+          // — this update had failed silently since it shipped.
+          const { error: mileErr } = await supabase
             .from("vehicles")
-            .update({ current_mileage: mileage, mileage_updated_at: new Date().toISOString() })
+            .update({ current_mileage: mileage })
             .eq("id", vehicle_id);
-          console.log(`[process-invoice] Updated vehicle mileage to ${mileage}`);
+          if (mileErr) console.error("[process-invoice] mileage update failed:", mileErr.message);
+          else console.log(`[process-invoice] Updated vehicle mileage to ${mileage}`);
         }
       }
 
-      // Auto-complete matched tasks
+      // Auto-complete matched tasks — UNLESS the caller asked to defer
+      // (Phase 8.4: the email auto-run surfaces completions as ask rows on
+      // the review card instead of silently completing from an unattended
+      // email; the iOS applier runs the canonical completion path with
+      // recurring fan-out). User-initiated scans keep today's behavior.
       const completedTasks = (result.completed_tasks as any[]) ?? [];
       const invoiceDate = (result as any).invoice_date ?? new Date().toISOString().split("T")[0];
-      for (const ct of completedTasks) {
-        if (ct.matched_maintenance_task_id && ct.confidence !== "low") {
-          await supabase
-            .from("maintenance_tasks")
-            .update({
-              last_completed_date: invoiceDate,
-              // Reschedule: parse frequency to compute next due date
-            })
-            .eq("id", ct.matched_maintenance_task_id);
-          console.log(`[process-invoice] Marked task ${ct.matched_maintenance_task_id} complete`);
+      if (body.defer_completions !== true) {
+        for (const ct of completedTasks) {
+          if (ct.matched_maintenance_task_id && ct.confidence !== "low") {
+            await supabase
+              .from("maintenance_tasks")
+              .update({
+                last_completed_date: invoiceDate,
+                // Reschedule: parse frequency to compute next due date
+              })
+              .eq("id", ct.matched_maintenance_task_id);
+            console.log(`[process-invoice] Marked task ${ct.matched_maintenance_task_id} complete`);
+          }
         }
+      } else {
+        console.log(`[process-invoice] defer_completions: ${completedTasks.length} matches left for the review card`);
       }
 
-      // Create vehicle service record
+      // Create vehicle service record. 8.4 fixture-caught: the columns are
+      // mileage_at_service (not mileage_at) and there is NO shop_name — the
+      // insert had failed silently since it shipped. Shop goes into notes;
+      // errors are surfaced.
       const vendorData = result.vendor as any;
-      await supabase.from("vehicle_service_records").insert({
+      const { error: vsrErr } = await supabase.from("vehicle_service_records").insert({
         vehicle_id,
         household_id,
         service_date: invoiceDate,
         service_type: (result as any).service_summary?.substring(0, 50) ?? "Service",
         description: (result as any).service_summary ?? "Service from invoice",
         cost: (result as any).total_amount ?? null,
-        mileage_at: mileage ?? null,
-        shop_name: vendorData?.company_name ?? null,
+        mileage_at_service: mileage ?? null,
+        notes: vendorData?.company_name ? `Shop: ${vendorData.company_name}` : null,
         invoice_document_id: document_id,
       });
-      console.log(`[process-invoice] Created vehicle service record`);
+      if (vsrErr) console.error("[process-invoice] service record insert failed:", vsrErr.message);
+      else console.log(`[process-invoice] Created vehicle service record`);
     }
 
     // --- SPECIALTY SYSTEM INFERENCE (Phase 52b) ---

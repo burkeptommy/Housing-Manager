@@ -31,6 +31,8 @@ struct InboxView: View {
 
     @State private var showDeleteConfirm = false
     @State private var itemToDelete: DatabaseService.InboxItemRow?
+    // Phase 8.5 — thread keys the user has expanded (session-only).
+    @State private var expandedThreads: Set<String> = []
 
     var body: some View {
         Group {
@@ -106,7 +108,7 @@ struct InboxView: View {
                 }
             } else {
                 Section {
-                    ForEach(filteredItems) { item in
+                    ForEach(displayItems) { item in
                         NavigationLink {
                             InboxItemDetailView(
                                 item: item,
@@ -134,18 +136,61 @@ struct InboxView: View {
                                 }
                             }
                         } label: {
-                            InboxItemCard(
-                                item: item,
-                                properties: viewModel.properties,
-                                projects: viewModel.projects,
-                                vehicles: viewModel.vehicles,
-                                onProcess: { propertyId, action, category, targetProjectId, vehicleId in
-                                    viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category, targetProjectId: targetProjectId, vehicleId: vehicleId)
-                                },
-                                onDismiss: {
-                                    withAnimation { viewModel.dismissItem(item) }
+                            VStack(alignment: .leading, spacing: 4) {
+                                InboxItemCard(
+                                    item: item,
+                                    properties: viewModel.properties,
+                                    projects: viewModel.projects,
+                                    vehicles: viewModel.vehicles,
+                                    onProcess: { propertyId, action, category, targetProjectId, vehicleId in
+                                        viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category, targetProjectId: targetProjectId, vehicleId: vehicleId)
+                                    },
+                                    onDismiss: {
+                                        withAnimation { viewModel.dismissItem(item) }
+                                    }
+                                )
+                                // Phase 8.5 — thread toggle under the
+                                // thread's newest item.
+                                if let key = item.metadata?.threadKey {
+                                    let olderCount = threadOlderCount(for: item)
+                                    if olderCount > 0 {
+                                        Button {
+                                            Haptics.selection()
+                                            withAnimation(HavenTheme.animationQuick) {
+                                                _ = expandedThreads.insert(key)
+                                            }
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "text.append")
+                                                    .font(.system(size: 10))
+                                                Text(olderCount == 1 ? "Show 1 earlier message" : "Show \(olderCount) earlier messages")
+                                            }
+                                            .font(HavenTypography.caption)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                            .padding(.leading, HavenTheme.spacing8)
+                                        }
+                                        .buttonStyle(.plain)
+                                    } else if expandedThreads.contains(key),
+                                              threadGroups[key]?.first?.id == item.id {
+                                        Button {
+                                            Haptics.selection()
+                                            withAnimation(HavenTheme.animationQuick) {
+                                                expandedThreads.remove(key)
+                                            }
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "chevron.up")
+                                                    .font(.system(size: 10))
+                                                Text("Hide earlier messages")
+                                            }
+                                            .font(HavenTypography.caption)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                            .padding(.leading, HavenTheme.spacing8)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
-                            )
+                            }
                         }
                         .buttonStyle(.plain)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -225,6 +270,38 @@ struct InboxView: View {
             // keeps the type signature stable for the standard list.
             return []
         }
+    }
+
+    // MARK: - Phase 8.5 thread collapsing
+
+    /// thread_key → all matching items (encounter order = newest first,
+    /// since fetchAllInboxItems orders created_at desc).
+    private var threadGroups: [String: [DatabaseService.InboxItemRow]] {
+        Dictionary(grouping: filteredItems.filter { $0.metadata?.threadKey != nil }) {
+            $0.metadata?.threadKey ?? ""
+        }
+    }
+
+    /// Collapsed view of the filtered list: threads with 2+ items show only
+    /// their newest item unless expanded. Needs Action never collapses —
+    /// hiding an actionable item behind a chip risks missed work.
+    private var displayItems: [DatabaseService.InboxItemRow] {
+        guard filter != .needsAction else { return filteredItems }
+        var hidden = Set<UUID>()
+        for (key, group) in threadGroups where group.count > 1 && !expandedThreads.contains(key) {
+            for older in group.dropFirst() { hidden.insert(older.id) }
+        }
+        return filteredItems.filter { !hidden.contains($0.id) }
+    }
+
+    /// Older-sibling count for the toggle chip under an item, when the item
+    /// is its thread's newest.
+    private func threadOlderCount(for item: DatabaseService.InboxItemRow) -> Int {
+        guard filter != .needsAction,
+              let key = item.metadata?.threadKey,
+              let group = threadGroups[key], group.count > 1,
+              group.first?.id == item.id else { return 0 }
+        return group.count - 1
     }
 
     private var emptyState: some View {

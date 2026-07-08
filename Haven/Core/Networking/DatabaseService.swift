@@ -4226,6 +4226,11 @@ final class DatabaseService {
         /// M5 — the appointment auto-stamp receipt. Non-nil renders the
         /// undoable "Scheduled: X — Oct 14" notice.
         let scheduleStamp: ScheduleStamp?
+        /// 8.5 — thread grouping. Items sharing a thread_key collapse to
+        /// the latest with a count; keys come from real mail headers
+        /// (References/In-Reply-To) or a vendor-scoped subject fallback.
+        let threadKey: String?
+        let messageId: String?
 
         struct ScheduleStamp: Decodable, Hashable {
             let taskId: String
@@ -4585,6 +4590,8 @@ final class DatabaseService {
             case appliedActions = "applied_actions"
             case suggestedVendorMatch = "suggested_vendor_match"
             case scheduleStamp = "schedule_stamp"
+            case threadKey = "thread_key"
+            case messageId = "message_id"
             case matchedContractorName = "matched_contractor_name"
         }
 
@@ -4642,6 +4649,8 @@ final class DatabaseService {
             appliedActions = try? c.decodeIfPresent([AppliedAction].self, forKey: .appliedActions)
             suggestedVendorMatch = try? c.decodeIfPresent(SuggestedVendorMatch.self, forKey: .suggestedVendorMatch)
             scheduleStamp = try? c.decodeIfPresent(ScheduleStamp.self, forKey: .scheduleStamp)
+            threadKey = try? c.decodeIfPresent(String.self, forKey: .threadKey)
+            messageId = try? c.decodeIfPresent(String.self, forKey: .messageId)
             matchedContractorName = try? c.decodeIfPresent(String.self, forKey: .matchedContractorName)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {

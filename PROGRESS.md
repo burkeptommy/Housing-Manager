@@ -40,6 +40,21 @@ The final Ingestion Intelligence v2 milestone. All five milestones (M1 foundatio
 
 ---
 
+## Phase 8 — Vendor-Primary-Contact hardening (8.1–8.5) — SHIPPED (2026-07-08, morning)
+
+The twelve interview-locked decisions (see CLAUDE.md "Vendor-primary-contact hardening" + the plan file's Phase 8 section), built, deployed, and fixture-verified in one pass. Four commits: 8.1 gate+adoption, 8.2 Chez routing+reply lane, 8.3 six-item polish, 8.4+8.5 vehicles+threads.
+
+**Highlights beyond the plan (all fixture-caught):**
+- The classifier never knew today's date — year-less dates ("July 18") could resolve to the PAST and silently break the M5 auto-stamp window. The classification prompt now carries TODAY'S DATE with a resolve-forward rule.
+- Marketing emails were auto-adding tasks ("Consider booking duct cleaning") and even proposing standing routines from promos — server-side suppression now zeroes both lanes for marketing intent, on top of quiet-filing.
+- **process-invoice's vehicle branch had been silently broken since it shipped:** `vehicles.mileage_updated_at` doesn't exist (mileage never updated), `vehicle_service_records` insert used `mileage_at`/`shop_name` (columns are `mileage_at_service` / no shop column — records never wrote), and the history SELECT had the same drift (AI context lost service history). All three fixed with error surfacing; verified live (mileage 38000→41250, record with cost+shop landed).
+- Quote emails were double-prompting (quote card + "needs a reply" card) — reply lane now suppressed for quotes/claims.
+- concierge_messages.user_id NOT NULL caught in the 8.2 fixture (thread message now attributes to the household owner).
+
+**Fixture matrix (all restored to baseline):** trigger auto-allowlists on contractor insert; direct exact + billing@ domain emails process (nudge fired once); stranger+PDF quarantined → Allow replayed the stored payload through the front door as the real bill item (hash handoff correct) → Reject blocked → third email dropped silently; chez_owned email → quiet item + ONE operator thread (second email appended, no dup) + admin push/email; reply-question → "Tyler Heating needs a reply" with Chez row recommended; appointment → stamp + calendar event + zero be-home noise, undo restored prior-null AND removed the event; marketing → seen, zero artifacts; vehicle invoice → auto-run card (complete_task deferred, task stayed open) + mileage + service record; threads → References inheritance grouped T1/T2 under one key, cross-vendor structurally impossible. Smoke 14/14 after every deploy.
+
+---
+
 ## Phase 7 M4 — Vendor ladder + spend — SHIPPED (2026-07-08, overnight)
 
 Sender→vendor matching graduated from exact-email-only to a three-tier ladder, and invoices from routine-served vendors now offer one-tap visit + spend logging.
