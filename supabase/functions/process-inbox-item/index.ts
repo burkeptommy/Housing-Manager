@@ -181,6 +181,39 @@ serve(async (req: Request) => {
       );
     }
 
+    // --- Phase 7 M5: UNDO SCHEDULE STAMP ---
+    // The appointment auto-stamp's escape hatch: restore the task's prior
+    // scheduled_date (including prior-null — explicit null in the PATCH).
+    if (action === "undo_schedule_stamp") {
+      const stamp = metadata.schedule_stamp as {
+        task_id?: string; previous_scheduled_date?: string | null; undone_at?: string;
+      } | undefined;
+      if (!stamp?.task_id) {
+        return new Response(JSON.stringify({ error: "No schedule stamp on this item" }), { status: 400, headers });
+      }
+      if (stamp.undone_at) {
+        return new Response(JSON.stringify({ success: true, already_undone: true }), { status: 200, headers });
+      }
+      const { data: taskRow } = await supabase
+        .from("maintenance_tasks").select("household_id").eq("id", stamp.task_id).single();
+      if (!taskRow || taskRow.household_id !== auth.householdId) {
+        return new Response(JSON.stringify({ error: "Access denied: task mismatch" }), { status: 403, headers });
+      }
+      const { error: undoErr } = await supabase
+        .from("maintenance_tasks")
+        .update({ scheduled_date: stamp.previous_scheduled_date ?? null })
+        .eq("id", stamp.task_id);
+      if (undoErr) {
+        return new Response(JSON.stringify({ error: "Undo failed" }), { status: 500, headers });
+      }
+      await supabase.from("inbox_items").update({
+        seen: true,
+        action_completed: true,
+        metadata: { ...metadata, schedule_stamp: { ...stamp, undone_at: new Date().toISOString() } },
+      }).eq("id", inbox_item_id);
+      return new Response(JSON.stringify({ success: true, restored: stamp.previous_scheduled_date ?? null }), { status: 200, headers });
+    }
+
     // --- HANDLE DISMISS ---
     if (action === "dismiss") {
       await supabase
@@ -364,6 +397,30 @@ serve(async (req: Request) => {
           } else {
             results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
           }
+        } else if (act.kind === "schedule_task") {
+          // Phase 7 M5 — ambiguous appointment: the homeowner picked which
+          // task the visit belongs to (payload_overrides.task_id).
+          const chosenTaskId = (payload.task_id as string | null) ?? null;
+          const dateStr = typeof payload.date === "string" ? (payload.date as string).substring(0, 10) : null;
+          if (!chosenTaskId || !dateStr) {
+            results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          const { data: taskRow } = await supabase
+            .from("maintenance_tasks").select("household_id, scheduled_date").eq("id", chosenTaskId).single();
+          if (!taskRow || taskRow.household_id !== auth.householdId) {
+            results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          if (taskRow.scheduled_date === dateStr) {
+            results.push({ id: act.id, status: "duplicate", result_ref: chosenTaskId, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          const { error: schedErr } = await supabase
+            .from("maintenance_tasks").update({ scheduled_date: dateStr }).eq("id", chosenTaskId);
+          results.push(schedErr
+            ? { id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId }
+            : { id: act.id, status: "applied", result_ref: chosenTaskId, applied_at: nowIso, applied_by_user_id: auth.userId });
         } else if (act.kind === "event") {
           const dateStr = (payload.date as string | null) ?? null;
           if (!dateStr) {

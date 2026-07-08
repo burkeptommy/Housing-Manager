@@ -89,6 +89,8 @@ struct SuggestedActionsReviewCard: View {
     @State private var showInvoiceScan = false
     // M4 — "Is this X?" vendor confirm row. nil = undecided.
     @State private var vendorConfirmed: Bool?
+    // M5 — schedule_task candidate choice (action id → task id).
+    @State private var scheduleChoice: [String: String] = [:]
 
     private struct VendorPickerTarget: Identifiable {
         let id: String        // action id
@@ -338,11 +340,14 @@ struct SuggestedActionsReviewCard: View {
 
     @ViewBuilder
     private func fullModeControls(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> some View {
-        let isRemappable = action.typedKind == .task || action.typedKind == .routine
-        if isRemappable, checked.contains(action.id) {
+        let hasControls = action.typedKind == .task || action.typedKind == .routine
+            || action.typedKind == .scheduleTask
+        if hasControls, checked.contains(action.id) {
             let currentDest = destinations[action.id] ?? defaultDestination(for: action)
+            let showsDestinationMenu = action.typedKind == .task || action.typedKind == .routine
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
+                    if showsDestinationMenu {
                     Menu {
                         ForEach(destinationOptions(for: action), id: \.self) { dest in
                             Button {
@@ -370,6 +375,7 @@ struct SuggestedActionsReviewCard: View {
                         .background(HavenColors.beige200.opacity(0.6))
                         .clipShape(Capsule())
                     }
+                    }
 
                     if action.typedKind == .task, currentDest == .task {
                         DatePicker(
@@ -383,6 +389,38 @@ struct SuggestedActionsReviewCard: View {
                         .labelsHidden()
                         .datePickerStyle(.compact)
                         .scaleEffect(0.85, anchor: .leading)
+                    }
+                }
+
+                if action.typedKind == .scheduleTask,
+                   let candidates = action.payload.candidates, !candidates.isEmpty {
+                    Menu {
+                        ForEach(candidates) { candidate in
+                            Button {
+                                scheduleChoice[action.id] = candidate.taskId
+                                Haptics.selection()
+                            } label: {
+                                if (scheduleChoice[action.id] ?? candidates.first?.taskId) == candidate.taskId {
+                                    Label(candidate.title, systemImage: "checkmark")
+                                } else {
+                                    Text(candidate.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                            Text(candidates.first(where: { $0.taskId == (scheduleChoice[action.id] ?? candidates.first?.taskId) })?.title ?? "Pick the task")
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9))
+                        }
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.navy800)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(HavenColors.beige200.opacity(0.6))
+                        .clipShape(Capsule())
                     }
                 }
 
@@ -580,6 +618,15 @@ struct SuggestedActionsReviewCard: View {
                         date: date,
                         costCents: action.payload.costCents
                     )))
+                }
+            case .scheduleTask:
+                // M5 — ambiguous appointment: send the chosen (or first)
+                // candidate; the server stamps scheduled_date after an
+                // ownership check.
+                if let chosen = scheduleChoice[action.id] ?? action.payload.candidates?.first?.taskId {
+                    plans.append(.init(actionId: action.id, operation: .server(payloadOverrides: [
+                        "task_id": chosen,
+                    ])))
                 }
             case .project, .event:
                 plans.append(.init(actionId: action.id, operation: .server(payloadOverrides: nil)))

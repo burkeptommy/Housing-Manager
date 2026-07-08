@@ -168,6 +168,34 @@ struct InboxItemCard: View {
                 .foregroundStyle(HavenColors.textTertiary)
             }
 
+            // Phase 7 M5 — the appointment auto-stamp's undoable notice.
+            // Informational (needs_action false), so it renders outside the
+            // pending-action gate; Undo restores the prior scheduled_date.
+            if let stamp = item.metadata?.scheduleStamp, stamp.undoneAt == nil, item.actionCompleted != true {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "calendar.badge.checkmark")
+                        .font(.system(size: 13))
+                        .foregroundStyle(HavenColors.success)
+                    Text("Put on the matching task")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Spacer()
+                    Button {
+                        Haptics.selection()
+                        onProcess(nil, "undo_schedule_stamp", nil, nil, nil)
+                    } label: {
+                        Text("Undo")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy800)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(HavenColors.beige200.opacity(0.6))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
             // Action area
             if item.isPending {
                 actionArea

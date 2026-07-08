@@ -4223,6 +4223,32 @@ final class DatabaseService {
         /// "Is this X?" confirm row; the answer feeds confirmed_contractor_id
         /// into apply. Never silently attributed.
         let suggestedVendorMatch: SuggestedVendorMatch?
+        /// M5 — the appointment auto-stamp receipt. Non-nil renders the
+        /// undoable "Scheduled: X — Oct 14" notice.
+        let scheduleStamp: ScheduleStamp?
+
+        struct ScheduleStamp: Decodable, Hashable {
+            let taskId: String
+            let taskTitle: String?
+            let previousScheduledDate: String?
+            let newScheduledDate: String?
+            let undoneAt: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                taskId = (try? c.decodeIfPresent(String.self, forKey: .taskId)) ?? ""
+                taskTitle = try? c.decodeIfPresent(String.self, forKey: .taskTitle)
+                previousScheduledDate = try? c.decodeIfPresent(String.self, forKey: .previousScheduledDate)
+                newScheduledDate = try? c.decodeIfPresent(String.self, forKey: .newScheduledDate)
+                undoneAt = try? c.decodeIfPresent(String.self, forKey: .undoneAt)
+            }
+            enum CodingKeys: String, CodingKey {
+                case taskId = "task_id"
+                case taskTitle = "task_title"
+                case previousScheduledDate = "previous_scheduled_date"
+                case newScheduledDate = "new_scheduled_date"
+                case undoneAt = "undone_at"
+            }
+        }
 
         struct SuggestedVendorMatch: Decodable, Hashable {
             let contractorId: String
@@ -4338,6 +4364,25 @@ final class DatabaseService {
                 let summary: String?
                 // schedule_task / system_link
                 let count: Int?
+                let candidates: [ScheduleCandidate]?
+
+                struct ScheduleCandidate: Decodable, Hashable, Identifiable {
+                    let taskId: String
+                    let title: String
+                    let dueDate: String?
+                    var id: String { taskId }
+                    init(from decoder: Decoder) throws {
+                        let c = try decoder.container(keyedBy: CodingKeys.self)
+                        taskId = (try? c.decodeIfPresent(String.self, forKey: .taskId)) ?? ""
+                        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+                        dueDate = try? c.decodeIfPresent(String.self, forKey: .dueDate)
+                    }
+                    enum CodingKeys: String, CodingKey {
+                        case title
+                        case taskId = "task_id"
+                        case dueDate = "due_date"
+                    }
+                }
 
                 init(from decoder: Decoder) throws {
                     let c = try? decoder.container(keyedBy: CodingKeys.self)
@@ -4367,10 +4412,11 @@ final class DatabaseService {
                     chezCategory = try? c?.decodeIfPresent(String.self, forKey: .chezCategory) ?? nil
                     summary = try? c?.decodeIfPresent(String.self, forKey: .summary) ?? nil
                     count = try? c?.decodeIfPresent(Int.self, forKey: .count) ?? nil
+                    candidates = try? c?.decodeIfPresent([ScheduleCandidate].self, forKey: .candidates) ?? nil
                 }
 
                 enum CodingKeys: String, CodingKey {
-                    case urgency, category, date, location, description, summary, count, signal
+                    case urgency, category, date, location, description, summary, count, signal, candidates
                     case dueDate = "due_date"
                     case needsVendor = "needs_vendor"
                     case taskId = "task_id"
@@ -4538,6 +4584,7 @@ final class DatabaseService {
             case suggestedActions = "suggested_actions"
             case appliedActions = "applied_actions"
             case suggestedVendorMatch = "suggested_vendor_match"
+            case scheduleStamp = "schedule_stamp"
             case matchedContractorName = "matched_contractor_name"
         }
 
@@ -4594,6 +4641,7 @@ final class DatabaseService {
             suggestedActions = try? c.decodeIfPresent([SuggestedAction].self, forKey: .suggestedActions)
             appliedActions = try? c.decodeIfPresent([AppliedAction].self, forKey: .appliedActions)
             suggestedVendorMatch = try? c.decodeIfPresent(SuggestedVendorMatch.self, forKey: .suggestedVendorMatch)
+            scheduleStamp = try? c.decodeIfPresent(ScheduleStamp.self, forKey: .scheduleStamp)
             matchedContractorName = try? c.decodeIfPresent(String.self, forKey: .matchedContractorName)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {

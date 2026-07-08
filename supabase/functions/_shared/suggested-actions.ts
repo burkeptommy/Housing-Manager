@@ -240,6 +240,28 @@ export function completeTaskAction(args: {
   };
 }
 
+export function scheduleTaskAction(args: {
+  date: string;                 // YYYY-MM-DD from the appointment email
+  candidates: Array<{ task_id: string; title: string; due_date: string | null }>;
+  vendorName?: string | null;
+  reason?: string | null;
+  source: SuggestedActionSource;
+}): Omit<SuggestedAction, "id"> {
+  return {
+    kind: "schedule_task",
+    title: `Put this ${args.vendorName ?? "vendor"} visit on a task`,
+    reason: args.reason ?? null,
+    confidence: "medium",
+    recommended: true,
+    source: args.source,
+    payload: {
+      date: args.date,
+      candidates: args.candidates.slice(0, 4),
+      count: args.candidates.length,
+    },
+  };
+}
+
 export function visitLogAction(args: {
   contractorId: string;
   vendorName?: string | null;

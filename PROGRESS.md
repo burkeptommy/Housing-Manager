@@ -24,6 +24,22 @@ The unified suggested-actions shape + universal review card + retry-safe apply s
 
 ---
 
+## Phase 7 M5 — Appointments + projects — SHIPPED (2026-07-08, overnight) · **PHASE 7 COMPLETE**
+
+The final Ingestion Intelligence v2 milestone. All five milestones (M1 foundation → M2 routines → M3 invoice auto-run → M4 vendor ladder → M5 appointments/projects) shipped in one overnight run, each deployed + fixture-verified against the prod test household.
+
+**Appointments (server, deployed):** STEP 2.8 — `intent == "appointment"` + HIGH-tier vendor + parsed date + EXACTLY ONE matching task (that vendor's, due ±60d or undated) → auto-stamps `scheduled_date` + an informational `schedule_stamped` item with Undo (founder decision: auto-stamp with undoable notice). `undo_schedule_stamp` restores the prior value including prior-null, idempotent via `undone_at`. Zero/2+ candidates → `schedule_task` ask row (candidate list) + an `event` row so the date never evaporates; the homeowner's picked candidate rides `payload_overrides.task_id` into the server apply (ownership-checked). Unknown senders never auto-stamp.
+
+**Projects (server, deployed):** the Phase 101 matcher now runs for NON-quote correspondence — original-sender (never the forwarder — bug caught in fixtures) → `project_contacts` on an active project → `quoteIntel.suggested_project`. The M1 project lane is now LIVE: document-bearing review items and the M3 invoice continuation both carry "Attach to project: X" rows.
+
+**iOS (Chez build green):** `InboxMetadata.ScheduleStamp` + `Payload.candidates` resilient decode; InboxItemCard renders the undoable "Scheduled: X — Jul 21" notice outside the pending-action gate (informational items); the review card's schedule_task rows get a candidate Menu.
+
+**Verified live (fixture household fully restored to baseline, all storage orphans cleaned):** one-candidate appointment → stamped 2026-07-21 + notice item; Undo → prior-null restored + second undo hits the idempotence guard; 3-candidate appointment → ask card with candidate list + event + chez rows; apply with chosen candidate → right task stamped; project-vendor document → review card with task + "Attach to project: Furnace Room Renovation" + chez; applying the project row → `documents.project_id` linked.
+
+**Phase 7 wrap:** ingestion can now create tasks, complete tasks, create routines, log visits + spend, map vendors (3-tier ladder with confirm row), stamp appointments (undoable), attach documents to projects, add punch items, and hand anything to Chez — always recommendation-first with per-row remapping. Remaining known gaps (deliberate): vehicle invoices stay manual (M3 fast-follow), multi-property switcher on the card uses single-property fallback, on-device apply testing of the iOS-side kinds (routine/punch/chez/complete/visit) awaits Tom's next TestFlight pass.
+
+---
+
 ## Phase 7 M4 — Vendor ladder + spend — SHIPPED (2026-07-08, overnight)
 
 Sender→vendor matching graduated from exact-email-only to a three-tier ladder, and invoices from routine-served vendors now offer one-tap visit + spend logging.

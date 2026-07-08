@@ -10,7 +10,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { arrayBufferToBase64 } from "../_shared/base64.ts";
-import { assignIds, chezAction, completeTaskAction, pickActionType, projectAction, routineAction, systemLinkAction, taskAction, toLegacySuggestedTasks, visitLogAction } from "../_shared/suggested-actions.ts";
+import { assignIds, chezAction, completeTaskAction, eventAction, pickActionType, projectAction, routineAction, scheduleTaskAction, systemLinkAction, taskAction, toLegacySuggestedTasks, visitLogAction } from "../_shared/suggested-actions.ts";
 import { extractDisplayName, extractEmailAddress, matchVendorBySender } from "../_shared/vendor-match.ts";
 import type { VendorMatchContractor } from "../_shared/vendor-match.ts";
 import {
@@ -2143,6 +2143,40 @@ Respond with ONLY valid JSON:
       }
     }
 
+    // --- Phase 7 M5: PROJECT MATCHING FOR NON-QUOTE CORRESPONDENCE ---
+    // Phase 101's matcher only ran for quotes; appointment/status emails
+    // from a vendor already attached to an active project now light up the
+    // M1 project lane ("Attach to project: Kitchen Renovation") on the
+    // review card. Sender -> project_contacts is the signal.
+    // Original sender wins over the forwarder — a forwarded vendor email's
+    // project signal is the vendor's address, not the homeowner's.
+    const projectSignalEmail = extractEmailAddress(originalSender || fromAddress) ?? senderEmail;
+    if (classification.type !== "contractor_quote" && !quoteIntel.suggested_project && projectSignalEmail) {
+      try {
+        const { data: contactMatches } = await supabase
+          .from("project_contacts")
+          .select("project_id, contact_email")
+          .eq("household_id", householdId)
+          .ilike("contact_email", projectSignalEmail)
+          .limit(5);
+        const projectIds = [...new Set((contactMatches || []).map((m: any) => m.project_id).filter(Boolean))];
+        if (projectIds.length > 0) {
+          const { data: projs } = await supabase
+            .from("property_projects")
+            .select("id, name, status")
+            .in("id", projectIds)
+            .neq("status", "completed")
+            .limit(1);
+          if (projs && projs.length > 0) {
+            quoteIntel.suggested_project = { id: projs[0].id, name: projs[0].name, signal: "sender_contact" };
+            actions.push(`project_matched:${projs[0].name}`);
+          }
+        }
+      } catch (projErr) {
+        console.warn("[receive-email] non-quote project match failed (non-blocking):", projErr);
+      }
+    }
+
     // --- STEP 2.7: FOLLOW-UP TASKS (intent → auto-add or ask) ---
     // The heart of the July 2026 upgrade. The classifier extracted
     // suggestedTasks — the follow-up work this email implies. Policy:
@@ -2239,6 +2273,80 @@ Respond with ONLY valid JSON:
 
     let autoAddedTasks: Array<{ id: string; title: string }> = [];
     let askFollowups: SuggestedTask[] = [];
+
+    // --- Phase 7 M5: APPOINTMENT AUTO-STAMP (STEP 2.8) ---
+    // Founder decision (2026-07-07): a HIGH-confidence vendor + a parsed
+    // appointment date + EXACTLY ONE unambiguous matching task -> stamp
+    // scheduled_date and surface an undoable informational item. Zero or
+    // 2+ candidates -> ask via a schedule_task row on the review card.
+    // Unknown senders never auto-stamp.
+    let scheduleAskActions: ReturnType<typeof scheduleTaskAction>[] = [];
+    let scheduleStamped: { task_id: string; task_title: string; previous_scheduled_date: string | null; new_scheduled_date: string } | null = null;
+    const appointmentDate = (() => {
+      const evts = (classification as any).events as Array<{ date?: string }> | undefined;
+      const raw = evts?.[0]?.date || (classification as any).eventDate || null;
+      return typeof raw === "string" && raw.length >= 10 ? raw.substring(0, 10) : null;
+    })();
+    if ((classification as any).intent === "appointment" && matchedContractor && appointmentDate) {
+      try {
+        const { data: vendorTasks } = await supabase
+          .from("maintenance_tasks")
+          .select("id, title, next_due_date, scheduled_date")
+          .eq("household_id", householdId)
+          .eq("assigned_contractor_id", matchedContractor.id)
+          .eq("is_archived", false);
+        const apptMs = new Date(appointmentDate).getTime();
+        const candidates = (vendorTasks || []).filter((t: any) => {
+          if (!t.next_due_date) return true; // unscheduled work for this vendor
+          const diff = Math.abs(new Date(t.next_due_date).getTime() - apptMs) / 86400000;
+          return diff <= 60;
+        });
+        if (candidates.length === 1) {
+          const target = candidates[0] as { id: string; title: string; scheduled_date: string | null };
+          const { error: stampErr } = await supabase
+            .from("maintenance_tasks")
+            .update({ scheduled_date: appointmentDate })
+            .eq("id", target.id);
+          if (!stampErr) {
+            scheduleStamped = {
+              task_id: target.id,
+              task_title: target.title,
+              previous_scheduled_date: target.scheduled_date ?? null,
+              new_scheduled_date: appointmentDate,
+            };
+            actions.push(`schedule_auto_stamped:${target.title}`);
+          } else {
+            console.error("[receive-email] schedule stamp failed:", stampErr.message);
+          }
+        } else if (candidates.length > 1) {
+          scheduleAskActions = [scheduleTaskAction({
+            date: appointmentDate,
+            candidates: candidates.map((t: any) => ({
+              task_id: t.id, title: t.title, due_date: t.next_due_date ?? null,
+            })),
+            vendorName: matchedContractor.company_name,
+            reason: `${matchedContractor.company_name} confirmed ${appointmentDate}, and more than one of their tasks could be this visit.`,
+            source: "email_classifier",
+          })];
+          actions.push(`schedule_ask:${candidates.length}`);
+        }
+        // Zero candidates: the event lane below still captures the date.
+      } catch (schedErr) {
+        console.warn("[receive-email] appointment auto-stamp failed (non-blocking):", schedErr);
+      }
+    }
+    // Ask-lane event row for appointment emails that didn't auto-stamp —
+    // the date shouldn't evaporate just because no task matched.
+    const eventAskActions = ((classification as any).intent === "appointment" && !scheduleStamped && appointmentDate)
+      ? [eventAction({
+          title: `${matchedContractor?.company_name ?? classification.vendorName ?? "Vendor"} visit`,
+          reason: "From the appointment email.",
+          source: "email_classifier",
+          date: ((classification as any).events?.[0]?.date as string | undefined) ?? appointmentDate,
+          all_day: !((((classification as any).events?.[0]?.date as string | undefined) ?? "").includes("T")),
+          location: ((classification as any).events?.[0]?.location as string | undefined) ?? null,
+        })]
+      : [];
 
     if (normalizedFollowups.length > 0 && !suppressFollowupsForType) {
       const isPureReminder = !createdDocumentId && !createdProjectId;
@@ -2608,7 +2716,8 @@ Respond with ONLY valid JSON:
         // auto-add path, so the review item now fires when either exists.
         // M3: skipped when the invoice auto-run continuation below will
         // author this item with the richer process-invoice extraction.
-        if ((askFollowups.length > 0 || routineActions.length > 0) && !willAutoRunInvoice) {
+        if ((askFollowups.length > 0 || routineActions.length > 0
+             || scheduleAskActions.length > 0 || eventAskActions.length > 0) && !willAutoRunInvoice) {
           const vendorLabel = matchedContractor?.company_name || classification.vendorName || null;
           const followTitle = askFollowups.length === 0
             ? `Standing service spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
@@ -2631,6 +2740,8 @@ Respond with ONLY valid JSON:
               needs_vendor: t.needs_vendor ?? null,
             })),
             ...routineActions,
+            ...scheduleAskActions,
+            ...eventAskActions,
             ...(() => {
               const sp = quoteIntel.suggested_project as { id?: string; name?: string; signal?: string } | undefined;
               return sp?.id && sp?.name
@@ -2686,6 +2797,31 @@ Respond with ONLY valid JSON:
             actions.push(`followup_review_item_created:${askFollowups.length}`);
             if (routineActions.length > 0) actions.push(`routine_suggestions:${routineActions.length}`);
           }
+        }
+
+        // Phase 7 M5 — the auto-stamp's undoable notice. Informational
+        // (needs_action false): the work is DONE; Undo is an escape hatch,
+        // not a to-do. iOS renders the Undo button off metadata.schedule_stamp.
+        if (scheduleStamped) {
+          const friendlyDate = new Date(scheduleStamped.new_scheduled_date + "T12:00:00Z")
+            .toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const { error: stampItemErr } = await supabase.from("inbox_items").insert({
+            household_id: householdId,
+            type: "schedule_stamped",
+            title: `Scheduled: ${scheduleStamped.task_title} — ${friendlyDate}`,
+            summary: `${matchedContractor?.company_name ?? "Your vendor"} confirmed ${friendlyDate}, so we put it on the matching task. Tap Undo if that's not right.`,
+            from_email: fromAddress,
+            related_contractor_id: matchedContractor?.id ?? null,
+            needs_action: false,
+            email_hash: emailHash + ":schedule",
+            metadata: {
+              schedule_stamp: scheduleStamped,
+              ...(matchedContractor ? { matched_contractor: { id: matchedContractor.id, name: matchedContractor.company_name, category: matchedContractor.category } } : {}),
+            },
+            status: "ready",
+          });
+          if (stampItemErr) console.error("[receive-email] schedule-stamp item insert failed:", stampItemErr.message);
+          else actions.push("schedule_stamp_item_created");
         }
 
         // --- Phase 7 M3: INVOICE AUTO-RUN (post-response continuation) ---
@@ -2835,7 +2971,14 @@ Respond with ONLY valid JSON:
               const vendorLabel = matchedContractor?.company_name
                 || ((classification as any).billVendor as string | null)
                 || classification.vendorName || null;
-              const actionable = [...completedRows, ...taskRows, ...cadenceRoutines, ...visitRows, ...systemRows];
+              // M5 — invoices for active-project work carry the attach lane.
+              const projRows = (() => {
+                const sp = quoteIntel.suggested_project as { id?: string; name?: string; signal?: string } | undefined;
+                return sp?.id && sp?.name
+                  ? [projectAction({ projectId: sp.id, projectName: sp.name, signal: sp.signal ?? "matched", source: "invoice_analysis" as const })]
+                  : [];
+              })();
+              const actionable = [...completedRows, ...taskRows, ...cadenceRoutines, ...visitRows, ...projRows, ...systemRows];
               if (actionable.length === 0) {
                 console.log("[receive-email] invoice auto-run: nothing actionable, staying quiet");
                 return;
