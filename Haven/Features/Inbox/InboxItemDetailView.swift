@@ -17,6 +17,11 @@ struct InboxItemDetailView: View {
     @State private var selectedVehicleId: UUID?
     @State private var selectedCategory: String = "Other"
     @State private var showDeleteConfirm = false
+    // Phase 8.1 — quarantine vendor mapping (seeded from the gate's
+    // fuzzy suggestion; overridable via ContractorPickerSheet).
+    @State private var quarantineVendorId: String?
+    @State private var quarantineVendorName: String?
+    @State private var showQuarantineVendorPicker = false
     @State private var isProcessing = false
     @State private var quickLookURL: URL?
     @State private var isLoadingAttachment = false
@@ -790,14 +795,47 @@ struct InboxItemDetailView: View {
                         isDisabled: isProcessing
                     )
                 } else if item.actionType == "review_quarantined_sender" {
-                    // Phase 8.1 — quarantined unknown sender.
+                    // Phase 8.1 — quarantined unknown sender, with the
+                    // mapping moment: link the address to a vendor so every
+                    // future email from them attributes automatically. The
+                    // gate's fuzzy suggestion pre-fills; the picker overrides.
                     VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        Button {
+                            showQuarantineVendorPicker = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: quarantineVendorName == nil ? "person.crop.circle.badge.plus" : "person.crop.circle.fill.badge.checkmark")
+                                    .font(.system(size: 13))
+                                Text(quarantineVendorName.map { "This is: \($0)" } ?? "Who is this? Link to a vendor (recommended)")
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.navy800)
+                            .padding(HavenTheme.spacing12)
+                            .background(HavenColors.navy800.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear {
+                            // Seed from the gate ladder's fuzzy suggestion.
+                            if quarantineVendorId == nil,
+                               let q = item.metadata?.quarantined,
+                               let sid = q.suggestedContractorId {
+                                quarantineVendorId = sid
+                                quarantineVendorName = q.suggestedContractorName
+                            }
+                        }
+
                         HavenButton(
-                            title: "Allow & process their email",
+                            title: quarantineVendorName.map { "Allow & link to \($0)" } ?? "Allow & process their email",
                             action: {
                                 guard !isProcessing else { return }
                                 isProcessing = true
-                                onProcess(nil, "allow_quarantined_sender", nil, nil)
+                                onProcess(nil, "allow_quarantined_sender", quarantineVendorId, nil)
                                 dismiss()
                             },
                             icon: "checkmark.shield",
@@ -816,9 +854,16 @@ struct InboxItemDetailView: View {
                             icon: "hand.raised",
                             isDisabled: isProcessing
                         )
-                        Text("Allowing adds them to your senders list and processes this email like any other. Blocking silently drops their future emails.")
+                        Text("Allowing adds them to your senders list, saves the address on the linked vendor, and processes this email like any other. Blocking silently drops their future emails.")
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .sheet(isPresented: $showQuarantineVendorPicker) {
+                        ContractorPickerSheet(systemCategory: "") { contractor in
+                            quarantineVendorId = contractor.id.uuidString
+                            quarantineVendorName = contractor.companyName
+                            Haptics.selection()
+                        }
                     }
                 } else if let stamp = item.metadata?.scheduleStamp, stamp.undoneAt == nil, item.actionCompleted != true {
                     // Phase 7 M5 — the appointment auto-stamp's undoable

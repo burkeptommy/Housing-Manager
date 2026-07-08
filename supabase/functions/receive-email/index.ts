@@ -664,7 +664,9 @@ serve(async (req: Request) => {
       // or company domain) are allowed and self-heal into the list. This
       // is what lets a vendor's billing@ address work the FIRST time
       // without the homeowner pre-allowlisting it. MEDIUM (fuzzy name)
-      // never passes the gate — that's quarantine territory.
+      // never passes the gate — that's quarantine territory, where it
+      // becomes the pre-selected vendor suggestion on the quarantine card.
+      let gateSuggestion: { id: string; name: string } | null = null;
       if (!isAllowed) {
         try {
           const { data: gateContractors } = await supabase
@@ -686,6 +688,8 @@ serve(async (req: Request) => {
               is_auto_added: true,
             });
             if (healErr) console.warn("[receive-email] ladder self-heal insert failed (non-fatal):", healErr);
+          } else if (gateLadder) {
+            gateSuggestion = { id: gateLadder.contractor.id, name: gateLadder.contractor.company_name };
           }
         } catch (gateErr) {
           console.warn("[receive-email] gate ladder check failed (treating as unknown):", gateErr);
@@ -729,6 +733,7 @@ serve(async (req: Request) => {
                 from: fromAddress,
                 sender_email: senderEmail,
                 sender_display: senderDisplay,
+                ...(gateSuggestion ? { suggested_contractor: gateSuggestion } : {}),
                 to: toAddress,
                 subject: subject || "",
                 text: (emailBody || "").substring(0, 20000),

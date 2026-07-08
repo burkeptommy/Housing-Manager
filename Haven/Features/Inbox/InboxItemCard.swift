@@ -227,25 +227,39 @@ struct InboxItemCard: View {
         } else if item.actionType == "review_quarantined_sender" {
             // Phase 8.1 — unknown sender emailed the household address.
             // Allow replays the stored email through the pipeline; Block
-            // silently drops this sender forever.
-            HStack(spacing: HavenTheme.spacing8) {
-                HavenButton(
-                    title: "Allow & process",
-                    action: {
-                        Haptics.selection()
-                        onProcess(nil, "allow_quarantined_sender", nil, nil, nil)
-                    },
-                    size: .compact
-                )
-                HavenButton(
-                    title: "Block sender",
-                    action: {
-                        Haptics.selection()
-                        onProcess(nil, "reject_quarantined_sender", nil, nil, nil)
-                    },
-                    style: .secondary,
-                    size: .compact
-                )
+            // silently drops this sender forever. When the gate's fuzzy
+            // ladder recognized the sender, the primary button ALSO maps
+            // the address onto that vendor (out of the box most vendors
+            // have no email on file — the first email is the mapping
+            // moment). Manual vendor picking lives in the detail view.
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                let suggestion = item.metadata?.quarantined
+                HStack(spacing: HavenTheme.spacing8) {
+                    HavenButton(
+                        title: suggestion?.suggestedContractorName != nil
+                            ? "Allow — it's \(suggestion?.suggestedContractorName ?? "")"
+                            : "Allow & process",
+                        action: {
+                            Haptics.selection()
+                            onProcess(nil, "allow_quarantined_sender", suggestion?.suggestedContractorId, nil, nil)
+                        },
+                        size: .compact
+                    )
+                    HavenButton(
+                        title: "Block",
+                        action: {
+                            Haptics.selection()
+                            onProcess(nil, "reject_quarantined_sender", nil, nil, nil)
+                        },
+                        style: .secondary,
+                        size: .compact
+                    )
+                }
+                if suggestion?.suggestedContractorName != nil {
+                    Text("Allowing links this address to \(suggestion?.suggestedContractorName ?? "the vendor"). Tap in for other options.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
             }
         } else if item.actionType == "review_followups" || item.actionType == "review_actions" {
             // Phase 7: items carrying the unified suggested_actions render

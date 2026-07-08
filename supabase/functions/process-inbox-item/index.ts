@@ -265,6 +265,43 @@ serve(async (req: Request) => {
       }
 
       // ALLOW
+      // 8.1 follow-up (Tom, 2026-07-08): most vendors WON'T have an email
+      // on file out of the box, so the first email IS the mapping moment.
+      // The card/detail can pass a contractor id (via document_category —
+      // the same param-overloading pattern add_to_project uses) and we
+      // teach the ladder BEFORE the replay, so the replayed email
+      // attributes to the vendor immediately (titles, spend, stamps).
+      const mapContractorId = typeof body.document_category === "string"
+        && /^[0-9a-f-]{36}$/i.test(body.document_category)
+        ? body.document_category
+        : null;
+      if (mapContractorId) {
+        const { data: mcRow } = await supabase
+          .from("contractors")
+          .select("id, household_id, email, alternate_emails, company_name")
+          .eq("id", mapContractorId)
+          .single();
+        const mc = mcRow as { household_id: string; email: string | null; alternate_emails: string[] | null; company_name: string } | null;
+        if (mc && mc.household_id === auth.householdId) {
+          const senderEmail = q.sender_email.toLowerCase().trim();
+          const known = new Set([
+            (mc.email || "").toLowerCase().trim(),
+            ...((mc.alternate_emails || []).map((a) => (a || "").toLowerCase().trim())),
+          ].filter(Boolean));
+          if (!known.has(senderEmail)) {
+            if (!mc.email) {
+              // The email-column update fires the 8.1 allowlist trigger.
+              await supabase.from("contractors")
+                .update({ email: senderEmail }).eq("id", mapContractorId);
+            } else {
+              await supabase.from("contractors")
+                .update({ alternate_emails: [...(mc.alternate_emails || []), senderEmail] })
+                .eq("id", mapContractorId);
+            }
+            console.log(`[process-inbox] quarantine allow mapped ${senderEmail} -> ${mc.company_name}`);
+          }
+        }
+      }
       const { error: allowErr } = await supabase.from("household_allowed_senders").insert({
         household_id: householdId,
         email: q.sender_email,

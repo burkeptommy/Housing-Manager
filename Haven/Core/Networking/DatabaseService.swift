@@ -4231,6 +4231,39 @@ final class DatabaseService {
         /// (References/In-Reply-To) or a vendor-scoped subject fallback.
         let threadKey: String?
         let messageId: String?
+        /// 8.1 — the quarantined-sender payload (sender identity + the
+        /// gate ladder's fuzzy vendor suggestion for one-tap mapping).
+        let quarantined: QuarantinedInfo?
+
+        struct QuarantinedInfo: Decodable, Hashable {
+            let senderEmail: String?
+            let senderDisplay: String?
+            let suggestedContractorId: String?
+            let suggestedContractorName: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                senderEmail = try? c.decodeIfPresent(String.self, forKey: .senderEmail)
+                senderDisplay = try? c.decodeIfPresent(String.self, forKey: .senderDisplay)
+                let suggestion = try? c.decodeIfPresent(Suggestion.self, forKey: .suggestedContractor)
+                suggestedContractorId = suggestion?.id
+                suggestedContractorName = suggestion?.name
+            }
+            private struct Suggestion: Decodable {
+                let id: String?
+                let name: String?
+                init(from decoder: Decoder) throws {
+                    let c = try decoder.container(keyedBy: CodingKeys.self)
+                    id = try? c.decodeIfPresent(String.self, forKey: .id)
+                    name = try? c.decodeIfPresent(String.self, forKey: .name)
+                }
+                enum CodingKeys: String, CodingKey { case id, name }
+            }
+            enum CodingKeys: String, CodingKey {
+                case senderEmail = "sender_email"
+                case senderDisplay = "sender_display"
+                case suggestedContractor = "suggested_contractor"
+            }
+        }
 
         struct ScheduleStamp: Decodable, Hashable {
             let taskId: String
@@ -4592,6 +4625,7 @@ final class DatabaseService {
             case scheduleStamp = "schedule_stamp"
             case threadKey = "thread_key"
             case messageId = "message_id"
+            case quarantined
             case matchedContractorName = "matched_contractor_name"
         }
 
@@ -4651,6 +4685,7 @@ final class DatabaseService {
             scheduleStamp = try? c.decodeIfPresent(ScheduleStamp.self, forKey: .scheduleStamp)
             threadKey = try? c.decodeIfPresent(String.self, forKey: .threadKey)
             messageId = try? c.decodeIfPresent(String.self, forKey: .messageId)
+            quarantined = try? c.decodeIfPresent(QuarantinedInfo.self, forKey: .quarantined)
             matchedContractorName = try? c.decodeIfPresent(String.self, forKey: .matchedContractorName)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
