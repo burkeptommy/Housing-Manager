@@ -608,30 +608,43 @@ serve(async (req: Request) => {
     }
 
     if (senderEmail) {
-      const { data: allowedSender } = await supabase
+      const { data: allowedSenders } = await supabase
         .from("household_allowed_senders")
-        .select("id")
+        .select("id, blocked")
         .eq("household_id", householdId)
         .ilike("email", senderEmail)
         .limit(1);
+      const senderRow = allowedSenders?.[0] ?? null;
+
+      // Phase 8.1 — homeowner explicitly rejected this sender from a
+      // quarantine ask. Silent drop; no item, no notification.
+      if (senderRow?.blocked) {
+        console.log(`[receive-email] Blocked sender dropped: ${senderEmail}`);
+        if (placeholderId) {
+          await supabase.from("inbox_items").delete().eq("id", placeholderId);
+        }
+        return new Response(
+          JSON.stringify({ success: true, rejected: true, reason: "sender_blocked" }),
+          { status: 200, headers }
+        );
+      }
+
+      let isAllowed = !!senderRow;
 
       // Phase 100 — household members are ALWAYS allowed senders. The
       // whitelist gate shipped (Phase 86C) without any seeding, so the
-      // homeowner's own forwards were rejected. The whitelist remains
-      // the control surface for third parties; your own account email
-      // never needs to be on it. Self-healing: when a member email
-      // passes this fallback, persist it to the list so Settings shows
-      // it and future checks hit the fast path.
-      let isHouseholdMember = false;
-      if (!allowedSender || allowedSender.length === 0) {
+      // homeowner's own forwards were rejected. Self-healing: when a
+      // member email passes this fallback, persist it to the list so
+      // Settings shows it and future checks hit the fast path.
+      if (!isAllowed) {
         const { data: memberUser } = await supabase
           .from("users")
           .select("id")
           .eq("household_id", householdId)
           .ilike("email", senderEmail)
           .limit(1);
-        isHouseholdMember = !!memberUser && memberUser.length > 0;
-        if (isHouseholdMember) {
+        if (memberUser && memberUser.length > 0) {
+          isAllowed = true;
           const { error: allowErr } = await supabase.from("household_allowed_senders").insert({
             household_id: householdId,
             email: senderEmail,
@@ -644,23 +657,112 @@ serve(async (req: Request) => {
         }
       }
 
-      if ((!allowedSender || allowedSender.length === 0) && !isHouseholdMember) {
-        console.log(`[receive-email] Sender not whitelisted: ${senderEmail} (raw: ${fromAddress}) for household ${householdId}`);
-        // Update placeholder to show rejection reason instead of silently returning
-        if (placeholderId) {
-          const { error: rejErr } = await supabase.from("inbox_items").update({
-            type: "other",
-            title: `Email not processed: sender not recognized`,
-            summary: `An email from ${senderEmail} was received but not processed because this sender is not in your allowed senders list. You can add them in Settings → Allowed Senders.`,
-            status: "ready",
-            needs_action: false,
-          }).eq("id", placeholderId);
-          if (rejErr) {
-            console.error(`[receive-email] rejection placeholder update failed (item stuck in processing):`, rejErr);
+      // Phase 8.1 — HIGH-tier vendor-ladder hits (exact contractor email
+      // or company domain) are allowed and self-heal into the list. This
+      // is what lets a vendor's billing@ address work the FIRST time
+      // without the homeowner pre-allowlisting it. MEDIUM (fuzzy name)
+      // never passes the gate — that's quarantine territory.
+      if (!isAllowed) {
+        try {
+          const { data: gateContractors } = await supabase
+            .from("contractors")
+            .select("id, company_name, category, email, website, alternate_emails")
+            .eq("household_id", householdId);
+          const gateLadder = matchVendorBySender({
+            senderEmail,
+            senderDisplayName: extractDisplayName(fromAddress),
+            contractors: (gateContractors || []) as VendorMatchContractor[],
+          });
+          if (gateLadder?.confidence === "high") {
+            isAllowed = true;
+            console.log(`[receive-email] Gate: vendor ladder allowed ${senderEmail} (${gateLadder.tier} → ${gateLadder.contractor.company_name})`);
+            const { error: healErr } = await supabase.from("household_allowed_senders").insert({
+              household_id: householdId,
+              email: senderEmail,
+              label: gateLadder.contractor.company_name,
+              is_auto_added: true,
+            });
+            if (healErr) console.warn("[receive-email] ladder self-heal insert failed (non-fatal):", healErr);
+          }
+        } catch (gateErr) {
+          console.warn("[receive-email] gate ladder check failed (treating as unknown):", gateErr);
+        }
+      }
+
+      if (!isAllowed) {
+        // Phase 8.1 — QUARANTINE instead of silent rejection. Store enough
+        // to replay: on Allow, process-inbox-item re-POSTs this payload
+        // through the front door (the sender is allowlisted by then, so
+        // the normal gate passes). The stored attachment covers the JSON
+        // path's single-attachment capability.
+        console.log(`[receive-email] Quarantining unknown sender: ${senderEmail} (raw: ${fromAddress}) for household ${householdId}`);
+        let quarantineAttachmentPath: string | null = null;
+        if (attachmentBase64) {
+          try {
+            const qPath = `${householdId}/${crypto.randomUUID()}`;
+            const qBuffer = Uint8Array.from(atob(attachmentBase64), (c) => c.charCodeAt(0));
+            const { error: qUpErr } = await supabase.storage
+              .from("inbox-attachments")
+              .upload(qPath, qBuffer, { contentType: attachmentContentType || "application/octet-stream" });
+            if (!qUpErr) quarantineAttachmentPath = qPath;
+            else console.warn("[receive-email] quarantine attachment upload failed:", qUpErr.message);
+          } catch (qErr) {
+            console.warn("[receive-email] quarantine attachment store failed:", qErr);
           }
         }
+        const senderDisplay = extractDisplayName(fromAddress) || senderEmail;
+        if (placeholderId) {
+          const { error: qErr } = await supabase.from("inbox_items").update({
+            type: "sender_quarantined",
+            title: `New sender: ${senderDisplay}`,
+            summary: `${senderEmail} emailed your Chez address${subject ? ` ("${subject.substring(0, 80)}")` : ""}. Allow them and process the email, or block them?`,
+            status: "ready",
+            needs_action: true,
+            action_type: "review_quarantined_sender",
+            from_email: fromAddress,
+            metadata: {
+              email_hash: emailHash,
+              quarantined: {
+                from: fromAddress,
+                sender_email: senderEmail,
+                sender_display: senderDisplay,
+                to: toAddress,
+                subject: subject || "",
+                text: (emailBody || "").substring(0, 20000),
+                attachment_path: quarantineAttachmentPath,
+                attachment_content_type: attachmentContentType || null,
+                attachment_filename: attachmentFilename || null,
+              },
+            },
+          }).eq("id", placeholderId);
+          if (qErr) console.error("[receive-email] quarantine item update failed:", qErr);
+        }
+        // Action-only push policy: a quarantine ask is decision-worthy.
+        try {
+          const { data: qUsers } = await supabase
+            .from("users").select("id").eq("household_id", householdId);
+          const qUserIds = (qUsers || []).map((u: { id: string }) => u.id);
+          if (qUserIds.length > 0) {
+            const qPush = fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${serviceRoleKey}`,
+                "x-internal-secret": Deno.env.get("INTERNAL_FN_SECRET") ?? "",
+              },
+              body: JSON.stringify({
+                recipient_user_ids: qUserIds,
+                title: "New sender wants to reach you",
+                body: `${senderDisplay} emailed your Chez address. Allow them?`,
+                data: { type: "inbox_item", inbox_item_id: placeholderId ?? "" },
+              }),
+            });
+            // @ts-ignore — EdgeRuntime is injected by the Supabase edge runtime
+            EdgeRuntime.waitUntil(qPush);
+          }
+        } catch (_) { /* push is best-effort */ }
         return new Response(
-          JSON.stringify({ success: true, rejected: true, reason: "sender_not_whitelisted" }),
+          JSON.stringify({ success: true, rejected: true, reason: "sender_quarantined" }),
           { status: 200, headers }
         );
       }
@@ -917,7 +1019,7 @@ serve(async (req: Request) => {
       const cleanSender = extractEmailAddress(rawSender);
       const { data: contractorRows } = await supabase
         .from("contractors")
-        .select("id, company_name, category, email, website")
+        .select("id, company_name, category, email, website, alternate_emails")
         .eq("household_id", householdId);
       const ladder = matchVendorBySender({
         senderEmail: cleanSender,
@@ -938,6 +1040,36 @@ serve(async (req: Request) => {
       }
     } catch (matchErr) {
       console.warn("[receive-email] sender→contractor match failed (non-blocking):", matchErr);
+    }
+
+    // Phase 8.1 — adoption nudge: the FIRST time a known vendor emails the
+    // household's address DIRECTLY (no forward markers), celebrate it once
+    // and suggest sharing the address with other vendors. One item per
+    // household, ever.
+    if (matchedContractor && !isForwarded) {
+      try {
+        const { data: priorNudge } = await supabase
+          .from("inbox_items")
+          .select("id")
+          .eq("household_id", householdId)
+          .eq("type", "share_contact_nudge")
+          .limit(1);
+        if (!priorNudge || priorNudge.length === 0) {
+          await supabase.from("inbox_items").insert({
+            household_id: householdId,
+            type: "share_contact_nudge",
+            title: "That worked. Vendors can reach you here",
+            summary: `${matchedContractor.company_name} just emailed your Chez address directly and we handled it. Share the address with your other vendors and their invoices, reminders, and appointments will organize themselves.`,
+            needs_action: false,
+            status: "ready",
+            email_hash: emailHash + ":nudge",
+            metadata: { share_contact_nudge: true },
+          });
+          console.log("[receive-email] adoption nudge created");
+        }
+      } catch (nudgeErr) {
+        console.warn("[receive-email] adoption nudge failed (non-blocking):", nudgeErr);
+      }
     }
 
     const classificationPrompt = `Analyze this email and classify it. This was forwarded to a household management app by a user.

@@ -10,6 +10,7 @@ import {
   type SuggestedTask,
 } from "../_shared/task-ingest.ts";
 import type { AppliedAction, SuggestedAction } from "../_shared/suggested-actions.ts";
+import { arrayBufferToBase64 } from "../_shared/base64.ts";
 import {
   authFailure,
   requireHousehold,
@@ -212,6 +213,127 @@ serve(async (req: Request) => {
         metadata: { ...metadata, schedule_stamp: { ...stamp, undone_at: new Date().toISOString() } },
       }).eq("id", inbox_item_id);
       return new Response(JSON.stringify({ success: true, restored: stamp.previous_scheduled_date ?? null }), { status: 200, headers });
+    }
+
+    // --- Phase 8.1: QUARANTINED SENDER — ALLOW / REJECT ---
+    // Allow: allowlist the sender, then REPLAY the stored payload through
+    // receive-email's front door (the sender passes the gate now, so the
+    // whole normal pipeline runs — classification, documents, review
+    // cards). Reject: block the sender; future emails drop silently.
+    if (action === "allow_quarantined_sender" || action === "reject_quarantined_sender") {
+      const q = metadata.quarantined as {
+        from?: string; sender_email?: string; sender_display?: string; to?: string;
+        subject?: string; text?: string; attachment_path?: string | null;
+        attachment_content_type?: string | null; attachment_filename?: string | null;
+      } | undefined;
+      if (!q?.sender_email) {
+        return new Response(JSON.stringify({ error: "No quarantined payload on this item" }), { status: 400, headers });
+      }
+
+      if (action === "reject_quarantined_sender") {
+        const { error: insErr } = await supabase.from("household_allowed_senders").insert({
+          household_id: householdId,
+          email: q.sender_email,
+          label: q.sender_display || q.sender_email,
+          is_auto_added: false,
+          added_by: auth.userId,
+          blocked: true,
+        });
+        if (insErr) {
+          // Row already exists (e.g. re-quarantine race) — flip it to blocked.
+          await supabase.from("household_allowed_senders")
+            .update({ blocked: true })
+            .eq("household_id", householdId)
+            .ilike("email", q.sender_email);
+        }
+        // Best-effort: drop the stored attachment; it will never be replayed.
+        if (q.attachment_path) {
+          await supabase.storage.from("inbox-attachments").remove([q.attachment_path]);
+        }
+        await supabase.from("inbox_items").update({
+          seen: true,
+          action_completed: true,
+          summary: `${q.sender_email} is blocked. Future emails from them will be dropped.`,
+        }).eq("id", inbox_item_id);
+        return new Response(JSON.stringify({ success: true, blocked: true }), { status: 200, headers });
+      }
+
+      // ALLOW
+      const { error: allowErr } = await supabase.from("household_allowed_senders").insert({
+        household_id: householdId,
+        email: q.sender_email,
+        label: q.sender_display || q.sender_email,
+        is_auto_added: false,
+        added_by: auth.userId,
+      });
+      if (allowErr) {
+        // Already on the list (possibly blocked from an earlier reject) —
+        // an explicit Allow un-blocks it.
+        await supabase.from("household_allowed_senders")
+          .update({ blocked: false })
+          .eq("household_id", householdId)
+          .ilike("email", q.sender_email);
+      }
+
+      // CRITICAL ordering: the replayed email carries the SAME email_hash
+      // as this quarantine item, and receive-email's 48h dedup gate skips
+      // any non-processing item with that hash. Suffix this item's hash
+      // BEFORE replaying so the replay lands as the real item.
+      const originalHash = (metadata.email_hash as string | undefined) ?? null;
+      await supabase.from("inbox_items").update({
+        seen: true,
+        action_completed: true,
+        email_hash: originalHash ? `${originalHash}:quarantined` : null,
+        summary: `${q.sender_display || q.sender_email} is now an allowed sender. Their email is being processed.`,
+        metadata: { ...metadata, allowed_at: new Date().toISOString() },
+      }).eq("id", inbox_item_id);
+
+      // Replay through the front door, post-response (classification can
+      // take ~30s; the user shouldn't wait on it).
+      const replay = (async () => {
+        try {
+          let attachmentBase64: string | null = null;
+          if (q.attachment_path) {
+            const { data: blob, error: dlErr } = await supabase.storage
+              .from("inbox-attachments").download(q.attachment_path);
+            if (blob && !dlErr) {
+              attachmentBase64 = arrayBufferToBase64(await blob.arrayBuffer());
+            } else {
+              console.warn("[process-inbox] quarantine replay: attachment download failed:", dlErr?.message);
+            }
+          }
+          const token = Deno.env.get("SENDGRID_WEBHOOK_TOKEN");
+          const url = `${supabaseUrl}/functions/v1/receive-email${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: q.to,
+              from: q.from,
+              subject: q.subject ?? "",
+              text: q.text ?? "",
+              ...(attachmentBase64 ? {
+                attachment_base64: attachmentBase64,
+                attachment_content_type: q.attachment_content_type ?? undefined,
+                attachment_filename: q.attachment_filename ?? undefined,
+              } : {}),
+            }),
+          });
+          console.log(`[process-inbox] quarantine replay for ${q.sender_email}: HTTP ${resp.status}`);
+          // The replay owns the attachment now; drop the quarantine copy.
+          if (q.attachment_path) {
+            await supabase.storage.from("inbox-attachments").remove([q.attachment_path]);
+          }
+        } catch (replayErr) {
+          console.error("[process-inbox] quarantine replay failed:", replayErr);
+        }
+      })();
+      try {
+        // @ts-ignore — EdgeRuntime is injected by the Supabase edge runtime
+        EdgeRuntime.waitUntil(replay);
+      } catch (_) { /* local run — promise already dispatched */ }
+
+      return new Response(JSON.stringify({ success: true, allowed: true, replaying: true }), { status: 200, headers });
     }
 
     // --- HANDLE DISMISS ---

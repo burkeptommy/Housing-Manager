@@ -689,6 +689,9 @@ struct ContractorDetailView: View {
             LazyVStack(alignment: .leading, spacing: 16) {
                 heroCard
                 quickActionsRow
+                // Phase 8.1 — adoption: hand this vendor the household's
+                // Chez address so their emails organize themselves.
+                ShareChezContactButton(vendorName: contractor.companyName)
                 // Phase 80.1 — Recurring delegation toggle. Lives near
                 // the top of the contractor surface so the homeowner
                 // sees the "make Chez point of contact" option as a

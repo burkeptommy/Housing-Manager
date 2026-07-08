@@ -224,6 +224,29 @@ struct InboxItemCard: View {
             duplicateResolutionArea
         } else if item.actionType == "confirm_vehicle_document" || item.actionType == "review_vehicle_invoice" {
             vehicleDocumentActionArea
+        } else if item.actionType == "review_quarantined_sender" {
+            // Phase 8.1 — unknown sender emailed the household address.
+            // Allow replays the stored email through the pipeline; Block
+            // silently drops this sender forever.
+            HStack(spacing: HavenTheme.spacing8) {
+                HavenButton(
+                    title: "Allow & process",
+                    action: {
+                        Haptics.selection()
+                        onProcess(nil, "allow_quarantined_sender", nil, nil, nil)
+                    },
+                    size: .compact
+                )
+                HavenButton(
+                    title: "Block sender",
+                    action: {
+                        Haptics.selection()
+                        onProcess(nil, "reject_quarantined_sender", nil, nil, nil)
+                    },
+                    style: .secondary,
+                    size: .compact
+                )
+            }
         } else if item.actionType == "review_followups" || item.actionType == "review_actions" {
             // Phase 7: items carrying the unified suggested_actions render
             // the universal review card (per-row selection; remapping lives

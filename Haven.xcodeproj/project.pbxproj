@@ -218,6 +218,7 @@
 		6E855BD2884967FC5849086B /* ProjectsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9382135E9032A56C0BBB9959 /* ProjectsViewModel.swift */; };
 		6EA0E5FC7D3DA704C7EFDA09 /* QuoteComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 902E6516D892F0B2C474E642 /* QuoteComparisonView.swift */; };
 		6F94226910D18095E31D3D4F /* PathDecisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A26D58615170032E9DDFE64 /* PathDecisionView.swift */; };
+		6F95BA90EB9D5F3F31674770 /* ShareChezContactButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E34F87745B7CFEF2FD44E85 /* ShareChezContactButton.swift */; };
 		6FCE9156D1D4A8B861F116D2 /* HandymanVisitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC10FD2223F1E84DF985A90 /* HandymanVisitService.swift */; };
 		71221A75967708FA23C4260D /* DocumentCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A03C5495A9EBA23FE8FAB5AD /* DocumentCategory.swift */; };
 		723B26FD3221339D1392AC94 /* HiddenTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C91393FE516BD3959D20D7 /* HiddenTasksView.swift */; };
@@ -781,6 +782,7 @@
 		7C7C2D5B47D544D813ADF1AE /* ChezDelegationsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChezDelegationsListView.swift; sourceTree = "<group>"; };
 		7D01DDF4F64847EE3ACA4603 /* HookContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookContent.swift; sourceTree = "<group>"; };
 		7D8D097C2BF6F956A8DA7876 /* AssessmentPendingCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssessmentPendingCard.swift; sourceTree = "<group>"; };
+		7E34F87745B7CFEF2FD44E85 /* ShareChezContactButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareChezContactButton.swift; sourceTree = "<group>"; };
 		7EE222CAEC72CDB421341443 /* ScenarioLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioLoadingView.swift; sourceTree = "<group>"; };
 		7F0B5112283A326974220DA2 /* TaskLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskLibraryView.swift; sourceTree = "<group>"; };
 		80692DF12B6F07485A0AA35A /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
@@ -2095,6 +2097,7 @@
 				3B1FA359763C96ED224CADD3 /* MessageComposeView.swift */,
 				B31B7C57764591968933F9EF /* ProcessingBanner.swift */,
 				ED6CAAD17D48E19486CB0690 /* SeasonCompletionBanner.swift */,
+				7E34F87745B7CFEF2FD44E85 /* ShareChezContactButton.swift */,
 				91EFE100675E01BCBB2021FF /* SpecialtySuggestionCard.swift */,
 				A0AE7AB5E6C3F35C6429980C /* UnifiedTaskCard.swift */,
 				2F404802C9E338E592601FED /* VendorLogoView.swift */,
@@ -2659,6 +2662,7 @@
 				EBFF47E7410595960A999A9B /* ServiceVendorInquirySheet.swift in Sources */,
 				09F7F49D0CD1D0C1266B9DB5 /* SessionManager.swift in Sources */,
 				2738C79DC803C870810040CF /* SettingsView.swift in Sources */,
+				6F95BA90EB9D5F3F31674770 /* ShareChezContactButton.swift in Sources */,
 				A50832A03C6A3975D16E74CE /* SignUpView.swift in Sources */,
 				8ED76C1CE6A11663C9BA5E77 /* SkipToastView.swift in Sources */,
 				C00E1EE90D914C08E76A9115 /* SmartRecommendations.swift in Sources */,

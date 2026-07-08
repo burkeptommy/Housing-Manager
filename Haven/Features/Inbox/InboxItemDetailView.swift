@@ -789,6 +789,37 @@ struct InboxItemDetailView: View {
                         icon: "doc.fill",
                         isDisabled: isProcessing
                     )
+                } else if item.actionType == "review_quarantined_sender" {
+                    // Phase 8.1 — quarantined unknown sender.
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        HavenButton(
+                            title: "Allow & process their email",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                onProcess(nil, "allow_quarantined_sender", nil, nil)
+                                dismiss()
+                            },
+                            icon: "checkmark.shield",
+                            isLoading: isProcessing,
+                            isDisabled: isProcessing
+                        )
+                        HavenButton(
+                            title: "Block this sender",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                onProcess(nil, "reject_quarantined_sender", nil, nil)
+                                dismiss()
+                            },
+                            style: .secondary,
+                            icon: "hand.raised",
+                            isDisabled: isProcessing
+                        )
+                        Text("Allowing adds them to your senders list and processes this email like any other. Blocking silently drops their future emails.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
                 } else if let stamp = item.metadata?.scheduleStamp, stamp.undoneAt == nil, item.actionCompleted != true {
                     // Phase 7 M5 — the appointment auto-stamp's undoable
                     // notice, mirrored from the inbox card so the detail

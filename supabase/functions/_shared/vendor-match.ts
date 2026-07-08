@@ -24,6 +24,8 @@ export interface VendorMatchContractor {
   category: string | null;
   email: string | null;
   website?: string | null;
+  /// Phase 8.3 learning loop: addresses confirmed via the "Is this X?" row.
+  alternate_emails?: string[] | null;
 }
 
 export interface VendorMatchResult {
@@ -117,10 +119,11 @@ export function matchVendorBySender(args: {
   const email = args.senderEmail?.toLowerCase().trim() || null;
   const senderDomain = domainOf(email);
 
-  // Tier 1 — exact email.
+  // Tier 1 — exact email (primary or a confirmed alternate).
   if (email) {
-    const hit = args.contractors.find(
-      (c) => (c.email || "").toLowerCase().trim() === email,
+    const hit = args.contractors.find((c) =>
+      (c.email || "").toLowerCase().trim() === email
+      || (c.alternate_emails || []).some((a) => (a || "").toLowerCase().trim() === email),
     );
     if (hit) {
       return { contractor: hit, tier: "exact_email", confidence: "high", evidence: `sender ${email} is on file` };
@@ -131,7 +134,8 @@ export function matchVendorBySender(args: {
   if (senderDomain && !FREEMAIL_DOMAINS.has(senderDomain)) {
     const hit = args.contractors.find((c) =>
       domainOf((c.email || "").toLowerCase().trim() || null) === senderDomain
-      || websiteDomain(c.website) === senderDomain,
+      || websiteDomain(c.website) === senderDomain
+      || (c.alternate_emails || []).some((a) => domainOf((a || "").toLowerCase().trim() || null) === senderDomain),
     );
     if (hit) {
       return { contractor: hit, tier: "company_domain", confidence: "high", evidence: `sender domain ${senderDomain} matches ${hit.company_name}` };
