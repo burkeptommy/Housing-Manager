@@ -224,9 +224,18 @@ final class SuggestedActionApplyEngine: ObservableObject {
             case .routine(let rawCategory, let intervalDays, let activeMonths,
                           let quotedText, let estimatedCostCents, let vendorId, let vendorLabel):
                 do {
+                    // Vendor-task linking inside createFromIngestion needs a
+                    // property; the card passes nil, so resolve the
+                    // single-property fallback here (same rule the server
+                    // apply uses). Household-scoped creation still works
+                    // when the household genuinely has no property.
+                    var resolvedPropertyId = propertyId
+                    if resolvedPropertyId == nil {
+                        resolvedPropertyId = (try? await DatabaseService.shared.fetchProperties())?.first?.id
+                    }
                     let outcome2 = try await RoutineSeeder.shared.createFromIngestion(
                         householdId: householdId,
-                        propertyId: propertyId,
+                        propertyId: resolvedPropertyId,
                         rawCategory: rawCategory,
                         intervalDays: intervalDays,
                         activeMonthsHint: activeMonths,

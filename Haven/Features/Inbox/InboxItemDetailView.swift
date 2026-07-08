@@ -112,6 +112,13 @@ struct InboxItemDetailView: View {
                 // Actions
                 if item.isPending {
                     actionSection
+                } else if item.metadata?.scheduleStamp != nil,
+                          item.metadata?.scheduleStamp?.undoneAt == nil,
+                          item.actionCompleted != true {
+                    // Phase 7 M5 — the schedule-stamp notice is informational
+                    // (needs_action false), so it fails isPending; the Undo
+                    // branch inside actionSection still needs to render.
+                    actionSection
                 } else if showsPostSaveQuoteActions {
                     // Phase 55.X: Persistent quote actions for items
                     // that have already been marked "Saved". Without
@@ -782,6 +789,32 @@ struct InboxItemDetailView: View {
                         icon: "doc.fill",
                         isDisabled: isProcessing
                     )
+                } else if let stamp = item.metadata?.scheduleStamp, stamp.undoneAt == nil, item.actionCompleted != true {
+                    // Phase 7 M5 — the appointment auto-stamp's undoable
+                    // notice, mirrored from the inbox card so the detail
+                    // view offers the same escape hatch.
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar.badge.checkmark")
+                                .foregroundStyle(HavenColors.success)
+                            Text("We put this visit on the matching task.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        HavenButton(
+                            title: "Undo — take it off the task",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                Analytics.track(.scheduleStampUndone, ["source": "inbox_detail"])
+                                onProcess(nil, "undo_schedule_stamp", nil, nil)
+                                dismiss()
+                            },
+                            style: .secondary,
+                            icon: "arrow.uturn.backward",
+                            isDisabled: isProcessing
+                        )
+                    }
                 } else if isFollowupsAction && item.metadata?.suggestedActions?.isEmpty == false {
                     // Phase 7 — the universal review card (full mode):
                     // per-row selection, destination remapping (Task ⇄

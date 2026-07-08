@@ -182,6 +182,7 @@ struct InboxItemCard: View {
                     Spacer()
                     Button {
                         Haptics.selection()
+                        Analytics.track(.scheduleStampUndone, ["source": "inbox_card"])
                         onProcess(nil, "undo_schedule_stamp", nil, nil, nil)
                     } label: {
                         Text("Undo")
