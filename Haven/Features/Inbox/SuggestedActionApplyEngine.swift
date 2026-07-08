@@ -51,6 +51,10 @@ final class SuggestedActionApplyEngine: ObservableObject {
             vendorId: UUID?,
             vendorLabel: String?
         )
+        /// M3 — mark an existing maintenance task done through the canonical
+        /// completion path (MaintenanceViewModel.completeTask: recurring
+        /// fan-out, system last_service_date, service record, notifications).
+        case completeTask(taskId: UUID)
         /// User left the row unchecked — record as skipped at completion.
         case skip
     }
@@ -143,6 +147,36 @@ final class SuggestedActionApplyEngine: ObservableObject {
                     NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
                 } catch {
                     print("[SuggestedActionApply] punch item failed: \(error)")
+                    outcome.statusById[plan.actionId] = "failed"
+                    outcome.anyFailure = true
+                    iosLedger.append(.init(id: plan.actionId, status: "failed"))
+                }
+            case .completeTask(let taskId):
+                do {
+                    guard let row = try await DatabaseService.shared.fetchMaintenanceTask(id: taskId) else {
+                        outcome.statusById[plan.actionId] = "failed"
+                        outcome.anyFailure = true
+                        iosLedger.append(.init(id: plan.actionId, status: "failed"))
+                        continue
+                    }
+                    // Already completed (recurring instances archive on
+                    // completion; once tasks archive too) → duplicate.
+                    if row.isArchived == true || row.lastCompletedDate != nil {
+                        outcome.statusById[plan.actionId] = "duplicate"
+                        iosLedger.append(.init(id: plan.actionId, status: "duplicate", resultRef: taskId.uuidString))
+                        continue
+                    }
+                    let ok = await MaintenanceViewModel.shared.completeTask(row)
+                    if ok {
+                        outcome.statusById[plan.actionId] = "applied"
+                        iosLedger.append(.init(id: plan.actionId, status: "applied", resultRef: taskId.uuidString))
+                    } else {
+                        outcome.statusById[plan.actionId] = "failed"
+                        outcome.anyFailure = true
+                        iosLedger.append(.init(id: plan.actionId, status: "failed"))
+                    }
+                } catch {
+                    print("[SuggestedActionApply] complete task failed: \(error)")
                     outcome.statusById[plan.actionId] = "failed"
                     outcome.anyFailure = true
                     iosLedger.append(.init(id: plan.actionId, status: "failed"))

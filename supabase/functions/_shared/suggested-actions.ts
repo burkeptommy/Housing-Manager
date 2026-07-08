@@ -213,6 +213,50 @@ export function eventAction(args: {
   };
 }
 
+export function completeTaskAction(args: {
+  taskId: string;
+  taskTitle?: string | null;
+  reason?: string | null;
+  confidence?: "high" | "medium" | "low";
+  source: SuggestedActionSource;
+  completedOn?: string | null;
+  costCents?: number | null;
+}): Omit<SuggestedAction, "id"> {
+  const label = args.taskTitle ?? "this task";
+  return {
+    kind: "complete_task",
+    title: `Mark done: ${label}`,
+    reason: args.reason ?? null,
+    confidence: args.confidence ?? "medium",
+    // Pre-check only when the invoice match was high-confidence.
+    recommended: (args.confidence ?? "medium") === "high",
+    source: args.source,
+    payload: {
+      task_id: args.taskId,
+      task_title: args.taskTitle ?? null,
+      completed_on: args.completedOn ?? null,
+      cost_cents: args.costCents ?? null,
+    },
+  };
+}
+
+export function systemLinkAction(args: {
+  count: number;
+  source: SuggestedActionSource;
+}): Omit<SuggestedAction, "id"> {
+  return {
+    kind: "system_link",
+    title: args.count === 1
+      ? "1 new system spotted on this invoice"
+      : `${args.count} new systems spotted on this invoice`,
+    reason: "Review in the invoice scanner to add them to your home profile.",
+    confidence: "medium",
+    recommended: false,
+    source: args.source,
+    payload: { count: args.count },
+  };
+}
+
 export function routineAction(args: {
   title: string;
   reason?: string | null;

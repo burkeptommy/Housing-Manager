@@ -712,6 +712,23 @@ SYSTEM IDENTIFICATION RULES:
       candidates: candidates.slice(0, 3),
     };
 
+    // Phase 7 M3 — the email pipeline's auto-run stamps the document so
+    // (a) a re-forwarded email doesn't re-run the analysis and (b) iOS
+    // manual entry points (InvoiceChoiceSheet / DocumentDetailView scan)
+    // can route the homeowner to the inbox review card instead of a
+    // second parallel review. User-initiated runs never stamp.
+    if (body.auto_run === true) {
+      const { data: docMetaRow } = await supabase
+        .from("documents").select("metadata").eq("id", document_id).single();
+      const mergedMeta = {
+        ...((docMetaRow?.metadata as Record<string, unknown>) ?? {}),
+        invoice_auto_processed_at: new Date().toISOString(),
+      };
+      const { error: stampErr } = await supabase
+        .from("documents").update({ metadata: mergedMeta }).eq("id", document_id);
+      if (stampErr) console.warn("[process-invoice] auto_run stamp failed:", stampErr.message);
+    }
+
     // --- LOG ACCESS ---
     supabase.from("access_log").insert({
       household_id,

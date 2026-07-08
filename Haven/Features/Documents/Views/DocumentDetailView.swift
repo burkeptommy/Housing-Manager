@@ -841,7 +841,13 @@ struct DocumentDetailView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Scan for Maintenance & Systems")
                                 .font(HavenTypography.headline)
-                            Text("Auto-complete tasks and discover tracked systems")
+                            // Phase 7 M3 — the email pipeline already ran this
+                            // scan; the results live on the inbox review card.
+                            // The button stays available (re-scan is legitimate
+                            // and dedup-safe) but the caption points home.
+                            Text(doc.metadata?.invoiceAutoProcessedAt != nil
+                                 ? "Already processed automatically. Results are in your inbox; scanning again is safe."
+                                 : "Auto-complete tasks and discover tracked systems")
                                 .font(HavenTypography.uiLabelSmall)
                                 .foregroundColor(HavenColors.textSecondary)
                         }

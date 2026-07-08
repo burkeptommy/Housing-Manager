@@ -10,7 +10,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { arrayBufferToBase64 } from "../_shared/base64.ts";
-import { assignIds, chezAction, pickActionType, projectAction, routineAction, taskAction } from "../_shared/suggested-actions.ts";
+import { assignIds, chezAction, completeTaskAction, pickActionType, projectAction, routineAction, systemLinkAction, taskAction, toLegacySuggestedTasks } from "../_shared/suggested-actions.ts";
 import {
   createTasksFromSuggestions,
   type SuggestedTask,
@@ -244,6 +244,16 @@ async function checkDocumentDuplicate(
       .limit(1);
     return data && data.length > 0 ? data[0] : null;
   } catch { return null; }
+}
+
+// Phase 7 M3 — invoice follow-up descriptions run long; cutting mid-word
+// ("recommends replacement wit") reads as a bug. Cut at the last word
+// boundary inside the limit instead.
+function truncateAtWord(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const cut = text.substring(0, limit);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > limit * 0.5 ? cut.substring(0, lastSpace) : cut).trim();
 }
 
 function lastFourDigits(value: string | null | undefined): string | null {
@@ -2202,6 +2212,21 @@ Respond with ONLY valid JSON:
       });
 
     const taskPropertyId: string | null = property?.id ?? null;
+
+    // Phase 7 M3 — invoice auto-run gate. When a home bill with an
+    // analyzable attachment landed with a resolved property, a
+    // post-response continuation runs process-invoice and authors the
+    // review item with the RICH extraction (completions + follow-ups +
+    // cadence + new systems). The synchronous classifier-followups item
+    // is skipped in that case — process-invoice owns invoice follow-ups
+    // (same rule analyze-document already applies). Vehicle bills keep
+    // the manual flow this milestone.
+    const willAutoRunInvoice = classification.type === "bill_invoice"
+      && (classification as any).vehicleContext !== true
+      && !!taskPropertyId
+      && !!createdDocumentId
+      && isAnalyzableContentType(attachmentContentType);
+
     let autoAddedTasks: Array<{ id: string; title: string }> = [];
     let askFollowups: SuggestedTask[] = [];
 
@@ -2571,7 +2596,9 @@ Respond with ONLY valid JSON:
         // Phase 7 M2: the same item also carries standing-arrangement
         // (routine) rows — those ALWAYS ask, even on the pure-reminder
         // auto-add path, so the review item now fires when either exists.
-        if (askFollowups.length > 0 || routineActions.length > 0) {
+        // M3: skipped when the invoice auto-run continuation below will
+        // author this item with the richer process-invoice extraction.
+        if ((askFollowups.length > 0 || routineActions.length > 0) && !willAutoRunInvoice) {
           const vendorLabel = matchedContractor?.company_name || classification.vendorName || null;
           const followTitle = askFollowups.length === 0
             ? `Standing service spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
@@ -2647,6 +2674,176 @@ Respond with ONLY valid JSON:
             actions.push(`followup_review_item_created:${askFollowups.length}`);
             if (routineActions.length > 0) actions.push(`routine_suggestions:${routineActions.length}`);
           }
+        }
+
+        // --- Phase 7 M3: INVOICE AUTO-RUN (post-response continuation) ---
+        // A ~15s Claude call inline would risk the SendGrid webhook timing
+        // out and re-posting (duplicate processing), so the run rides
+        // EdgeRuntime.waitUntil AFTER the response. It calls process-invoice
+        // with the internal secret + auto_run (which stamps
+        // documents.metadata.invoice_auto_processed_at for idempotence +
+        // iOS double-review routing), then authors the ":followups" review
+        // item with the rich extraction. Failure is contained: the bill
+        // document + main item already exist, and the homeowner's manual
+        // scan affordances still work.
+        if (willAutoRunInvoice && createdDocumentId) {
+          const autoRunDocId = createdDocumentId;
+          const classifierFollowups = askFollowups;
+          const classifierRoutines = routineActions;
+          const continuation = (async () => {
+            const started = Date.now();
+            try {
+              // Idempotence: a re-forward that slipped past the email-hash
+              // gate (body nonce) must not re-run the analysis.
+              const { data: docRow } = await supabase
+                .from("documents").select("metadata").eq("id", autoRunDocId).single();
+              if ((docRow?.metadata as Record<string, unknown> | null)?.invoice_auto_processed_at) {
+                console.log("[receive-email] invoice auto-run skipped: already processed");
+                return;
+              }
+
+              const resp = await fetch(`${supabaseUrl}/functions/v1/process-invoice`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${serviceRoleKey}`,
+                  "x-internal-secret": Deno.env.get("INTERNAL_FN_SECRET") ?? "",
+                },
+                body: JSON.stringify({
+                  document_id: autoRunDocId,
+                  household_id: householdId,
+                  property_id: taskPropertyId,
+                  auto_run: true,
+                  // STEP-1 exact-email match is high confidence; the fuzzy
+                  // ladder lands in M4.
+                  ...(matchedContractor ? { preferred_contractor_id: matchedContractor.id } : {}),
+                }),
+              });
+              if (!resp.ok) {
+                console.error(`[receive-email] invoice auto-run HTTP ${resp.status}: ${(await resp.text()).substring(0, 300)}`);
+                return;
+              }
+              const invoice = await resp.json() as Record<string, unknown>;
+              const invoiceDate = (invoice.invoice_date as string | null) ?? null;
+
+              const completedRows = (Array.isArray(invoice.completed_tasks) ? invoice.completed_tasks as Array<Record<string, unknown>> : [])
+                .filter((t) => t && typeof t.matched_maintenance_task_id === "string" && t.matched_maintenance_task_id)
+                .slice(0, 4)
+                .map((t) => completeTaskAction({
+                  taskId: t.matched_maintenance_task_id as string,
+                  taskTitle: (t.matched_maintenance_task_title as string | null) ?? null,
+                  reason: t.description ? String(t.description).substring(0, 200) : null,
+                  confidence: t.confidence === "high" ? "high" : t.confidence === "low" ? "low" : "medium",
+                  source: "invoice_analysis",
+                  completedOn: invoiceDate,
+                }));
+
+              const invoiceFollowups = (Array.isArray(invoice.follow_up_needed) ? invoice.follow_up_needed as Array<Record<string, unknown>> : [])
+                .filter((f) => f && typeof f.description === "string" && (f.description as string).trim().length > 0)
+                .slice(0, 3)
+                .map((f) => taskAction({
+                  title: truncateAtWord(String(f.description).trim(), 80),
+                  reason: "Recommended on the invoice.",
+                  source: "invoice_analysis",
+                  due_date: (f.suggested_due_date as string | null) ?? null,
+                  urgency: (f.urgency as string | null) ?? null,
+                  category: matchedContractor?.category ?? null,
+                  needs_vendor: matchedContractor ? false : null,
+                }));
+              // Classifier follow-ups only ride when the invoice extraction
+              // found none — two phrasings of the same recommendation on one
+              // card reads as a bug.
+              const taskRows = invoiceFollowups.length > 0
+                ? invoiceFollowups
+                : classifierFollowups.map((t) => taskAction({
+                    title: t.title,
+                    reason: t.reason ?? null,
+                    source: "email_classifier",
+                    due_date: t.due_date ?? null,
+                    urgency: t.urgency ?? null,
+                    category: t.category ?? null,
+                    needs_vendor: t.needs_vendor ?? null,
+                  }));
+
+              // Cadence → routine row (M2 rule): explicit cadence + a
+              // category to hang it on. Falls back to the classifier's
+              // standing-arrangement rows when the invoice had no cadence.
+              const cadence = invoice.cadence_detected as { interval_days?: number | null; confidence?: number; quoted_text?: string | null } | null;
+              const cadenceRoutines = (cadence
+                  && typeof cadence.interval_days === "number" && cadence.interval_days > 0
+                  && (cadence.confidence ?? 0) > 0.8
+                  && matchedContractor?.category)
+                ? [routineAction({
+                    title: `Set up ${matchedContractor.category.toLowerCase()} routine`,
+                    reason: cadence.quoted_text ? `"${String(cadence.quoted_text).substring(0, 140)}"` : null,
+                    source: "invoice_analysis",
+                    category: matchedContractor.category,
+                    interval_days: Math.round(cadence.interval_days),
+                    cadence_phrase: cadence.quoted_text ? String(cadence.quoted_text).substring(0, 80) : null,
+                    quoted_text: cadence.quoted_text ? String(cadence.quoted_text).substring(0, 140) : null,
+                    contractor_id: matchedContractor.id,
+                  })]
+                : classifierRoutines;
+
+              const newSystemsCount = Array.isArray(invoice.new_systems_discovered)
+                ? (invoice.new_systems_discovered as unknown[]).length : 0;
+              const systemRows = newSystemsCount > 0
+                ? [systemLinkAction({ count: newSystemsCount, source: "invoice_analysis" })]
+                : [];
+
+              const vendorLabel = matchedContractor?.company_name
+                || ((classification as any).billVendor as string | null)
+                || classification.vendorName || null;
+              const actionable = [...completedRows, ...taskRows, ...cadenceRoutines, ...systemRows];
+              if (actionable.length === 0) {
+                console.log("[receive-email] invoice auto-run: nothing actionable, staying quiet");
+                return;
+              }
+              const unified = assignIds([
+                ...actionable,
+                chezAction({
+                  summary: `Handle the follow-through on an invoice${vendorLabel ? ` from ${vendorLabel}` : ""}: ${actionable.map((a) => a.title).join("; ")}`.substring(0, 300),
+                  description: (invoice.service_summary as string | null) ?? classification.summary ?? null,
+                  category: "coordinate_task",
+                  source: "invoice_analysis",
+                }),
+              ]);
+              const legacyTasks = toLegacySuggestedTasks(unified);
+
+              const { error: insErr } = await supabase.from("inbox_items").insert({
+                household_id: householdId,
+                type: "follow_ups",
+                title: completedRows.length > 0
+                  ? `Invoice processed${vendorLabel ? `: ${vendorLabel}` : ""} — confirm what got done`
+                  : `Invoice processed${vendorLabel ? `: ${vendorLabel}` : ""} — review follow-ups`,
+                summary: unified.filter((a) => a.kind !== "chez_request").map((a) => `• ${a.title}`).join("\n"),
+                from_email: fromAddress,
+                related_document_id: autoRunDocId,
+                related_contractor_id: matchedContractor?.id ?? createdContractorId ?? null,
+                needs_action: true,
+                action_type: pickActionType(unified),
+                email_hash: emailHash + ":followups",
+                metadata: {
+                  ...(legacyTasks.length > 0 ? { suggested_tasks: legacyTasks } : {}),
+                  suggested_actions: unified,
+                  source_document_id: autoRunDocId,
+                  invoice_auto_run: true,
+                  ...(matchedContractor ? { matched_contractor: { id: matchedContractor.id, name: matchedContractor.company_name, category: matchedContractor.category } } : {}),
+                },
+                status: "ready",
+              });
+              if (insErr) {
+                console.error("[receive-email] invoice auto-run review item insert failed:", insErr.message);
+              } else {
+                console.log(`[receive-email] invoice auto-run complete in ${Date.now() - started}ms: ${unified.length} rows`);
+              }
+            } catch (e) {
+              console.error("[receive-email] invoice auto-run failed:", e);
+            }
+          })();
+          // @ts-ignore — EdgeRuntime is injected by the Supabase edge runtime
+          EdgeRuntime.waitUntil(continuation);
+          actions.push("invoice_auto_run_scheduled");
         }
 
         // --- MULTI-EVENT EXTRACTION ---

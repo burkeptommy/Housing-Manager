@@ -24,6 +24,18 @@ The unified suggested-actions shape + universal review card + retry-safe apply s
 
 ---
 
+## Phase 7 M3 — Invoice auto-run — SHIPPED (2026-07-08, overnight)
+
+Forwarded home invoices now process THEMSELVES: receive-email schedules an `EdgeRuntime.waitUntil` continuation (inline would risk SendGrid webhook timeout → retry → duplicate processing) that calls process-invoice with the internal secret + `auto_run: true`, then authors the review item with the rich extraction — no more waiting for the homeowner to manually run the scanner.
+
+**Server (deployed):** gate = bill_invoice + analyzable attachment + resolved property + NOT vehicleContext. The continuation: idempotence check on `documents.metadata.invoice_auto_processed_at` (stamped by process-invoice on auto_run only — user-initiated runs never stamp) → process-invoice with `preferred_contractor_id` when STEP-1 matched → unified rows: `complete_task` per matched task (recommended when confidence high, completed_on = invoice date), `task` rows from `follow_up_needed` with real due dates (classifier follow-ups ride only when the invoice extraction found none — two phrasings of one recommendation reads as a bug), M2's cadence→routine rule, `system_link` when new systems found → authors the `:followups` review item ("Invoice processed: X — confirm what got done"). The synchronous classifier item is skipped when the auto-run is scheduled (process-invoice owns invoice follow-ups — same rule analyze-document applies). New shared builders `completeTaskAction` / `systemLinkAction`; word-boundary title truncation (fixture caught "replacement wit").
+
+**iOS (Chez build green):** `complete_task` applier on the engine — fetches the row (`DatabaseService.fetchMaintenanceTask(id:)`, new), archived-or-completed reads as duplicate, applies via `MaintenanceViewModel.shared.completeTask` (the canonical path: recurring fan-out, system last_service_date, service record, push). `system_link` rows render as deep-link rows (chevron, no checkbox) that open `InvoiceReviewSheet` via a fresh `InvoiceProcessingViewModel` — the card never re-implements system dedup. `DocumentMetadata` gains `invoiceAutoProcessedAt`; DocumentDetailView's scan caption flips to "Already processed automatically… scanning again is safe."
+
+**Verified live (fixture household + matching open task, restored to baseline after):** forward invoice PDF → `invoice_auto_run_scheduled`, no synchronous card → ~30s later the review item lands with a1 complete_task (matched the fixture task id, high/recommended) + a2/a3 invoice follow-ups (real computed due dates) + a4 system_link (3 systems) + a5 Chez; document stamped; legacy mirror = task kinds only (2); server task apply → applied; ledger completion (5 recorded, done). Vehicle invoices + iOS on-device complete_task apply remain manual/pending Tom's TestFlight pass.
+
+---
+
 ## Phase 7 M2 — Routines from ingestion — SHIPPED (2026-07-08, overnight)
 
 The founder-priority milestone: "every 2 weeks" contracts and service-agreement emails now propose REAL `routines` rows, ask-first, with inline cadence/vendor editing on the review card.

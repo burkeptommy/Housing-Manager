@@ -84,10 +84,31 @@ struct SuggestedActionsReviewCard: View {
     @State private var routineVendorIds: [String: UUID] = [:]
     @State private var routineVendorNames: [String: String] = [:]
     @State private var vendorPickerTarget: VendorPickerTarget?
+    // M3 — system_link deep-link into the invoice scanner.
+    @State private var invoiceScanVM: InvoiceProcessingViewModel?
+    @State private var showInvoiceScan = false
 
     private struct VendorPickerTarget: Identifiable {
         let id: String        // action id
         let category: String  // canonical-ish category for the picker
+    }
+
+    private func openInvoiceScan() {
+        guard let documentId = item.relatedDocumentId else { return }
+        Haptics.selection()
+        Task {
+            // Single-property fallback mirrors the server's resolution rule.
+            let properties = (try? await DatabaseService.shared.fetchProperties()) ?? []
+            guard let propertyId = properties.first?.id else { return }
+            let vm = InvoiceProcessingViewModel(
+                documentId: documentId,
+                propertyId: propertyId,
+                householdId: item.householdId
+            )
+            invoiceScanVM = vm
+            showInvoiceScan = true
+            await vm.process()
+        }
     }
 
     private var actions: [DatabaseService.InboxMetadata.SuggestedAction] {
@@ -146,6 +167,11 @@ struct SuggestedActionsReviewCard: View {
                 Haptics.selection()
             }
         }
+        .sheet(isPresented: $showInvoiceScan) {
+            if let vm = invoiceScanVM {
+                InvoiceReviewSheet(viewModel: vm)
+            }
+        }
     }
 
     private var applyButtonTitle: String {
@@ -164,6 +190,46 @@ struct SuggestedActionsReviewCard: View {
 
     @ViewBuilder
     private func actionRow(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> some View {
+        if action.typedKind == .systemLink {
+            systemLinkRow(action)
+        } else {
+            checkboxRow(action)
+        }
+    }
+
+    /// M3 — new-systems rows aren't apply rows: they deep-link into the
+    /// existing InvoiceReviewSheet, whose system dedup / parent grouping /
+    /// task migration is too load-bearing to duplicate on this card.
+    @ViewBuilder
+    private func systemLinkRow(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> some View {
+        Button {
+            openInvoiceScan()
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "sparkles.rectangle.stack")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.navy800)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(action.title)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text("Review in the invoice scanner")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func checkboxRow(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> some View {
         let status = resolvedStatus(for: action)
         HStack(alignment: .top, spacing: 10) {
             if let status {
@@ -441,6 +507,10 @@ struct SuggestedActionsReviewCard: View {
                         summary: action.title,
                         description: action.reason
                     )))
+                }
+            case .completeTask:
+                if let raw = action.payload.taskId, let taskId = UUID(uuidString: raw) {
+                    plans.append(.init(actionId: action.id, operation: .completeTask(taskId: taskId)))
                 }
             case .project, .event:
                 plans.append(.init(actionId: action.id, operation: .server(payloadOverrides: nil)))

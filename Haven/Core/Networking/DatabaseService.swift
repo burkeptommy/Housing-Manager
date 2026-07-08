@@ -1571,6 +1571,18 @@ final class DatabaseService {
         return try await query.order("next_due_date").execute().value
     }
 
+    /// Phase 7 M3 — single-row fetch for the complete_task applier (the
+    /// suggested-action payload carries a task id, not a row).
+    func fetchMaintenanceTask(id: UUID) async throws -> MaintenanceTaskDBRow? {
+        let rows: [MaintenanceTaskDBRow] = try await from("maintenance_tasks")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
     func fetchVehicleMaintenanceTasks(vehicleId: UUID, includeArchived: Bool = false) async throws -> [MaintenanceTaskDBRow] {
         var query = from("maintenance_tasks")
             .select()

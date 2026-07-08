@@ -502,6 +502,10 @@ struct DocumentMetadata: Codable {
     let detectedVins: [String]?
     let matchedVehicleIds: [String]?
     let unmatchedVins: [String]?
+    /// Phase 7 M3 — stamped by process-invoice when the email pipeline's
+    /// auto-run analyzed this invoice; iOS scan affordances read it to
+    /// point at the inbox review card instead of re-running.
+    let invoiceAutoProcessedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case crossReferences = "cross_references"
@@ -509,15 +513,18 @@ struct DocumentMetadata: Codable {
         case detectedVins = "detected_vins"
         case matchedVehicleIds = "matched_vehicle_ids"
         case unmatchedVins = "unmatched_vins"
+        case invoiceAutoProcessedAt = "invoice_auto_processed_at"
     }
 
     init(crossReferences: [String]? = nil, extractedMetadata: [String: FlexibleValue]? = nil,
-         detectedVins: [String]? = nil, matchedVehicleIds: [String]? = nil, unmatchedVins: [String]? = nil) {
+         detectedVins: [String]? = nil, matchedVehicleIds: [String]? = nil, unmatchedVins: [String]? = nil,
+         invoiceAutoProcessedAt: String? = nil) {
         self.crossReferences = crossReferences
         self.extractedMetadata = extractedMetadata
         self.detectedVins = detectedVins
         self.matchedVehicleIds = matchedVehicleIds
         self.unmatchedVins = unmatchedVins
+        self.invoiceAutoProcessedAt = invoiceAutoProcessedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -527,6 +534,7 @@ struct DocumentMetadata: Codable {
         detectedVins = try? container.decode([String].self, forKey: .detectedVins)
         matchedVehicleIds = try? container.decode([String].self, forKey: .matchedVehicleIds)
         unmatchedVins = try? container.decode([String].self, forKey: .unmatchedVins)
+        invoiceAutoProcessedAt = try? container.decode(String.self, forKey: .invoiceAutoProcessedAt)
     }
 }
 
