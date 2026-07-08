@@ -1014,7 +1014,7 @@ serve(async (req: Request) => {
     // attribution. Best-effort — a miss just means no vendor attribution.
     type MatchedContractor = { id: string; company_name: string; category: string | null; chez_owned?: boolean | null };
     let matchedContractor: MatchedContractor | null = null;
-    let suggestedVendorMatch: { contractor_id: string; name: string; category: string | null; evidence: string } | null = null;
+    let suggestedVendorMatch: { contractor_id: string; name: string; category: string | null; evidence: string; sender_email: string | null } | null = null;
     try {
       const rawSender = originalSender || fromAddress || "";
       const cleanSender = extractEmailAddress(rawSender);
@@ -1036,6 +1036,7 @@ serve(async (req: Request) => {
           name: ladder.contractor.company_name,
           category: ladder.contractor.category,
           evidence: ladder.evidence,
+          sender_email: cleanSender,
         };
         console.log(`[receive-email] Sender POSSIBLY matches (${ladder.tier}): ${ladder.contractor.company_name}`);
       }
@@ -1081,7 +1082,9 @@ serve(async (req: Request) => {
       }
     }
 
+    const todayISO = new Date().toISOString().split("T")[0];
     const classificationPrompt = `Analyze this email and classify it. This was forwarded to a household management app by a user.
+TODAY'S DATE: ${todayISO}. When a date in the email has no year (e.g. "July 18"), resolve it to the NEXT occurrence on or after today — never a past date.
 ${isForwarded ? `\nIMPORTANT: This is a FORWARDED email. The "FROM" below is the person who forwarded it (the app user), NOT the original sender. Look inside the email body for the actual original sender, content, and context. Ignore the forwarder's signature — focus on the forwarded content after markers like "---------- Forwarded message ---------" or "Begin forwarded message:".` : ""}
 ${originalSender ? `\nDETECTED ORIGINAL SENDER: ${originalSender}` : ""}
 
@@ -1293,6 +1296,13 @@ Respond with ONLY valid JSON:
         console.log(`[receive-email] Address "${extractedAddress}" did not match any property`);
       }
     }
+
+    // Phase 8.3 — multi-property households: auto-actions only fire when
+    // the property is CONFIDENTLY resolved (single property, or the email's
+    // address matched one). Otherwise suggestions go to the review card,
+    // which asks with a property picker. First-property fallback stays for
+    // display-level resolution only.
+    const propertyResolutionConfident = (properties?.length ?? 0) <= 1 || addressMatched;
 
     // --- ACTION RESULTS ---
     const actions: string[] = [];
@@ -2363,7 +2373,11 @@ Respond with ONLY valid JSON:
     const rawRoutines = Array.isArray((classification as any).suggestedRoutines)
       ? (classification as any).suggestedRoutines as Array<Record<string, unknown>>
       : [];
-    const routineActions = classification.type === "insurance_claim" ? [] : rawRoutines
+    // 8.3 — marketing emails produce NOTHING actionable, no matter what the
+    // classifier extracted ("Consider booking our special" is an ad, not a
+    // task — fixture-caught disobedience). Quiet-file only.
+    const isMarketingIntent = (classification as any).intent === "marketing";
+    const routineActions = (classification.type === "insurance_claim" || isMarketingIntent) ? [] : rawRoutines
       .filter((r) => r && typeof r.category === "string" && (r.category as string).trim().length > 0)
       .slice(0, 2)
       .map((r) => {
@@ -2411,6 +2425,7 @@ Respond with ONLY valid JSON:
       && !!taskPropertyId
       && !!createdDocumentId
       && !routeToChez
+      && propertyResolutionConfident
       && isAnalyzableContentType(attachmentContentType);
 
     // Phase 8.2 — reply lane: the vendor is asking the HOMEOWNER something
@@ -2464,6 +2479,23 @@ Respond with ONLY valid JSON:
               new_scheduled_date: appointmentDate,
             };
             actions.push(`schedule_auto_stamped:${target.title}`);
+            // 8.3 — the visit shows on the family calendar too (spouses live
+            // there). Undo removes it alongside the task date.
+            try {
+              const rawEvt = ((classification as any).events?.[0]?.date as string | undefined) ?? appointmentDate;
+              const { data: evtRow } = await supabase.from("family_events").insert({
+                household_id: householdId,
+                title: `${matchedContractor.company_name} visit`,
+                start_date: rawEvt,
+                all_day: !rawEvt.includes("T"),
+                source: "email_parsed",
+              }).select("id").single();
+              if (evtRow) {
+                (scheduleStamped as Record<string, unknown>).family_event_id = (evtRow as { id: string }).id;
+              }
+            } catch (evtErr) {
+              console.warn("[receive-email] stamp calendar event failed (non-blocking):", evtErr);
+            }
           } else {
             console.error("[receive-email] schedule stamp failed:", stampErr.message);
           }
@@ -2497,9 +2529,11 @@ Respond with ONLY valid JSON:
         })]
       : [];
 
-    if (normalizedFollowups.length > 0 && !suppressFollowupsForType && !routeToChez) {
+    // 8.3: when the appointment auto-stamp fired, the stamped task IS the
+    // reminder — the classifier's "be home for the visit" task is noise.
+    if (normalizedFollowups.length > 0 && !suppressFollowupsForType && !routeToChez && !scheduleStamped && !isMarketingIntent) {
       const isPureReminder = !createdDocumentId && !createdProjectId;
-      if (isPureReminder && taskPropertyId) {
+      if (isPureReminder && taskPropertyId && propertyResolutionConfident) {
         // AUTO-ADD path. Dedup lives in the shared helper (same title within
         // ±21 days) so a vendor re-sending the same "your service is due"
         // note never stacks duplicate tasks.
@@ -2798,6 +2832,9 @@ Respond with ONLY valid JSON:
         baseMetadata.matched_contractor_name = matchedContractor.company_name;
       }
 
+      // Phase 8.3 — marketing quiet-files: pre-seen, no push, still stored.
+      const isMarketing = isMarketingIntent;
+
       // Phase 8.2 — chez_owned vendor: the homeowner's record is quiet.
       // Whatever prompt the type machinery picked (utility match, invoice
       // review) belongs to the OPERATOR now, not the homeowner.
@@ -2835,6 +2872,8 @@ ${baseSummary}` : "");
         email_hash: emailHash,
         metadata: baseMetadata,
         status: "ready",
+        // 8.3 — marketing quiet-files: no unread badge, still searchable.
+        seen: isMarketing,
         family_category: classification.type === "bill_invoice" ? "bills" : (classification.type === "family" ? ((classification as any).familyCategory || "other") : null),
         family_member_name: classification.type === "family" ? ((classification as any).familyMemberName || null) : null,
         event_date: (classification as any).eventDate || null,
@@ -3268,7 +3307,22 @@ ${baseSummary}` : "");
       }
 
       // --- SEND COMPLETION PUSH NOTIFICATION (fire-and-forget) ---
-      if (householdUserIds.length > 0) {
+      // Phase 8.3 — action-only policy: push when the email produced
+      // something to decide (a prompt on the main item, a review card) or
+      // an auto-action worth knowing (schedule stamp, auto-added
+      // reminders, invoice auto-run incoming). Receipts, statements,
+      // marketing, plain filings, and chez-routed messages land silently.
+      const pushWorthy = !isMarketing && !routeToChez && (
+        mainNeedsAction
+        || autoAddedTasks.length > 0
+        || !!scheduleStamped
+        || willAutoRunInvoice
+        || askFollowups.length > 0
+        || routineActions.length > 0
+        || scheduleAskActions.length > 0
+        || needsChezReply
+      );
+      if (householdUserIds.length > 0 && pushWorthy) {
         try {
           const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
           const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";

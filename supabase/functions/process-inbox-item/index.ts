@@ -207,6 +207,12 @@ serve(async (req: Request) => {
       if (undoErr) {
         return new Response(JSON.stringify({ error: "Undo failed" }), { status: 500, headers });
       }
+      // 8.3 — the stamp also wrote a family calendar event; undo removes it.
+      const stampEventId = (stamp as { family_event_id?: string }).family_event_id;
+      if (stampEventId) {
+        await supabase.from("family_events")
+          .delete().eq("id", stampEventId).eq("household_id", auth.householdId);
+      }
       await supabase.from("inbox_items").update({
         seen: true,
         action_completed: true,
@@ -455,6 +461,49 @@ serve(async (req: Request) => {
           );
         }
         confirmedContractorId = body.confirmed_contractor_id;
+
+        // Phase 8.3 — learning loop: "Yes, it's them" teaches the ladder.
+        // Persist the sender address onto the contractor (email if blank,
+        // else alternate_emails) and allowlist it, so the next email from
+        // this address is an instant tier-1 match that passes the gate.
+        const svm = metadata.suggested_vendor_match as { contractor_id?: string; sender_email?: string | null } | undefined;
+        if (svm?.sender_email && svm.contractor_id === confirmedContractorId) {
+          const senderEmail = svm.sender_email.toLowerCase().trim();
+          try {
+            const { data: cRow } = await supabase
+              .from("contractors")
+              .select("email, alternate_emails")
+              .eq("id", confirmedContractorId)
+              .single();
+            const c = cRow as { email: string | null; alternate_emails: string[] | null } | null;
+            const known = new Set([
+              (c?.email || "").toLowerCase().trim(),
+              ...((c?.alternate_emails || []).map((a) => (a || "").toLowerCase().trim())),
+            ].filter(Boolean));
+            if (!known.has(senderEmail)) {
+              if (!c?.email) {
+                // The email-column update also fires the 8.1 allowlist trigger.
+                await supabase.from("contractors")
+                  .update({ email: senderEmail }).eq("id", confirmedContractorId);
+              } else {
+                await supabase.from("contractors")
+                  .update({ alternate_emails: [...(c.alternate_emails || []), senderEmail] })
+                  .eq("id", confirmedContractorId);
+                // alternate_emails doesn't fire the trigger — allowlist here.
+                const { error: alErr } = await supabase.from("household_allowed_senders").insert({
+                  household_id: auth.householdId,
+                  email: senderEmail,
+                  label: (metadata.suggested_vendor_match as { name?: string })?.name ?? "Vendor",
+                  is_auto_added: true,
+                });
+                if (alErr) console.warn("[process-inbox] learn-loop allowlist insert (non-fatal):", alErr.message);
+              }
+              console.log(`[process-inbox] learned vendor address ${senderEmail} for ${confirmedContractorId}`);
+            }
+          } catch (learnErr) {
+            console.warn("[process-inbox] vendor learn-loop failed (non-fatal):", learnErr);
+          }
+        }
       }
 
       // Property resolution: explicit param → household's first (single-

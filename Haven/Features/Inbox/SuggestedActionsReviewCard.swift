@@ -91,6 +91,10 @@ struct SuggestedActionsReviewCard: View {
     @State private var vendorConfirmed: Bool?
     // M5 — schedule_task candidate choice (action id → task id).
     @State private var scheduleChoice: [String: String] = [:]
+    // 8.3 — multi-property households pick where task rows land; the
+    // server's single-property fallback covers everyone else.
+    @State private var householdProperties: [PropertyRow] = []
+    @State private var chosenPropertyId: UUID?
 
     private struct VendorPickerTarget: Identifiable {
         let id: String        // action id
@@ -147,6 +151,36 @@ struct SuggestedActionsReviewCard: View {
             if let match = item.metadata?.suggestedVendorMatch, vendorConfirmed == nil,
                !pendingActions.isEmpty {
                 vendorConfirmRow(match)
+            }
+            if mode == .full, householdProperties.count > 1, !pendingActions.isEmpty {
+                Menu {
+                    ForEach(householdProperties) { prop in
+                        Button {
+                            chosenPropertyId = prop.id
+                            Haptics.selection()
+                        } label: {
+                            if (chosenPropertyId ?? householdProperties.first?.id) == prop.id {
+                                Label(prop.name, systemImage: "checkmark")
+                            } else {
+                                Text(prop.name)
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "house")
+                        Text(householdProperties.first(where: { $0.id == (chosenPropertyId ?? householdProperties.first?.id) })?.name ?? "Property")
+                            .lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                    }
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.navy800)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(HavenColors.beige200.opacity(0.6))
+                    .clipShape(Capsule())
+                }
             }
             ForEach(mode == .compact ? Array(actions.prefix(4)) : actions) { action in
                 actionRow(action)
@@ -535,6 +569,11 @@ struct SuggestedActionsReviewCard: View {
         for action in pendingActions where action.recommended {
             checked.insert(action.id)
         }
+        if mode == .full {
+            Task {
+                householdProperties = (try? await DatabaseService.shared.fetchProperties()) ?? []
+            }
+        }
         Analytics.track(.suggestedActionsCardShown, [
             "count": actions.count,
             "mode": mode == .compact ? "compact" : "full",
@@ -649,7 +688,9 @@ struct SuggestedActionsReviewCard: View {
             item: item,
             plans: plans,
             householdId: item.householdId,
-            propertyId: nil, // server + orchestrator resolve (single-property fallback)
+            // 8.3 — the picker's choice for multi-property households;
+            // nil keeps the server's single-property fallback.
+            propertyId: chosenPropertyId,
             confirmedContractorId: confirmedVendorId
         )
         for (id, status) in outcome.statusById {
