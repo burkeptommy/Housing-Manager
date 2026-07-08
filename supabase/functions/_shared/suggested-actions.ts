@@ -150,14 +150,19 @@ export function chezAction(args: {
   description?: string | null;
   category?: string | null;
   source: SuggestedActionSource;
+  /// Phase 8.2 — reply-needed emails make the Chez lane the DEFAULT
+  /// (the homeowner has no outbound reply; Chez does). Everything else
+  /// keeps opt-in false.
+  recommended?: boolean;
+  title?: string;
+  reason?: string | null;
 }): Omit<SuggestedAction, "id"> {
   return {
     kind: "chez_request",
-    title: "Have Chez handle this",
-    reason: null,
+    title: args.title ?? "Have Chez handle this",
+    reason: args.reason ?? null,
     confidence: "high",
-    // Never the default — the homeowner opts into the concierge handoff.
-    recommended: false,
+    recommended: args.recommended ?? false,
     source: args.source,
     payload: {
       category: args.category ?? "general",

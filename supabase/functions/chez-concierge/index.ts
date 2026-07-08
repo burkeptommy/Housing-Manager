@@ -56,6 +56,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
+import { requireInternal } from "../_shared/require-household.ts";
 import {
   attachSnapshotToRequest,
   buildDelegationSnapshot,
@@ -7694,6 +7695,158 @@ async function handleLogOperatorEvent(
 }
 
 // ============================================================================
+// Phase 8.2 — vendor email ingestion (internal, from receive-email)
+// ============================================================================
+//
+// When a chez_owned contractor emails the household's alfred@ address,
+// receive-email routes the message HERE instead of surfacing homeowner
+// action items: find (or create) the vendor's standing-engagement request,
+// append the email to the thread as a system message, and notify the
+// operator. "Make Chez point of contact" becomes true end-to-end.
+async function handleIngestVendorEmail(
+  service: ServiceClient,
+  payload: {
+    household_id?: string;
+    contractor_id?: string;
+    from?: string;
+    subject?: string;
+    summary?: string;
+    body_excerpt?: string;
+    document_note?: string;
+  },
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  const householdId = compactString(payload.household_id);
+  const contractorId = compactString(payload.contractor_id);
+  if (!householdId || !contractorId) {
+    return json({ error: "household_id and contractor_id required" }, 400);
+  }
+
+  const { data: contractor } = await service
+    .from("contractors")
+    .select("id, household_id, company_name, category, chez_owned")
+    .eq("id", contractorId)
+    .maybeSingle();
+  const c = contractor as {
+    household_id: string; company_name: string; category: string | null; chez_owned: boolean | null;
+  } | null;
+  if (!c || c.household_id !== householdId) {
+    return json({ error: "contractor not found" }, 404);
+  }
+  // Re-verify delegation server-side — the caller's claim is not trusted.
+  if (!c.chez_owned) {
+    return json({ error: "contractor is not chez_owned" }, 409);
+  }
+
+  const now = new Date().toISOString();
+
+  // Requests + messages attribute to the household's owning user.
+  const { data: hhUsers } = await service
+    .from("users").select("id").eq("household_id", householdId).limit(1);
+  const ownerId = (hhUsers?.[0] as { id: string } | undefined)?.id;
+  if (!ownerId) return json({ error: "no household user" }, 404);
+
+  // Find the newest open thread for this vendor (the standing-engagement
+  // parent when one exists; any open coordinate thread otherwise).
+  const { data: openReqs } = await service
+    .from("chez_requests")
+    .select("id, status, context")
+    .eq("household_id", householdId)
+    .eq("context->>contractor_id", contractorId)
+    .neq("status", "resolved")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  let requestId = (openReqs?.[0] as { id: string } | undefined)?.id ?? null;
+  let created = false;
+
+  if (!requestId) {
+    // No open thread — create the standing-engagement parent.
+    const slaDueAt = await businessHoursDue(service);
+    const { data: req, error: reqErr } = await service
+      .from("chez_requests")
+      .insert({
+        household_id: householdId,
+        user_id: ownerId,
+        category: "coordinate_task",
+        summary: `Standing engagement: ${c.company_name}`,
+        context: {
+          _kind: "standing_engagement_contractor",
+          contractor_id: contractorId,
+          contractor_category: c.category ?? "",
+          source: "email_ingestion",
+        },
+        status: "open",
+        sla_due_at: slaDueAt,
+        last_message_at: now,
+        unread_for_user: false,
+        unread_for_admin: true,
+      })
+      .select("id")
+      .single();
+    if (reqErr || !req) {
+      console.error("[chez-concierge] ingest_vendor_email request insert failed:", reqErr);
+      return json({ error: "failed to create request" }, 500);
+    }
+    requestId = (req as { id: string }).id;
+    created = true;
+  } else {
+    await service
+      .from("chez_requests")
+      .update({ unread_for_admin: true, last_message_at: now })
+      .eq("id", requestId);
+  }
+
+  const subject = compactString(payload.subject) || "(no subject)";
+  const excerpt = (payload.body_excerpt ?? "").substring(0, 4000);
+  const content = [
+    `Vendor email from ${c.company_name}${payload.from ? ` (${payload.from})` : ""}`,
+    `Subject: ${subject}`,
+    payload.summary ? `\nAI summary: ${payload.summary}` : "",
+    payload.document_note ? `\n${payload.document_note}` : "",
+    excerpt ? `\n---\n${excerpt}` : "",
+  ].filter(Boolean).join("\n");
+
+  const { error: msgErr } = await service.from("concierge_messages").insert({
+    household_id: householdId,
+    user_id: ownerId,
+    request_id: requestId,
+    role: "system",
+    content,
+    attachments: [],
+  });
+  if (msgErr) {
+    console.error("[chez-concierge] ingest_vendor_email message insert failed:", msgErr);
+  }
+
+  await Promise.all([
+    sendPush(
+      serviceUrl,
+      serviceRoleKey,
+      adminUserIds(),
+      `Vendor email: ${c.company_name}`,
+      subject,
+      { type: "chez_admin_request", request_id: requestId }
+    ),
+    sendAdminEmail(
+      adminEmails(),
+      `[Chez] Vendor email from ${c.company_name}: ${subject}`,
+      `${content}\n\n${adminPortalUrl(requestId)}`,
+      emailBody({
+        preview: `${c.company_name} emailed the household address.`,
+        heading: "Vendor email (Chez is point of contact)",
+        intro: `${c.company_name} emailed the household's Chez address. You own this relationship — the homeowner only got a quiet notice.`,
+        bodyText: content,
+        ctaLabel: "Open in admin portal",
+        ctaUrl: adminPortalUrl(requestId),
+      })
+    ),
+  ]);
+
+  return json({ ok: true, request_id: requestId, created });
+}
+
+// ============================================================================
 // Server entry
 // ============================================================================
 
@@ -7721,6 +7874,21 @@ serve(async (req: Request) => {
     const user = await getAuthenticatedUser(service, req);
 
     switch (action) {
+      // Phase 8.2 — internal only: receive-email routes chez_owned vendors'
+      // emails into the operator's thread. Never callable by clients.
+      case "ingest_vendor_email": {
+        if (!requireInternal(req)) return json({ error: "unauthorized" }, 401);
+        return handleIngestVendorEmail(
+          service,
+          body as {
+            household_id?: string; contractor_id?: string; from?: string;
+            subject?: string; summary?: string; body_excerpt?: string;
+            document_note?: string;
+          },
+          supabaseUrl,
+          serviceRoleKey
+        );
+      }
       case "submit": {
         if (!user) return json({ error: "auth required" }, 401);
         return handleSubmit(

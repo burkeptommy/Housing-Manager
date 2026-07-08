@@ -1012,14 +1012,15 @@ serve(async (req: Request) => {
     // attribute exactly like the old exact-email match; MEDIUM becomes an
     // "Is this X?" confirm row on the review card — never silent
     // attribution. Best-effort — a miss just means no vendor attribution.
-    let matchedContractor: { id: string; company_name: string; category: string | null } | null = null;
+    type MatchedContractor = { id: string; company_name: string; category: string | null; chez_owned?: boolean | null };
+    let matchedContractor: MatchedContractor | null = null;
     let suggestedVendorMatch: { contractor_id: string; name: string; category: string | null; evidence: string } | null = null;
     try {
       const rawSender = originalSender || fromAddress || "";
       const cleanSender = extractEmailAddress(rawSender);
       const { data: contractorRows } = await supabase
         .from("contractors")
-        .select("id, company_name, category, email, website, alternate_emails")
+        .select("id, company_name, category, email, website, alternate_emails, chez_owned")
         .eq("household_id", householdId);
       const ladder = matchVendorBySender({
         senderEmail: cleanSender,
@@ -1027,7 +1028,7 @@ serve(async (req: Request) => {
         contractors: (contractorRows || []) as VendorMatchContractor[],
       });
       if (ladder?.confidence === "high") {
-        matchedContractor = ladder.contractor;
+        matchedContractor = ladder.contractor as unknown as MatchedContractor;
         console.log(`[receive-email] Sender matched contractor (${ladder.tier}): ${ladder.contractor.company_name}`);
       } else if (ladder) {
         suggestedVendorMatch = {
@@ -1041,6 +1042,14 @@ serve(async (req: Request) => {
     } catch (matchErr) {
       console.warn("[receive-email] sender→contractor match failed (non-blocking):", matchErr);
     }
+
+    // Phase 8.2 — "Make Chez point of contact" becomes true end-to-end:
+    // emails from chez_owned contractors route to the operator's thread
+    // (via chez-concierge ingest_vendor_email after processing) and the
+    // homeowner gets a QUIET informational record instead of action items.
+    // Documents still file; the auto-stamp still fires (it's an auto
+    // action, not an ask).
+    const routeToChez = matchedContractor?.chez_owned === true;
 
     // Phase 8.1 — adoption nudge: the FIRST time a known vendor emails the
     // household's address DIRECTLY (no forward markers), celebrate it once
@@ -2401,7 +2410,15 @@ Respond with ONLY valid JSON:
       && (classification as any).vehicleContext !== true
       && !!taskPropertyId
       && !!createdDocumentId
+      && !routeToChez
       && isAnalyzableContentType(attachmentContentType);
+
+    // Phase 8.2 — reply lane: the vendor is asking the HOMEOWNER something
+    // (choose a slot, approve a change) and the app has no outbound reply.
+    // The review card fires with the Chez lane as the recommended default.
+    const needsChezReply = (classification as any).intent === "action_required"
+      && !!matchedContractor
+      && !routeToChez;
 
     let autoAddedTasks: Array<{ id: string; title: string }> = [];
     let askFollowups: SuggestedTask[] = [];
@@ -2480,7 +2497,7 @@ Respond with ONLY valid JSON:
         })]
       : [];
 
-    if (normalizedFollowups.length > 0 && !suppressFollowupsForType) {
+    if (normalizedFollowups.length > 0 && !suppressFollowupsForType && !routeToChez) {
       const isPureReminder = !createdDocumentId && !createdProjectId;
       if (isPureReminder && taskPropertyId) {
         // AUTO-ADD path. Dedup lives in the shared helper (same title within
@@ -2549,7 +2566,7 @@ Respond with ONLY valid JSON:
       const summaryExtra = failedActions.length > 0
         ? "\n\nSome automated processing encountered issues."
         : "";
-      const baseSummary = (classification.summary || `Email from ${fromAddress}: ${subject}`) + summaryExtra;
+      let baseSummary = (classification.summary || `Email from ${fromAddress}: ${subject}`) + summaryExtra;
 
       // --- Main notification (what the system did) ---
       let mainTitle = subject || "Email received";
@@ -2781,6 +2798,19 @@ Respond with ONLY valid JSON:
         baseMetadata.matched_contractor_name = matchedContractor.company_name;
       }
 
+      // Phase 8.2 — chez_owned vendor: the homeowner's record is quiet.
+      // Whatever prompt the type machinery picked (utility match, invoice
+      // review) belongs to the OPERATOR now, not the homeowner.
+      if (routeToChez && matchedContractor) {
+        mainNeedsAction = false;
+        mainActionType = null;
+        baseSummary = `Chez is handling this message from ${matchedContractor.company_name}.` +
+          (baseSummary ? `
+
+${baseSummary}` : "");
+        baseMetadata.chez_handled = true;
+      }
+
       // Deep-link target for the completion push (set from the insert below).
       let completionInboxItemId = "";
       // Insert the final inbox item FIRST, then delete placeholder only on success.
@@ -2849,13 +2879,18 @@ Respond with ONLY valid JSON:
         // M3: skipped when the invoice auto-run continuation below will
         // author this item with the richer process-invoice extraction.
         if ((askFollowups.length > 0 || routineActions.length > 0
-             || scheduleAskActions.length > 0 || eventAskActions.length > 0) && !willAutoRunInvoice) {
+             || scheduleAskActions.length > 0 || eventAskActions.length > 0
+             || needsChezReply) && !willAutoRunInvoice && !routeToChez) {
           const vendorLabel = matchedContractor?.company_name || classification.vendorName || null;
-          const followTitle = askFollowups.length === 0
-            ? `Standing service spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
-            : askFollowups.length === 1
-              ? `Follow-up spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
-              : `${askFollowups.length} follow-ups spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`;
+          const replyOnly = needsChezReply && askFollowups.length === 0
+            && routineActions.length === 0 && scheduleAskActions.length === 0;
+          const followTitle = replyOnly
+            ? `${vendorLabel ?? "A vendor"} needs a reply`
+            : askFollowups.length === 0
+              ? `Standing service spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
+              : askFollowups.length === 1
+                ? `Follow-up spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
+                : `${askFollowups.length} follow-ups spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`;
 
           // Phase 7 M1 — build the unified suggested_actions ALONGSIDE the
           // legacy suggested_tasks (old clients keep their working
@@ -2886,16 +2921,24 @@ Respond with ONLY valid JSON:
                 : [];
             })(),
             chezAction({
-              summary: `Handle ${askFollowups.length > 0 ? "follow-ups" : "a standing service"} from ${vendorLabel ?? "a forwarded email"}: ${[...askFollowups.map((t) => t.title), ...routineActions.map((r) => r.title)].join("; ")}`.substring(0, 300),
+              summary: needsChezReply
+                ? `Reply to ${vendorLabel ?? "the vendor"} about "${(subject || "their email").substring(0, 80)}"`
+                : `Handle ${askFollowups.length > 0 ? "follow-ups" : "a standing service"} from ${vendorLabel ?? "a forwarded email"}: ${[...askFollowups.map((t) => t.title), ...routineActions.map((r) => r.title)].join("; ")}`.substring(0, 300),
               description: classification.summary ?? null,
               category: "coordinate_task",
               source: "email_classifier",
+              // 8.2 — reply-needed makes Chez the recommended default; the
+              // homeowner has no outbound reply from the app.
+              recommended: needsChezReply,
+              title: needsChezReply ? "Have Chez reply for you" : undefined,
+              reason: needsChezReply ? "The app can't reply to vendors yet; Chez can, and will loop you in." : null,
             }),
           ]);
 
           const itemSummaryLines = [
             ...askFollowups.map((t) => `• ${t.title}`),
             ...routineActions.map((r) => `• ${r.title}`),
+            ...(replyOnly ? [`• ${classification.summary ?? "The vendor asked a question."}`] : []),
           ];
           const { error: followErr } = await supabase.from("inbox_items").insert({
             household_id: householdId,
@@ -2954,6 +2997,40 @@ Respond with ONLY valid JSON:
           });
           if (stampItemErr) console.error("[receive-email] schedule-stamp item insert failed:", stampItemErr.message);
           else actions.push("schedule_stamp_item_created");
+        }
+
+        // --- Phase 8.2: ROUTE TO CHEZ (post-response) ---
+        // Append the email to the vendor's standing-engagement thread and
+        // notify the operator. Best-effort: a failure leaves the quiet
+        // homeowner record in place and the email content in the vault.
+        if (routeToChez && matchedContractor) {
+          const ingestPayload = {
+            action: "ingest_vendor_email",
+            household_id: householdId,
+            contractor_id: matchedContractor.id,
+            from: fromAddress,
+            subject: subject || "",
+            summary: classification.summary ?? "",
+            body_excerpt: (emailBody || "").substring(0, 4000),
+            document_note: createdDocumentId
+              ? `A document from this email was filed in the vault (id ${createdDocumentId}).`
+              : "",
+          };
+          const ingest = fetch(`${supabaseUrl}/functions/v1/chez-concierge`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceRoleKey}`,
+              "x-internal-secret": Deno.env.get("INTERNAL_FN_SECRET") ?? "",
+            },
+            body: JSON.stringify(ingestPayload),
+          }).then(async (r) => {
+            if (!r.ok) console.error(`[receive-email] chez ingest HTTP ${r.status}: ${(await r.text()).substring(0, 200)}`);
+            else console.log("[receive-email] chez ingest ok");
+          }).catch((e) => console.error("[receive-email] chez ingest failed:", e));
+          // @ts-ignore — EdgeRuntime is injected by the Supabase edge runtime
+          EdgeRuntime.waitUntil(ingest);
+          actions.push("routed_to_chez");
         }
 
         // --- Phase 7 M3: INVOICE AUTO-RUN (post-response continuation) ---
