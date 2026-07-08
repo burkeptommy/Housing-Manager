@@ -59,6 +59,13 @@ enum AnalyticsEvent: String {
     case quizSkippedForever = "quiz_skipped_forever"
     case quizMilestoneReached = "quiz_milestone_reached"
     case quizForwardingRevealShown = "quiz_forwarding_reveal_shown"
+
+    // Phase 7 — Ingestion Intelligence v2 (universal review card). The
+    // remap rate is the post-ship health metric: it tells us whether the
+    // recommendations are earning trust.
+    case suggestedActionsCardShown = "suggested_actions_card_shown"
+    case suggestedActionApplied = "suggested_action_applied"
+    case suggestedActionRemapped = "suggested_action_remapped"
     case quizCompleted = "quiz_completed"
     case quizDismissed = "quiz_dismissed"
     case quizCompletionViewMaintenanceTapped = "quiz_completion_view_maintenance_tapped"

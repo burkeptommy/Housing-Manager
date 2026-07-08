@@ -10,6 +10,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { arrayBufferToBase64 } from "../_shared/base64.ts";
+import { assignIds, chezAction, pickActionType, projectAction, taskAction } from "../_shared/suggested-actions.ts";
 import {
   createTasksFromSuggestions,
   type SuggestedTask,
@@ -2521,6 +2522,40 @@ Respond with ONLY valid JSON:
           const followTitle = askFollowups.length === 1
             ? `Follow-up spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`
             : `${askFollowups.length} follow-ups spotted${vendorLabel ? ` from ${vendorLabel}` : ""}`;
+
+          // Phase 7 M1 — build the unified suggested_actions ALONGSIDE the
+          // legacy suggested_tasks (old clients keep their working
+          // "Add all N" card; new clients get per-row selection +
+          // destination remapping + the Chez lane + the project lane).
+          const unifiedActions = assignIds([
+            ...askFollowups.map((t) => taskAction({
+              title: t.title,
+              reason: t.reason ?? null,
+              source: "email_classifier",
+              due_date: t.due_date ?? null,
+              urgency: t.urgency ?? null,
+              category: t.category ?? null,
+              needs_vendor: t.needs_vendor ?? null,
+            })),
+            ...(() => {
+              const sp = quoteIntel.suggested_project as { id?: string; name?: string; signal?: string } | undefined;
+              return sp?.id && sp?.name
+                ? [projectAction({
+                    projectId: sp.id,
+                    projectName: sp.name,
+                    signal: sp.signal ?? "matched",
+                    source: "email_classifier" as const,
+                  })]
+                : [];
+            })(),
+            chezAction({
+              summary: `Handle follow-ups from ${vendorLabel ?? "a forwarded email"}: ${askFollowups.map((t) => t.title).join("; ")}`.substring(0, 300),
+              description: classification.summary ?? null,
+              category: "coordinate_task",
+              source: "email_classifier",
+            }),
+          ]);
+
           const { error: followErr } = await supabase.from("inbox_items").insert({
             household_id: householdId,
             type: "follow_ups",
@@ -2530,10 +2565,11 @@ Respond with ONLY valid JSON:
             related_document_id: createdDocumentId,
             related_contractor_id: createdContractorId ?? matchedContractor?.id ?? null,
             needs_action: true,
-            action_type: "review_followups",
+            action_type: pickActionType(unifiedActions),
             email_hash: emailHash,
             metadata: {
               suggested_tasks: askFollowups,
+              suggested_actions: unifiedActions,
               source_document_id: createdDocumentId,
               ...(matchedContractor ? { matched_contractor: { id: matchedContractor.id, name: matchedContractor.company_name, category: matchedContractor.category } } : {}),
             },

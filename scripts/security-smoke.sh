@@ -41,6 +41,8 @@ check "score-property no-auth"          401 score-property         '{"property_i
 check "research-project no-auth"        401 research-project       '{"project_name":"x","project_id":"'"$U2"'"}'
 check "visualize-room no-auth"          401 visualize-room         '{"project_id":"a","household_id":"b","user_id":"c","room_image_base64":"x"}'
 check "lookup-manual system-id no-auth" 401 lookup-manual          '{"home_system_id":"'"$U2"'"}'
+check "apply_suggested_actions no-auth" 401 process-inbox-item     '{"inbox_item_id":"'"$U2"'","action":"apply_suggested_actions","selected":[{"id":"a1"}]}'
+check "record_applied_actions no-auth"  401 process-inbox-item     '{"inbox_item_id":"'"$U2"'","action":"record_applied_actions","applied":[],"done":true}'
 check "send-push garbage bearer"        401 send-push-notification '{"recipient_user_ids":["'"$U1"'"],"title":"x","body":"y"}' -H "Authorization: Bearer garbage"
 
 if [ "$FAIL" = "1" ]; then echo "SMOKE FAILED"; exit 1; fi

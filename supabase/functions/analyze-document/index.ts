@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
+import { assignIds, chezAction, pickActionType, taskAction } from "../_shared/suggested-actions.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -636,6 +637,23 @@ Return ONLY JSON. No markdown. No explanation.`;
           const followTitle = suggestedTasks.length === 1
             ? "Follow-up spotted in your document"
             : `${suggestedTasks.length} follow-ups spotted in your document`;
+          // Phase 7 M1 — unified suggested_actions alongside the legacy
+          // suggested_tasks (see _shared/suggested-actions.ts).
+          const unifiedActions = assignIds([
+            ...suggestedTasks.map((t) => taskAction({
+              title: t.title,
+              reason: t.reason,
+              source: "document_analysis",
+              due_date: t.due_date,
+              urgency: t.urgency,
+            })),
+            chezAction({
+              summary: `Handle follow-ups from an uploaded document: ${suggestedTasks.map((t) => t.title).join("; ")}`.substring(0, 300),
+              description: (analysis.summary as string | null) ?? null,
+              category: "coordinate_task",
+              source: "document_analysis",
+            }),
+          ]);
           const { error: followErr } = await svc.from("inbox_items").insert({
             household_id,
             type: "follow_ups",
@@ -643,8 +661,12 @@ Return ONLY JSON. No markdown. No explanation.`;
             summary: suggestedTasks.map((t) => `• ${t.title}`).join("\n"),
             related_document_id: document_id,
             needs_action: true,
-            action_type: "review_followups",
-            metadata: { suggested_tasks: suggestedTasks, source_document_id: document_id },
+            action_type: pickActionType(unifiedActions),
+            metadata: {
+              suggested_tasks: suggestedTasks,
+              suggested_actions: unifiedActions,
+              source_document_id: document_id,
+            },
             status: "ready",
           });
           if (followErr) console.error("[analyze] follow-up review item insert failed:", followErr.message);

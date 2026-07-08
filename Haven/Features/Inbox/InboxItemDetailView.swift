@@ -782,6 +782,16 @@ struct InboxItemDetailView: View {
                         icon: "doc.fill",
                         isDisabled: isProcessing
                     )
+                } else if isFollowupsAction && item.metadata?.suggestedActions?.isEmpty == false {
+                    // Phase 7 — the universal review card (full mode):
+                    // per-row selection, destination remapping (Task ⇄
+                    // Handyman ⇄ Chez), inline due-date edits. Applies via
+                    // the hybrid engine; the item completes through the
+                    // server-owned ledger, so we don't dismiss until the
+                    // card reports a clean apply.
+                    SuggestedActionsReviewCard(item: item, mode: .full, onApplied: {
+                        dismiss()
+                    })
                 } else if isFollowupsAction {
                     // July 2026 — follow-up tasks review. The server spotted
                     // implied follow-up work (invoice recommendations, a
@@ -1437,9 +1447,14 @@ struct InboxItemDetailView: View {
 
     /// July 2026 — follow-up tasks review card ("we spotted N follow-ups").
     private var isFollowupsAction: Bool {
-        (initialActionType ?? item.actionType) == "review_followups"
-            && (item.metadata?.suggestedTasks?.isEmpty == false)
-            && item.isPending
+        // Phase 7: "review_actions" is the unified-card action_type used
+        // when the item carries only non-task kinds (old clients render it
+        // as a generic item; this branch gives new clients the full card).
+        let actionType = initialActionType ?? item.actionType
+        let isReviewType = actionType == "review_followups" || actionType == "review_actions"
+        let hasContent = (item.metadata?.suggestedTasks?.isEmpty == false)
+            || (item.metadata?.suggestedActions?.isEmpty == false)
+        return isReviewType && hasContent && item.isPending
     }
 
     private var primaryActionTitle: String {

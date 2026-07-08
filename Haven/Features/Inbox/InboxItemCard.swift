@@ -195,8 +195,19 @@ struct InboxItemCard: View {
             duplicateResolutionArea
         } else if item.actionType == "confirm_vehicle_document" || item.actionType == "review_vehicle_invoice" {
             vehicleDocumentActionArea
-        } else if item.actionType == "review_followups" {
-            followupsActionArea
+        } else if item.actionType == "review_followups" || item.actionType == "review_actions" {
+            // Phase 7: items carrying the unified suggested_actions render
+            // the universal review card (per-row selection; remapping lives
+            // in the detail view). Items from BEFORE Phase 7 only carry
+            // suggested_tasks — they keep the legacy all-or-nothing card.
+            if item.metadata?.suggestedActions?.isEmpty == false {
+                SuggestedActionsReviewCard(item: item, mode: .compact, onApplied: nil)
+                    .padding(HavenTheme.spacing8)
+                    .background(HavenColors.action.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+            } else {
+                followupsActionArea
+            }
         } else {
             standardActionArea
         }

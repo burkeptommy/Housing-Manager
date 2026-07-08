@@ -9,6 +9,7 @@ import {
   createTasksFromSuggestions,
   type SuggestedTask,
 } from "../_shared/task-ingest.ts";
+import type { AppliedAction, SuggestedAction } from "../_shared/suggested-actions.ts";
 import {
   authFailure,
   requireHousehold,
@@ -164,7 +165,15 @@ serve(async (req: Request) => {
     const metadata = item.metadata ?? {};
 
     // --- DEDUP: Prevent double-processing ---
-    if (item.action_completed && action !== "dismiss" && action !== "move_to_project") {
+    // Phase 7: record_applied_actions is exempt — merging a ledger entry
+    // into an already-completed item is harmless bookkeeping (a second
+    // household member may finish applying after the first completed it).
+    if (
+      item.action_completed &&
+      action !== "dismiss" &&
+      action !== "move_to_project" &&
+      action !== "record_applied_actions"
+    ) {
       console.log(`[process-inbox] Item ${inbox_item_id} already processed, skipping`);
       return new Response(
         JSON.stringify({ success: true, already_processed: true }),
@@ -247,6 +256,252 @@ serve(async (req: Request) => {
           created_tasks: res.created,
           skipped_duplicates: res.skippedDuplicates.length,
         }),
+        { status: 200, headers }
+      );
+    }
+
+    // --- PHASE 7: APPLY SUGGESTED ACTIONS (server-side kinds) ---
+    // The universal review card's server batch. Applies the SERVER-side
+    // kinds (task / event / project) for the selected action ids, honoring
+    // per-row payload overrides from the card's inline editors. iOS-side
+    // kinds (routine / visit_log / punch_item / complete_task /
+    // chez_request) are returned as "skipped" — the ApplyEngine applies
+    // those through the Swift machinery and reports them via
+    // record_applied_actions. This handler NEVER stamps action_completed
+    // (completion is ledger-driven), and it self-records its results into
+    // metadata.applied_actions so a client crash between this call and the
+    // ledger call can't lose or forge server-side statuses.
+    if (action === "apply_suggested_actions") {
+      const suggestedActions = (metadata.suggested_actions as SuggestedAction[]) || [];
+      const priorApplied: AppliedAction[] = Array.isArray(metadata.applied_actions)
+        ? metadata.applied_actions
+        : [];
+      const appliedById = new Map<string, AppliedAction>(priorApplied.map((a) => [a.id, a]));
+      const selected: Array<{ id: string; payload_overrides?: Record<string, unknown> }> =
+        Array.isArray(body.selected) ? body.selected : [];
+
+      if (suggestedActions.length === 0 || selected.length === 0) {
+        return new Response(
+          JSON.stringify({ success: true, results: [], note: "nothing to apply" }),
+          { status: 200, headers }
+        );
+      }
+
+      // Optional confirmed vendor from the card's "Is this X?" row — must
+      // belong to the caller's household like every other body-supplied id.
+      let confirmedContractorId: string | null = null;
+      if (typeof body.confirmed_contractor_id === "string" && body.confirmed_contractor_id) {
+        const { data: c } = await supabase
+          .from("contractors").select("household_id").eq("id", body.confirmed_contractor_id).single();
+        if (!c || c.household_id !== auth.householdId) {
+          return new Response(
+            JSON.stringify({ error: "Access denied: contractor mismatch" }),
+            { status: 403, headers }
+          );
+        }
+        confirmedContractorId = body.confirmed_contractor_id;
+      }
+
+      // Property resolution: explicit param → household's first (single-
+      // property fallback), same as add_suggested_tasks.
+      let resolvedPropertyId: string | null = property_id ?? null;
+      if (!resolvedPropertyId) {
+        const { data: props } = await supabase
+          .from("properties").select("id").eq("household_id", householdId).limit(1);
+        resolvedPropertyId = props?.[0]?.id ?? null;
+      }
+
+      const contractorForTasks = confirmedContractorId
+        || (metadata.matched_contractor as any)?.id
+        || item.related_contractor_id
+        || null;
+
+      const nowIso = new Date().toISOString();
+      const results: AppliedAction[] = [];
+
+      for (const sel of selected) {
+        const act = suggestedActions.find((a) => a.id === sel.id);
+        if (!act) {
+          results.push({ id: sel.id, status: "skipped", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+          continue;
+        }
+        const prior = appliedById.get(sel.id);
+        if (prior && (prior.status === "applied" || prior.status === "duplicate")) {
+          results.push({ ...prior, status: "duplicate" });
+          continue;
+        }
+        const payload = { ...(act.payload ?? {}), ...(sel.payload_overrides ?? {}) };
+
+        if (act.kind === "task") {
+          if (!resolvedPropertyId) {
+            results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          const res = await createTasksFromSuggestions(supabase, {
+            householdId,
+            propertyId: resolvedPropertyId,
+            contractorId: contractorForTasks,
+            source: "email_invoice_followup",
+            suggestions: [{
+              title: (payload.title as string) || act.title,
+              due_date: (payload.due_date as string | null) ?? null,
+              urgency: (payload.urgency as string | null) ?? null,
+              reason: act.reason,
+              category: (payload.category as string | null) ?? null,
+              needs_vendor: (payload.needs_vendor as boolean | null) ?? null,
+            }],
+          });
+          if (res.created.length > 0) {
+            results.push({ id: act.id, status: "applied", result_ref: res.created[0].id, applied_at: nowIso, applied_by_user_id: auth.userId });
+          } else if (res.skippedDuplicates.length > 0) {
+            results.push({ id: act.id, status: "duplicate", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+          } else {
+            results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+          }
+        } else if (act.kind === "event") {
+          const dateStr = (payload.date as string | null) ?? null;
+          if (!dateStr) {
+            results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          // Dedup: same household + title + calendar day.
+          const dayStart = dateStr.substring(0, 10);
+          const { data: existingEvt } = await supabase
+            .from("family_events")
+            .select("id")
+            .eq("household_id", householdId)
+            .eq("title", (payload.title as string) || act.title)
+            .gte("start_date", `${dayStart}T00:00:00Z`)
+            .lt("start_date", `${dayStart}T23:59:59Z`)
+            .limit(1);
+          if (existingEvt && existingEvt.length > 0) {
+            results.push({ id: act.id, status: "duplicate", result_ref: existingEvt[0].id, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          const { data: evt, error: evtErr } = await supabase
+            .from("family_events")
+            .insert({
+              household_id: householdId,
+              title: (payload.title as string) || act.title,
+              start_date: dateStr,
+              end_date: (payload.end_date as string | null) ?? null,
+              all_day: payload.all_day === true,
+              location: (payload.location as string | null) ?? null,
+              source: "email_parsed",
+              source_inbox_item_id: inbox_item_id,
+            })
+            .select("id")
+            .single();
+          results.push(evtErr || !evt
+            ? { id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId }
+            : { id: act.id, status: "applied", result_ref: evt.id, applied_at: nowIso, applied_by_user_id: auth.userId });
+        } else if (act.kind === "project") {
+          const projectId = (payload.project_id as string | null) ?? null;
+          if (!projectId || !item.related_document_id) {
+            results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          const { data: proj } = await supabase
+            .from("property_projects").select("household_id").eq("id", projectId).single();
+          if (!proj || proj.household_id !== auth.householdId) {
+            results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+            continue;
+          }
+          // Honor user edits: only link when the document isn't already on
+          // a project. Already-linked-to-this-project reads as duplicate.
+          const { data: docRow } = await supabase
+            .from("documents").select("project_id").eq("id", item.related_document_id).single();
+          if (docRow?.project_id === projectId) {
+            results.push({ id: act.id, status: "duplicate", result_ref: projectId, applied_at: nowIso, applied_by_user_id: auth.userId });
+          } else if (docRow?.project_id) {
+            results.push({ id: act.id, status: "skipped", result_ref: docRow.project_id, applied_at: nowIso, applied_by_user_id: auth.userId });
+          } else {
+            const { error: linkErr } = await supabase
+              .from("documents").update({ project_id: projectId }).eq("id", item.related_document_id);
+            results.push(linkErr
+              ? { id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId }
+              : { id: act.id, status: "applied", result_ref: projectId, applied_at: nowIso, applied_by_user_id: auth.userId });
+          }
+        } else {
+          // iOS-side kind — the ApplyEngine handles it and reports via
+          // record_applied_actions.
+          results.push({ id: act.id, status: "skipped", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
+        }
+      }
+
+      // Self-record server-side outcomes into the ledger (read-merge-write
+      // on a FRESH row so concurrent appliers don't clobber each other).
+      // "skipped" results (iOS kinds) are NOT recorded — they aren't done.
+      const recordable = results.filter((r) => r.status !== "skipped");
+      if (recordable.length > 0) {
+        const { data: fresh } = await supabase
+          .from("inbox_items").select("metadata").eq("id", inbox_item_id).single();
+        const freshMeta = (fresh?.metadata ?? {}) as Record<string, unknown>;
+        const ledger: AppliedAction[] = Array.isArray(freshMeta.applied_actions)
+          ? freshMeta.applied_actions as AppliedAction[]
+          : [];
+        const byId = new Map(ledger.map((a) => [a.id, a]));
+        for (const r of recordable) {
+          const existing = byId.get(r.id);
+          if (!existing || existing.status === "failed") byId.set(r.id, r);
+        }
+        await supabase.from("inbox_items")
+          .update({ metadata: { ...freshMeta, applied_actions: [...byId.values()] } })
+          .eq("id", inbox_item_id);
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, results }),
+        { status: 200, headers }
+      );
+    }
+
+    // --- PHASE 7: RECORD APPLIED ACTIONS (the ledger call) ---
+    // iOS reports the outcomes of the iOS-side kinds it just applied, plus
+    // `done: true` when every selected action has resolved. Completion is
+    // stamped HERE and only here — the whole apply flow is re-entrant until
+    // this call says done.
+    if (action === "record_applied_actions") {
+      const incoming: AppliedAction[] = Array.isArray(body.applied) ? body.applied : [];
+      const done = body.done === true;
+      const nowIso = new Date().toISOString();
+      const allowedStatuses = new Set(["applied", "duplicate", "failed", "skipped"]);
+
+      const { data: fresh } = await supabase
+        .from("inbox_items").select("metadata").eq("id", inbox_item_id).single();
+      const freshMeta = (fresh?.metadata ?? {}) as Record<string, unknown>;
+      const ledger: AppliedAction[] = Array.isArray(freshMeta.applied_actions)
+        ? freshMeta.applied_actions as AppliedAction[]
+        : [];
+      const byId = new Map(ledger.map((a) => [a.id, a]));
+      for (const raw of incoming) {
+        if (!raw || typeof raw.id !== "string" || !allowedStatuses.has(raw.status)) continue;
+        const sanitized: AppliedAction = {
+          id: raw.id,
+          status: raw.status,
+          result_ref: typeof raw.result_ref === "string" ? raw.result_ref : null,
+          applied_at: nowIso,
+          applied_by_user_id: auth.userId,
+        };
+        const existing = byId.get(sanitized.id);
+        // Never downgrade a recorded success.
+        if (!existing || (existing.status !== "applied" && existing.status !== "duplicate")) {
+          byId.set(sanitized.id, sanitized);
+        }
+      }
+
+      const update: Record<string, unknown> = {
+        metadata: { ...freshMeta, applied_actions: [...byId.values()] },
+      };
+      if (done && !item.action_completed) {
+        update.seen = true;
+        update.action_completed = true;
+        update.needs_action = false;
+      }
+      await supabase.from("inbox_items").update(update).eq("id", inbox_item_id);
+
+      return new Response(
+        JSON.stringify({ success: true, recorded: byId.size, completed: done }),
         { status: 200, headers }
       );
     }
