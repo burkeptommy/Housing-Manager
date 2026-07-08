@@ -404,6 +404,125 @@ final class RoutineSeeder {
         }
     }
 
+    // MARK: - Phase 7 M2 — routines from ingestion
+
+    /// Outcome of an ingestion-sourced routine apply. `duplicate` carries
+    /// the existing row so the card can render "already set up".
+    enum IngestionRoutineOutcome {
+        case created(RoutineRow)
+        case duplicate(RoutineRow)
+        /// Template-backed or non-program category — the reconciler owns
+        /// these as vendor bundles; a standing routine would double-surface
+        /// the same visit. The card downgrades the row to a task destination.
+        case notEligible
+    }
+
+    /// Phase 7 M2 — create a routine from an email/document standing-
+    /// arrangement suggestion (the `routine` kind on the suggested-actions
+    /// review card). This wrapper is MANDATORY for every ingestion path —
+    /// never call `ServiceOrchestrator.createCustomRoutine` directly from
+    /// ingestion code: this owns eligibility (template-backed categories
+    /// never get standing routines), serviceKey/kind dedup (kind-level
+    /// dedup for `.otherService` is the painter-hijacks-smoke/CO bug),
+    /// evidence-over-default cadence resolution, and the
+    /// `weekly_has_days_of_week` CHECK synthesis.
+    ///
+    /// The payload is EVIDENCE ONLY (raw category string, interval days,
+    /// month hints, quoted text) — kind, serviceKey, and cadence type are
+    /// derived HERE so the rules stay single-sourced in Swift.
+    func createFromIngestion(
+        householdId: UUID,
+        propertyId: UUID?,
+        rawCategory: String,
+        intervalDays: Int?,
+        activeMonthsHint: [Int]?,
+        quotedText: String?,
+        estimatedCostCents: Int?,
+        vendorId: UUID?,
+        vendorLabel: String?
+    ) async throws -> IngestionRoutineOutcome {
+        let canonical = SystemCategoryRegistry.canonical(category: rawCategory) ?? rawCategory
+        guard let kind = RoutineGroupingEngine.routineKindFor(systemCategory: canonical) else {
+            return .notEligible
+        }
+        let seedDefaults = defaults(for: canonical)
+        // `.otherService` routines are only distinguishable by serviceKey —
+        // without one we can't dedup safely, so we don't create one.
+        if kind == .otherService && seedDefaults?.serviceKey == nil {
+            return .notEligible
+        }
+
+        let db = DatabaseService.shared
+        let existing = try await db.fetchRoutines(householdId: householdId)
+        if let match = existing.first(where: {
+            if kind == .otherService {
+                return $0.resolvedServiceKey == seedDefaults?.serviceKey
+            }
+            return $0.routineKind == kind.rawValue
+        }) {
+            return .duplicate(match)
+        }
+
+        // Cadence: explicit evidence wins; category default otherwise.
+        let fallback = RoutineGroupingEngine.defaultCadenceForRoutineKind(kind)
+        let (cadenceType, customInterval): (RoutineCadenceType, Int?) = {
+            guard let days = intervalDays, days > 0 else { return (fallback.0, nil) }
+            switch days {
+            case 5...9: return (.weekly, nil)
+            case 12...16: return (.biweekly, nil)
+            case 19...23: return (.triweekly, nil)
+            case 26...34: return (.monthly, nil)
+            case 55...68: return (.bimonthly, nil)
+            case 82...100: return (.quarterly, nil)
+            case 170...195: return (.semiannual, nil)
+            case 340...395: return (.annual, nil)
+            default: return (.customDays, days)
+            }
+        }()
+        let hintedMonths = (activeMonthsHint ?? []).filter { (1...12).contains($0) }
+        let activeMonths = hintedMonths.isEmpty
+            ? (seedDefaults?.activeMonths ?? fallback.2)
+            : hintedMonths.sorted()
+
+        var insert = RoutineInsert(
+            householdId: householdId,
+            propertyId: propertyId,
+            label: vendorLabel.map { "\(kind.displayLabel) · \($0)" }
+                ?? seedDefaults?.label
+                ?? kind.displayLabel,
+            routineKind: kind.rawValue,
+            cadenceType: cadenceType.rawValue
+        )
+        insert.serviceKey = seedDefaults?.serviceKey
+        insert.icon = kind.icon
+        insert.vendorId = vendorId
+        insert.cadenceIntervalDays = cadenceType == .customDays ? customInterval : nil
+        // weekly_has_days_of_week CHECK: weekly variants need a weekday.
+        // The email rarely says which day, so anchor to today's weekday
+        // (same synthesis the 55.1 backfill and the F5 fix use); the user
+        // can adjust in RoutineEditSheet.
+        if [.weekly, .biweekly, .triweekly].contains(cadenceType) {
+            insert.daysOfWeek = seedDefaults?.daysOfWeek
+                ?? [Calendar.current.component(.weekday, from: Date())]
+        }
+        insert.activeMonths = activeMonths
+        insert.estimatedCostPerVisitCents = estimatedCostCents
+        if let quote = quotedText, !quote.isEmpty {
+            insert.notes = "From your forwarded email: \"\(quote)\""
+        }
+        insert.cadenceSource = "email_ingestion"
+        insert.setupState = vendorId != nil ? "active" : "pending_vendor"
+
+        let row = try await ServiceOrchestrator.createCustomRoutine(insert)
+        if vendorId != nil, let propertyId {
+            _ = try? await RoutineGroupingEngine.linkVendorTasksToRoutine(
+                row, in: householdId, propertyId: propertyId
+            )
+        }
+        NotificationCenter.default.post(name: .routineChanged, object: nil)
+        return .created(row)
+    }
+
     /// Phase 67E/F: when seeding a pest_control / mosquito_tick routine,
     /// opportunistically link this contractor to the OTHER kind's pending
     /// routine if one exists without a vendor. Real-world pattern from

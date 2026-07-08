@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
-import { assignIds, chezAction, pickActionType, taskAction } from "../_shared/suggested-actions.ts";
+import { assignIds, chezAction, pickActionType, routineAction, taskAction } from "../_shared/suggested-actions.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -251,6 +251,16 @@ serve(async (req: Request) => {
       "estimatedCost": "rough cost estimate or null"
     }
   ],
+  "standing_arrangements": [
+    {
+      "category": "service category, e.g. Landscaping | Pool Service | Cleaning Service | Pest Control | Snow Removal | Gutter Cleaning | Painting | Mosquito & Tick | Pet Waste Removal | Window Cleaning",
+      "intervalDays": "number or null (7 weekly, 14 biweekly, 30 monthly...)",
+      "cadencePhrase": "the exact cadence phrase from the document",
+      "activeMonths": "[array of month numbers 1-12 when the service runs] or null if year-round/unstated",
+      "quotedText": "short verbatim quote of the evidence, <= 140 chars",
+      "estimatedCostPerVisit": "number in dollars or null"
+    }
+  ],
   "insurance_policy": {
     "type": "auto|home|umbrella|renters|flood|life|other or null",
     "provider": "Carrier name or null",
@@ -268,6 +278,7 @@ EXTRACTION RULES:
 - vendor_info: Extract if the document is from a contractor, service company, vendor, or business. Include for: quotes, invoices, service reports, warranties, vendor contracts, repair estimates, inspection reports.
 - home_systems: Extract if the document mentions specific home systems, appliances, or equipment. Especially important for: inspection reports (extract ALL systems inspected), warranty cards (extract the covered system), appliance manuals, service reports, completion certificates.
 - maintenance_suggestions: Extract if the document recommends maintenance, repairs, or follow-up work. Especially from: inspection reports, service reports, warranty cards (maintenance requirements to keep warranty valid).
+- standing_arrangements: Be VERY conservative. Populate (max 2) ONLY when the document is an ACCEPTED/ACTIVE recurring service arrangement — a signed service contract, a seasonal agreement, a service plan with an explicit recurring cadence ("every week", "biweekly", "monthly service", "May through October"). A one-time job, a single invoice, a recommendation for annual service (that is a maintenance_suggestion), or an unaccepted proposal is NOT a standing arrangement. Empty array when in doubt. Do not duplicate a standing arrangement into maintenance_suggestions.
 - insurance_policy: Extract if this is a declarations page, policy summary, ID card, binder, or any insurance document. The "type" should be the PRIMARY policy type (auto/home/umbrella/etc). The "bundled_policies" list captures any OTHER policy types that appear on the same declaration (e.g. a State Farm dec page that lists both auto AND home gets "auto" as type and ["home"] in bundled_policies). When the user uploads such a declaration we surface both policies in the inbox so they can confirm both with one tap.
 - If none of these apply (e.g., a will or passport), return null/empty arrays for those fields.
 
@@ -621,8 +632,45 @@ Return ONLY JSON. No markdown. No explanation.`;
       // the tasks with dedup. Skipped for invoices (process-invoice owns
       // those follow-ups).
       const maintSuggestions = analysis.maintenance_suggestions as Array<Record<string, unknown>> | null;
-      if (maintSuggestions && maintSuggestions.length > 0 && !isInvoice) {
-        const suggestedTasks = maintSuggestions
+      // Phase 7 M2 — standing arrangements from uploaded service
+      // agreements/contracts. Evidence-only payloads; iOS derives kind /
+      // serviceKey / cadence and enforces the template-backed exclusions.
+      const rawArrangements = Array.isArray(analysis.standing_arrangements)
+        ? analysis.standing_arrangements as Array<Record<string, unknown>>
+        : [];
+      const routineActions = isInvoice ? [] : rawArrangements
+        .filter((r) => r && typeof r.category === "string" && (r.category as string).trim().length > 0)
+        .slice(0, 2)
+        .map((r) => {
+          const months = Array.isArray(r.activeMonths)
+            ? (r.activeMonths as unknown[]).filter((m): m is number =>
+                typeof m === "number" && Number.isInteger(m) && m >= 1 && m <= 12)
+            : [];
+          const interval = typeof r.intervalDays === "number" && r.intervalDays > 0
+            ? Math.round(r.intervalDays as number)
+            : null;
+          const costDollars = typeof r.estimatedCostPerVisit === "number" && r.estimatedCostPerVisit > 0
+            ? r.estimatedCostPerVisit as number
+            : null;
+          const category = (r.category as string).trim();
+          const cadencePhrase = typeof r.cadencePhrase === "string" ? (r.cadencePhrase as string).trim() : null;
+          return routineAction({
+            title: `Set up ${category.toLowerCase()} routine${cadencePhrase ? ` (${cadencePhrase})` : ""}`,
+            reason: typeof r.quotedText === "string" && (r.quotedText as string).trim()
+              ? `"${(r.quotedText as string).trim().substring(0, 140)}"`
+              : null,
+            source: "document_analysis",
+            category,
+            raw_category: category,
+            interval_days: interval,
+            cadence_phrase: cadencePhrase,
+            active_months_hint: months.length > 0 ? months : null,
+            quoted_text: typeof r.quotedText === "string" ? (r.quotedText as string).substring(0, 140) : null,
+            estimated_cost_cents: costDollars ? Math.round(costDollars * 100) : null,
+          });
+        });
+      if (((maintSuggestions && maintSuggestions.length > 0) || routineActions.length > 0) && !isInvoice) {
+        const suggestedTasks = (maintSuggestions ?? [])
           .filter((m) => typeof m.task === "string" && (m.task as string).trim().length > 0)
           .slice(0, 3)
           .map((m) => ({
@@ -633,10 +681,12 @@ Return ONLY JSON. No markdown. No explanation.`;
               ? `From document analysis. Estimated cost: ${m.estimatedCost}`
               : "Recommended by the document you uploaded.",
           }));
-        if (suggestedTasks.length > 0) {
-          const followTitle = suggestedTasks.length === 1
-            ? "Follow-up spotted in your document"
-            : `${suggestedTasks.length} follow-ups spotted in your document`;
+        if (suggestedTasks.length > 0 || routineActions.length > 0) {
+          const followTitle = suggestedTasks.length === 0
+            ? "Standing service spotted in your document"
+            : suggestedTasks.length === 1
+              ? "Follow-up spotted in your document"
+              : `${suggestedTasks.length} follow-ups spotted in your document`;
           // Phase 7 M1 — unified suggested_actions alongside the legacy
           // suggested_tasks (see _shared/suggested-actions.ts).
           const unifiedActions = assignIds([
@@ -647,8 +697,9 @@ Return ONLY JSON. No markdown. No explanation.`;
               due_date: t.due_date,
               urgency: t.urgency,
             })),
+            ...routineActions,
             chezAction({
-              summary: `Handle follow-ups from an uploaded document: ${suggestedTasks.map((t) => t.title).join("; ")}`.substring(0, 300),
+              summary: `Handle ${suggestedTasks.length > 0 ? "follow-ups" : "a standing service"} from an uploaded document: ${[...suggestedTasks.map((t) => t.title), ...routineActions.map((r) => r.title)].join("; ")}`.substring(0, 300),
               description: (analysis.summary as string | null) ?? null,
               category: "coordinate_task",
               source: "document_analysis",
@@ -658,19 +709,24 @@ Return ONLY JSON. No markdown. No explanation.`;
             household_id,
             type: "follow_ups",
             title: followTitle,
-            summary: suggestedTasks.map((t) => `• ${t.title}`).join("\n"),
+            summary: [
+              ...suggestedTasks.map((t) => `• ${t.title}`),
+              ...routineActions.map((r) => `• ${r.title}`),
+            ].join("\n"),
             related_document_id: document_id,
             needs_action: true,
             action_type: pickActionType(unifiedActions),
             metadata: {
-              suggested_tasks: suggestedTasks,
+              // Legacy mirror is TASK KINDS ONLY — routine rows must never
+              // become one-off tasks on an old client.
+              ...(suggestedTasks.length > 0 ? { suggested_tasks: suggestedTasks } : {}),
               suggested_actions: unifiedActions,
               source_document_id: document_id,
             },
             status: "ready",
           });
           if (followErr) console.error("[analyze] follow-up review item insert failed:", followErr.message);
-          else console.log(`[analyze] Created follow-up review item (${suggestedTasks.length} tasks)`);
+          else console.log(`[analyze] Created follow-up review item (${suggestedTasks.length} tasks, ${routineActions.length} routines)`);
         }
       }
 

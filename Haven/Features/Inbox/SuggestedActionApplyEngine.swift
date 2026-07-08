@@ -39,6 +39,18 @@ final class SuggestedActionApplyEngine: ObservableObject {
         case punchItem(title: String, description: String?)
         /// Hand off to the concierge (remap destination or the built-in row).
         case chezRequest(category: String?, summary: String, description: String?)
+        /// M2 — create a standing routine (evidence + the card's inline
+        /// cadence/vendor edits). Applies via RoutineSeeder.createFromIngestion,
+        /// the MANDATORY dedup/eligibility wrapper.
+        case routine(
+            rawCategory: String,
+            intervalDays: Int?,
+            activeMonths: [Int]?,
+            quotedText: String?,
+            estimatedCostCents: Int?,
+            vendorId: UUID?,
+            vendorLabel: String?
+        )
         /// User left the row unchecked — record as skipped at completion.
         case skip
     }
@@ -131,6 +143,43 @@ final class SuggestedActionApplyEngine: ObservableObject {
                     NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
                 } catch {
                     print("[SuggestedActionApply] punch item failed: \(error)")
+                    outcome.statusById[plan.actionId] = "failed"
+                    outcome.anyFailure = true
+                    iosLedger.append(.init(id: plan.actionId, status: "failed"))
+                }
+            case .routine(let rawCategory, let intervalDays, let activeMonths,
+                          let quotedText, let estimatedCostCents, let vendorId, let vendorLabel):
+                do {
+                    let outcome2 = try await RoutineSeeder.shared.createFromIngestion(
+                        householdId: householdId,
+                        propertyId: propertyId,
+                        rawCategory: rawCategory,
+                        intervalDays: intervalDays,
+                        activeMonthsHint: activeMonths,
+                        quotedText: quotedText,
+                        estimatedCostCents: estimatedCostCents,
+                        vendorId: vendorId,
+                        vendorLabel: vendorLabel
+                    )
+                    switch outcome2 {
+                    case .created(let row):
+                        outcome.statusById[plan.actionId] = "applied"
+                        iosLedger.append(.init(id: plan.actionId, status: "applied", resultRef: row.id.uuidString))
+                    case .duplicate(let row):
+                        outcome.statusById[plan.actionId] = "duplicate"
+                        iosLedger.append(.init(id: plan.actionId, status: "duplicate", resultRef: row.id.uuidString))
+                    case .notEligible:
+                        // The card downgrades ineligible categories to a task
+                        // destination at render — reaching here means the
+                        // category resolved differently at apply time. Surface
+                        // as failed so the row stays actionable.
+                        print("[SuggestedActionApply] routine not eligible: \(rawCategory)")
+                        outcome.statusById[plan.actionId] = "failed"
+                        outcome.anyFailure = true
+                        iosLedger.append(.init(id: plan.actionId, status: "failed"))
+                    }
+                } catch {
+                    print("[SuggestedActionApply] routine failed: \(error)")
                     outcome.statusById[plan.actionId] = "failed"
                     outcome.anyFailure = true
                     iosLedger.append(.init(id: plan.actionId, status: "failed"))

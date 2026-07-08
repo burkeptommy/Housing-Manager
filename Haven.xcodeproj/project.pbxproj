@@ -332,6 +332,7 @@
 		A67C92A1218D835213E9E7BF /* HeaderSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0CED2ECB3698ED477BB00D /* HeaderSwitcher.swift */; };
 		A7CD1D35E7229CC1883016AF /* CategoryProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08D056E30880763A14839C3 /* CategoryProgress.swift */; };
 		A818EE7EC90F063034BCDEDF /* ForceUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2196EE2869675E5615FCE1A2 /* ForceUpdateView.swift */; };
+		A8431193E111F2E1C7118505 /* CompactCadenceEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F53D8A260D374B26EE6DF6 /* CompactCadenceEditor.swift */; };
 		A87F72171DAA5021FB40FEA6 /* OnboardingModeChooserStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 784A6C1BDC934E0399059199 /* OnboardingModeChooserStep.swift */; };
 		A883756C8AA8216C97B0494F /* EquipmentSearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD5377254AFED79D10F0B50 /* EquipmentSearchResult.swift */; };
 		A8CD742D6D98F44FF6A05439 /* AssessmentDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59F960B4652CC9D928C5A0C5 /* AssessmentDetailSheet.swift */; };
@@ -528,6 +529,7 @@
 		03A24F3C7936018D3191CFF4 /* ServiceOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceOrchestrator.swift; sourceTree = "<group>"; };
 		03BFF144BC77F27E46ABFFFB /* FeatureValueLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureValueLibrary.swift; sourceTree = "<group>"; };
 		03D64EAE4435181BE7303600 /* HomeSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSystem.swift; sourceTree = "<group>"; };
+		04F53D8A260D374B26EE6DF6 /* CompactCadenceEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactCadenceEditor.swift; sourceTree = "<group>"; };
 		059E33DD767A37B6B76D0953 /* CompletedTasksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompletedTasksSheet.swift; sourceTree = "<group>"; };
 		05ACC1AD3C78491F50BDF8E4 /* QuizVehicleInputSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizVehicleInputSelector.swift; sourceTree = "<group>"; };
 		05ADA54A4E7717D0015544C8 /* EquipmentSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentSearchSheet.swift; sourceTree = "<group>"; };
@@ -2075,6 +2077,7 @@
 				68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */,
 				15DC7665829C027EA8937D17 /* AlfredMark.swift */,
 				8E9458FC278D2F9489C69773 /* ChezHandleButton.swift */,
+				04F53D8A260D374B26EE6DF6 /* CompactCadenceEditor.swift */,
 				7C6B830964C31D665D3E5876 /* ContractorLogoView.swift */,
 				CD3497A46F82CCF175F158A2 /* CostTierView.swift */,
 				C4B5DD5BFCD50724A3EF7556 /* DocumentCategoryPicker.swift */,
@@ -2343,6 +2346,7 @@
 				78C2CFA02E60DA1FE6F31C15 /* ChezStatusBadge.swift in Sources */,
 				8F692AEE9ACEB460F4384A76 /* ChezTaskActivityCard.swift in Sources */,
 				355888DCD1168D6EB16EA195 /* Color+Haven.swift in Sources */,
+				A8431193E111F2E1C7118505 /* CompactCadenceEditor.swift in Sources */,
 				F60F37AF63B774DF7449EC98 /* CompletedTasksSheet.swift in Sources */,
 				933430937C48605A9C99D706 /* Constants.swift in Sources */,
 				81DB7AF5968F9E41BC70E9B6 /* ContactPickerView.swift in Sources */,

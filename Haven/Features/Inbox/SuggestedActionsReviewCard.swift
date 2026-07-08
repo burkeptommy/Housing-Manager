@@ -22,19 +22,49 @@ import SwiftUI
 struct SuggestedActionsReviewCard: View {
     enum Mode { case compact, full }
 
-    /// Where a task-kind row can be remapped to (M1 set; M2 adds Routine).
+    /// Where a row can be remapped to. Task rows offer Task/Handyman/Chez;
+    /// routine rows offer Routine/Task/Chez (a standing program is never a
+    /// punch item). Ineligible routine categories (template-backed — HVAC,
+    /// Solar, roofer… — where a standing routine would double-surface the
+    /// reconciler's vendor bundle) drop the Routine option entirely.
     enum Destination: String, CaseIterable {
+        case routine = "Routine"
         case task = "Task"
         case handyman = "Handyman list"
         case chez = "Ask Chez"
 
         var icon: String {
             switch self {
+            case .routine: return "repeat"
             case .task: return "checkmark.circle"
             case .handyman: return "hammer"
             case .chez: return "sparkles"
             }
         }
+    }
+
+    private func destinationOptions(for action: DatabaseService.InboxMetadata.SuggestedAction) -> [Destination] {
+        switch action.typedKind {
+        case .routine:
+            return routineEligible(action) ? [.routine, .task, .chez] : [.task, .chez]
+        default:
+            return [.task, .handyman, .chez]
+        }
+    }
+
+    /// Mirrors RoutineSeeder.createFromIngestion's eligibility gate so the
+    /// card can downgrade ineligible rows at render instead of failing at
+    /// apply. Kind derivation stays single-sourced in RoutineGroupingEngine.
+    private func routineEligible(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> Bool {
+        guard let raw = action.payload.category ?? action.payload.rawCategory, !raw.isEmpty else { return false }
+        let canonical = SystemCategoryRegistry.canonical(category: raw) ?? raw
+        return RoutineGroupingEngine.routineKindFor(systemCategory: canonical) != nil
+    }
+
+    private func defaultDestination(for action: DatabaseService.InboxMetadata.SuggestedAction) -> Destination {
+        action.typedKind == .routine
+            ? (routineEligible(action) ? .routine : .task)
+            : .task
     }
 
     let item: DatabaseService.InboxItemRow
@@ -48,6 +78,17 @@ struct SuggestedActionsReviewCard: View {
     @State private var dueDateOverrides: [String: Date] = [:]
     @State private var localStatuses: [String: String] = [:]
     @State private var didSeedDefaults = false
+    // M2 — routine-row inline edits (keyed by action id).
+    @State private var routineCadence: [String: CompactCadenceChoice] = [:]
+    @State private var routineMonths: [String: Set<Int>] = [:]
+    @State private var routineVendorIds: [String: UUID] = [:]
+    @State private var routineVendorNames: [String: String] = [:]
+    @State private var vendorPickerTarget: VendorPickerTarget?
+
+    private struct VendorPickerTarget: Identifiable {
+        let id: String        // action id
+        let category: String  // canonical-ish category for the picker
+    }
 
     private var actions: [DatabaseService.InboxMetadata.SuggestedAction] {
         (item.metadata?.suggestedActions ?? []).filter { $0.typedKind != nil }
@@ -98,6 +139,13 @@ struct SuggestedActionsReviewCard: View {
             }
         }
         .onAppear(perform: seedDefaultsIfNeeded)
+        .sheet(item: $vendorPickerTarget) { target in
+            ContractorPickerSheet(systemCategory: target.category) { contractor in
+                routineVendorIds[target.id] = contractor.id
+                routineVendorNames[target.id] = contractor.companyName
+                Haptics.selection()
+            }
+        }
     }
 
     private var applyButtonTitle: String {
@@ -167,51 +215,129 @@ struct SuggestedActionsReviewCard: View {
 
     @ViewBuilder
     private func fullModeControls(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> some View {
-        if action.typedKind == .task, checked.contains(action.id) {
-            HStack(spacing: 10) {
-                Menu {
-                    ForEach(Destination.allCases, id: \.self) { dest in
-                        Button {
-                            destinations[action.id] = dest
-                            Haptics.selection()
-                            Analytics.track(.suggestedActionRemapped, [
-                                "from_kind": action.kindRaw,
-                                "to": dest.rawValue,
-                            ])
-                        } label: {
-                            Label(dest.rawValue, systemImage: dest.icon)
+        let isRemappable = action.typedKind == .task || action.typedKind == .routine
+        if isRemappable, checked.contains(action.id) {
+            let currentDest = destinations[action.id] ?? defaultDestination(for: action)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Menu {
+                        ForEach(destinationOptions(for: action), id: \.self) { dest in
+                            Button {
+                                destinations[action.id] = dest
+                                Haptics.selection()
+                                Analytics.track(.suggestedActionRemapped, [
+                                    "from_kind": action.kindRaw,
+                                    "to": dest.rawValue,
+                                ])
+                            } label: {
+                                Label(dest.rawValue, systemImage: dest.icon)
+                            }
                         }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: currentDest.icon)
+                            Text(currentDest.rawValue)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9))
+                        }
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.navy800)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(HavenColors.beige200.opacity(0.6))
+                        .clipShape(Capsule())
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: (destinations[action.id] ?? .task).icon)
-                        Text((destinations[action.id] ?? .task).rawValue)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9))
+
+                    if action.typedKind == .task, currentDest == .task {
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: { dueDateOverrides[action.id] ?? parsedDueDate(action) },
+                                set: { dueDateOverrides[action.id] = $0 }
+                            ),
+                            displayedComponents: .date
+                        )
+                        .labelsHidden()
+                        .datePickerStyle(.compact)
+                        .scaleEffect(0.85, anchor: .leading)
                     }
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.navy800)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(HavenColors.beige200.opacity(0.6))
-                    .clipShape(Capsule())
                 }
 
-                if (destinations[action.id] ?? .task) == .task {
-                    DatePicker(
-                        "",
-                        selection: Binding(
-                            get: { dueDateOverrides[action.id] ?? parsedDueDate(action) },
-                            set: { dueDateOverrides[action.id] = $0 }
+                if action.typedKind == .routine, currentDest == .routine {
+                    CompactCadenceEditor(
+                        choice: Binding(
+                            get: { routineCadence[action.id] ?? seededCadence(for: action) },
+                            set: { routineCadence[action.id] = $0 }
                         ),
-                        displayedComponents: .date
+                        activeMonths: Binding(
+                            get: { routineMonths[action.id] ?? seededMonths(for: action) },
+                            set: { routineMonths[action.id] = $0 }
+                        )
                     )
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .scaleEffect(0.85, anchor: .leading)
+                    vendorRow(action)
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func vendorRow(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> some View {
+        let pickedName = routineVendorNames[action.id]
+        Button {
+            let raw = action.payload.category ?? action.payload.rawCategory ?? ""
+            vendorPickerTarget = VendorPickerTarget(
+                id: action.id,
+                category: SystemCategoryRegistry.canonical(category: raw) ?? raw
+            )
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: pickedName == nil ? "person.crop.circle.badge.plus" : "person.crop.circle.fill.badge.checkmark")
+                    .font(.system(size: 11))
+                Text(pickedName ?? (action.payload.contractorId != nil ? "Vendor linked from this email" : "Link a vendor (optional)"))
+                    .lineLimit(1)
+            }
+            .font(HavenTypography.caption)
+            .foregroundStyle(pickedName == nil && action.payload.contractorId == nil ? HavenColors.textSecondary : HavenColors.navy800)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(HavenColors.beige200.opacity(0.4))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func seededCadence(for action: DatabaseService.InboxMetadata.SuggestedAction) -> CompactCadenceChoice {
+        if let match = CompactCadenceChoice.nearest(toDays: action.payload.intervalDays) {
+            return match
+        }
+        // Category default via the single-sourced kind mapping.
+        let raw = action.payload.category ?? action.payload.rawCategory ?? ""
+        let canonical = SystemCategoryRegistry.canonical(category: raw) ?? raw
+        if let kind = RoutineGroupingEngine.routineKindFor(systemCategory: canonical) {
+            let fallback = RoutineGroupingEngine.defaultCadenceForRoutineKind(kind)
+            switch fallback.0 {
+            case .weekly: return .weekly
+            case .biweekly: return .biweekly
+            case .triweekly: return .triweekly
+            case .monthly, .bimonthly: return .monthly
+            case .quarterly: return .quarterly
+            case .semiannual: return .semiannual
+            case .annual, .customDays: return .annual
+            }
+        }
+        return .monthly
+    }
+
+    private func seededMonths(for action: DatabaseService.InboxMetadata.SuggestedAction) -> Set<Int> {
+        if let hint = action.payload.activeMonthsHint, !hint.isEmpty {
+            return Set(hint.filter { (1...12).contains($0) })
+        }
+        let raw = action.payload.category ?? action.payload.rawCategory ?? ""
+        let canonical = SystemCategoryRegistry.canonical(category: raw) ?? raw
+        if let kind = RoutineGroupingEngine.routineKindFor(systemCategory: canonical) {
+            return Set(RoutineGroupingEngine.defaultCadenceForRoutineKind(kind).2)
+        }
+        return Set(1...12)
     }
 
     private func statusLabel(_ status: String) -> String {
@@ -222,6 +348,13 @@ struct SuggestedActionsReviewCard: View {
         case "skipped": return "Skipped"
         default: return status
         }
+    }
+
+    /// A "set up X routine (every 2 weeks)" title reads wrong as a one-off
+    /// task — reframe to a schedule-shaped title for the downgrade path.
+    private func routineDowngradeTitle(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> String {
+        let raw = action.payload.category ?? action.payload.rawCategory ?? "service"
+        return "Schedule \(raw.lowercased()) service"
     }
 
     private func parsedDueDate(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> Date {
@@ -261,7 +394,7 @@ struct SuggestedActionsReviewCard: View {
             case .task:
                 let dest = destinations[action.id] ?? .task
                 switch dest {
-                case .task:
+                case .task, .routine:
                     var overrides: [String: String?]? = nil
                     if let edited = dueDateOverrides[action.id] {
                         overrides = ["due_date": df.string(from: edited)]
@@ -279,17 +412,49 @@ struct SuggestedActionsReviewCard: View {
                         description: action.reason
                     )))
                 }
+            case .routine:
+                let dest = destinations[action.id] ?? defaultDestination(for: action)
+                switch dest {
+                case .routine:
+                    let raw = action.payload.category ?? action.payload.rawCategory ?? ""
+                    plans.append(.init(actionId: action.id, operation: .routine(
+                        rawCategory: raw,
+                        intervalDays: (routineCadence[action.id] ?? seededCadence(for: action)).intervalDays,
+                        activeMonths: Array(routineMonths[action.id] ?? seededMonths(for: action)).sorted(),
+                        quotedText: action.payload.quotedText,
+                        estimatedCostCents: action.payload.estimatedCostCents,
+                        vendorId: routineVendorIds[action.id]
+                            ?? action.payload.contractorId.flatMap(UUID.init(uuidString:)),
+                        vendorLabel: routineVendorNames[action.id]
+                    )))
+                case .task, .handyman:
+                    // Template-backed downgrade or explicit choice — applies
+                    // through the SERVER task path (apply_as override) so
+                    // task dedup stays single-sourced in task-ingest.ts.
+                    plans.append(.init(actionId: action.id, operation: .server(payloadOverrides: [
+                        "apply_as": "task",
+                        "title": routineDowngradeTitle(action),
+                    ])))
+                case .chez:
+                    plans.append(.init(actionId: action.id, operation: .chezRequest(
+                        category: "coordinate_task",
+                        summary: action.title,
+                        description: action.reason
+                    )))
+                }
             case .project, .event:
                 plans.append(.init(actionId: action.id, operation: .server(payloadOverrides: nil)))
             case .chezRequest:
                 plans.append(.init(actionId: action.id, operation: .chezRequest(
-                    category: action.payload.chezCategory,
+                    // The wire key is "category" (shared with task rows);
+                    // "chez_category" was the M1 decode assumption — read both.
+                    category: action.payload.chezCategory ?? action.payload.category,
                     summary: action.payload.summary ?? action.title,
                     description: action.payload.description
                 )))
             default:
-                // Kinds this milestone can't apply yet (routine lands in M2,
-                // complete_task/system_link in M3) — leave pending.
+                // Kinds this milestone can't apply yet (complete_task /
+                // system_link land in M3) — leave pending.
                 continue
             }
         }

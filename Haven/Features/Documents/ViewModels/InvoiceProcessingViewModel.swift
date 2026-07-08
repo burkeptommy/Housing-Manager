@@ -972,6 +972,48 @@ final class InvoiceCadenceCoordinator: ObservableObject {
             current = nil
             return true
         }
+
+        // Phase 7 M2 — program-kind categories (landscaping, cleaning, pool,
+        // pest…) become REAL routines instead of a bare interval + legacy
+        // standing appointment. The interval path below remains for
+        // non-program system cadences (HVAC filter swaps, water treatment).
+        // RoutineSeeder.createFromIngestion owns eligibility + dedup, so a
+        // second invoice from the same vendor is a no-op.
+        if let system = (try? await DatabaseService.shared.fetchHomeSystems())?
+            .first(where: { $0.id == systemId }),
+           let canonical = SystemCategoryRegistry.canonical(category: system.category),
+           RoutineGroupingEngine.routineKindFor(systemCategory: canonical) != nil {
+            var vendorId: UUID?
+            if let vendorName = suggestion.vendorName {
+                let contractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
+                vendorId = contractors.first(where: {
+                    $0.companyName.localizedCaseInsensitiveCompare(vendorName) == .orderedSame
+                })?.id
+            }
+            do {
+                let outcome = try await RoutineSeeder.shared.createFromIngestion(
+                    householdId: system.householdId,
+                    propertyId: system.propertyId,
+                    rawCategory: system.category,
+                    intervalDays: suggestion.intervalDays,
+                    activeMonthsHint: nil,
+                    quotedText: suggestion.quotedText,
+                    estimatedCostCents: nil,
+                    vendorId: vendorId,
+                    vendorLabel: vendorId != nil ? suggestion.vendorName : nil
+                )
+                switch outcome {
+                case .created, .duplicate:
+                    current = nil
+                    return true
+                case .notEligible:
+                    break // fall through to the interval path
+                }
+            } catch {
+                print("[InvoiceCadence] Routine apply failed, falling back to interval: \(error)")
+            }
+        }
+
         var update = HomeSystemUpdate()
         update.serviceIntervalDays = suggestion.intervalDays
         update.serviceIntervalSource = "vendor_invoice"

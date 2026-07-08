@@ -332,7 +332,13 @@ serve(async (req: Request) => {
         }
         const payload = { ...(act.payload ?? {}), ...(sel.payload_overrides ?? {}) };
 
-        if (act.kind === "task") {
+        // Phase 7 M2 — a routine row the homeowner remapped to "just a
+        // task" (template-backed category, or their explicit choice)
+        // applies through the SAME task path so dedup stays single-sourced.
+        const applyAsTask = act.kind === "task"
+          || (act.kind === "routine" && payload.apply_as === "task");
+
+        if (applyAsTask) {
           if (!resolvedPropertyId) {
             results.push({ id: act.id, status: "failed", result_ref: null, applied_at: nowIso, applied_by_user_id: auth.userId });
             continue;
