@@ -4219,6 +4219,28 @@ final class DatabaseService {
         let suggestedActions: [SuggestedAction]?
         let appliedActions: [AppliedAction]?
         let matchedContractorName: String?
+        /// M4 — medium-confidence sender→vendor ladder hit. Renders as an
+        /// "Is this X?" confirm row; the answer feeds confirmed_contractor_id
+        /// into apply. Never silently attributed.
+        let suggestedVendorMatch: SuggestedVendorMatch?
+
+        struct SuggestedVendorMatch: Decodable, Hashable {
+            let contractorId: String
+            let name: String
+            let category: String?
+            let evidence: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                contractorId = (try? c.decodeIfPresent(String.self, forKey: .contractorId)) ?? ""
+                name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
+                category = try? c.decodeIfPresent(String.self, forKey: .category)
+                evidence = try? c.decodeIfPresent(String.self, forKey: .evidence)
+            }
+            enum CodingKeys: String, CodingKey {
+                case name, category, evidence
+                case contractorId = "contractor_id"
+            }
+        }
 
         struct SuggestedTaskHint: Decodable, Identifiable, Hashable {
             let title: String
@@ -4515,6 +4537,7 @@ final class DatabaseService {
             case autoAddedTasks = "auto_added_tasks"
             case suggestedActions = "suggested_actions"
             case appliedActions = "applied_actions"
+            case suggestedVendorMatch = "suggested_vendor_match"
             case matchedContractorName = "matched_contractor_name"
         }
 
@@ -4570,6 +4593,7 @@ final class DatabaseService {
             autoAddedTasks = try? c.decodeIfPresent([AutoAddedTask].self, forKey: .autoAddedTasks)
             suggestedActions = try? c.decodeIfPresent([SuggestedAction].self, forKey: .suggestedActions)
             appliedActions = try? c.decodeIfPresent([AppliedAction].self, forKey: .appliedActions)
+            suggestedVendorMatch = try? c.decodeIfPresent(SuggestedVendorMatch.self, forKey: .suggestedVendorMatch)
             matchedContractorName = try? c.decodeIfPresent(String.self, forKey: .matchedContractorName)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {

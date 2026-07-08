@@ -240,6 +240,30 @@ export function completeTaskAction(args: {
   };
 }
 
+export function visitLogAction(args: {
+  contractorId: string;
+  vendorName?: string | null;
+  date: string;                 // YYYY-MM-DD — the visit/service date
+  costCents?: number | null;
+  reason?: string | null;
+  source: SuggestedActionSource;
+}): Omit<SuggestedAction, "id"> {
+  const cost = args.costCents != null ? ` ($${(args.costCents / 100).toFixed(0)})` : "";
+  return {
+    kind: "visit_log",
+    title: `Log a ${args.vendorName ?? "vendor"} visit${cost}`,
+    reason: args.reason ?? null,
+    confidence: "high",
+    recommended: true,
+    source: args.source,
+    payload: {
+      contractor_id: args.contractorId,
+      date: args.date,
+      cost_cents: args.costCents ?? null,
+    },
+  };
+}
+
 export function systemLinkAction(args: {
   count: number;
   source: SuggestedActionSource;

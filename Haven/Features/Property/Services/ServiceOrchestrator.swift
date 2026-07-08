@@ -155,7 +155,8 @@ enum ServiceOrchestrator {
         scheduledDate: String,
         notes: String? = nil,
         actualCostCents: Int? = nil,
-        visitState: RoutineVisitState = .scheduled
+        visitState: RoutineVisitState = .scheduled,
+        confirmedBy: String? = nil
     ) async throws -> RoutineVisitRow {
         var insert = RoutineVisitInsert(
             routineId: routine.id,
@@ -165,6 +166,7 @@ enum ServiceOrchestrator {
         insert.visitState = visitState.rawValue
         insert.notes = notes
         insert.actualCostCents = actualCostCents
+        insert.confirmedBy = confirmedBy
         insert.visitTypeKey = ServiceLibrary.visitTypeKey(
             for: routine,
             scheduledDate: scheduledDate,

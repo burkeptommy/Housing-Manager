@@ -24,6 +24,18 @@ The unified suggested-actions shape + universal review card + retry-safe apply s
 
 ---
 
+## Phase 7 M4 — Vendor ladder + spend — SHIPPED (2026-07-08, overnight)
+
+Sender→vendor matching graduated from exact-email-only to a three-tier ladder, and invoices from routine-served vendors now offer one-tap visit + spend logging.
+
+**Server (deployed):** NEW `_shared/vendor-match.ts` — exact email → company domain (contractor email OR website domain; 25-domain freemail denylist) → fuzzy display name (token overlap with light stemming + final-e normalization + corporate-suffix stop words; full-cover-of-shorter-name bonus). receive-email's STEP 1 rewired onto it: HIGH attributes exactly as before (feeds titles, task attribution, `preferred_contractor_id` into the M3 auto-run); MEDIUM stamps `metadata.suggested_vendor_match` on both review items — never silent attribution. The M3 continuation appends a `visit_log` row (cost from total_amount, recommended) when the HIGH-matched vendor has a live active routine. Spend = documents writeback (Phase 59) + routine_visits; service_records intentionally untouched.
+
+**iOS (Chez build green):** `InboxMetadata.SuggestedVendorMatch` resilient decode; the card renders the "Is this Green Valley Landscaping?" confirm row (evidence caption + Yes/Not them) — Yes feeds `confirmed_contractor_id` into the server batch (M1's handler already verified household) and becomes the default vendor for routine rows; engine gains the `visit_log` applier — finds the vendor's active routine, dedups on scheduled_date via `fetchRoutineVisits`, applies via `ServiceOrchestrator.recordVisit` (new `confirmedBy` param; `RoutineVisitInsert.confirmedBy` column wired) with visit_state completed + `confirmed_by: "invoice_auto"`.
+
+**Fixture matrix (verified live, household restored to baseline, 8 storage orphans cleaned):** billing@ on the company domain → HIGH match, title attributed, visit_log row with cost on the card; exact lookalike name at gmail → ladder yields MEDIUM only (no silent attribution — auto-add ran unattributed); fuzzy lookalike "Green Valley Landscape Co" at gmail → `suggested_vendor_match` stamped with evidence, NO visit_log (unconfirmed vendors never log spend). Two scorer bugs caught live: missing stemming (landscape/landscaping) and the -ing/final-e mismatch — both fixed in vendor-match.ts.
+
+---
+
 ## Phase 7 M3 — Invoice auto-run — SHIPPED (2026-07-08, overnight)
 
 Forwarded home invoices now process THEMSELVES: receive-email schedules an `EdgeRuntime.waitUntil` continuation (inline would risk SendGrid webhook timeout → retry → duplicate processing) that calls process-invoice with the internal secret + `auto_run: true`, then authors the review item with the rich extraction — no more waiting for the homeowner to manually run the scanner.

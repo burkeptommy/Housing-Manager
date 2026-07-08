@@ -10,7 +10,9 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { arrayBufferToBase64 } from "../_shared/base64.ts";
-import { assignIds, chezAction, completeTaskAction, pickActionType, projectAction, routineAction, systemLinkAction, taskAction, toLegacySuggestedTasks } from "../_shared/suggested-actions.ts";
+import { assignIds, chezAction, completeTaskAction, pickActionType, projectAction, routineAction, systemLinkAction, taskAction, toLegacySuggestedTasks, visitLogAction } from "../_shared/suggested-actions.ts";
+import { extractDisplayName, extractEmailAddress, matchVendorBySender } from "../_shared/vendor-match.ts";
+import type { VendorMatchContractor } from "../_shared/vendor-match.ts";
 import {
   createTasksFromSuggestions,
   type SuggestedTask,
@@ -901,30 +903,38 @@ serve(async (req: Request) => {
 
     const isForwarded = subject.toLowerCase().startsWith("fwd:") || subject.toLowerCase().startsWith("fw:") || !!originalSender;
 
-    // --- SENDER → CONTRACTOR MATCH ---
+    // --- SENDER → CONTRACTOR MATCH (Phase 7 M4: the ladder) ---
     // The keystone of "vendors can use your alfred address as their primary
-    // contact": when the ORIGINAL sender (not the forwarder) matches a
-    // contractor on file, we know exactly whose email this is — the
-    // landscaper, the HVAC company — and can title, route, and stamp
-    // accordingly. Matched by email; the original sender wins over the
-    // forwarder. Best-effort — a miss just means no vendor attribution.
+    // contact". Three tiers via _shared/vendor-match.ts: exact email →
+    // company domain (freemail excluded) → fuzzy display name. HIGH tiers
+    // attribute exactly like the old exact-email match; MEDIUM becomes an
+    // "Is this X?" confirm row on the review card — never silent
+    // attribution. Best-effort — a miss just means no vendor attribution.
     let matchedContractor: { id: string; company_name: string; category: string | null } | null = null;
+    let suggestedVendorMatch: { contractor_id: string; name: string; category: string | null; evidence: string } | null = null;
     try {
       const rawSender = originalSender || fromAddress || "";
-      const senderMatch = rawSender.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
-      const cleanSender = senderMatch ? senderMatch[0].toLowerCase() : "";
-      if (cleanSender) {
-        const { data: contractorRows } = await supabase
-          .from("contractors")
-          .select("id, company_name, category, email")
-          .eq("household_id", householdId)
-          .not("email", "is", null);
-        matchedContractor = (contractorRows || []).find(
-          (c: any) => (c.email || "").toLowerCase().trim() === cleanSender,
-        ) ?? null;
-        if (matchedContractor) {
-          console.log(`[receive-email] Sender matched contractor: ${matchedContractor.company_name}`);
-        }
+      const cleanSender = extractEmailAddress(rawSender);
+      const { data: contractorRows } = await supabase
+        .from("contractors")
+        .select("id, company_name, category, email, website")
+        .eq("household_id", householdId);
+      const ladder = matchVendorBySender({
+        senderEmail: cleanSender,
+        senderDisplayName: extractDisplayName(rawSender),
+        contractors: (contractorRows || []) as VendorMatchContractor[],
+      });
+      if (ladder?.confidence === "high") {
+        matchedContractor = ladder.contractor;
+        console.log(`[receive-email] Sender matched contractor (${ladder.tier}): ${ladder.contractor.company_name}`);
+      } else if (ladder) {
+        suggestedVendorMatch = {
+          contractor_id: ladder.contractor.id,
+          name: ladder.contractor.company_name,
+          category: ladder.contractor.category,
+          evidence: ladder.evidence,
+        };
+        console.log(`[receive-email] Sender POSSIBLY matches (${ladder.tier}): ${ladder.contractor.company_name}`);
       }
     } catch (matchErr) {
       console.warn("[receive-email] sender→contractor match failed (non-blocking):", matchErr);
@@ -2665,6 +2675,8 @@ Respond with ONLY valid JSON:
               suggested_actions: unifiedActions,
               source_document_id: createdDocumentId,
               ...(matchedContractor ? { matched_contractor: { id: matchedContractor.id, name: matchedContractor.company_name, category: matchedContractor.category } } : {}),
+              // M4: medium-confidence ladder hit → confirm row on the card.
+              ...(suggestedVendorMatch ? { suggested_vendor_match: suggestedVendorMatch } : {}),
             },
             status: "ready",
           });
@@ -2791,10 +2803,39 @@ Respond with ONLY valid JSON:
                 ? [systemLinkAction({ count: newSystemsCount, source: "invoice_analysis" })]
                 : [];
 
+              // M4 — spend lands on the routine when the matched vendor has
+              // a live one: offer "log this as a visit ($240)". iOS applies
+              // via ServiceOrchestrator.recordVisit (visit_state completed,
+              // confirmed_by invoice_auto) with scheduled-date dedup.
+              // Spend source of truth stays documents.invoice_amount (the
+              // Phase 59 writeback) + routine_visits — never service_records.
+              let visitRows: ReturnType<typeof visitLogAction>[] = [];
+              if (matchedContractor && invoiceDate) {
+                const { data: liveRoutines } = await supabase
+                  .from("routines")
+                  .select("id")
+                  .eq("household_id", householdId)
+                  .eq("vendor_id", matchedContractor.id)
+                  .is("archived_at", null)
+                  .eq("setup_state", "active")
+                  .limit(1);
+                if (liveRoutines && liveRoutines.length > 0) {
+                  const totalAmount = typeof invoice.total_amount === "number" ? invoice.total_amount : null;
+                  visitRows = [visitLogAction({
+                    contractorId: matchedContractor.id,
+                    vendorName: matchedContractor.company_name,
+                    date: invoiceDate,
+                    costCents: totalAmount != null ? Math.round(totalAmount * 100) : null,
+                    reason: "This invoice looks like a visit under your standing service.",
+                    source: "invoice_analysis",
+                  })];
+                }
+              }
+
               const vendorLabel = matchedContractor?.company_name
                 || ((classification as any).billVendor as string | null)
                 || classification.vendorName || null;
-              const actionable = [...completedRows, ...taskRows, ...cadenceRoutines, ...systemRows];
+              const actionable = [...completedRows, ...taskRows, ...cadenceRoutines, ...visitRows, ...systemRows];
               if (actionable.length === 0) {
                 console.log("[receive-email] invoice auto-run: nothing actionable, staying quiet");
                 return;
@@ -2829,6 +2870,7 @@ Respond with ONLY valid JSON:
                   source_document_id: autoRunDocId,
                   invoice_auto_run: true,
                   ...(matchedContractor ? { matched_contractor: { id: matchedContractor.id, name: matchedContractor.company_name, category: matchedContractor.category } } : {}),
+                  ...(suggestedVendorMatch ? { suggested_vendor_match: suggestedVendorMatch } : {}),
                 },
                 status: "ready",
               });

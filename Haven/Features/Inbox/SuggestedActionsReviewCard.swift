@@ -87,6 +87,8 @@ struct SuggestedActionsReviewCard: View {
     // M3 — system_link deep-link into the invoice scanner.
     @State private var invoiceScanVM: InvoiceProcessingViewModel?
     @State private var showInvoiceScan = false
+    // M4 — "Is this X?" vendor confirm row. nil = undecided.
+    @State private var vendorConfirmed: Bool?
 
     private struct VendorPickerTarget: Identifiable {
         let id: String        // action id
@@ -132,8 +134,18 @@ struct SuggestedActionsReviewCard: View {
         actions.filter { resolvedStatus(for: $0) == nil }
     }
 
+    private var confirmedVendorId: UUID? {
+        guard vendorConfirmed == true,
+              let match = item.metadata?.suggestedVendorMatch else { return nil }
+        return UUID(uuidString: match.contractorId)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let match = item.metadata?.suggestedVendorMatch, vendorConfirmed == nil,
+               !pendingActions.isEmpty {
+                vendorConfirmRow(match)
+            }
             ForEach(mode == .compact ? Array(actions.prefix(4)) : actions) { action in
                 actionRow(action)
             }
@@ -187,6 +199,51 @@ struct SuggestedActionsReviewCard: View {
     }
 
     // MARK: - Rows
+
+    /// M4 — medium-confidence sender→vendor ladder hit. The homeowner's
+    /// answer feeds confirmed_contractor_id into apply; "Not them" just
+    /// drops the attribution (nothing is created either way).
+    @ViewBuilder
+    private func vendorConfirmRow(_ match: DatabaseService.InboxMetadata.SuggestedVendorMatch) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Is this from \(match.name)?")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textPrimary)
+            if let evidence = match.evidence, !evidence.isEmpty {
+                Text(evidence)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            HStack(spacing: 8) {
+                Button {
+                    vendorConfirmed = true
+                    Haptics.selection()
+                } label: {
+                    Text("Yes, it's them")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textOnNavy)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(HavenColors.navy800)
+                        .clipShape(Capsule())
+                }
+                Button {
+                    vendorConfirmed = false
+                    Haptics.selection()
+                } label: {
+                    Text("Not them")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.navy800)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(HavenColors.beige200.opacity(0.6))
+                        .clipShape(Capsule())
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(HavenColors.navy800.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
 
     @ViewBuilder
     private func actionRow(_ action: DatabaseService.InboxMetadata.SuggestedAction) -> some View {
@@ -490,8 +547,11 @@ struct SuggestedActionsReviewCard: View {
                         quotedText: action.payload.quotedText,
                         estimatedCostCents: action.payload.estimatedCostCents,
                         vendorId: routineVendorIds[action.id]
-                            ?? action.payload.contractorId.flatMap(UUID.init(uuidString:)),
+                            ?? action.payload.contractorId.flatMap(UUID.init(uuidString:))
+                            ?? confirmedVendorId,
                         vendorLabel: routineVendorNames[action.id]
+                            ?? (routineVendorIds[action.id] == nil && action.payload.contractorId == nil && confirmedVendorId != nil
+                                ? item.metadata?.suggestedVendorMatch?.name : nil)
                     )))
                 case .task, .handyman:
                     // Template-backed downgrade or explicit choice — applies
@@ -511,6 +571,15 @@ struct SuggestedActionsReviewCard: View {
             case .completeTask:
                 if let raw = action.payload.taskId, let taskId = UUID(uuidString: raw) {
                     plans.append(.init(actionId: action.id, operation: .completeTask(taskId: taskId)))
+                }
+            case .visitLog:
+                if let raw = action.payload.contractorId, let vendorId = UUID(uuidString: raw),
+                   let date = action.payload.date {
+                    plans.append(.init(actionId: action.id, operation: .visitLog(
+                        contractorId: vendorId,
+                        date: date,
+                        costCents: action.payload.costCents
+                    )))
                 }
             case .project, .event:
                 plans.append(.init(actionId: action.id, operation: .server(payloadOverrides: nil)))
@@ -533,7 +602,8 @@ struct SuggestedActionsReviewCard: View {
             item: item,
             plans: plans,
             householdId: item.householdId,
-            propertyId: nil // server + orchestrator resolve (single-property fallback)
+            propertyId: nil, // server + orchestrator resolve (single-property fallback)
+            confirmedContractorId: confirmedVendorId
         )
         for (id, status) in outcome.statusById {
             localStatuses[id] = status

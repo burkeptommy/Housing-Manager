@@ -1134,6 +1134,9 @@ struct RoutineVisitInsert: Codable {
     var targetWindowEnd: String? = nil
     var actualCostCents: Int? = nil
     var notes: String? = nil
+    /// Provenance of the confirmation: a user id string, "invoice_auto"
+    /// (Phase 7 M4 email-invoice visit logging), "assumed_rollforward", …
+    var confirmedBy: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case status, notes
@@ -1144,6 +1147,7 @@ struct RoutineVisitInsert: Codable {
         case targetWindowStart = "target_window_start"
         case targetWindowEnd = "target_window_end"
         case actualCostCents = "actual_cost_cents"
+        case confirmedBy = "confirmed_by"
     }
 }
 

@@ -55,6 +55,9 @@ final class SuggestedActionApplyEngine: ObservableObject {
         /// completion path (MaintenanceViewModel.completeTask: recurring
         /// fan-out, system last_service_date, service record, notifications).
         case completeTask(taskId: UUID)
+        /// M4 — log an invoice as a visit on the vendor's live routine
+        /// (ServiceOrchestrator.recordVisit, completed + invoice_auto).
+        case visitLog(contractorId: UUID, date: String, costCents: Int?)
         /// User left the row unchecked — record as skipped at completion.
         case skip
     }
@@ -80,7 +83,8 @@ final class SuggestedActionApplyEngine: ObservableObject {
         item: DatabaseService.InboxItemRow,
         plans: [PlannedApplication],
         householdId: UUID,
-        propertyId: UUID?
+        propertyId: UUID?,
+        confirmedContractorId: UUID? = nil
     ) async -> Outcome {
         var outcome = Outcome()
         guard !isApplying else { return outcome }
@@ -111,7 +115,8 @@ final class SuggestedActionApplyEngine: ObservableObject {
                 let results = try await HavenSupabase.applySuggestedActions(
                     inboxItemId: item.id.uuidString,
                     propertyId: propertyId?.uuidString,
-                    selected: selected
+                    selected: selected,
+                    confirmedContractorId: confirmedContractorId?.uuidString
                 )
                 for r in results { outcome.statusById[r.id] = r.status }
             } catch {
@@ -177,6 +182,41 @@ final class SuggestedActionApplyEngine: ObservableObject {
                     }
                 } catch {
                     print("[SuggestedActionApply] complete task failed: \(error)")
+                    outcome.statusById[plan.actionId] = "failed"
+                    outcome.anyFailure = true
+                    iosLedger.append(.init(id: plan.actionId, status: "failed"))
+                }
+            case .visitLog(let contractorId, let date, let costCents):
+                do {
+                    let routines = try await DatabaseService.shared.fetchRoutines(householdId: householdId)
+                    guard let routine = routines.first(where: {
+                        $0.vendorId == contractorId && $0.setupState == "active"
+                    }) else {
+                        outcome.statusById[plan.actionId] = "failed"
+                        outcome.anyFailure = true
+                        iosLedger.append(.init(id: plan.actionId, status: "failed"))
+                        continue
+                    }
+                    // Dedup: one visit per (routine, date) from this path.
+                    let visits = (try? await DatabaseService.shared.fetchRoutineVisits(routineId: routine.id)) ?? []
+                    if let existing = visits.first(where: { $0.scheduledDate == date }) {
+                        outcome.statusById[plan.actionId] = "duplicate"
+                        iosLedger.append(.init(id: plan.actionId, status: "duplicate", resultRef: existing.id.uuidString))
+                        continue
+                    }
+                    let visit = try await ServiceOrchestrator.recordVisit(
+                        routine: routine,
+                        scheduledDate: date,
+                        notes: "Logged from a forwarded invoice.",
+                        actualCostCents: costCents,
+                        visitState: .completed,
+                        confirmedBy: "invoice_auto"
+                    )
+                    outcome.statusById[plan.actionId] = "applied"
+                    iosLedger.append(.init(id: plan.actionId, status: "applied", resultRef: visit.id.uuidString))
+                    NotificationCenter.default.post(name: .routineChanged, object: nil)
+                } catch {
+                    print("[SuggestedActionApply] visit log failed: \(error)")
                     outcome.statusById[plan.actionId] = "failed"
                     outcome.anyFailure = true
                     iosLedger.append(.init(id: plan.actionId, status: "failed"))
