@@ -919,6 +919,36 @@ final class HouseQuizAnswerMapper {
                                 )
                             }
 
+                            // July 2026 audit: the waterproofing chip is
+                            // universally visible, but no quiz question
+                            // creates a Crawl Space system — so a captured
+                            // vendor had no system row to link to and the
+                            // Crawl Space:annual bundle never seeded
+                            // (vendor captured, nothing scheduled). Hiring
+                            // a waterproofing company is direct evidence
+                            // the space exists — same evidence-based
+                            // pattern as resolveChimneyRule. The inline
+                            // reconcile seeds the bundle even when the
+                            // chip is added on re-entry after quiz
+                            // completion; on the first pass it's a
+                            // harmless no-op ahead of reconcileAll
+                            // (dedup by templateKey).
+                            if chipId == "waterproofing", createdContractor != nil {
+                                if let systemId = try? await ensureHomeSystem(
+                                    name: "Crawl Space / Basement",
+                                    category: "Crawl Space",
+                                    matchByCategory: true
+                                ) {
+                                    _ = await MaintenanceTaskReconciler.reconcile(
+                                        propertyId: propertyId,
+                                        householdId: householdId,
+                                        systemId: systemId,
+                                        systemCategory: "Crawl Space",
+                                        confirmedSubtype: nil
+                                    )
+                                }
+                            }
+
                             // Round 5 (May 2026, friend feedback): the
                             // vendor was getting linked to the ROUTINE
                             // but NOT to the matching home_systems row.
@@ -2030,14 +2060,30 @@ final class HouseQuizAnswerMapper {
     ) async {
         do {
             let allRoutines = (try? await db.fetchRoutines(householdId: householdId)) ?? []
+            // July 2026 audit: .otherService is a shared kind across
+            // DISTINCT programs (painting, security, smoke/CO check, and
+            // any future one-off program). Kind-level dedup let a painter
+            // capture "find" the household's smoke/CO routine and rewrite
+            // its vendor + label context. For .otherService, dedup on the
+            // RoutineSeeder serviceKey instead so programs stay separate.
+            let serviceKey: String? = (kind == .otherService)
+                ? RoutineSeeder.shared.defaults(for: category)?.serviceKey
+                : nil
             // Find an existing routine of this kind for this property. If
             // the user re-enters the quiz with a different vendor pick,
             // update the existing routine's vendor_id in place.
             if let existing = allRoutines.first(where: {
-                $0.typedKind == kind
-                    && $0.typedScope == .property
-                    && ($0.propertyId == propertyId || $0.propertyId == nil)
-                    && $0.archivedAt == nil
+                guard $0.typedScope == .property,
+                      ($0.propertyId == propertyId || $0.propertyId == nil),
+                      $0.archivedAt == nil else { return false }
+                if kind == .otherService {
+                    // Match only the same program. When the category has no
+                    // seeder serviceKey we can't tell programs apart, so
+                    // never adopt an existing .otherService routine.
+                    guard let serviceKey else { return false }
+                    return $0.resolvedServiceKey == serviceKey
+                }
+                return $0.typedKind == kind
             }) {
                 // Only update if the vendor actually changed.
                 if existing.vendorId != contractor.id || existing.typedSetupState != .active {
@@ -2067,6 +2113,10 @@ final class HouseQuizAnswerMapper {
             insert.icon = kind.icon
             insert.setupState = "active"
             insert.activeMonths = activeMonths
+            // July 2026 audit: stamp the program's serviceKey so this
+            // routine dedupes correctly against both this method's
+            // .otherService matcher and RoutineSeeder.seedIfNeeded.
+            insert.serviceKey = serviceKey
             let created = try? await db.createRoutine(insert)
             Analytics.track(.routineActivated, [
                 "source": "q15b",

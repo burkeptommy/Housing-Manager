@@ -9,6 +9,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,6 +34,22 @@ serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const propertyId: string | null = body.property_id ?? null;
     if (!propertyId) throw new Error("property_id is required");
+
+    // July 2026 security sweep (audit S1): reads the full property picture
+    // and writes the score back — caller must own the property. Internal
+    // callers (batch scoring) use the shared secret.
+    if (!requireInternal(req)) {
+      const auth = await requireHousehold(req);
+      if ("failure" in auth) return authFailure(auth, { ...corsHeaders, "Content-Type": "application/json" });
+      const { data: owned } = await supabase
+        .from("properties").select("household_id").eq("id", propertyId).single();
+      if (!owned || owned.household_id !== auth.householdId) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: property does not belong to your household" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     // Fetch property details
     const { data: property, error: propError } = await supabase

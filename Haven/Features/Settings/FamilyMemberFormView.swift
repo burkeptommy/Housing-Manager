@@ -68,6 +68,11 @@ struct FamilyMemberFormView: View {
     @State private var isCheckingEmail = false
     @State private var emailCheckTask: Task<Void, Never>?
     @State private var showInviteAfterSave = false
+    /// July 2026 (audit): the member row created by "Save & Send Invite" for
+    /// a BRAND-NEW member. The invite sheet used to receive `existingMember`
+    /// (nil for new members), and InviteToHavenSheet.send() guards on nil —
+    /// so the invite silently never sent. Captured here at create time.
+    @State private var justCreatedMember: FamilyMemberRow?
     @State private var showLinkedDeleteWarning = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var avatarImage: UIImage?
@@ -362,7 +367,7 @@ struct FamilyMemberFormView: View {
         .tint(HavenColors.navy)
         .trackScreen(isEditing ? "FamilyMemberEditView" : "FamilyMemberAddView")
         .sheet(isPresented: $showInviteSheet) {
-            InviteToHavenSheet(familyMember: existingMember, prefillEmail: email)
+            InviteToHavenSheet(familyMember: existingMember ?? justCreatedMember, prefillEmail: email)
         }
         .confirmationDialog("Delete Family Member?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
@@ -537,6 +542,21 @@ struct FamilyMemberFormView: View {
                     isExpecting: isExpecting, legalName: legalName.isEmpty ? nil : legalName,
                     school: school.isEmpty ? nil : school, notes: notes.isEmpty ? nil : notes
                 ))
+
+                // July 2026 (audit F4): nil fields are OMITTED from the PATCH
+                // by the synthesized encoder — deleting a wrong email/phone/
+                // school/note never persisted. Explicit SQL NULLs for fields
+                // the user cleared.
+                var clearedColumns: [String] = []
+                if email.isEmpty, existing.email?.isEmpty == false { clearedColumns.append("email") }
+                if phone.isEmpty, existing.phone?.isEmpty == false { clearedColumns.append("phone") }
+                if school.isEmpty, existing.school?.isEmpty == false { clearedColumns.append("school") }
+                if notes.isEmpty, existing.notes?.isEmpty == false { clearedColumns.append("notes") }
+                if legalName.isEmpty, existing.legalName?.isEmpty == false { clearedColumns.append("legal_name") }
+                if !hasDateOfBirth, existing.dateOfBirth != nil { clearedColumns.append("date_of_birth") }
+                try? await db.clearColumns(
+                    table: "family_members", id: existing.id, columns: clearedColumns
+                )
             } else {
                 let user = try await db.fetchCurrentUser()
                 guard let householdId = user.householdId else { error = "No household found"; isSaving = false; return }
@@ -575,6 +595,7 @@ struct FamilyMemberFormView: View {
                 )
                 let result = try await HouseholdInviteCoordinator.shared.addPersonToHousehold(coordinatorRequest)
                 let newMember = result.familyMember
+                justCreatedMember = newMember  // audit: for the Save & Send Invite path
 
                 // Patch in any fields the coordinator's slimmer insert didn't
                 // touch (avatar color, expected date, legal name, school,
@@ -600,6 +621,10 @@ struct FamilyMemberFormView: View {
             }
             Haptics.success()
             Analytics.track(isEditing ? .familyMemberEdited : .familyMemberCreated, ["relationship": relationship])
+            // July 2026 (audit): Dashboard family surfaces observe
+            // .householdMemberChanged; only AddHouseholdStaffSheet posted it,
+            // so family-member add/edit left those surfaces stale.
+            NotificationCenter.default.post(name: .householdMemberChanged, object: nil)
             await onSave?()
 
             if showInviteAfterSave && existingUserDetected {
@@ -717,6 +742,7 @@ struct FamilyMemberFormView: View {
             }
             try await DatabaseService.shared.deleteFamilyMember(id: member.id)
             Analytics.track(.familyMemberDeleted)
+            NotificationCenter.default.post(name: .householdMemberChanged, object: nil)
             Haptics.success()
             await onSave?()
             dismiss()

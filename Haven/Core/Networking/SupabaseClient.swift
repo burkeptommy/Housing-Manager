@@ -1047,6 +1047,117 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "process-inbox-item", body: body, timeoutSeconds: 120)
     }
 
+    // MARK: - Phase 7: Suggested-actions apply protocol
+
+    /// One selected row for the server batch. `payloadOverrides` carries the
+    /// card's inline edits (e.g. an adjusted due_date) as raw JSON values.
+    struct SelectedActionPayload: Encodable {
+        let id: String
+        var payloadOverrides: [String: String?]? = nil
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case payloadOverrides = "payload_overrides"
+        }
+    }
+
+    struct ApplySuggestedActionsRequest: Encodable {
+        let inboxItemId: String
+        let action = "apply_suggested_actions"
+        var propertyId: String?
+        let selected: [SelectedActionPayload]
+        var confirmedContractorId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case action, selected
+            case inboxItemId = "inbox_item_id"
+            case propertyId = "property_id"
+            case confirmedContractorId = "confirmed_contractor_id"
+        }
+    }
+
+    struct AppliedActionResult: Decodable {
+        let id: String
+        let status: String
+        let resultRef: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, status
+            case resultRef = "result_ref"
+        }
+
+        // Resilient decode — server response shape may grow.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+            status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? "failed"
+            resultRef = try? c.decodeIfPresent(String.self, forKey: .resultRef)
+        }
+    }
+
+    private struct ApplySuggestedActionsResponse: Decodable {
+        let results: [AppliedActionResult]?
+        init(from decoder: Decoder) throws {
+            let c = try? decoder.container(keyedBy: CodingKeys.self)
+            results = try? c?.decodeIfPresent([AppliedActionResult].self, forKey: .results) ?? nil
+        }
+        enum CodingKeys: String, CodingKey { case results }
+    }
+
+    /// Server batch: applies the server-side kinds (task/event/project) for
+    /// the selected rows and self-records their ledger entries. Returns the
+    /// per-action outcomes; iOS-side kinds come back "skipped".
+    static func applySuggestedActions(
+        inboxItemId: String,
+        propertyId: String?,
+        selected: [SelectedActionPayload],
+        confirmedContractorId: String? = nil
+    ) async throws -> [AppliedActionResult] {
+        let body = ApplySuggestedActionsRequest(
+            inboxItemId: inboxItemId,
+            propertyId: propertyId,
+            selected: selected,
+            confirmedContractorId: confirmedContractorId
+        )
+        let data = try await callEdgeFunction(name: "process-inbox-item", body: body, timeoutSeconds: 120)
+        let decoded = try? JSONDecoder().decode(ApplySuggestedActionsResponse.self, from: data)
+        return decoded?.results ?? []
+    }
+
+    struct RecordAppliedEntry: Encodable {
+        let id: String
+        let status: String
+        var resultRef: String? = nil
+
+        enum CodingKeys: String, CodingKey {
+            case id, status
+            case resultRef = "result_ref"
+        }
+    }
+
+    private struct RecordAppliedActionsRequest: Encodable {
+        let inboxItemId: String
+        let action = "record_applied_actions"
+        let applied: [RecordAppliedEntry]
+        let done: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case action, applied, done
+            case inboxItemId = "inbox_item_id"
+        }
+    }
+
+    /// The ledger call: reports iOS-applied outcomes; `done: true` stamps
+    /// the item complete. The whole apply flow is re-entrant until then.
+    static func recordAppliedActions(
+        inboxItemId: String,
+        applied: [RecordAppliedEntry],
+        done: Bool
+    ) async throws {
+        let body = RecordAppliedActionsRequest(inboxItemId: inboxItemId, applied: applied, done: done)
+        _ = try await callEdgeFunction(name: "process-inbox-item", body: body, timeoutSeconds: 60)
+    }
+
     // MARK: - View Document (Zero-Access Model)
 
     struct ViewDocumentRequest: Encodable {
@@ -1125,6 +1236,23 @@ enum HavenSupabase {
             case name
             case householdId = "household_id"
             case householdName = "household_name"
+        }
+
+        // July 2026 (audit — resilient-decoder sweep): this is decoded from
+        // the merge-households check_user Edge Function. Before this, a
+        // drifted optional field (e.g. household_name as a number) threw the
+        // WHOLE decode; the caller's try? then read it as "no existing
+        // account" and silently bypassed the merge-request flow — a real
+        // spouse could be treated as a brand-new invite. `exists` stays the
+        // load-bearing field (defaults false only if genuinely absent);
+        // every optional is try? so one bad field can't sink a true match.
+        init(from decoder: Decoder) throws {
+            let c = try? decoder.container(keyedBy: CodingKeys.self)
+            exists = (try? c?.decodeIfPresent(Bool.self, forKey: .exists) ?? nil) ?? false
+            userId = try? c?.decodeIfPresent(String.self, forKey: .userId) ?? nil
+            name = try? c?.decodeIfPresent(String.self, forKey: .name) ?? nil
+            householdId = try? c?.decodeIfPresent(String.self, forKey: .householdId) ?? nil
+            householdName = try? c?.decodeIfPresent(String.self, forKey: .householdName) ?? nil
         }
     }
 

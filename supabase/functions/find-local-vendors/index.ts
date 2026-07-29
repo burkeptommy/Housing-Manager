@@ -87,6 +87,20 @@ const CATEGORY_SEARCH_TERMS: Record<string, string> = {
   solar: "solar panel installer",
   pest_control: "pest control company",
   pool_service: "swimming pool service",
+  // July 2026 audit: canonical SystemCategoryRegistry keys (lowercased)
+  // that the iOS pickers now send. Several categories were falling
+  // through to the raw-input fallback — fine for "painter", terrible
+  // for "gutter_cleaning" / "Chimney" (Places matched the literal word,
+  // not the trade). Every key a picker can send should resolve here.
+  chimney: "chimney sweep",
+  "tree service": "tree service",
+  "security system": "home security system installer",
+  "gutter cleaning": "gutter cleaning service",
+  painting: "house painter",
+  "cleaning service": "house cleaning service",
+  "snow removal": "snow plowing service",
+  "mosquito & tick": "mosquito and tick control service",
+  "pet waste": "pet waste removal service",
   // Phase X+4 (dedup + category-correctness): the utility-account
   // queries below previously matched gas STATIONS (Exxon/Mobil/Shell/
   // Sunoco) because "natural gas" / "oil" / "propane" are too generic.

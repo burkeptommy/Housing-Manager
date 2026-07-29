@@ -62,6 +62,12 @@ final class VehicleDetailViewModel: ObservableObject {
         else { cache.removeAll() }
     }
 
+    // July 2026 (audit F8): the 60s freshness window silently swallowed every
+    // mutation's refresh — editing mileage / insurance / mechanic within 60s
+    // of opening the detail view left the hero + sections stale (the
+    // un-forced load early-returned). Fix: every mutation callback in
+    // VehicleDetailView now passes force: true; only the .task onAppear load
+    // keeps the cache (for instant re-entry).
     func load(vehicleId: UUID, force: Bool = false) async {
         // Skip the full reload if data is fresh enough — view shows cached
         // hero/sections instantly. The estimated-value refresh below still

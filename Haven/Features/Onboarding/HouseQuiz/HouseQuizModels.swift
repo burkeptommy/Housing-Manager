@@ -37,6 +37,11 @@ struct HouseQuizState: Codable, Equatable {
     var answers: [String: HouseQuizAnswer]
     var savedForLater: [String]
     var skipped: [String]
+    /// Stamped the first time the forwarding-email reveal interstitial
+    /// fires (after q15b_household_contractors). Nil on rows saved before
+    /// the reveal moved off the legacy milestone system, so pre-existing
+    /// mid-quiz users who are already past q15b simply never see it.
+    var forwardingRevealShownAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case startedAt = "started_at"
@@ -48,6 +53,7 @@ struct HouseQuizState: Codable, Equatable {
         case answers
         case savedForLater = "saved_for_later"
         case skipped
+        case forwardingRevealShownAt = "forwarding_reveal_shown_at"
     }
 
     init(
@@ -59,7 +65,8 @@ struct HouseQuizState: Codable, Equatable {
         walkthroughMode: String? = nil,
         answers: [String: HouseQuizAnswer] = [:],
         savedForLater: [String] = [],
-        skipped: [String] = []
+        skipped: [String] = [],
+        forwardingRevealShownAt: Date? = nil
     ) {
         self.startedAt = startedAt
         self.completedAt = completedAt
@@ -70,6 +77,7 @@ struct HouseQuizState: Codable, Equatable {
         self.answers = answers
         self.savedForLater = savedForLater
         self.skipped = skipped
+        self.forwardingRevealShownAt = forwardingRevealShownAt
     }
 
     /// Resilient decoder per CLAUDE.md rule for externally-fed Codable types.
@@ -89,6 +97,7 @@ struct HouseQuizState: Codable, Equatable {
         self.answers = (try? c.decodeIfPresent([String: HouseQuizAnswer].self, forKey: .answers)) ?? [:]
         self.savedForLater = (try? c.decodeIfPresent([String].self, forKey: .savedForLater)) ?? []
         self.skipped = (try? c.decodeIfPresent([String].self, forKey: .skipped)) ?? []
+        self.forwardingRevealShownAt = try? c.decodeIfPresent(Date.self, forKey: .forwardingRevealShownAt)
 
         // Back-compat: pre-Phase-85 rows only have completedAt. If the new
         // intake/walkthrough fields are nil but completedAt is set, fill

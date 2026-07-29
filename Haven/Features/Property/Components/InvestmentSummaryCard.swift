@@ -277,7 +277,7 @@ struct InvestmentSummaryCard: View {
                             .font(HavenTypography.uiSectionHeader)
                             .tracking(1.5)
                             .foregroundStyle(HavenColors.textTertiary)
-                        Text("Zillow and Redfin lean heavily on MLS listing volume, which can be thin in low-turnover neighborhoods. ATTOM weights closed sales and tax-assessor data more directly. Neither method is the definitive answer — that's why we show a range below the headline number, so the uncertainty stays visible.")
+                        Text("Zillow and Redfin lean heavily on MLS listing volume, which can be thin in low-turnover neighborhoods. ATTOM weights closed sales and tax-assessor data more directly. Neither method is the definitive answer. That's why we show a range below the headline number, so the uncertainty stays visible.")
                             .font(HavenTypography.body)
                             .foregroundStyle(HavenColors.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)

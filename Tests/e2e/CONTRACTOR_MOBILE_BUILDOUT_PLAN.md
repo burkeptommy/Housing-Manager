@@ -37,7 +37,7 @@ This is a **complete spec** — no "skip this" gates. Each wave is dispatched in
 5. Initial discipline check: `Text()`-style `handyman` + em-dash count = 0
 
 After implementation:
-- `cd /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8` and verify TS clean (no `tsc` for vanilla JS but check no console errors)
+- `cd /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8` and verify TS clean (no `tsc` for vanilla JS but check no console errors)
 - Deploy edge function: `supabase functions deploy handyman-portal --no-verify-jwt` (or `handyman-provider` if reusing)
 - Apply migration: `supabase db push --linked` if a migration shipped
 - Take 1–3 screenshots in 390×844 viewport
@@ -504,7 +504,7 @@ M13 (quote duplication)         ← needs M4
 In a fresh chat:
 
 ```
-Read /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_MOBILE_BUILDOUT_PLAN.md
+Read /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_MOBILE_BUILDOUT_PLAN.md
 
 Execute Wave M{N} via a general-purpose subagent. Use the wave's spec verbatim from the plan doc.
 
@@ -552,7 +552,7 @@ All private; per-household-scoped RLS via `documents_storage_bucket_policy` patt
 Every wave touches `handyman-provider/index.ts` to add 1–4 actions. Wave M7 adds a NEW edge function `crew-chat/index.ts`. Each wave deploys via:
 
 ```bash
-cd /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8
+cd /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8
 supabase functions deploy handyman-provider --no-verify-jwt
 # or for M7:
 supabase functions deploy crew-chat --no-verify-jwt

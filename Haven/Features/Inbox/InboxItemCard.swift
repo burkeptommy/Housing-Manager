@@ -168,6 +168,35 @@ struct InboxItemCard: View {
                 .foregroundStyle(HavenColors.textTertiary)
             }
 
+            // Phase 7 M5 — the appointment auto-stamp's undoable notice.
+            // Informational (needs_action false), so it renders outside the
+            // pending-action gate; Undo restores the prior scheduled_date.
+            if let stamp = item.metadata?.scheduleStamp, stamp.undoneAt == nil, item.actionCompleted != true {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "calendar.badge.checkmark")
+                        .font(.system(size: 13))
+                        .foregroundStyle(HavenColors.success)
+                    Text("Put on the matching task")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Spacer()
+                    Button {
+                        Haptics.selection()
+                        Analytics.track(.scheduleStampUndone, ["source": "inbox_card"])
+                        onProcess(nil, "undo_schedule_stamp", nil, nil, nil)
+                    } label: {
+                        Text("Undo")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy800)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(HavenColors.beige200.opacity(0.6))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
             // Action area
             if item.isPending {
                 actionArea
@@ -195,9 +224,103 @@ struct InboxItemCard: View {
             duplicateResolutionArea
         } else if item.actionType == "confirm_vehicle_document" || item.actionType == "review_vehicle_invoice" {
             vehicleDocumentActionArea
+        } else if item.actionType == "review_quarantined_sender" {
+            // Phase 8.1 — unknown sender emailed the household address.
+            // Allow replays the stored email through the pipeline; Block
+            // silently drops this sender forever. When the gate's fuzzy
+            // ladder recognized the sender, the primary button ALSO maps
+            // the address onto that vendor (out of the box most vendors
+            // have no email on file — the first email is the mapping
+            // moment). Manual vendor picking lives in the detail view.
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                let suggestion = item.metadata?.quarantined
+                HStack(spacing: HavenTheme.spacing8) {
+                    HavenButton(
+                        title: suggestion?.suggestedContractorName != nil
+                            ? "Allow — it's \(suggestion?.suggestedContractorName ?? "")"
+                            : "Allow & process",
+                        action: {
+                            Haptics.selection()
+                            onProcess(nil, "allow_quarantined_sender", suggestion?.suggestedContractorId, nil, nil)
+                        },
+                        size: .compact
+                    )
+                    HavenButton(
+                        title: "Block",
+                        action: {
+                            Haptics.selection()
+                            onProcess(nil, "reject_quarantined_sender", nil, nil, nil)
+                        },
+                        style: .secondary,
+                        size: .compact
+                    )
+                }
+                if suggestion?.suggestedContractorName != nil {
+                    Text("Allowing links this address to \(suggestion?.suggestedContractorName ?? "the vendor"). Tap in for other options.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        } else if item.actionType == "review_followups" || item.actionType == "review_actions" {
+            // Phase 7: items carrying the unified suggested_actions render
+            // the universal review card (per-row selection; remapping lives
+            // in the detail view). Items from BEFORE Phase 7 only carry
+            // suggested_tasks — they keep the legacy all-or-nothing card.
+            if item.metadata?.suggestedActions?.isEmpty == false {
+                SuggestedActionsReviewCard(item: item, mode: .compact, onApplied: nil)
+                    .padding(HavenTheme.spacing8)
+                    .background(HavenColors.action.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+            } else {
+                followupsActionArea
+            }
         } else {
             standardActionArea
         }
+    }
+
+    // MARK: - Follow-up tasks (July 2026)
+
+    /// Compact "we spotted N follow-ups" card. One tap adds them all; the
+    /// full list + per-task evidence lives in the detail view.
+    private var followupsActionArea: some View {
+        let tasks = item.metadata?.suggestedTasks ?? []
+        return VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            ForEach(tasks.prefix(3)) { task in
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "checklist")
+                        .font(.system(size: 11))
+                        .foregroundStyle(HavenColors.action)
+                        .padding(.top, 1)
+                    Text(task.title)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
+                }
+            }
+            HStack(spacing: HavenTheme.spacing8) {
+                HavenButton(
+                    title: tasks.count == 1 ? "Add it" : "Add all \(tasks.count)",
+                    action: {
+                        Haptics.medium()
+                        onProcess(nil, "add_suggested_tasks", nil, nil, nil)
+                    },
+                    icon: "plus.circle.fill"
+                )
+                Button {
+                    Haptics.light()
+                    onProcess(nil, "dismiss", nil, nil, nil)
+                } label: {
+                    Text("No thanks")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .padding(HavenTheme.spacing8)
+        .background(HavenColors.action.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
     }
 
     // MARK: - Confirm Project Match

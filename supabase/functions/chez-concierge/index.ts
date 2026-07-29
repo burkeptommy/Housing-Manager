@@ -56,6 +56,28 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
+import { requireInternal } from "../_shared/require-household.ts";
+import {
+  attachSnapshotToRequest,
+  buildDelegationSnapshot,
+  inferSnapshotKindFromContext,
+  intakeContextMirrors,
+  isSnapshotKind,
+  sanitizeHomeownerIntake,
+  SnapshotAuthError,
+  snapshotDigest,
+  snapshotReadiness,
+  suggestedBudgetFor,
+  type DelegationSnapshot,
+  type SnapshotKind,
+} from "./snapshot.ts";
+import {
+  confirmApprovedCharge,
+  handleConfirmPaymentMethod,
+  handleCreateSetupIntent,
+  handleDetachPaymentMethod,
+  paymentsConfigured,
+} from "./payments.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -315,6 +337,10 @@ interface SubmitPayload {
   description: string;
   context?: Record<string, unknown>;
   attachments?: AttachmentMeta[];
+  /// Wave 4 — what only the homeowner can tell Chez (budget band,
+  /// timing, preferred windows, access override). Optional; sanitized
+  /// server-side.
+  intake?: unknown;
 }
 
 async function handleSubmit(
@@ -333,6 +359,14 @@ async function handleSubmit(
   if (!summary || !description) {
     return json({ error: "summary and description required" }, 400);
   }
+
+  // Wave 4 — homeowner intake: validated, mirrored into the flat context
+  // (display strings only), and stored on the snapshot below.
+  const intake = sanitizeHomeownerIntake(payload.intake);
+  const submitContext = {
+    ...(payload.context || {}),
+    ...intakeContextMirrors(intake),
+  };
 
   // Compute SLA via the SQL helper.
   const { data: slaRow, error: slaErr } = await service
@@ -353,7 +387,7 @@ async function handleSubmit(
       user_id: user.id,
       category,
       summary,
-      context: payload.context || {},
+      context: submitContext,
       status: "open",
       sla_due_at,
       last_message_at: new Date().toISOString(),
@@ -380,12 +414,38 @@ async function handleSubmit(
     console.error("[chez-concierge] submit message failed:", msgErr);
   }
 
+  // Wave 1 — server-assembled delegation snapshot. iOS entry points pass
+  // entity ids in `context`; the server assembles the full household
+  // truth (system details, warranties, service history, cost references)
+  // so the operator and the AI brief act without follow-up questions.
+  // Best-effort: a snapshot failure never sinks the submit. Runs BEFORE
+  // the playbook so runAnalysisCore sees the attached snapshot.
+  const requestId = (request as ConciergeRequestRow).id;
+  let submitDigest = "";
+  try {
+    const inferred = inferSnapshotKindFromContext(
+      (payload.context ?? {}) as Record<string, unknown>
+    );
+    const snapshot = await buildDelegationSnapshot(service, {
+      kind: inferred?.kind ?? "general",
+      entityId: inferred?.entityId,
+      householdId,
+      propertyId: inferred?.propertyId,
+    });
+    if (snapshot) {
+      if (intake) snapshot.homeowner_intake = intake;
+      await attachSnapshotToRequest(service, requestId, snapshot);
+      submitDigest = snapshotDigest(snapshot);
+    }
+  } catch (e) {
+    console.warn("[snapshot] submit build failed:", e);
+  }
+
   // Phase 86D — kick off the category playbook. Each playbook drops a
   // first-touch system message in the thread ("Chez is on it…") and
   // optionally fires server-side work (AI research, follow-up reminders).
   // Best-effort: failure here doesn't sink the submit. Runs in parallel
   // with the admin notification fan-out below.
-  const requestId = (request as ConciergeRequestRow).id;
   const playbookPromise = runChezPlaybookForRequest({
     service,
     user,
@@ -411,12 +471,12 @@ async function handleSubmit(
     sendAdminEmail(
       adminEmails(),
       `[Chez] New ${category}: ${summary.slice(0, 60)}`,
-      `${emailIntro}\n\nRequest body:\n${description}\n\nOpen the portal:\n${portalUrl}`,
+      `${emailIntro}\n\nRequest body:\n${description}${submitDigest ? `\n\n${submitDigest}` : ""}\n\nOpen the portal:\n${portalUrl}`,
       emailBody({
         preview: `New Chez request: ${summary}`,
         heading: "New Chez request",
         intro: emailIntro,
-        bodyText: description,
+        bodyText: submitDigest ? `${description}\n\n${submitDigest}` : description,
         ctaLabel: "Open in admin portal",
         ctaUrl: portalUrl,
       })
@@ -886,6 +946,124 @@ const OUTCOME_RESOLUTION_TYPES = new Set([
   "other",
 ]);
 
+/// Wave 6 — the memory flywheel. When a Chez-coordinated job resolves
+/// with a real cost, write it back into the household's service_records
+/// (and roll it onto the linked system) so the NEXT delegation snapshot
+/// for that system/vendor is richer. Idempotent on chez_request_id, and
+/// never throws: a write-back failure must not block a resolution.
+async function writeBackServiceRecord(
+  service: ServiceClient,
+  request: ConciergeRequestRow,
+  opts: {
+    costCents: number;
+    contractorId?: string | null;
+    vendorName?: string | null;
+    description?: string | null;
+  }
+): Promise<void> {
+  try {
+    if (!(opts.costCents > 0)) return;
+
+    // Idempotency: one write-back per request, ever.
+    const { data: existing } = await service
+      .from("service_records")
+      .select("id")
+      .eq("chez_request_id", request.id)
+      .limit(1);
+    if (existing && (existing as unknown[]).length > 0) return;
+
+    const snapshot = (request as unknown as { snapshot?: Record<string, unknown> }).snapshot ?? null;
+    const context = (request.context ?? {}) as Record<string, unknown>;
+    const snapSection = (key: string): Record<string, unknown> | null => {
+      const v = snapshot?.[key];
+      return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+    };
+    const asId = (v: unknown): string | null =>
+      typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v.trim()) ? v.trim() : null;
+
+    // Resolve the property (record insert requires a non-null property_id).
+    let propertyId = asId(snapSection("property")?.id);
+    if (!propertyId) {
+      const { data: prop } = await service
+        .from("properties")
+        .select("id")
+        .eq("household_id", request.household_id)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      propertyId = asId((prop as { id?: string } | null)?.id);
+    }
+    if (!propertyId) return; // no property to hang the record on
+
+    // Resolve the linked system (optional), household-scoped.
+    let systemId = asId(snapSection("system")?.id) ?? asId(context.system_id);
+    if (systemId) {
+      const { data: sys } = await service
+        .from("home_systems")
+        .select("id, total_spent")
+        .eq("id", systemId)
+        .eq("household_id", request.household_id)
+        .maybeSingle();
+      if (!sys) systemId = null;
+      else {
+        // Roll the cost onto the system so trust math and the next
+        // snapshot see it. Read-modify-write; best-effort.
+        const today = new Date().toISOString().slice(0, 10);
+        const prevSpent = Number((sys as { total_spent?: number }).total_spent) || 0;
+        const { error: sysErr } = await service
+          .from("home_systems")
+          .update({
+            last_service_date: today,
+            total_spent: prevSpent + opts.costCents / 100,
+          })
+          .eq("id", systemId);
+        if (sysErr) console.warn("[writeback] system roll-up failed:", sysErr.message);
+      }
+    }
+
+    // Resolve the contractor, household-scoped. Prefer the explicit
+    // winning contractor; fall back to a vendor-name match.
+    let contractorId = asId(opts.contractorId);
+    if (contractorId) {
+      const { data: c } = await service
+        .from("contractors")
+        .select("id")
+        .eq("id", contractorId)
+        .eq("household_id", request.household_id)
+        .maybeSingle();
+      if (!c) contractorId = null;
+    }
+    if (!contractorId && opts.vendorName) {
+      const { data: match } = await service
+        .from("contractors")
+        .select("id")
+        .eq("household_id", request.household_id)
+        .ilike("company_name", opts.vendorName.trim())
+        .limit(1)
+        .maybeSingle();
+      contractorId = asId((match as { id?: string } | null)?.id);
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const description = (opts.description || request.summary || "Chez-coordinated service").slice(0, 300);
+    const { error: insErr } = await service.from("service_records").insert({
+      household_id: request.household_id,
+      property_id: propertyId,
+      system_id: systemId,
+      contractor_id: contractorId,
+      service_date: today,
+      service_type: "Chez coordinated",
+      description,
+      cost: opts.costCents / 100,
+      notes: "Handled by Chez.",
+      chez_request_id: request.id,
+    });
+    if (insErr) console.warn("[writeback] service_record insert failed:", insErr.message);
+  } catch (e) {
+    console.warn("[writeback] exception (non-fatal):", e);
+  }
+}
+
 /// Phase 100 — upsert the structured outcome row for a case. Shared by
 /// transition_status (resolve path) and the standalone record_outcome
 /// action (post-hoc edits). Never throws: outcome capture must not
@@ -947,6 +1125,13 @@ async function upsertRequestOutcome(
       } catch (e) {
         console.warn("[outcome] activity log failed (non-fatal):", e);
       }
+      // Wave 6 — feed the resolved job back into the household record.
+      await writeBackServiceRecord(service, request, {
+        costCents: cost,
+        contractorId: outcome.winning_contractor_id ?? null,
+        vendorName: outcome.winning_vendor_name ?? null,
+        description: outcome.summary ?? null,
+      });
     }
     return { ok: true };
   } catch (e) {
@@ -1118,6 +1303,20 @@ async function handleUpdateProfile(
       ?.chez_profile ?? {};
     nextProfile = deepMergeProfile(current, incoming);
   }
+  // July 2026 security sweep (audit S8): spending tiers render into the
+  // operator portal DOM. They are dollar amounts — coerce to numbers at
+  // write time so a tampered client can never plant HTML/script that
+  // executes in the operator's session. Non-numeric values are dropped.
+  const tiers = nextProfile.spending_tiers as Record<string, unknown> | undefined;
+  if (tiers && typeof tiers === "object" && !Array.isArray(tiers)) {
+    const cleaned: Record<string, number> = {};
+    for (const [k, v] of Object.entries(tiers)) {
+      const n = typeof v === "number" ? v : Number(String(v).replace(/[^0-9.]/g, ""));
+      if (Number.isFinite(n)) cleaned[k] = n;
+    }
+    nextProfile.spending_tiers = cleaned;
+  }
+
   // Stamp completion timestamp on first non-empty fill.
   const completion = (nextProfile._completion as Record<string, unknown> | undefined) ?? {};
   if (!completion.filled_at && Object.keys(nextProfile).filter((k) => k !== "_completion").length > 0) {
@@ -1171,12 +1370,14 @@ interface DelegateRoutinePayload {
   routine_id: string;
   delegated: boolean;       // true to hand off, false to revoke
   notes?: string;           // optional one-line context for Chez
+  intake?: unknown;         // Wave 4 — budget/timing/access from the confirm sheet
 }
 
 interface DelegateContractorPayload {
   contractor_id: string;
   delegated: boolean;
   notes?: string;
+  intake?: unknown;
 }
 
 async function handleDelegateRoutine(
@@ -1218,6 +1419,7 @@ async function handleDelegateRoutine(
   // so it has a thread + push hook to Tom. Title says "Standing
   // engagement" so it visually distinguishes from one-shot requests.
   if (payload.delegated) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const summary = `Standing engagement: ${(routine as { label: string }).label}`;
     const slaDueAt = await businessHoursDue(service);
     const { data: req } = await service
@@ -1231,6 +1433,7 @@ async function handleDelegateRoutine(
           _kind: "standing_engagement_routine",
           routine_id: routineId,
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -1242,13 +1445,32 @@ async function handleDelegateRoutine(
       .single();
     if (req) {
       const r = req as { id: string };
+
+      // Wave 1 — server-assembled snapshot: full routine cadence,
+      // linked vendor + history, cost references. Best-effort.
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: "routine",
+          entityId: routineId,
+          householdId,
+        });
+        if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn("[snapshot] delegate_routine build failed:", e);
+      }
+
       // System message in the new thread.
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        content: `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
 
@@ -1277,12 +1499,12 @@ async function handleDelegateRoutine(
         sendAdminEmail(
           adminEmails(),
           `[Chez] New standing engagement: ${(routine as { label: string }).label}`,
-          `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          `Customer delegated this routine to Chez. From now on, schedule visits without prompting them.\n\n${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
           emailBody({
             preview: "Customer handed off a recurring routine to Chez.",
             heading: "New standing engagement",
             intro: `The customer wants Chez to own scheduling for "${(routine as { label: string }).label}" from now on.`,
-            bodyText: payload.notes ?? "(no additional notes)",
+            bodyText: `${payload.notes ?? "(no additional notes)"}${digest ? `\n\n${digest}` : ""}`,
             ctaLabel: "Open in admin portal",
             ctaUrl: adminPortalUrl(r.id),
           })
@@ -1329,6 +1551,7 @@ async function handleDelegateContractor(
   if (updateErr) return json({ error: updateErr.message }, 500);
 
   if (payload.delegated) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const c = contractor as { company_name: string; category: string | null };
     const summary = `Standing engagement: ${c.company_name}`;
     const slaDueAt = await businessHoursDue(service);
@@ -1344,6 +1567,7 @@ async function handleDelegateContractor(
           contractor_id: contractorId,
           contractor_category: c.category ?? "",
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -1355,12 +1579,31 @@ async function handleDelegateContractor(
       .single();
     if (req) {
       const r = req as { id: string };
+
+      // Wave 1 — server-assembled snapshot: vendor contact details,
+      // per-vendor service history + stats, cost references. Best-effort.
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: "contractor",
+          entityId: contractorId,
+          householdId,
+        });
+        if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn("[snapshot] delegate_contractor build failed:", e);
+      }
+
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `Customer set Chez as point of contact for ${c.company_name}. From now on, you handle scheduling and follow-ups directly with this vendor.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        content: `Customer set Chez as point of contact for ${c.company_name}. From now on, you handle scheduling and follow-ups directly with this vendor.${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
 
@@ -1387,12 +1630,12 @@ async function handleDelegateContractor(
         sendAdminEmail(
           adminEmails(),
           `[Chez] New standing engagement: ${c.company_name}`,
-          `Customer set Chez as point of contact for ${c.company_name}.\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          `Customer set Chez as point of contact for ${c.company_name}.\n\n${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
           emailBody({
             preview: `Customer made Chez point of contact for ${c.company_name}.`,
             heading: "New standing engagement",
             intro: `The customer wants Chez to be point of contact for ${c.company_name} from now on.`,
-            bodyText: payload.notes ?? "(no additional notes)",
+            bodyText: `${payload.notes ?? "(no additional notes)"}${digest ? `\n\n${digest}` : ""}`,
             ctaLabel: "Open in admin portal",
             ctaUrl: adminPortalUrl(r.id),
           })
@@ -1412,6 +1655,7 @@ interface DelegateTaskPayload {
   task_id: string;
   delegated: boolean;
   notes?: string;
+  intake?: unknown;         // Wave 4 — budget/timing/access from the confirm sheet
 }
 
 async function handleDelegateTask(
@@ -1490,6 +1734,7 @@ async function handleDelegateTask(
     vendorRow = vendor as typeof vendorRow;
   }
 
+  const intake = sanitizeHomeownerIntake(payload.intake);
   const category = hasVendor ? "coordinate_task" : "find_vendor";
   const summary = hasVendor
     ? `Schedule + manage: ${task.title}`
@@ -1513,6 +1758,7 @@ async function handleDelegateTask(
         next_due_date: task.next_due_date ?? "",
         frequency: task.frequency ?? "",
         notes: payload.notes ?? "",
+        ...intakeContextMirrors(intake),
       },
       status: "open",
       sla_due_at: slaDueAt,
@@ -1535,6 +1781,26 @@ async function handleDelegateTask(
     })
     .eq("id", taskId);
 
+  // Wave 1 — server-assembled snapshot: the linked system's full
+  // details (make/model/warranties), service history, vendor history,
+  // cost references. Best-effort; runs before the playbook fires so
+  // runAnalysisCore sees it.
+  let taskDigest = "";
+  try {
+    const snapshot = await buildDelegationSnapshot(service, {
+      kind: "task",
+      entityId: taskId,
+      householdId,
+    });
+    if (snapshot) {
+      if (intake) snapshot.homeowner_intake = intake;
+      await attachSnapshotToRequest(service, r.id, snapshot);
+      taskDigest = snapshotDigest(snapshot);
+    }
+  } catch (e) {
+    console.warn("[snapshot] delegate_task build failed:", e);
+  }
+
   // System message: explicit + actionable so Chez knows the routing.
   const description = task.description?.trim() ?? "";
   const customerNotes = payload.notes?.trim() ?? "";
@@ -1547,6 +1813,7 @@ async function handleDelegateTask(
   }
   if (description) systemBody += `\n\nWhat the task involves:\n${description}`;
   if (customerNotes) systemBody += `\n\nCustomer notes:\n${customerNotes}`;
+  if (taskDigest) systemBody += `\n\n${taskDigest}`;
 
   await service.from("concierge_messages").insert({
     household_id: householdId,
@@ -1594,7 +1861,7 @@ async function handleDelegateTask(
         intro: hasVendor
           ? `Customer delegated this task to Chez. Vendor on file: ${vendorRow?.company_name ?? "unknown"}.`
           : "Customer asked Chez to find a vendor for this task and own coordination end-to-end.",
-        bodyText: customerNotes || description || "(no additional notes)",
+        bodyText: `${customerNotes || description || "(no additional notes)"}${taskDigest ? `\n\n${taskDigest}` : ""}`,
         ctaLabel: "Open in admin portal",
         ctaUrl: adminPortalUrl(r.id),
       })
@@ -1612,7 +1879,7 @@ async function handleDelegateTask(
 interface ProposePayload {
   request_id: string;
   proposal: {
-    kind: "vendor" | "date_slot" | "cost" | "quote";
+    kind: "vendor" | "date_slot" | "cost" | "quote" | "info_request";
     [key: string]: unknown;
   };
   /// Optional textual preface that lands as the message body.
@@ -1642,8 +1909,14 @@ async function handlePropose(
   if (!requestId) return json({ error: "request_id required" }, 400);
   const proposal = payload.proposal;
   if (!proposal || !proposal.kind ||
-      !["vendor", "date_slot", "cost", "quote"].includes(proposal.kind as string)) {
+      !["vendor", "date_slot", "cost", "quote", "info_request"].includes(proposal.kind as string)) {
     return json({ error: "valid proposal.kind required" }, 400);
+  }
+  // Wave 6 — info_request needs a plain-text fallback in `content` so
+  // shipped clients that don't render the structured card still show
+  // the question.
+  if (proposal.kind === "info_request" && !compactString(payload.content ?? "")) {
+    return json({ error: "info_request requires content (plain-text question)" }, 400);
   }
   const { data: requestData, error: lookupErr } = await service
     .from("chez_requests")
@@ -1724,6 +1997,12 @@ async function handleDecideProposal(
     proposal: Record<string, unknown> | null;
   };
   if (!message.proposal) return json({ error: "not a proposal" }, 400);
+  // Wave 6 — info_request proposals are answered via answer_info_request,
+  // not the approve/decline/counter path. Guard so an old client's
+  // Approve tap can't mangle one.
+  if ((message.proposal as { kind?: string }).kind === "info_request") {
+    return json({ error: "use answer_info_request" }, 400);
+  }
   if ((message.proposal as { status?: string }).status !== "pending") {
     return json({ error: "already decided" }, 409);
   }
@@ -1876,6 +2155,21 @@ async function handleDecideProposal(
   if (decision === "approved") {
     const propBlob = (message.proposal as Record<string, unknown>) ?? {};
     const kind = String(propBlob.kind ?? "");
+    // Wave 5 — a cost proposal that carries an above-tier charge gets
+    // confirmed against the card on file when the homeowner approves.
+    // Best-effort: a charge failure doesn't unwind the approval (the
+    // failed charge row + admin visibility handle retry).
+    if (kind === "cost" && paymentsConfigured()) {
+      const chargeId = compactString(propBlob.charge_id);
+      if (chargeId) {
+        try {
+          const res = await confirmApprovedCharge(service, chargeId);
+          if (!res.ok) console.warn("[payments] approved-charge confirm failed:", res.error);
+        } catch (e) {
+          console.warn("[payments] approved-charge confirm exception:", e);
+        }
+      }
+    }
     if (kind === "vendor") {
       const vendorBlob = (propBlob.vendor as Record<string, unknown>) ?? {};
       const vendorName = String(vendorBlob.name ?? "").trim() || "(unnamed vendor)";
@@ -2122,6 +2416,9 @@ async function handleFetchDossier(
     vehiclesRes,
     routinesRes,
     pastRequestsRes,
+    documentsRes,
+    utilitiesRes,
+    projectsRes,
   ] = await Promise.all([
     safe(service.from("households").select("*").eq("id", householdId).maybeSingle(), "household"),
     safe(service.from("properties").select("*").eq("household_id", householdId), "properties"),
@@ -2146,6 +2443,27 @@ async function handleFetchDossier(
         .limit(20),
       "past_requests"
     ),
+    // Phase C/D — the operator's reference view gains documents,
+    // utilities, and projects so vendor calls never require a dig.
+    safe(
+      service.from("documents")
+        .select("id, title, filename, category, expiration_date, uploaded_at, created_at")
+        .eq("household_id", householdId)
+        .is("deleted_at", null)
+        .eq("visible_to_home_managers", true)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      "documents"
+    ),
+    safe(service.from("utility_accounts").select("*").eq("household_id", householdId), "utility_accounts"),
+    safe(
+      service.from("property_projects")
+        .select("id, name, status, entry_type, estimated_budget, created_at")
+        .eq("household_id", householdId)
+        .order("created_at", { ascending: false })
+        .limit(30),
+      "projects"
+    ),
   ]);
 
   return json({
@@ -2159,7 +2477,58 @@ async function handleFetchDossier(
     vehicles: (vehiclesRes as { data?: unknown[] })?.data ?? [],
     routines: (routinesRes as { data?: unknown[] })?.data ?? [],
     past_requests: (pastRequestsRes as { data?: unknown[] })?.data ?? [],
+    documents: (documentsRes as { data?: unknown[] })?.data ?? [],
+    utility_accounts: (utilitiesRes as { data?: unknown[] })?.data ?? [],
+    projects: (projectsRes as { data?: unknown[] })?.data ?? [],
   });
+}
+
+// ============================================================================
+// Wave 1 — Snapshot preview (composer v2's "What Chez already knows")
+// ============================================================================
+// Homeowner-callable dry run of the delegation snapshot. iOS renders the
+// returned snapshot as the pre-submit summary card, the readiness gaps as
+// amber inline hints, and the suggested budget as the pre-selected band.
+// Entity ownership is enforced inside the builder (SnapshotAuthError →
+// 403), so a caller can never preview another household's data.
+
+interface PreviewSnapshotPayload {
+  kind?: string;
+  entity_id?: string;
+  property_id?: string;
+  group?: string;
+  household_id?: string;   // admin-only pass-through (resolveHouseholdId)
+}
+
+async function handlePreviewSnapshot(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: PreviewSnapshotPayload
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const householdId = await resolveHouseholdId(service, user, payload.household_id);
+  if (!householdId) return json({ error: "no household" }, 404);
+
+  const kind = isSnapshotKind(payload.kind) ? payload.kind : "general";
+  try {
+    const snapshot = await buildDelegationSnapshot(service, {
+      kind,
+      entityId: compactString(payload.entity_id) || undefined,
+      householdId,
+      propertyId: compactString(payload.property_id) || undefined,
+      group: compactString(payload.group) || undefined,
+    });
+    if (!snapshot) return json({ error: "entity not found" }, 404);
+    return json({
+      snapshot,
+      readiness: snapshotReadiness(snapshot),
+      suggested_budget: suggestedBudgetFor(snapshot),
+    });
+  } catch (e) {
+    if (e instanceof SnapshotAuthError) return json({ error: "not authorized" }, 403);
+    console.error("[snapshot] preview failed:", e);
+    return json({ error: "snapshot failed" }, 500);
+  }
 }
 
 // ============================================================================
@@ -2445,6 +2814,23 @@ async function runAnalysisCore(
       }
     }
 
+    // Wave 1 — the server-assembled delegation snapshot (when present)
+    // gives the analysis model numbers, warranty state, service history,
+    // and cost references it previously never saw. Rendered as the same
+    // compact digest the operator reads.
+    let snapshotBlock = "";
+    try {
+      const snap = (requestRow as Record<string, unknown>).snapshot;
+      if (snap && typeof snap === "object") {
+        const digest = snapshotDigest(snap as DelegationSnapshot);
+        if (digest) {
+          snapshotBlock = `\n## Delegation snapshot (server-assembled household truth)\n${digest}\n`;
+        }
+      }
+    } catch (e) {
+      console.warn("[analyze] snapshot digest failed (non-fatal):", e);
+    }
+
     const modeTask =
       mode === "coordinate_task"
         ? "The homeowner already has this vendor or task on file: the job is COORDINATION, not sourcing. The call_script should open a call to the homeowner's OWN vendor (warm, references the relationship), not a cold call."
@@ -2469,7 +2855,7 @@ async function runAnalysisCore(
 Category: ${request.category}
 Summary: ${request.summary}
 Context payload: ${JSON.stringify(request.context ?? {}, null, 2)}
-
+${snapshotBlock}
 ## Property
 ${propertyContext}
 
@@ -2844,6 +3230,7 @@ async function handleUpdateVisit(
     household_id: string;
     state: string;
     vendor_name: string;
+    contractor_id?: string | null;
   };
 
   const update: Record<string, unknown> = {};
@@ -2937,6 +3324,18 @@ async function handleUpdateVisit(
             attachments: [],
           });
         }
+      }
+
+      // Wave 6 — a completed visit with a real cost feeds the household
+      // record too (idempotent on chez_request_id, so it never
+      // double-writes with the resolve-outcome path).
+      if (payload.state === "completed" && typeof update.final_cost_cents === "number" && update.final_cost_cents > 0) {
+        await writeBackServiceRecord(service, request, {
+          costCents: update.final_cost_cents as number,
+          contractorId: visit.contractor_id ?? null,
+          vendorName: visit.vendor_name ?? null,
+          description: `Visit with ${visit.vendor_name}`,
+        });
       }
     }
   }
@@ -3129,6 +3528,7 @@ interface DelegateEntityPayload {
   notes?: string;
   property_id?: string;                       // required for "insurance" since insurance lives on properties
   household_id?: string;                      // admin-only — workbench operators pass this explicitly since they aren't tied to any household. task / routine / contractor have their own delegate_* actions.
+  intake?: unknown;                           // Wave 4 — budget/timing/access from the confirm sheet
 }
 
 const ENTITY_TABLES: Record<string, { table: string; idCol: string; labelCol?: string; categoryCol?: string }> = {
@@ -3246,6 +3646,7 @@ async function handleDelegateEntity(
   // Create a parent chez_request only when delegating ON. Revoking
   // doesn't spawn a thread — it just flips the flag.
   if (payload.delegated) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const summary = `Standing engagement: ${labelForThread}`;
     const slaDueAt = await businessHoursDue(service);
     const { data: req } = await service
@@ -3259,8 +3660,11 @@ async function handleDelegateEntity(
           _kind: `standing_engagement_${entityType}`,
           entity_type: entityType,
           entity_id: entityId,
-          property_id: payload.property_id ?? null,
+          // Empty string, not JSON null — iOS decodes context as
+          // [String: String] and one non-string value fails the whole dict.
+          property_id: payload.property_id ?? "",
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -3273,12 +3677,35 @@ async function handleDelegateEntity(
     if (req) {
       const r = req as { id: string };
       const instruction = ENTITY_INSTRUCTION[entityType] ?? "Customer delegated this entity to Chez.";
+
+      // Wave 1 — server-assembled snapshot. Before this, delegate_entity
+      // sent an EMPTY context and the operator had to dig for everything.
+      // The entity_type maps 1:1 onto a snapshot kind; insurance gets the
+      // common household + property sections only (the policy lives as a
+      // JSONB key, not a row).
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: entityType as SnapshotKind,
+          entityId: entityType === "insurance" ? undefined : entityId,
+          householdId,
+          propertyId: compactString(payload.property_id || "") || undefined,
+        });
+        if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn(`[snapshot] delegate_entity (${entityType}) build failed:`, e);
+      }
+
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `${instruction}${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}`,
+        content: `${instruction}${payload.notes ? `\n\nNotes from customer:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
 
@@ -3310,12 +3737,12 @@ async function handleDelegateEntity(
         sendAdminEmail(
           adminEmails(),
           `[Chez] New standing engagement: ${labelForThread}`,
-          `${instruction}\n\n${payload.notes ?? ""}\n\n${adminPortalUrl(r.id)}`,
+          `${instruction}\n\n${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
           emailBody({
             preview: `Customer handed off a ${ENTITY_FRIENDLY_LABEL[entityType] ?? "entity"} to Chez.`,
             heading: "New standing engagement",
             intro: `The customer wants Chez to own management of "${labelForThread}" from now on.`,
-            bodyText: payload.notes ?? "(no additional notes)",
+            bodyText: `${payload.notes ?? "(no additional notes)"}${digest ? `\n\n${digest}` : ""}`,
             ctaLabel: "Open in admin portal",
             ctaUrl: adminPortalUrl(r.id),
           })
@@ -3595,6 +4022,7 @@ interface SetOwnershipGroupPayload {
   group: string;        // one of the keys above OR "all_insurance"
   on: boolean;
   notes?: string;
+  intake?: unknown;     // Wave 4 — one budget/timing confirmation for the whole category
 }
 
 async function handleSetOwnershipGroup(
@@ -3672,6 +4100,7 @@ async function handleSetOwnershipGroup(
 
   // 3. Single summary chez_request — not one per entity.
   if (payload.on) {
+    const intake = sanitizeHomeownerIntake(payload.intake);
     const friendly: Record<string, string> = {
       all_routines: "all routines",
       all_systems: "all home systems",
@@ -3694,8 +4123,11 @@ async function handleSetOwnershipGroup(
         context: {
           _kind: "standing_engagement_group",
           group,
-          backfill_count: backfillCount,
+          // Stringified — iOS decodes context as [String: String] and a
+          // single non-string value fails the whole dict.
+          backfill_count: String(backfillCount),
           notes: payload.notes ?? "",
+          ...intakeContextMirrors(intake),
         },
         status: "open",
         sla_due_at: slaDueAt,
@@ -3707,12 +4139,32 @@ async function handleSetOwnershipGroup(
       .single();
     if (req) {
       const r = req as { id: string };
+
+      // Wave 1 — grouped snapshot: enumerates every entity in the
+      // category (labels, cadences, vendors, est monthly spend) so the
+      // operator sees exactly what was handed off, not just a count.
+      let digest = "";
+      try {
+        const snapshot = await buildDelegationSnapshot(service, {
+          kind: "group",
+          householdId,
+          group,
+        });
+        if (snapshot) {
+          if (intake) snapshot.homeowner_intake = intake;
+          await attachSnapshotToRequest(service, r.id, snapshot);
+          digest = snapshotDigest(snapshot);
+        }
+      } catch (e) {
+        console.warn("[snapshot] set_ownership_group build failed:", e);
+      }
+
       await service.from("concierge_messages").insert({
         household_id: householdId,
         user_id: user.id,
         request_id: r.id,
         role: "system",
-        content: `Customer asked Chez to take over ${friendly[group] ?? group} (${backfillCount} item${backfillCount === 1 ? "" : "s"} now owned). New entries in this category will auto-delegate going forward.${payload.notes ? `\n\nNotes:\n${payload.notes}` : ""}`,
+        content: `Customer asked Chez to take over ${friendly[group] ?? group} (${backfillCount} item${backfillCount === 1 ? "" : "s"} now owned). New entries in this category will auto-delegate going forward.${payload.notes ? `\n\nNotes:\n${payload.notes}` : ""}${digest ? `\n\n${digest}` : ""}`,
         attachments: [],
       });
       await sendPush(
@@ -3726,12 +4178,12 @@ async function handleSetOwnershipGroup(
       await sendAdminEmail(
         adminEmails(),
         `[Chez] New group delegation: ${friendly[group] ?? group}`,
-        `Customer flipped on ${friendly[group] ?? group}. ${backfillCount} existing items now owned by Chez.\n\n${adminPortalUrl(r.id)}`,
+        `Customer flipped on ${friendly[group] ?? group}. ${backfillCount} existing items now owned by Chez.${digest ? `\n\n${digest}` : ""}\n\n${adminPortalUrl(r.id)}`,
         emailBody({
           preview: `${backfillCount} ${friendly[group] ?? group} now Chez-owned.`,
           heading: "New group delegation",
           intro: `The customer wants Chez to own ${friendly[group] ?? group} from now on.`,
-          bodyText: `${backfillCount} existing items stamped owned. ${payload.notes ?? ""}`,
+          bodyText: `${backfillCount} existing items stamped owned. ${payload.notes ?? ""}${digest ? `\n\n${digest}` : ""}`,
           ctaLabel: "Open in admin portal",
           ctaUrl: adminPortalUrl(r.id),
         })
@@ -5034,7 +5486,14 @@ async function handleFetchTodayBrief(
   user: { id: string; email?: string | null } | null
 ) {
   if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  return json(await buildTodayBrief(service));
+}
 
+// Wave 3 Phase A — the brief internals live in a shared builder so the
+// legacy admin cockpit (fetch_today_brief) and the service portal boot
+// (fetch_service_boot → boot.today) render the exact same payload and
+// can never drift.
+async function buildTodayBrief(service: ServiceClient): Promise<Record<string, unknown>> {
   const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
     try { return await p; } catch (e) { console.warn(`[today_brief] ${label} failed:`, e); return null; }
   };
@@ -5224,7 +5683,7 @@ async function handleFetchTodayBrief(
   const slaDueSoon = urgentCases.filter((u) => u.severity === "due_soon").length;
   const homesUnderManagement = new Set([...requests.map((r) => r.household_id), ...visits.map((v) => v.household_id)]).size;
 
-  return json({
+  return {
     urgent_cases: urgentCases,
     todays_visits: todaysVisits,
     upcoming_visits: upcomingVisits,
@@ -5238,6 +5697,297 @@ async function handleFetchTodayBrief(
       homes_under_management: homesUnderManagement,
     },
     fetched_at: now.toISOString(),
+  };
+}
+
+// ============================================================================
+// Wave 3 Phase A — Service portal v2 (service.getchez.com)
+// ============================================================================
+// Two single-round-trip reads powering the rebuilt operator portal:
+//
+//   fetch_service_boot — everything the portal shell needs at login:
+//     the Today brief (shared builder, identical payload to
+//     fetch_today_brief), the case queue (non-resolved plus resolved in
+//     the last 48h) with server-derived snapshot chips, tag definitions,
+//     and the operator's snippets.
+//
+//   fetch_case_bundle — everything the case workspace needs on open:
+//     the full request row, the thread, vendor calls, visits, related
+//     cases, open reminders, and a slim dossier (household + first
+//     property + family + the specific entities the snapshot references).
+//
+// Both are admin-only and use the same safe() posture as
+// handleFetchDossier — one surprise query never kills the boot.
+
+/// Display strings for the homeowner-intake budget bands (Wave 4 composer
+/// chips: under $250 / $250 to $750 / $750 to $2,000 / $2,000+ / show me
+/// options). Unknown raw values pass through as-is so a future band
+/// addition degrades to showing the raw token instead of hiding the chip.
+const SERVICE_BUDGET_BAND_DISPLAY: Record<string, string> = {
+  under_250: "Under $250",
+  "250_750": "$250 to $750",
+  "750_2000": "$750 to $2,000",
+  "2000_plus": "$2,000 plus",
+  // Same label the iOS chips and the digest use — one string everywhere.
+  options_first: "Show me options first",
+  open: "Show me options first",
+  options: "Show me options first",
+  show_options: "Show me options first",
+  show_me_options: "Show me options first",
+};
+
+/// Display strings for homeowner-intake urgency (Wave 4 timing chips:
+/// ASAP / this week / two weeks / flexible).
+const SERVICE_URGENCY_DISPLAY: Record<string, string> = {
+  asap: "ASAP",
+  this_week: "This week",
+  two_weeks: "Within 2 weeks",
+  within_2_weeks: "Within 2 weeks",
+  flexible: "Flexible",
+};
+
+/// Queue chips derived server-side so the portal renders budget/timing/
+/// readiness without shipping every row's full snapshot blob down the
+/// wire. snapshot.homeowner_intake is null until Wave 4 lands — the
+/// context fallback covers rows where iOS mirrored display-safe
+/// budget/timing strings into context, and everything else nulls out.
+function deriveServiceQueueChips(
+  snapshot: Record<string, unknown> | null,
+  context: Record<string, unknown>
+): { budget: string | null; timing: string | null; has_snapshot: boolean; kind: string | null } {
+  const intake =
+    snapshot && typeof snapshot.homeowner_intake === "object" && snapshot.homeowner_intake !== null
+      ? (snapshot.homeowner_intake as Record<string, unknown>)
+      : null;
+
+  const displayFor = (raw: unknown, table: Record<string, string>): string | null => {
+    if (typeof raw !== "string") return null;
+    const t = raw.trim();
+    if (!t) return null;
+    return table[t.toLowerCase()] ?? t;
+  };
+  const ctxString = (key: string): string | null => {
+    const v = context[key];
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    return t.length > 0 ? t : null;
+  };
+
+  return {
+    budget: displayFor(intake?.budget_band, SERVICE_BUDGET_BAND_DISPLAY) ?? ctxString("budget"),
+    timing: displayFor(intake?.urgency, SERVICE_URGENCY_DISPLAY) ?? ctxString("timing"),
+    has_snapshot: !!snapshot,
+    kind: ctxString("_kind"),
+  };
+}
+
+async function handleFetchServiceBoot(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[service_boot] ${label} failed:`, e); return null; }
+  };
+
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+  const [todayRes, queueRes, tagsRes, snippetsRes] = await Promise.all([
+    safe(buildTodayBrief(service), "today"),
+    // Case queue: everything not resolved, plus anything resolved in the
+    // last 48h (so a just-closed case doesn't vanish mid-shift). Unread
+    // homeowner replies float to the top, then soonest SLA.
+    safe(
+      service.from("chez_requests")
+        .select("id, household_id, category, summary, status, sla_due_at, last_message_at, created_at, unread_for_admin, pending_proposal_count, admin_initiated, assigned_to_user_id, resolved_at, snapshot, context")
+        .or(`status.neq.resolved,resolved_at.gte.${fortyEightHoursAgo}`)
+        .order("unread_for_admin", { ascending: false, nullsFirst: false })
+        .order("sla_due_at", { ascending: true })
+        .limit(100),
+      "queue"
+    ),
+    // Same rows list_tag_definitions returns.
+    safe(
+      service.from("chez_tag_definitions")
+        .select("*")
+        .is("archived_at", null)
+        .order("label", { ascending: true }),
+      "tag_definitions"
+    ),
+    // Same rows list_snippets returns (personal + org-shared + seed).
+    safe(
+      service.from("chez_snippets")
+        .select("*")
+        .or(`owner_user_id.eq.${user.id},shared_with_org.eq.true,owner_user_id.is.null`)
+        .order("use_count", { ascending: false })
+        .order("label", { ascending: true }),
+      "snippets"
+    ),
+  ]);
+
+  type ServiceQueueRow = {
+    id: string;
+    household_id: string;
+    category: string | null;
+    summary: string | null;
+    status: string | null;
+    sla_due_at: string | null;
+    last_message_at: string | null;
+    created_at: string | null;
+    unread_for_admin: boolean | null;
+    pending_proposal_count: number | null;
+    admin_initiated: boolean | null;
+    assigned_to_user_id: string | null;
+    resolved_at: string | null;
+    snapshot: Record<string, unknown> | null;
+    context: Record<string, unknown> | null;
+  };
+  const queueRows = (((queueRes as { data?: ServiceQueueRow[] } | null)?.data) ?? []) as ServiceQueueRow[];
+
+  // household_name resolved via ONE households query over the distinct ids.
+  const householdIds = [...new Set(queueRows.map((r) => r.household_id).filter(Boolean))];
+  const householdName = new Map<string, string>();
+  if (householdIds.length > 0) {
+    const hhRes = await safe(
+      service.from("households").select("id, name").in("id", householdIds),
+      "queue households"
+    );
+    for (const h of (((hhRes as { data?: Array<{ id: string; name: string | null }> } | null)?.data) ?? [])) {
+      if (h.name) householdName.set(h.id, h.name);
+    }
+  }
+
+  const queue = queueRows.map((r) => ({
+    id: r.id,
+    summary: r.summary,
+    category: r.category,
+    status: r.status,
+    sla_due_at: r.sla_due_at,
+    last_message_at: r.last_message_at,
+    created_at: r.created_at,
+    unread_for_admin: r.unread_for_admin === true,
+    pending_proposal_count: r.pending_proposal_count ?? 0,
+    household_id: r.household_id,
+    household_name: householdName.get(r.household_id) ?? null,
+    admin_initiated: r.admin_initiated === true,
+    assigned_to_user_id: r.assigned_to_user_id ?? null,
+    chips: deriveServiceQueueChips(
+      (r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null) as Record<string, unknown> | null,
+      (r.context && typeof r.context === "object" ? r.context : {}) as Record<string, unknown>
+    ),
+  }));
+
+  return json({
+    today: (todayRes as Record<string, unknown> | null) ?? null,
+    queue,
+    tag_definitions: ((tagsRes as { data?: unknown[] } | null)?.data) ?? [],
+    snippets: ((snippetsRes as { data?: unknown[] } | null)?.data) ?? [],
+  });
+}
+
+interface FetchCaseBundlePayload {
+  request_id?: string;
+}
+
+async function handleFetchCaseBundle(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: FetchCaseBundlePayload
+) {
+  if (!user || !isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+
+  const safe = async <T,>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[case_bundle] ${label} failed:`, e); return null; }
+  };
+
+  // The request row is the one required read — everything else degrades
+  // to null/[] via safe() so a surprise never kills the case open.
+  const { data: requestRow, error: reqErr } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (reqErr || !requestRow) return json({ error: "request not found" }, 404);
+
+  const request = requestRow as {
+    id: string;
+    household_id: string;
+    related_case_ids?: string[] | null;
+    snapshot?: Record<string, unknown> | null;
+    context?: Record<string, unknown> | null;
+  };
+  const householdId = String(request.household_id);
+  const snapshot = (request.snapshot && typeof request.snapshot === "object" ? request.snapshot : null) as Record<string, unknown> | null;
+  const context = (request.context && typeof request.context === "object" ? request.context : {}) as Record<string, unknown>;
+
+  const isUuid = (v: unknown): v is string =>
+    typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.trim());
+
+  // Referenced entity ids: snapshot sections win (they carry the id the
+  // snapshot was built from); context keys are the fallback for legacy
+  // rows that predate Wave 1 snapshots and only have string context.
+  const sectionId = (section: unknown): string | null => {
+    if (!section || typeof section !== "object") return null;
+    const id = (section as Record<string, unknown>).id;
+    return isUuid(id) ? id.trim() : null;
+  };
+  const contextId = (key: string): string | null => {
+    const v = context[key];
+    return isUuid(v) ? v.trim() : null;
+  };
+  const systemId = sectionId(snapshot?.system) ?? contextId("system_id");
+  const routineId = sectionId(snapshot?.routine) ?? contextId("routine_id");
+  const contractorId = sectionId(snapshot?.vendor) ?? contextId("contractor_id");
+  const taskId = sectionId(snapshot?.task) ?? contextId("task_id");
+
+  const relatedIds = (Array.isArray(request.related_case_ids) ? request.related_case_ids : []).filter(isUuid);
+
+  const none = Promise.resolve(null);
+  const [
+    messagesRes, vendorCallsRes, visitsRes, relatedRes, remindersRes,
+    householdRes, propertyRes, familyRes,
+    systemRes, routineRes, contractorRes, taskRes,
+  ] = await Promise.all([
+    // Newest 300, then reversed to ascending below — a capped ascending
+    // query would keep the OLDEST rows and silently drop the homeowner's
+    // latest reply on long-lived standing-engagement threads.
+    safe(service.from("concierge_messages").select("*").eq("request_id", requestId).order("created_at", { ascending: false }).limit(300), "messages"),
+    safe(service.from("chez_vendor_calls").select("*").eq("request_id", requestId).order("created_at", { ascending: true }), "vendor_calls"),
+    safe(service.from("chez_visits").select("*").eq("request_id", requestId).order("created_at", { ascending: true }), "visits"),
+    relatedIds.length > 0
+      ? safe(service.from("chez_requests").select("id, summary, status").in("id", relatedIds), "related_cases")
+      : none,
+    safe(service.from("chez_reminders").select("*").eq("request_id", requestId).is("completed_at", null).order("due_at", { ascending: true }), "reminders"),
+    safe(service.from("households").select("id, name, chez_profile").eq("id", householdId).maybeSingle(), "household"),
+    safe(service.from("properties").select("*").eq("household_id", householdId).order("created_at", { ascending: true }).limit(1), "property"),
+    safe(service.from("family_members").select("id, first_name, last_name, member_type").eq("household_id", householdId), "family_members"),
+    systemId ? safe(service.from("home_systems").select("*").eq("id", systemId).eq("household_id", householdId).maybeSingle(), "referenced system") : none,
+    routineId ? safe(service.from("routines").select("*").eq("id", routineId).eq("household_id", householdId).maybeSingle(), "referenced routine") : none,
+    contractorId ? safe(service.from("contractors").select("*").eq("id", contractorId).eq("household_id", householdId).maybeSingle(), "referenced contractor") : none,
+    taskId ? safe(service.from("maintenance_tasks").select("*").eq("id", taskId).eq("household_id", householdId).maybeSingle(), "referenced task") : none,
+  ]);
+
+  return json({
+    request: requestRow,
+    messages: (((messagesRes as { data?: unknown[] } | null)?.data) ?? []).slice().reverse(),
+    vendor_calls: ((vendorCallsRes as { data?: unknown[] } | null)?.data) ?? [],
+    visits: ((visitsRes as { data?: unknown[] } | null)?.data) ?? [],
+    related_cases: ((relatedRes as { data?: unknown[] } | null)?.data) ?? [],
+    reminders: ((remindersRes as { data?: unknown[] } | null)?.data) ?? [],
+    dossier_lite: {
+      household: ((householdRes as { data?: unknown } | null)?.data) ?? null,
+      property: (((propertyRes as { data?: unknown[] } | null)?.data) ?? [])[0] ?? null,
+      family_members: ((familyRes as { data?: unknown[] } | null)?.data) ?? [],
+      referenced: {
+        system: ((systemRes as { data?: unknown } | null)?.data) ?? null,
+        routine: ((routineRes as { data?: unknown } | null)?.data) ?? null,
+        contractor: ((contractorRes as { data?: unknown } | null)?.data) ?? null,
+        task: ((taskRes as { data?: unknown } | null)?.data) ?? null,
+      },
+    },
   });
 }
 
@@ -6365,6 +7115,13 @@ async function handleAssignHandymanToAssessment(
 
 interface SaveVendorCallsPayload {
   request_id: string;
+  /// Wave 3 Phase B — server-side drafts. true = the operator is still
+  /// typing (portal saves per-row on blur): the row lands with
+  /// is_draft=true, no call-history stamping, and the aggregate views
+  /// ignore it. A row with an outcome always finalizes regardless.
+  /// Legacy callers omit this and keep the original finalize-on-save
+  /// behavior.
+  draft?: boolean;
   calls: Array<{
     candidate_key: string;
     source?: "existing" | "places" | "manual";
@@ -6430,12 +7187,17 @@ async function handleSaveVendorCalls(
   const householdId = (requestRow as { household_id: string }).household_id;
 
   const nowIso = new Date().toISOString();
+  const draftMode = payload.draft === true;
   const rows = payload.calls
     .filter((c) => compactString(c.candidate_key))
     .slice(0, 40)
     .map((c) => {
       const hasOutcome = !!compactString(c.outcome ?? undefined);
       return {
+        // An outcome always finalizes the row, even inside a draft batch —
+        // matches the aggregate views' (NOT is_draft OR outcome IS NOT NULL).
+        is_draft: draftMode && !hasOutcome,
+        draft_updated_at: draftMode && !hasOutcome ? nowIso : null,
         request_id: requestId,
         household_id: householdId,
         candidate_key: String(c.candidate_key).slice(0, 300),
@@ -6470,6 +7232,7 @@ async function handleSaveVendorCalls(
 
   // first_called_at: stamp once for rows that now have an outcome but no
   // first_called_at yet. Separate cheap update keeps the upsert simple.
+  // Runs in draft mode too — an outcome-bearing row finalizes either way.
   try {
     await service
       .from("chez_vendor_calls")
@@ -6481,7 +7244,7 @@ async function handleSaveVendorCalls(
     console.warn("[vendor-calls] first_called_at stamp failed:", e);
   }
 
-  return json({ ok: true, saved: rows.length });
+  return json({ ok: true, saved: rows.length, draft: draftMode });
 }
 
 async function handleFetchVendorCalls(
@@ -6547,6 +7310,294 @@ async function handleFetchVendorRegistry(
   const { data, error } = await query;
   if (error) return json({ error: error.message }, 500);
   return json({ vendors: data ?? [] });
+}
+
+// ============================================================================
+// Wave 6 — structured info requests (homeowner answers Chez's questions)
+// ============================================================================
+
+async function handleAnswerInfoRequest(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { message_id?: string; answers?: Record<string, unknown>; attachments?: AttachmentMeta[] },
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const messageId = compactString(payload.message_id);
+  if (!messageId) return json({ error: "message_id required" }, 400);
+
+  const { data: messageRow, error: lookupErr } = await service
+    .from("concierge_messages")
+    .select("*")
+    .eq("id", messageId)
+    .maybeSingle();
+  if (lookupErr || !messageRow) return json({ error: "message not found" }, 404);
+  const message = messageRow as {
+    id: string; request_id: string; household_id: string;
+    proposal: Record<string, unknown> | null;
+  };
+  if (!message.proposal || (message.proposal as { kind?: string }).kind !== "info_request") {
+    return json({ error: "not an info request" }, 400);
+  }
+  const proposalStatus = (message.proposal as { status?: string }).status;
+  if (proposalStatus && proposalStatus !== "pending") {
+    return json({ error: "already answered" }, 409);
+  }
+
+  const { data: req } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", message.request_id)
+    .maybeSingle();
+  if (!req) return json({ error: "request not found" }, 404);
+  const request = req as ConciergeRequestRow;
+  if (user.id !== request.user_id) return json({ error: "not authorized" }, 403);
+
+  // Sanitize answers into a flat string map (cap 20 keys, 2KB total).
+  const rawAnswers = (payload.answers && typeof payload.answers === "object") ? payload.answers : {};
+  const answers: Record<string, string> = {};
+  let budget = 0;
+  for (const [k, v] of Object.entries(rawAnswers)) {
+    if (Object.keys(answers).length >= 20) break;
+    const key = String(k).slice(0, 100);
+    const val = typeof v === "string" ? v.slice(0, 500) : String(v ?? "").slice(0, 500);
+    if (budget + key.length + val.length > 2048) break;
+    answers[key] = val;
+    budget += key.length + val.length;
+  }
+  const attachments = Array.isArray(payload.attachments) ? payload.attachments.slice(0, 8) : [];
+  const now = new Date().toISOString();
+
+  // Write the reply onto the proposal + flip status.
+  const updatedProposal = {
+    ...(message.proposal as Record<string, unknown>),
+    status: "answered",
+    reply: { answers, attachments, answered_at: now },
+  };
+  await service.from("concierge_messages").update({ proposal: updatedProposal }).eq("id", messageId);
+
+  // A readable user-role summary message so the thread narrates itself.
+  const fields = Array.isArray((message.proposal as { fields?: unknown }).fields)
+    ? ((message.proposal as { fields: Array<Record<string, unknown>> }).fields)
+    : [];
+  const labelFor = (id: string): string => {
+    const f = fields.find((x) => String(x.id) === id);
+    return f && typeof f.label === "string" && f.label.trim() ? String(f.label) : id;
+  };
+  const lines = Object.entries(answers)
+    .map(([id, val]) => `${labelFor(id)}: ${val || "(skipped)"}`)
+    .join("\n");
+  await service.from("concierge_messages").insert({
+    household_id: request.household_id,
+    user_id: request.user_id,
+    request_id: request.id,
+    role: "user",
+    content: `Answered Chez's questions:\n${lines}`,
+    attachments,
+  });
+
+  // Reopen for the operator + decrement the pending counter.
+  await service
+    .from("chez_requests")
+    .update({
+      status: request.status === "waiting_customer" ? "open" : request.status,
+      last_message_at: now,
+      unread_for_admin: true,
+      pending_proposal_count: Math.max(0, (request.pending_proposal_count ?? 0) - 1),
+    })
+    .eq("id", request.id);
+
+  await sendPush(
+    serviceUrl,
+    serviceRoleKey,
+    adminUserIds(),
+    "Homeowner answered your questions",
+    request.summary ?? "A homeowner replied with details.",
+    { type: "chez_admin_request", request_id: request.id }
+  );
+
+  return json({ ok: true });
+}
+
+// ============================================================================
+// Wave 6 — homeowner progress timeline (counts only, no vendor names)
+// ============================================================================
+
+async function handleFetchRequestProgress(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string }
+) {
+  if (!user) return json({ error: "auth required" }, 401);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+
+  const { data: req } = await service
+    .from("chez_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (!req) return json({ error: "request not found" }, 404);
+  const request = req as ConciergeRequestRow & {
+    analysis_cache_at?: string | null; resolved_at?: string | null;
+  };
+  if (user.id !== request.user_id) return json({ error: "not authorized" }, 403);
+
+  const safe = async <T>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[progress] ${label}:`, e); return null; }
+  };
+  const [callsRes, proposalsRes, visitsRes] = await Promise.all([
+    safe(service.from("chez_vendor_calls").select("outcome, quoted_cost_cents, last_called_at").eq("request_id", requestId), "calls"),
+    safe(service.from("concierge_messages").select("proposal, proposal_kind, created_at").eq("request_id", requestId).not("proposal", "is", null).order("created_at", { ascending: true }), "proposals"),
+    safe(service.from("chez_visits").select("scheduled_for, state, completed_at, final_cost_cents").eq("request_id", requestId).order("created_at", { ascending: true }), "visits"),
+  ]);
+
+  const calls = (((callsRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? []);
+  const called = calls.filter((c) => c.outcome !== null && c.outcome !== undefined).length;
+  const quotes = calls.filter((c) => c.quoted_cost_cents !== null && c.quoted_cost_cents !== undefined).length;
+  const lastCalledAt = calls
+    .map((c) => (typeof c.last_called_at === "string" ? c.last_called_at : null))
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
+
+  const money = (cents: unknown): string | null => {
+    const n = Number(cents);
+    return Number.isFinite(n) && n > 0 ? `$${Math.round(n / 100).toLocaleString("en-US")}` : null;
+  };
+  const dateShort = (iso: unknown): string => {
+    const s = typeof iso === "string" ? iso : "";
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const steps: Array<{ kind: string; label: string; at: string | null }> = [];
+  steps.push({ kind: "submitted", label: "You handed this to Chez", at: request.created_at });
+  if (request.analysis_cache_at) {
+    steps.push({ kind: "research", label: "Chez lined up candidates", at: request.analysis_cache_at });
+  }
+  if (called > 0) {
+    const label = quotes > 0
+      ? `Chez called ${called} vendor${called === 1 ? "" : "s"} · ${quotes} quote${quotes === 1 ? "" : "s"} in`
+      : `Chez called ${called} vendor${called === 1 ? "" : "s"}`;
+    steps.push({ kind: "outreach", label, at: lastCalledAt });
+  }
+
+  const PROPOSAL_LABELS: Record<string, string> = {
+    vendor: "Recommendation sent", date_slot: "Dates proposed",
+    cost: "Cost approval requested", info_request: "Chez asked you a question",
+    quote: "Quote shared",
+  };
+  const STATUS_SUFFIX: Record<string, string> = {
+    approved: "approved", declined: "declined", countered: "countered", answered: "answered",
+  };
+  for (const m of (((proposalsRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? [])) {
+    const p = (m.proposal && typeof m.proposal === "object") ? m.proposal as Record<string, unknown> : {};
+    const kind = String(p.kind ?? m.proposal_kind ?? "");
+    let label = PROPOSAL_LABELS[kind] ?? "Update sent";
+    const status = String(p.status ?? "");
+    if (STATUS_SUFFIX[status]) label += ` · ${STATUS_SUFFIX[status]}`;
+    steps.push({ kind: "proposal", label, at: (typeof m.created_at === "string" ? m.created_at : null) });
+  }
+
+  for (const v of (((visitsRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? [])) {
+    if (v.state === "completed") {
+      const cost = money(v.final_cost_cents);
+      steps.push({ kind: "visit_completed", label: cost ? `Visit completed · ${cost}` : "Visit completed", at: (typeof v.completed_at === "string" ? v.completed_at : null) });
+    } else if (v.scheduled_for) {
+      const when = dateShort(v.scheduled_for);
+      steps.push({ kind: "visit_scheduled", label: when ? `Visit booked for ${when}` : "Visit booked", at: (typeof v.scheduled_for === "string" ? v.scheduled_for : null) });
+    }
+  }
+
+  if (request.resolved_at) {
+    steps.push({ kind: "resolved", label: "Wrapped up", at: request.resolved_at });
+  }
+
+  steps.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+  const capped = steps.slice(0, 30);
+  const lastMeaningful = [...capped].reverse().find((s) => s.kind !== "submitted");
+  const headline = lastMeaningful?.label ?? "Chez is on it";
+
+  return json({ steps: capped, headline, called, quotes });
+}
+
+// ============================================================================
+// Wave 3 Phase C — operator-captured homeowner availability
+// ============================================================================
+
+async function handleSaveCaseAvailability(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { request_id?: string; windows?: unknown }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const requestId = compactString(payload.request_id);
+  if (!requestId) return json({ error: "request_id required" }, 400);
+  const windows = payload.windows ?? null;
+  if (windows !== null && JSON.stringify(windows).length > 8192) {
+    return json({ error: "windows too large" }, 400);
+  }
+  const { data, error } = await service
+    .from("chez_requests")
+    .update({ availability_windows: windows })
+    .eq("id", requestId)
+    .select("availability_windows")
+    .maybeSingle();
+  if (error) return json({ error: error.message }, 500);
+  return json({ ok: true, availability_windows: (data as { availability_windows?: unknown } | null)?.availability_windows ?? null });
+}
+
+// ============================================================================
+// Wave 3 Phase D — vendor registry drilldown
+// ============================================================================
+
+async function handleFetchVendorDetail(
+  service: ServiceClient,
+  user: { id: string; email?: string | null } | null,
+  payload: { vendor_key?: string }
+) {
+  if (!isAdminUser(user)) return json({ error: "admin only" }, 403);
+  const vendorKey = compactString(payload.vendor_key);
+  if (!vendorKey) return json({ error: "vendor_key required" }, 400);
+
+  const safe = async <T>(p: PromiseLike<T>, label: string): Promise<T | null> => {
+    try { return await p; } catch (e) { console.warn(`[vendor-detail] ${label}:`, e); return null; }
+  };
+
+  // Identity spine → the underlying (source, source_id) pairs for this key.
+  const identRes = await safe(
+    service.from("chez_vendor_identities").select("source, source_id, name, phone").eq("vendor_key", vendorKey),
+    "identities"
+  );
+  const idents = (((identRes as { data?: Array<Record<string, unknown>> } | null)?.data) ?? []);
+  const callIds = idents.filter((i) => i.source === "call").map((i) => String(i.source_id));
+  const outreachIds = idents.filter((i) => i.source === "outreach").map((i) => String(i.source_id));
+  // A display name + phone to match visits (which key by name/phone).
+  const anyName = idents.map((i) => (typeof i.name === "string" ? i.name : null)).filter(Boolean)[0] ?? null;
+  const anyPhone = idents.map((i) => (typeof i.phone === "string" ? i.phone : null)).filter(Boolean)[0] ?? null;
+
+  const [registryRes, callsRes, outreachRes, visitsRes] = await Promise.all([
+    safe(service.from("chez_vendor_registry").select("*").eq("vendor_key", vendorKey).maybeSingle(), "registry"),
+    callIds.length > 0
+      ? safe(service.from("chez_vendor_calls").select("*").in("id", callIds).order("created_at", { ascending: false }).limit(50), "calls")
+      : Promise.resolve(null),
+    outreachIds.length > 0
+      ? safe(service.from("chez_vendor_outreach").select("*").in("id", outreachIds).order("created_at", { ascending: false }).limit(50), "outreach")
+      : Promise.resolve(null),
+    anyName
+      ? safe(service.from("chez_visits").select("*").ilike("vendor_name", anyName).order("created_at", { ascending: false }).limit(50), "visits")
+      : Promise.resolve(null),
+  ]);
+
+  return json({
+    registry: (registryRes as { data?: unknown } | null)?.data ?? null,
+    calls: ((callsRes as { data?: unknown[] } | null)?.data) ?? [],
+    outreach: ((outreachRes as { data?: unknown[] } | null)?.data) ?? [],
+    visits: ((visitsRes as { data?: unknown[] } | null)?.data) ?? [],
+    matched_by: { name: anyName, phone: anyPhone },
+  });
 }
 
 async function handleFetchOpsMetrics(
@@ -6644,6 +7695,158 @@ async function handleLogOperatorEvent(
 }
 
 // ============================================================================
+// Phase 8.2 — vendor email ingestion (internal, from receive-email)
+// ============================================================================
+//
+// When a chez_owned contractor emails the household's alfred@ address,
+// receive-email routes the message HERE instead of surfacing homeowner
+// action items: find (or create) the vendor's standing-engagement request,
+// append the email to the thread as a system message, and notify the
+// operator. "Make Chez point of contact" becomes true end-to-end.
+async function handleIngestVendorEmail(
+  service: ServiceClient,
+  payload: {
+    household_id?: string;
+    contractor_id?: string;
+    from?: string;
+    subject?: string;
+    summary?: string;
+    body_excerpt?: string;
+    document_note?: string;
+  },
+  serviceUrl: string,
+  serviceRoleKey: string
+) {
+  const householdId = compactString(payload.household_id);
+  const contractorId = compactString(payload.contractor_id);
+  if (!householdId || !contractorId) {
+    return json({ error: "household_id and contractor_id required" }, 400);
+  }
+
+  const { data: contractor } = await service
+    .from("contractors")
+    .select("id, household_id, company_name, category, chez_owned")
+    .eq("id", contractorId)
+    .maybeSingle();
+  const c = contractor as {
+    household_id: string; company_name: string; category: string | null; chez_owned: boolean | null;
+  } | null;
+  if (!c || c.household_id !== householdId) {
+    return json({ error: "contractor not found" }, 404);
+  }
+  // Re-verify delegation server-side — the caller's claim is not trusted.
+  if (!c.chez_owned) {
+    return json({ error: "contractor is not chez_owned" }, 409);
+  }
+
+  const now = new Date().toISOString();
+
+  // Requests + messages attribute to the household's owning user.
+  const { data: hhUsers } = await service
+    .from("users").select("id").eq("household_id", householdId).limit(1);
+  const ownerId = (hhUsers?.[0] as { id: string } | undefined)?.id;
+  if (!ownerId) return json({ error: "no household user" }, 404);
+
+  // Find the newest open thread for this vendor (the standing-engagement
+  // parent when one exists; any open coordinate thread otherwise).
+  const { data: openReqs } = await service
+    .from("chez_requests")
+    .select("id, status, context")
+    .eq("household_id", householdId)
+    .eq("context->>contractor_id", contractorId)
+    .neq("status", "resolved")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  let requestId = (openReqs?.[0] as { id: string } | undefined)?.id ?? null;
+  let created = false;
+
+  if (!requestId) {
+    // No open thread — create the standing-engagement parent.
+    const slaDueAt = await businessHoursDue(service);
+    const { data: req, error: reqErr } = await service
+      .from("chez_requests")
+      .insert({
+        household_id: householdId,
+        user_id: ownerId,
+        category: "coordinate_task",
+        summary: `Standing engagement: ${c.company_name}`,
+        context: {
+          _kind: "standing_engagement_contractor",
+          contractor_id: contractorId,
+          contractor_category: c.category ?? "",
+          source: "email_ingestion",
+        },
+        status: "open",
+        sla_due_at: slaDueAt,
+        last_message_at: now,
+        unread_for_user: false,
+        unread_for_admin: true,
+      })
+      .select("id")
+      .single();
+    if (reqErr || !req) {
+      console.error("[chez-concierge] ingest_vendor_email request insert failed:", reqErr);
+      return json({ error: "failed to create request" }, 500);
+    }
+    requestId = (req as { id: string }).id;
+    created = true;
+  } else {
+    await service
+      .from("chez_requests")
+      .update({ unread_for_admin: true, last_message_at: now })
+      .eq("id", requestId);
+  }
+
+  const subject = compactString(payload.subject) || "(no subject)";
+  const excerpt = (payload.body_excerpt ?? "").substring(0, 4000);
+  const content = [
+    `Vendor email from ${c.company_name}${payload.from ? ` (${payload.from})` : ""}`,
+    `Subject: ${subject}`,
+    payload.summary ? `\nAI summary: ${payload.summary}` : "",
+    payload.document_note ? `\n${payload.document_note}` : "",
+    excerpt ? `\n---\n${excerpt}` : "",
+  ].filter(Boolean).join("\n");
+
+  const { error: msgErr } = await service.from("concierge_messages").insert({
+    household_id: householdId,
+    user_id: ownerId,
+    request_id: requestId,
+    role: "system",
+    content,
+    attachments: [],
+  });
+  if (msgErr) {
+    console.error("[chez-concierge] ingest_vendor_email message insert failed:", msgErr);
+  }
+
+  await Promise.all([
+    sendPush(
+      serviceUrl,
+      serviceRoleKey,
+      adminUserIds(),
+      `Vendor email: ${c.company_name}`,
+      subject,
+      { type: "chez_admin_request", request_id: requestId }
+    ),
+    sendAdminEmail(
+      adminEmails(),
+      `[Chez] Vendor email from ${c.company_name}: ${subject}`,
+      `${content}\n\n${adminPortalUrl(requestId)}`,
+      emailBody({
+        preview: `${c.company_name} emailed the household address.`,
+        heading: "Vendor email (Chez is point of contact)",
+        intro: `${c.company_name} emailed the household's Chez address. You own this relationship — the homeowner only got a quiet notice.`,
+        bodyText: content,
+        ctaLabel: "Open in admin portal",
+        ctaUrl: adminPortalUrl(requestId),
+      })
+    ),
+  ]);
+
+  return json({ ok: true, request_id: requestId, created });
+}
+
+// ============================================================================
 // Server entry
 // ============================================================================
 
@@ -6671,6 +7874,21 @@ serve(async (req: Request) => {
     const user = await getAuthenticatedUser(service, req);
 
     switch (action) {
+      // Phase 8.2 — internal only: receive-email routes chez_owned vendors'
+      // emails into the operator's thread. Never callable by clients.
+      case "ingest_vendor_email": {
+        if (!requireInternal(req)) return json({ error: "unauthorized" }, 401);
+        return handleIngestVendorEmail(
+          service,
+          body as {
+            household_id?: string; contractor_id?: string; from?: string;
+            subject?: string; summary?: string; body_excerpt?: string;
+            document_note?: string;
+          },
+          supabaseUrl,
+          serviceRoleKey
+        );
+      }
       case "submit": {
         if (!user) return json({ error: "auth required" }, 401);
         return handleSubmit(
@@ -6736,6 +7954,15 @@ serve(async (req: Request) => {
           serviceRoleKey
         );
 
+      // Wave 1 — homeowner dry run of the delegation snapshot (composer
+      // v2 renders "What Chez already knows" + readiness + budget hint)
+      case "preview_snapshot":
+        return handlePreviewSnapshot(
+          service,
+          user,
+          body as unknown as PreviewSnapshotPayload
+        );
+
       // Phase 80.1 — structured proposals (Chez proposes vendor / date /
       // cost / quote, homeowner approves / declines / counters)
       case "propose":
@@ -6795,6 +8022,52 @@ serve(async (req: Request) => {
           user,
           body as unknown as UpdateVisitPayload
         );
+
+      // Wave 6 — structured info requests + homeowner progress timeline
+      case "answer_info_request":
+        return handleAnswerInfoRequest(
+          service,
+          user,
+          body as { message_id?: string; answers?: Record<string, unknown>; attachments?: AttachmentMeta[] },
+          supabaseUrl,
+          serviceRoleKey
+        );
+      case "fetch_request_progress":
+        return handleFetchRequestProgress(service, user, body as { request_id?: string });
+
+      // Wave 5 — Stripe card-on-file (homeowner). Inert until
+      // STRIPE_SECRET_KEY is set; each handler returns a clean 503 so the
+      // iOS payment surfaces stay capability-gated until go-live.
+      case "payments_status":
+        return json({ configured: paymentsConfigured() });
+      case "create_setup_intent": {
+        if (!user) return json({ error: "auth required" }, 401);
+        const hid = await householdIdForUser(service, user.id);
+        if (!hid) return json({ error: "no household" }, 404);
+        return handleCreateSetupIntent(service, hid);
+      }
+      case "confirm_payment_method": {
+        if (!user) return json({ error: "auth required" }, 401);
+        const hid = await householdIdForUser(service, user.id);
+        if (!hid) return json({ error: "no household" }, 404);
+        const setupIntentId = compactString((body as { setup_intent_id?: string }).setup_intent_id);
+        if (!setupIntentId) return json({ error: "setup_intent_id required" }, 400);
+        return handleConfirmPaymentMethod(service, hid, setupIntentId);
+      }
+      case "detach_payment_method": {
+        if (!user) return json({ error: "auth required" }, 401);
+        const hid = await householdIdForUser(service, user.id);
+        if (!hid) return json({ error: "no household" }, 404);
+        const pmId = compactString((body as { payment_method_id?: string }).payment_method_id);
+        if (!pmId) return json({ error: "payment_method_id required" }, 400);
+        return handleDetachPaymentMethod(service, hid, pmId);
+      }
+
+      // Wave 3 Phase C/D — case availability + vendor registry drilldown
+      case "save_case_availability":
+        return handleSaveCaseAvailability(service, user, body as { request_id?: string; windows?: unknown });
+      case "fetch_vendor_detail":
+        return handleFetchVendorDetail(service, user, body as { vendor_key?: string });
 
       // Phase 100 — intelligence foundation: call ledger persistence,
       // structured outcomes, vendor registry, ops metrics, operator
@@ -6925,6 +8198,19 @@ serve(async (req: Request) => {
       // landing with a customer-service surface.
       case "fetch_today_brief":
         return handleFetchTodayBrief(service, user);
+
+      // Wave 3 Phase A — service portal v2 (service.getchez.com). Two
+      // single-round-trip reads: portal boot (Today brief + case queue +
+      // tag definitions + snippets) and the case workspace bundle.
+      // Admin-only.
+      case "fetch_service_boot":
+        return handleFetchServiceBoot(service, user);
+      case "fetch_case_bundle":
+        return handleFetchCaseBundle(
+          service,
+          user,
+          body as unknown as FetchCaseBundlePayload
+        );
 
       // Phase 84 PR 4 — project negotiation tracking. Each call appends
       // one turn to project_quotes.negotiation_history. Admin-only;

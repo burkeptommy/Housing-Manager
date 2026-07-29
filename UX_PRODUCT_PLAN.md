@@ -4,7 +4,7 @@ This document turns the recent UX audit into an execution plan for the product i
 
 This is not a security plan. It is focused on experience, information architecture, navigation, and product clarity.
 
-Companion spec: [PROPERTY_EXPERIENCE_REDESIGN_SPEC.md](/Users/tomburke/Projects/Housing-Manager/PROPERTY_EXPERIENCE_REDESIGN_SPEC.md)
+Companion spec: [PROPERTY_EXPERIENCE_REDESIGN_SPEC.md](/Users/tomburke/Documents/Projects/Housing-Manager/PROPERTY_EXPERIENCE_REDESIGN_SPEC.md)
 
 That document is the concrete follow-on from the latest dashboard, property, maintenance, and systems feedback. It translates the audit into exact screen roles, proposed tab structure, status definitions, copy direction, and implementation priorities, with explicit guardrails for preserving Haven's existing systems intelligence.
 

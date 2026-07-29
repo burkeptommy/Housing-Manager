@@ -4604,13 +4604,16 @@ struct PropertyDetailView: View {
     private func seasonalFindVendorContent(task: MaintenanceTaskDBRow) -> some View {
         if let property = viewModel.property,
            let system = viewModel.systems.first(where: { $0.id == task.systemId }) {
+            // July 2026 (audit F16): pass a CANONICAL category so the adopted
+            // vendor matches coverage (sub-system keys locked vendors out).
+            let canonical = SystemCategoryRegistry.canonical(category: system.category) ?? system.category
             FindLocalVendorSheet(
                 task: task,
                 householdId: property.householdId,
                 town: property.city ?? "",
                 state: property.state ?? "",
-                systemCategory: system.category,
-                categoryDisplayName: system.category.lowercased(),
+                systemCategory: canonical,
+                categoryDisplayName: canonical.lowercased(),
                 onComplete: {
                     Task { await viewModel.loadProperty(id: propertyID) }
                 }

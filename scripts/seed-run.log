@@ -1,0 +1,432 @@
+📋 Seed plan:
+   States: CT, NY, MA, RI, MI
+   Categories: 25
+   Budget cap: 20000 calls (~$340.00)
+   Previously completed: 0 cells
+   Calls already made: 0
+   Dry run: no
+   Total cells: 6650
+   Remaining: 6650
+   Estimated cost remaining: ~$113.05
+   🌐 [1/6650] CT/Bethel/hvac: 14 vendors
+   🌐 [2/6650] CT/Bethel/plumbing: 14 vendors
+   🌐 [3/6650] CT/Bethel/electrical: 14 vendors
+   🌐 [4/6650] CT/Bethel/roofing: 14 vendors
+   🌐 [5/6650] CT/Bethel/chimney_sweep: 14 vendors
+   🌐 [6/6650] CT/Bethel/tree_service: 14 vendors
+   🌐 [7/6650] CT/Bethel/garage_door: 9 vendors
+   🌐 [8/6650] CT/Bethel/septic_pumper: 13 vendors
+   🌐 [9/6650] CT/Bethel/well_water_service: 13 vendors
+   🌐 [10/6650] CT/Bethel/landscaping: 4 vendors
+   🌐 [11/6650] CT/Bethel/pest_control: 4 vendors
+   🌐 [12/6650] CT/Bethel/pool_service: 4 vendors
+   🌐 [13/6650] CT/Bethel/solar: 4 vendors
+   🌐 [14/6650] CT/Bethel/security: 4 vendors
+   🌐 [15/6650] CT/Bethel/irrigation: 4 vendors
+   🌐 [16/6650] CT/Bethel/waterproofing: 4 vendors
+   🌐 [17/6650] CT/Bethel/electric: 14 vendors
+   💾 [18/6650] CT/Bethel/natural_gas: 14 vendors
+   🌐 [19/6650] CT/Bethel/oil: 10 vendors
+   🌐 [20/6650] CT/Bethel/propane: 11 vendors
+   🌐 [21/6650] CT/Bethel/water: 10 vendors
+   🌐 [22/6650] CT/Bethel/trash: 14 vendors
+   🌐 [23/6650] CT/Bethel/internet_cable: 14 vendors
+   🌐 [24/6650] CT/Bethel/home_insurance: 14 vendors
+   🌐 [25/6650] CT/Bethel/auto_insurance: 14 vendors
+   🌐 [26/6650] CT/Bridgeport/hvac: 14 vendors
+   🌐 [27/6650] CT/Bridgeport/plumbing: 14 vendors
+   🌐 [28/6650] CT/Bridgeport/electrical: 14 vendors
+   🌐 [29/6650] CT/Bridgeport/roofing: 14 vendors
+   🌐 [30/6650] CT/Bridgeport/chimney_sweep: 14 vendors
+   🌐 [31/6650] CT/Bridgeport/tree_service: 14 vendors
+   🌐 [32/6650] CT/Bridgeport/garage_door: 14 vendors
+   🌐 [33/6650] CT/Bridgeport/septic_pumper: 14 vendors
+   🌐 [34/6650] CT/Bridgeport/well_water_service: 14 vendors
+   🌐 [35/6650] CT/Bridgeport/landscaping: 4 vendors
+   🌐 [36/6650] CT/Bridgeport/pest_control: 4 vendors
+   🌐 [37/6650] CT/Bridgeport/pool_service: 4 vendors
+   🌐 [38/6650] CT/Bridgeport/solar: 4 vendors
+   🌐 [39/6650] CT/Bridgeport/security: 4 vendors
+   🌐 [40/6650] CT/Bridgeport/irrigation: 4 vendors
+   🌐 [41/6650] CT/Bridgeport/waterproofing: 4 vendors
+   🌐 [42/6650] CT/Bridgeport/electric: 14 vendors
+   🌐 [43/6650] CT/Bridgeport/natural_gas: 14 vendors
+   🌐 [44/6650] CT/Bridgeport/oil: 14 vendors
+   🌐 [45/6650] CT/Bridgeport/propane: 14 vendors
+   🌐 [46/6650] CT/Bridgeport/water: 10 vendors
+   🌐 [47/6650] CT/Bridgeport/trash: 14 vendors
+   🌐 [48/6650] CT/Bridgeport/internet_cable: 10 vendors
+   🌐 [49/6650] CT/Bridgeport/home_insurance: 14 vendors
+   🌐 [50/6650] CT/Bridgeport/auto_insurance: 14 vendors
+   🌐 [51/6650] CT/Brookfield/hvac: 14 vendors
+   🌐 [52/6650] CT/Brookfield/plumbing: 14 vendors
+   🌐 [53/6650] CT/Brookfield/electrical: 14 vendors
+   🌐 [54/6650] CT/Brookfield/roofing: 14 vendors
+   🌐 [55/6650] CT/Brookfield/chimney_sweep: 14 vendors
+   🌐 [56/6650] CT/Brookfield/tree_service: 14 vendors
+   🌐 [57/6650] CT/Brookfield/garage_door: 14 vendors
+   🌐 [58/6650] CT/Brookfield/septic_pumper: 14 vendors
+   🌐 [59/6650] CT/Brookfield/well_water_service: 14 vendors
+   🌐 [60/6650] CT/Brookfield/landscaping: 4 vendors
+   🌐 [61/6650] CT/Brookfield/pest_control: 4 vendors
+   🌐 [62/6650] CT/Brookfield/pool_service: 4 vendors
+   🌐 [63/6650] CT/Brookfield/solar: 4 vendors
+   🌐 [64/6650] CT/Brookfield/security: 4 vendors
+   🌐 [65/6650] CT/Brookfield/irrigation: 4 vendors
+   🌐 [66/6650] CT/Brookfield/waterproofing: 4 vendors
+   🌐 [67/6650] CT/Brookfield/electric: 14 vendors
+   🌐 [68/6650] CT/Brookfield/natural_gas: 14 vendors
+   🌐 [69/6650] CT/Brookfield/oil: 14 vendors
+   🌐 [70/6650] CT/Brookfield/propane: 14 vendors
+   🌐 [71/6650] CT/Brookfield/water: 10 vendors
+   🌐 [72/6650] CT/Brookfield/trash: 14 vendors
+   🌐 [73/6650] CT/Brookfield/internet_cable: 14 vendors
+   🌐 [74/6650] CT/Brookfield/home_insurance: 14 vendors
+   🌐 [75/6650] CT/Brookfield/auto_insurance: 14 vendors
+   🌐 [76/6650] CT/Danbury/hvac: 14 vendors
+   🌐 [77/6650] CT/Danbury/plumbing: 14 vendors
+   🌐 [78/6650] CT/Danbury/electrical: 14 vendors
+   🌐 [79/6650] CT/Danbury/roofing: 14 vendors
+   🌐 [80/6650] CT/Danbury/chimney_sweep: 14 vendors
+   🌐 [81/6650] CT/Danbury/tree_service: 14 vendors
+   🌐 [82/6650] CT/Danbury/garage_door: 14 vendors
+   🌐 [83/6650] CT/Danbury/septic_pumper: 14 vendors
+   🌐 [84/6650] CT/Danbury/well_water_service: 14 vendors
+   🌐 [85/6650] CT/Danbury/landscaping: 4 vendors
+   🌐 [86/6650] CT/Danbury/pest_control: 4 vendors
+   🌐 [87/6650] CT/Danbury/pool_service: 4 vendors
+   🌐 [88/6650] CT/Danbury/solar: 4 vendors
+   🌐 [89/6650] CT/Danbury/security: 4 vendors
+   🌐 [90/6650] CT/Danbury/irrigation: 4 vendors
+   🌐 [91/6650] CT/Danbury/waterproofing: 4 vendors
+   🌐 [92/6650] CT/Danbury/electric: 14 vendors
+   🌐 [93/6650] CT/Danbury/natural_gas: 14 vendors
+   🌐 [94/6650] CT/Danbury/oil: 14 vendors
+   🌐 [95/6650] CT/Danbury/propane: 14 vendors
+   🌐 [96/6650] CT/Danbury/water: 12 vendors
+   🌐 [97/6650] CT/Danbury/trash: 14 vendors
+   🌐 [98/6650] CT/Danbury/internet_cable: 12 vendors
+   🌐 [99/6650] CT/Danbury/home_insurance: 14 vendors
+   🌐 [100/6650] CT/Danbury/auto_insurance: 14 vendors
+   🌐 [101/6650] CT/Darien/hvac: 14 vendors
+   🌐 [102/6650] CT/Darien/plumbing: 14 vendors
+   🌐 [103/6650] CT/Darien/electrical: 14 vendors
+   🌐 [104/6650] CT/Darien/roofing: 14 vendors
+   🌐 [105/6650] CT/Darien/chimney_sweep: 14 vendors
+   🌐 [106/6650] CT/Darien/tree_service: 14 vendors
+   🌐 [107/6650] CT/Darien/garage_door: 14 vendors
+   🌐 [108/6650] CT/Darien/septic_pumper: 14 vendors
+   🌐 [109/6650] CT/Darien/well_water_service: 14 vendors
+   🌐 [110/6650] CT/Darien/landscaping: 4 vendors
+   🌐 [111/6650] CT/Darien/pest_control: 4 vendors
+   🌐 [112/6650] CT/Darien/pool_service: 4 vendors
+   🌐 [113/6650] CT/Darien/solar: 4 vendors
+   🌐 [114/6650] CT/Darien/security: 4 vendors
+   🌐 [115/6650] CT/Darien/irrigation: 4 vendors
+   🌐 [116/6650] CT/Darien/waterproofing: 4 vendors
+   🌐 [117/6650] CT/Darien/electric: 14 vendors
+   🌐 [118/6650] CT/Darien/natural_gas: 14 vendors
+   🌐 [119/6650] CT/Darien/oil: 14 vendors
+   🌐 [120/6650] CT/Darien/propane: 11 vendors
+   🌐 [121/6650] CT/Darien/water: 10 vendors
+   🌐 [122/6650] CT/Darien/trash: 14 vendors
+   🌐 [123/6650] CT/Darien/internet_cable: 13 vendors
+   🌐 [124/6650] CT/Darien/home_insurance: 14 vendors
+   🌐 [125/6650] CT/Darien/auto_insurance: 14 vendors
+   🌐 [126/6650] CT/Easton/hvac: 14 vendors
+   🌐 [127/6650] CT/Easton/plumbing: 14 vendors
+   🌐 [128/6650] CT/Easton/electrical: 14 vendors
+   🌐 [129/6650] CT/Easton/roofing: 14 vendors
+   🌐 [130/6650] CT/Easton/chimney_sweep: 14 vendors
+   🌐 [131/6650] CT/Easton/tree_service: 14 vendors
+   🌐 [132/6650] CT/Easton/garage_door: 14 vendors
+   🌐 [133/6650] CT/Easton/septic_pumper: 12 vendors
+   🌐 [134/6650] CT/Easton/well_water_service: 14 vendors
+   🌐 [135/6650] CT/Easton/landscaping: 4 vendors
+   🌐 [136/6650] CT/Easton/pest_control: 4 vendors
+   🌐 [137/6650] CT/Easton/pool_service: 4 vendors
+   🌐 [138/6650] CT/Easton/solar: 4 vendors
+   🌐 [139/6650] CT/Easton/security: 4 vendors
+   🌐 [140/6650] CT/Easton/irrigation: 4 vendors
+   🌐 [141/6650] CT/Easton/waterproofing: 4 vendors
+   🌐 [142/6650] CT/Easton/electric: 14 vendors
+   🌐 [143/6650] CT/Easton/natural_gas: 14 vendors
+   🌐 [144/6650] CT/Easton/oil: 14 vendors
+   🌐 [145/6650] CT/Easton/propane: 14 vendors
+   🌐 [146/6650] CT/Easton/water: 10 vendors
+   🌐 [147/6650] CT/Easton/trash: 14 vendors
+   🌐 [148/6650] CT/Easton/internet_cable: 11 vendors
+   🌐 [149/6650] CT/Easton/home_insurance: 14 vendors
+   🌐 [150/6650] CT/Easton/auto_insurance: 14 vendors
+   🌐 [151/6650] CT/Fairfield/hvac: 14 vendors
+   🌐 [152/6650] CT/Fairfield/plumbing: 14 vendors
+   🌐 [153/6650] CT/Fairfield/electrical: 14 vendors
+   🌐 [154/6650] CT/Fairfield/roofing: 14 vendors
+   🌐 [155/6650] CT/Fairfield/chimney_sweep: 14 vendors
+   🌐 [156/6650] CT/Fairfield/tree_service: 14 vendors
+   🌐 [157/6650] CT/Fairfield/garage_door: 14 vendors
+   🌐 [158/6650] CT/Fairfield/septic_pumper: 14 vendors
+   🌐 [159/6650] CT/Fairfield/well_water_service: 14 vendors
+   🌐 [160/6650] CT/Fairfield/landscaping: 4 vendors
+   🌐 [161/6650] CT/Fairfield/pest_control: 4 vendors
+   🌐 [162/6650] CT/Fairfield/pool_service: 4 vendors
+   🌐 [163/6650] CT/Fairfield/solar: 4 vendors
+   🌐 [164/6650] CT/Fairfield/security: 4 vendors
+   🌐 [165/6650] CT/Fairfield/irrigation: 4 vendors
+   🌐 [166/6650] CT/Fairfield/waterproofing: 4 vendors
+   🌐 [167/6650] CT/Fairfield/electric: 14 vendors
+   🌐 [168/6650] CT/Fairfield/natural_gas: 14 vendors
+   🌐 [169/6650] CT/Fairfield/oil: 14 vendors
+   🌐 [170/6650] CT/Fairfield/propane: 14 vendors
+   🌐 [171/6650] CT/Fairfield/water: 11 vendors
+   🌐 [172/6650] CT/Fairfield/trash: 14 vendors
+   🌐 [173/6650] CT/Fairfield/internet_cable: 11 vendors
+   🌐 [174/6650] CT/Fairfield/home_insurance: 14 vendors
+   🌐 [175/6650] CT/Fairfield/auto_insurance: 14 vendors
+   🌐 [176/6650] CT/Greenwich/hvac: 14 vendors
+   🌐 [177/6650] CT/Greenwich/plumbing: 14 vendors
+   🌐 [178/6650] CT/Greenwich/electrical: 14 vendors
+   🌐 [179/6650] CT/Greenwich/roofing: 14 vendors
+   🌐 [180/6650] CT/Greenwich/chimney_sweep: 14 vendors
+   🌐 [181/6650] CT/Greenwich/tree_service: 14 vendors
+   🌐 [182/6650] CT/Greenwich/garage_door: 14 vendors
+   🌐 [183/6650] CT/Greenwich/septic_pumper: 14 vendors
+   🌐 [184/6650] CT/Greenwich/well_water_service: 14 vendors
+   🌐 [185/6650] CT/Greenwich/landscaping: 4 vendors
+   🌐 [186/6650] CT/Greenwich/pest_control: 4 vendors
+   🌐 [187/6650] CT/Greenwich/pool_service: 1 vendors
+   🌐 [188/6650] CT/Greenwich/solar: 4 vendors
+   🌐 [189/6650] CT/Greenwich/security: 4 vendors
+   🌐 [190/6650] CT/Greenwich/irrigation: 4 vendors
+   🌐 [191/6650] CT/Greenwich/waterproofing: 4 vendors
+   🌐 [192/6650] CT/Greenwich/electric: 14 vendors
+   🌐 [193/6650] CT/Greenwich/natural_gas: 14 vendors
+   🌐 [194/6650] CT/Greenwich/oil: 14 vendors
+   🌐 [195/6650] CT/Greenwich/propane: 14 vendors
+   🌐 [196/6650] CT/Greenwich/water: 10 vendors
+   🌐 [197/6650] CT/Greenwich/trash: 14 vendors
+   🌐 [198/6650] CT/Greenwich/internet_cable: 14 vendors
+   🌐 [199/6650] CT/Greenwich/home_insurance: 14 vendors
+   🌐 [200/6650] CT/Greenwich/auto_insurance: 14 vendors
+   🌐 [201/6650] CT/Monroe/hvac: 14 vendors
+   🌐 [202/6650] CT/Monroe/plumbing: 14 vendors
+   🌐 [203/6650] CT/Monroe/electrical: 14 vendors
+   🌐 [204/6650] CT/Monroe/roofing: 14 vendors
+   🌐 [205/6650] CT/Monroe/chimney_sweep: 14 vendors
+   🌐 [206/6650] CT/Monroe/tree_service: 14 vendors
+   🌐 [207/6650] CT/Monroe/garage_door: 14 vendors
+   🌐 [208/6650] CT/Monroe/septic_pumper: 14 vendors
+   🌐 [209/6650] CT/Monroe/well_water_service: 14 vendors
+   🌐 [210/6650] CT/Monroe/landscaping: 4 vendors
+   🌐 [211/6650] CT/Monroe/pest_control: 4 vendors
+   🌐 [212/6650] CT/Monroe/pool_service: 4 vendors
+   🌐 [213/6650] CT/Monroe/solar: 4 vendors
+   🌐 [214/6650] CT/Monroe/security: 1 vendors
+   🌐 [215/6650] CT/Monroe/irrigation: 4 vendors
+   🌐 [216/6650] CT/Monroe/waterproofing: 4 vendors
+   🌐 [217/6650] CT/Monroe/electric: 14 vendors
+   🌐 [218/6650] CT/Monroe/natural_gas: 14 vendors
+   🌐 [219/6650] CT/Monroe/oil: 14 vendors
+   🌐 [220/6650] CT/Monroe/propane: 14 vendors
+   🌐 [221/6650] CT/Monroe/water: 10 vendors
+   🌐 [222/6650] CT/Monroe/trash: 14 vendors
+   🌐 [223/6650] CT/Monroe/internet_cable: 13 vendors
+   🌐 [224/6650] CT/Monroe/home_insurance: 14 vendors
+   🌐 [225/6650] CT/Monroe/auto_insurance: 14 vendors
+   🌐 [226/6650] CT/New Canaan/hvac: 14 vendors
+   🌐 [227/6650] CT/New Canaan/plumbing: 14 vendors
+   🌐 [228/6650] CT/New Canaan/electrical: 14 vendors
+   🌐 [229/6650] CT/New Canaan/roofing: 14 vendors
+   🌐 [230/6650] CT/New Canaan/chimney_sweep: 14 vendors
+   🌐 [231/6650] CT/New Canaan/tree_service: 14 vendors
+   🌐 [232/6650] CT/New Canaan/garage_door: 14 vendors
+   🌐 [233/6650] CT/New Canaan/septic_pumper: 14 vendors
+   🌐 [234/6650] CT/New Canaan/well_water_service: 14 vendors
+   🌐 [235/6650] CT/New Canaan/landscaping: 4 vendors
+   🌐 [236/6650] CT/New Canaan/pest_control: 4 vendors
+   🌐 [237/6650] CT/New Canaan/pool_service: 4 vendors
+   🌐 [238/6650] CT/New Canaan/solar: 4 vendors
+   🌐 [239/6650] CT/New Canaan/security: 0 vendors
+   🌐 [240/6650] CT/New Canaan/irrigation: 4 vendors
+   🌐 [241/6650] CT/New Canaan/waterproofing: 4 vendors
+   🌐 [242/6650] CT/New Canaan/electric: 14 vendors
+   🌐 [243/6650] CT/New Canaan/natural_gas: 14 vendors
+   🌐 [244/6650] CT/New Canaan/oil: 14 vendors
+   🌐 [245/6650] CT/New Canaan/propane: 14 vendors
+   🌐 [246/6650] CT/New Canaan/water: 11 vendors
+   🌐 [247/6650] CT/New Canaan/trash: 14 vendors
+   🌐 [248/6650] CT/New Canaan/internet_cable: 12 vendors
+   🌐 [249/6650] CT/New Canaan/home_insurance: 14 vendors
+   🌐 [250/6650] CT/New Canaan/auto_insurance: 14 vendors
+   🌐 [251/6650] CT/New Fairfield/hvac: 14 vendors
+   🌐 [252/6650] CT/New Fairfield/plumbing: 14 vendors
+   🌐 [253/6650] CT/New Fairfield/electrical: 14 vendors
+   🌐 [254/6650] CT/New Fairfield/roofing: 14 vendors
+   🌐 [255/6650] CT/New Fairfield/chimney_sweep: 14 vendors
+   🌐 [256/6650] CT/New Fairfield/tree_service: 14 vendors
+   🌐 [257/6650] CT/New Fairfield/garage_door: 14 vendors
+   🌐 [258/6650] CT/New Fairfield/septic_pumper: 14 vendors
+   🌐 [259/6650] CT/New Fairfield/well_water_service: 14 vendors
+   🌐 [260/6650] CT/New Fairfield/landscaping: 4 vendors
+   🌐 [261/6650] CT/New Fairfield/pest_control: 4 vendors
+   🌐 [262/6650] CT/New Fairfield/pool_service: 4 vendors
+   🌐 [263/6650] CT/New Fairfield/solar: 4 vendors
+   🌐 [264/6650] CT/New Fairfield/security: 4 vendors
+   🌐 [265/6650] CT/New Fairfield/irrigation: 4 vendors
+   🌐 [266/6650] CT/New Fairfield/waterproofing: 4 vendors
+   🌐 [267/6650] CT/New Fairfield/electric: 14 vendors
+   🌐 [268/6650] CT/New Fairfield/natural_gas: 14 vendors
+   🌐 [269/6650] CT/New Fairfield/oil: 14 vendors
+   🌐 [270/6650] CT/New Fairfield/propane: 14 vendors
+   🌐 [271/6650] CT/New Fairfield/water: 10 vendors
+   🌐 [272/6650] CT/New Fairfield/trash: 14 vendors
+   🌐 [273/6650] CT/New Fairfield/internet_cable: 10 vendors
+   🌐 [274/6650] CT/New Fairfield/home_insurance: 14 vendors
+   🌐 [275/6650] CT/New Fairfield/auto_insurance: 14 vendors
+   🌐 [276/6650] CT/Newtown/hvac: 14 vendors
+   🌐 [277/6650] CT/Newtown/plumbing: 14 vendors
+   🌐 [278/6650] CT/Newtown/electrical: 14 vendors
+   🌐 [279/6650] CT/Newtown/roofing: 14 vendors
+   🌐 [280/6650] CT/Newtown/chimney_sweep: 14 vendors
+   🌐 [281/6650] CT/Newtown/tree_service: 14 vendors
+   🌐 [282/6650] CT/Newtown/garage_door: 14 vendors
+   🌐 [283/6650] CT/Newtown/septic_pumper: 14 vendors
+   🌐 [284/6650] CT/Newtown/well_water_service: 14 vendors
+   🌐 [285/6650] CT/Newtown/landscaping: 4 vendors
+   🌐 [286/6650] CT/Newtown/pest_control: 4 vendors
+   🌐 [287/6650] CT/Newtown/pool_service: 4 vendors
+   🌐 [288/6650] CT/Newtown/solar: 4 vendors
+   🌐 [289/6650] CT/Newtown/security: 1 vendors
+   🌐 [290/6650] CT/Newtown/irrigation: 4 vendors
+   🌐 [291/6650] CT/Newtown/waterproofing: 4 vendors
+   🌐 [292/6650] CT/Newtown/electric: 10 vendors
+   🌐 [293/6650] CT/Newtown/natural_gas: 14 vendors
+   🌐 [294/6650] CT/Newtown/oil: 13 vendors
+   🌐 [295/6650] CT/Newtown/propane: 14 vendors
+   🌐 [296/6650] CT/Newtown/water: 10 vendors
+   🌐 [297/6650] CT/Newtown/trash: 14 vendors
+   🌐 [298/6650] CT/Newtown/internet_cable: 10 vendors
+   🌐 [299/6650] CT/Newtown/home_insurance: 14 vendors
+   🌐 [300/6650] CT/Newtown/auto_insurance: 14 vendors
+   🌐 [301/6650] CT/Norwalk/hvac: 14 vendors
+   🌐 [302/6650] CT/Norwalk/plumbing: 14 vendors
+   🌐 [303/6650] CT/Norwalk/electrical: 14 vendors
+   🌐 [304/6650] CT/Norwalk/roofing: 14 vendors
+   🌐 [305/6650] CT/Norwalk/chimney_sweep: 14 vendors
+   🌐 [306/6650] CT/Norwalk/tree_service: 14 vendors
+   🌐 [307/6650] CT/Norwalk/garage_door: 14 vendors
+   🌐 [308/6650] CT/Norwalk/septic_pumper: 14 vendors
+   🌐 [309/6650] CT/Norwalk/well_water_service: 14 vendors
+   🌐 [310/6650] CT/Norwalk/landscaping: 4 vendors
+   🌐 [311/6650] CT/Norwalk/pest_control: 4 vendors
+   🌐 [312/6650] CT/Norwalk/pool_service: 4 vendors
+   🌐 [313/6650] CT/Norwalk/solar: 4 vendors
+   🌐 [314/6650] CT/Norwalk/security: 0 vendors
+   🌐 [315/6650] CT/Norwalk/irrigation: 4 vendors
+   🌐 [316/6650] CT/Norwalk/waterproofing: 4 vendors
+   🌐 [317/6650] CT/Norwalk/electric: 12 vendors
+   🌐 [318/6650] CT/Norwalk/natural_gas: 14 vendors
+   🌐 [319/6650] CT/Norwalk/oil: 14 vendors
+   🌐 [320/6650] CT/Norwalk/propane: 11 vendors
+   🌐 [321/6650] CT/Norwalk/water: 10 vendors
+   🌐 [322/6650] CT/Norwalk/trash: 14 vendors
+   🌐 [323/6650] CT/Norwalk/internet_cable: 12 vendors
+   🌐 [324/6650] CT/Norwalk/home_insurance: 14 vendors
+   🌐 [325/6650] CT/Norwalk/auto_insurance: 14 vendors
+   🌐 [326/6650] CT/Redding/hvac: 14 vendors
+   🌐 [327/6650] CT/Redding/plumbing: 14 vendors
+   🌐 [328/6650] CT/Redding/electrical: 14 vendors
+   🌐 [329/6650] CT/Redding/roofing: 14 vendors
+   🌐 [330/6650] CT/Redding/chimney_sweep: 14 vendors
+   🌐 [331/6650] CT/Redding/tree_service: 14 vendors
+   🌐 [332/6650] CT/Redding/garage_door: 14 vendors
+   🌐 [333/6650] CT/Redding/septic_pumper: 14 vendors
+   🌐 [334/6650] CT/Redding/well_water_service: 14 vendors
+   🌐 [335/6650] CT/Redding/landscaping: 4 vendors
+   🌐 [336/6650] CT/Redding/pest_control: 4 vendors
+   🌐 [337/6650] CT/Redding/pool_service: 4 vendors
+   🌐 [338/6650] CT/Redding/solar: 4 vendors
+   🌐 [339/6650] CT/Redding/security: 4 vendors
+   🌐 [340/6650] CT/Redding/irrigation: 4 vendors
+   🌐 [341/6650] CT/Redding/waterproofing: 4 vendors
+   🌐 [342/6650] CT/Redding/electric: 14 vendors
+   🌐 [343/6650] CT/Redding/natural_gas: 14 vendors
+   🌐 [344/6650] CT/Redding/oil: 14 vendors
+   🌐 [345/6650] CT/Redding/propane: 14 vendors
+   🌐 [346/6650] CT/Redding/water: 11 vendors
+   🌐 [347/6650] CT/Redding/trash: 14 vendors
+   🌐 [348/6650] CT/Redding/internet_cable: 13 vendors
+   🌐 [349/6650] CT/Redding/home_insurance: 14 vendors
+   🌐 [350/6650] CT/Redding/auto_insurance: 14 vendors
+   🌐 [351/6650] CT/Ridgefield/hvac: 14 vendors
+   🌐 [352/6650] CT/Ridgefield/plumbing: 14 vendors
+   🌐 [353/6650] CT/Ridgefield/electrical: 14 vendors
+   🌐 [354/6650] CT/Ridgefield/roofing: 14 vendors
+   🌐 [355/6650] CT/Ridgefield/chimney_sweep: 14 vendors
+   🌐 [356/6650] CT/Ridgefield/tree_service: 14 vendors
+   🌐 [357/6650] CT/Ridgefield/garage_door: 14 vendors
+   🌐 [358/6650] CT/Ridgefield/septic_pumper: 14 vendors
+   🌐 [359/6650] CT/Ridgefield/well_water_service: 14 vendors
+   🌐 [360/6650] CT/Ridgefield/landscaping: 4 vendors
+   🌐 [361/6650] CT/Ridgefield/pest_control: 4 vendors
+   🌐 [362/6650] CT/Ridgefield/pool_service: 4 vendors
+   🌐 [363/6650] CT/Ridgefield/solar: 4 vendors
+   🌐 [364/6650] CT/Ridgefield/security: 4 vendors
+   🌐 [365/6650] CT/Ridgefield/irrigation: 4 vendors
+   🌐 [366/6650] CT/Ridgefield/waterproofing: 4 vendors
+   🌐 [367/6650] CT/Ridgefield/electric: 14 vendors
+   🌐 [368/6650] CT/Ridgefield/natural_gas: 14 vendors
+   🌐 [369/6650] CT/Ridgefield/oil: 14 vendors
+   🌐 [370/6650] CT/Ridgefield/propane: 14 vendors
+   🌐 [371/6650] CT/Ridgefield/water: 12 vendors
+   🌐 [372/6650] CT/Ridgefield/trash: 14 vendors
+   🌐 [373/6650] CT/Ridgefield/internet_cable: 13 vendors
+   🌐 [374/6650] CT/Ridgefield/home_insurance: 14 vendors
+   🌐 [375/6650] CT/Ridgefield/auto_insurance: 14 vendors
+   🌐 [376/6650] CT/Shelton/hvac: 14 vendors
+   🌐 [377/6650] CT/Shelton/plumbing: 14 vendors
+   🌐 [378/6650] CT/Shelton/electrical: 14 vendors
+   🌐 [379/6650] CT/Shelton/roofing: 14 vendors
+   🌐 [380/6650] CT/Shelton/chimney_sweep: 14 vendors
+   🌐 [381/6650] CT/Shelton/tree_service: 14 vendors
+   🌐 [382/6650] CT/Shelton/garage_door: 14 vendors
+   🌐 [383/6650] CT/Shelton/septic_pumper: 14 vendors
+   🌐 [384/6650] CT/Shelton/well_water_service: 14 vendors
+   🌐 [385/6650] CT/Shelton/landscaping: 4 vendors
+   🌐 [386/6650] CT/Shelton/pest_control: 4 vendors
+   🌐 [387/6650] CT/Shelton/pool_service: 4 vendors
+   🌐 [388/6650] CT/Shelton/solar: 4 vendors
+   🌐 [389/6650] CT/Shelton/security: 4 vendors
+   🌐 [390/6650] CT/Shelton/irrigation: 4 vendors
+   🌐 [391/6650] CT/Shelton/waterproofing: 4 vendors
+   🌐 [392/6650] CT/Shelton/electric: 14 vendors
+   🌐 [393/6650] CT/Shelton/natural_gas: 14 vendors
+   🌐 [394/6650] CT/Shelton/oil: 14 vendors
+   🌐 [395/6650] CT/Shelton/propane: 14 vendors
+   🌐 [396/6650] CT/Shelton/water: 11 vendors
+   🌐 [397/6650] CT/Shelton/trash: 14 vendors
+   🌐 [398/6650] CT/Shelton/internet_cable: 10 vendors
+   🌐 [399/6650] CT/Shelton/home_insurance: 14 vendors
+   🌐 [400/6650] CT/Shelton/auto_insurance: 14 vendors
+   🌐 [401/6650] CT/Sherman/hvac: 14 vendors
+   🌐 [402/6650] CT/Sherman/plumbing: 14 vendors
+   🌐 [403/6650] CT/Sherman/electrical: 14 vendors
+   🌐 [404/6650] CT/Sherman/roofing: 14 vendors
+   🌐 [405/6650] CT/Sherman/chimney_sweep: 14 vendors
+   🌐 [406/6650] CT/Sherman/tree_service: 14 vendors
+   🌐 [407/6650] CT/Sherman/garage_door: 14 vendors
+   🌐 [408/6650] CT/Sherman/septic_pumper: 14 vendors
+   🌐 [409/6650] CT/Sherman/well_water_service: 14 vendors
+   🌐 [410/6650] CT/Sherman/landscaping: 4 vendors
+   🌐 [411/6650] CT/Sherman/pest_control: 4 vendors
+   🌐 [412/6650] CT/Sherman/pool_service: 4 vendors
+   🌐 [413/6650] CT/Sherman/solar: 4 vendors
+   🌐 [414/6650] CT/Sherman/security: 4 vendors
+   🌐 [415/6650] CT/Sherman/irrigation: 4 vendors
+   🌐 [416/6650] CT/Sherman/waterproofing: 4 vendors
+   🌐 [417/6650] CT/Sherman/electric: 14 vendors
+   🌐 [418/6650] CT/Sherman/natural_gas: 14 vendors
+   🌐 [419/6650] CT/Sherman/oil: 14 vendors
+   🌐 [420/6650] CT/Sherman/propane: 12 vendors
+   🌐 [421/6650] CT/Sherman/water: 11 vendors
+   🌐 [422/6650] CT/Sherman/trash: 12 vendors

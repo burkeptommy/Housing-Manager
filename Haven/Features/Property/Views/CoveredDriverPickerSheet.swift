@@ -41,16 +41,17 @@ struct CoveredDriverPickerSheet: View {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         return familyMembers.filter { member in
-            // Hard exclude 'Child' relationship regardless of DOB — a child
-            // is never a legitimate insured driver, even if DOB is missing.
-            // Caught by Round C Wave C-7 sim audit where A4 Baby (no DOB)
-            // surfaced as a selectable driver.
-            if member.relationship.lowercased() == "child" {
-                return false
-            }
+            let isChild = member.relationship.lowercased() == "child"
             guard let dobStr = member.dateOfBirth, let dob = df.date(from: dobStr) else {
-                return true // No DOB on file, include them
+                // July 2026 (audit): no DOB — exclude children (the Round C
+                // case: "A4 Baby" with no DOB surfacing as a driver), include
+                // adults. A licensed 16+ child WITH a DOB is handled below.
+                return !isChild
             }
+            // July 2026 (audit): the age >= 16 gate applies to EVERYONE,
+            // children included — a 17-year-old with a DOB on file is a
+            // legitimate covered driver. The old blanket child-exclude ran
+            // BEFORE the DOB check, so licensed teens could never be added.
             let age = calendar.dateComponents([.year], from: dob, to: Date()).year ?? 0
             return age >= 16
         }

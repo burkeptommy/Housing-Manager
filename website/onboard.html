@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#6938EF">
+  <meta name="apple-mobile-web-app-title" content="Chez">
+  <meta name="application-name" content="Chez">
+  <title>Chez home setup</title>
+  <link rel="stylesheet" href="/chez.css">
+  <link rel="stylesheet" href="/onboard.css">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=6">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=6">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=6">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=6">
+</head>
+<body class="ob-body">
+
+<header class="ob-topbar">
+  <span class="ob-brand">
+    <img src="/chez-logo.png?v=6" alt="" class="ob-brand-mark">
+    <span>Chez home setup</span>
+  </span>
+  <button type="button" class="ob-sync" id="sync-badge" hidden>
+    <span class="ob-sync-dot"></span>
+    <span id="sync-badge-count">0</span> to sync
+  </button>
+</header>
+
+<main class="ob-main">
+
+  <!-- LOADING -->
+  <section data-screen="loading" class="ob-screen ob-screen-center">
+    <div class="ob-spinner" aria-hidden="true"></div>
+    <p class="ob-muted">Opening this home visit…</p>
+  </section>
+
+  <!-- DEAD END (invalid / expired / revoked) -->
+  <section data-screen="deadend" class="ob-screen ob-screen-center" hidden>
+    <div class="ob-endcard">
+      <div class="ob-endcard-icon">!</div>
+      <h1 id="deadend-title">This link has expired</h1>
+      <p id="deadend-message">Ask Chez for a fresh one.</p>
+    </div>
+  </section>
+
+  <!-- ALREADY SUBMITTED -->
+  <section data-screen="submitted" class="ob-screen ob-screen-center" hidden>
+    <div class="ob-endcard">
+      <div class="ob-endcard-icon ob-endcard-icon-ok">✓</div>
+      <h1>This visit is already submitted</h1>
+      <p>Everything captured on site is saved. Chez is finishing the setup.</p>
+    </div>
+  </section>
+
+  <!-- PROPERTY CONFIRM -->
+  <section data-screen="confirm" class="ob-screen" hidden>
+    <div class="ob-confirm-card">
+      <p class="ob-eyebrow">Home visit</p>
+      <h1 id="confirm-street">…</h1>
+      <p class="ob-confirm-sub" id="confirm-citystate"></p>
+      <div class="ob-confirm-meta" id="confirm-meta"></div>
+      <p class="ob-confirm-owner" id="confirm-owner"></p>
+    </div>
+    <div class="ob-sticky-cta">
+      <button type="button" class="ob-btn ob-btn-primary" id="start-visit-btn">Start visit</button>
+    </div>
+  </section>
+
+  <!-- HUB -->
+  <section data-screen="hub" class="ob-screen" hidden>
+    <h1 class="ob-hub-title" id="hub-title">Capture this home</h1>
+    <p class="ob-muted ob-hub-sub">Work through each area. Everything saves as you go.</p>
+    <div class="ob-hub-grid">
+      <button type="button" class="ob-tile" data-goto="systems">
+        <span class="ob-tile-count" data-count="systems">0</span>
+        <span class="ob-tile-label">Systems</span>
+      </button>
+      <button type="button" class="ob-tile" data-goto="vendors">
+        <span class="ob-tile-count" data-count="contractors">0</span>
+        <span class="ob-tile-label">Vendors</span>
+      </button>
+      <button type="button" class="ob-tile" data-goto="routines">
+        <span class="ob-tile-count" data-count="routines">0</span>
+        <span class="ob-tile-label">Routines</span>
+      </button>
+      <button type="button" class="ob-tile" data-goto="utilities">
+        <span class="ob-tile-count" data-count="utility_accounts">0</span>
+        <span class="ob-tile-label">Utilities</span>
+      </button>
+      <button type="button" class="ob-tile" data-goto="household">
+        <span class="ob-tile-count" data-count="household">–</span>
+        <span class="ob-tile-label">Household</span>
+      </button>
+      <button type="button" class="ob-tile" data-goto="quickfixes">
+        <span class="ob-tile-count" data-count="quick_fixes">0</span>
+        <span class="ob-tile-label">Quick fixes</span>
+      </button>
+      <button type="button" class="ob-tile" data-goto="punchlist">
+        <span class="ob-tile-count" data-count="recommendations">0</span>
+        <span class="ob-tile-label">Follow-ups</span>
+      </button>
+      <button type="button" class="ob-tile ob-tile-accent" data-goto="wrapup">
+        <span class="ob-tile-count">→</span>
+        <span class="ob-tile-label">Wrap up</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- SYSTEMS LIST -->
+  <section data-screen="systems" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Systems</h2>
+    </div>
+    <div class="screen-body" id="systems-body"></div>
+  </section>
+
+  <!-- SYSTEM EDITOR -->
+  <section data-screen="system-edit" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="systems">‹ Systems</button>
+      <h2 id="system-edit-title">Add system</h2>
+    </div>
+    <div class="screen-body" id="system-edit-body"></div>
+  </section>
+
+  <!-- VENDORS -->
+  <section data-screen="vendors" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Vendors</h2>
+    </div>
+    <div class="screen-body" id="vendors-body"></div>
+  </section>
+
+  <!-- ROUTINES -->
+  <section data-screen="routines" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Routines</h2>
+    </div>
+    <div class="screen-body" id="routines-body"></div>
+  </section>
+
+  <!-- UTILITIES -->
+  <section data-screen="utilities" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Utilities</h2>
+    </div>
+    <div class="screen-body" id="utilities-body"></div>
+  </section>
+
+  <!-- HOUSEHOLD -->
+  <section data-screen="household" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Household</h2>
+    </div>
+    <div class="screen-body" id="household-body"></div>
+  </section>
+
+  <!-- QUICK FIXES -->
+  <section data-screen="quickfixes" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Quick fixes</h2>
+    </div>
+    <div class="screen-body" id="quickfixes-body"></div>
+  </section>
+
+  <!-- FOLLOW-UPS (internal screen id stays "punchlist") -->
+  <section data-screen="punchlist" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Follow-ups</h2>
+    </div>
+    <div class="screen-body" id="punchlist-body"></div>
+  </section>
+
+  <!-- WRAP UP -->
+  <section data-screen="wrapup" class="ob-screen" hidden>
+    <div class="ob-screen-head">
+      <button type="button" class="ob-back" data-goto="hub">‹ Hub</button>
+      <h2>Wrap up</h2>
+    </div>
+    <div class="screen-body">
+      <div class="ob-summary" id="wrapup-summary"></div>
+      <div class="ob-field">
+        <label for="wrapup-concerns">What is the homeowner most concerned about?</label>
+        <textarea id="wrapup-concerns" class="ob-input ob-textarea" rows="4" placeholder="In their words, if you can."></textarea>
+      </div>
+      <p class="ob-trust">Chez captured equipment, vendors and schedules during this visit. No documents, no account numbers, no codes.</p>
+      <div class="ob-sticky-cta">
+        <button type="button" class="ob-btn ob-btn-primary" id="submit-visit-btn">Submit visit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUCCESS -->
+  <section data-screen="success" class="ob-screen ob-screen-center" hidden>
+    <div class="ob-endcard">
+      <div class="ob-endcard-icon ob-endcard-icon-ok">✓</div>
+      <h1>This home is set up</h1>
+      <p id="success-message">The homeowner will get the reveal in their app.</p>
+    </div>
+  </section>
+
+  <!-- INGESTION ERROR (submitted, server will finish) -->
+  <section data-screen="ingest-error" class="ob-screen ob-screen-center" hidden>
+    <div class="ob-endcard">
+      <div class="ob-endcard-icon ob-endcard-icon-ok">✓</div>
+      <h1>Visit captured</h1>
+      <p>Everything you recorded is saved. Chez will finish the account setup from here. Nothing else is needed on site.</p>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast-root"></div>
+<div id="dialog-root"></div>
+
+<script type="module" src="/onboard/main.js"></script>
+</body>
+</html>

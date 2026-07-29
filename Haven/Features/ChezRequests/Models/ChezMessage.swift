@@ -83,18 +83,27 @@ struct ChezMessageRow: Codable, Identifiable, Hashable {
 /// when the homeowner views it. Server-side this is a JSONB blob on
 /// `concierge_messages.proposal`; here it's a typed Codable.
 struct ChezProposal: Codable, Hashable {
-    let kind: String           // "vendor" | "date_slot" | "cost" | "quote"
-    let status: String         // "pending" | "approved" | "declined" | "countered"
+    let kind: String           // "vendor" | "date_slot" | "cost" | "quote" | "info_request"
+    let status: String         // "pending" | "approved" | "declined" | "countered" | "answered"
     let decidedAt: Date?
     let vendor: ChezProposalVendor?
     let dateSlot: ChezProposalDateSlot?
     let cost: ChezProposalCost?
     let quote: ChezProposalQuote?
+    /// Wave 6 — structured info-request fields. Present when
+    /// `kind == "info_request"`: Chez asks the homeowner for a few
+    /// specifics (a time window, a budget confirmation, a photo) and
+    /// the card renders one input per field.
+    let infoRequestFields: [ChezInfoRequestField]?
+    /// Wave 6 — the homeowner's answers, once sent. Non-nil means the
+    /// card renders the quiet answered-summary state.
+    let reply: ChezInfoRequestReply?
 
     enum CodingKeys: String, CodingKey {
-        case kind, status, vendor, cost, quote
+        case kind, status, vendor, cost, quote, reply
         case decidedAt = "decided_at"
         case dateSlot = "date_slot"
+        case infoRequestFields = "fields"
     }
 
     init(from decoder: Decoder) throws {
@@ -106,10 +115,17 @@ struct ChezProposal: Codable, Hashable {
         dateSlot = (try? c.decodeIfPresent(ChezProposalDateSlot.self, forKey: .dateSlot)) ?? nil
         cost = (try? c.decodeIfPresent(ChezProposalCost.self, forKey: .cost)) ?? nil
         quote = (try? c.decodeIfPresent(ChezProposalQuote.self, forKey: .quote)) ?? nil
+        infoRequestFields = (try? c.decodeIfPresent([ChezInfoRequestField].self, forKey: .infoRequestFields)) ?? nil
+        reply = (try? c.decodeIfPresent(ChezInfoRequestReply.self, forKey: .reply)) ?? nil
     }
 
+    /// Wave 6 back-compat change: unknown kinds used to fall back to
+    /// `.vendor`, which rendered a broken vendor card with live Approve
+    /// buttons. They now fall back to `.unknown`, which renders as plain
+    /// message text with a quiet "Update from Chez" caption and no
+    /// action buttons — so future proposal kinds degrade gracefully.
     var typedKind: ChezProposalKind {
-        ChezProposalKind(rawValue: kind) ?? .vendor
+        ChezProposalKind(rawValue: kind) ?? .unknown
     }
 
     var typedStatus: ChezProposalStatusValue {
@@ -124,6 +140,11 @@ enum ChezProposalKind: String, Codable {
     case dateSlot = "date_slot"
     case cost
     case quote
+    /// Wave 6 — Chez needs a few details from the homeowner.
+    case infoRequest = "info_request"
+    /// Wave 6 — safe fallback for kinds this build doesn't know about.
+    /// Renders content-only, never live decision buttons.
+    case unknown
 }
 
 enum ChezProposalStatusValue: String, Codable {
@@ -131,6 +152,80 @@ enum ChezProposalStatusValue: String, Codable {
     case approved
     case declined
     case countered
+    /// Wave 6 — terminal state for info_request proposals.
+    case answered
+}
+
+// MARK: - Wave 6 — info-request field + reply shapes
+
+/// One input Chez asks for inside an info_request proposal. Types:
+/// `date_window` / `choice` (single-select chips over `options`),
+/// `budget_confirm` (yes/no on `amountCents`), `photo` (upload), and
+/// anything else renders as a plain text input (forward compatible).
+struct ChezInfoRequestField: Codable, Hashable, Identifiable {
+    let id: String
+    let type: String?
+    let label: String?
+    let options: [String]?
+    let amountCents: Int?
+    let isRequired: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, label, options
+        case amountCents = "amount_cents"
+        case isRequired = "required"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+        type = (try? c.decodeIfPresent(String.self, forKey: .type)) ?? nil
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? nil
+        options = (try? c.decodeIfPresent([String].self, forKey: .options)) ?? nil
+        amountCents = (try? c.decodeIfPresent(Int.self, forKey: .amountCents)) ?? nil
+        isRequired = (try? c.decodeIfPresent(Bool.self, forKey: .isRequired)) ?? false
+    }
+
+    var typedFieldType: ChezInfoRequestFieldType? {
+        ChezInfoRequestFieldType(rawValue: type ?? "")
+    }
+}
+
+enum ChezInfoRequestFieldType: String {
+    case dateWindow = "date_window"
+    case choice
+    case budgetConfirm = "budget_confirm"
+    case photo
+}
+
+/// The homeowner's submitted answers on an info_request proposal.
+/// Answer conventions: choice / date_window → the selected option
+/// string verbatim; budget_confirm → "yes" | "no"; photo → the uploaded
+/// attachment path (empty string when skipped).
+struct ChezInfoRequestReply: Codable, Hashable {
+    let answers: [String: String]
+    let attachments: [ChezAttachmentMeta]
+    let answeredAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case answers, attachments
+        case answeredAt = "answered_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        answers = (try? c.decodeIfPresent([String: String].self, forKey: .answers)) ?? [:]
+        attachments = (try? c.decodeIfPresent([ChezAttachmentMeta].self, forKey: .attachments)) ?? []
+        answeredAt = (try? c.decodeIfPresent(Date.self, forKey: .answeredAt)) ?? nil
+    }
+
+    /// Memberwise init for the optimistic local flip after a successful
+    /// send (custom init(from:) suppresses the synthesized one).
+    init(answers: [String: String], attachments: [ChezAttachmentMeta], answeredAt: Date?) {
+        self.answers = answers
+        self.attachments = attachments
+        self.answeredAt = answeredAt
+    }
 }
 
 struct ChezProposalVendor: Codable, Hashable {

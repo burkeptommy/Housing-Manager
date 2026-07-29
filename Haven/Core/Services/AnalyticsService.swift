@@ -58,6 +58,18 @@ enum AnalyticsEvent: String {
     case quizSavedForLater = "quiz_saved_for_later"
     case quizSkippedForever = "quiz_skipped_forever"
     case quizMilestoneReached = "quiz_milestone_reached"
+    case quizForwardingRevealShown = "quiz_forwarding_reveal_shown"
+
+    // Phase 7 — Ingestion Intelligence v2 (universal review card). The
+    // remap rate is the post-ship health metric: it tells us whether the
+    // recommendations are earning trust.
+    case suggestedActionsCardShown = "suggested_actions_card_shown"
+    case suggestedActionApplied = "suggested_action_applied"
+    case suggestedActionRemapped = "suggested_action_remapped"
+    case scheduleStampUndone = "schedule_stamp_undone"
+    case shareChezContactShown = "share_chez_contact_shown"
+    case chatPhotosAttachedToCase = "chat_photos_attached_to_case"
+    case quickCaptureOpened = "quick_capture_opened"
     case quizCompleted = "quiz_completed"
     case quizDismissed = "quiz_dismissed"
     case quizCompletionViewMaintenanceTapped = "quiz_completion_view_maintenance_tapped"
@@ -648,6 +660,22 @@ enum AnalyticsEvent: String {
     case chezProfileSaved = "chez_profile_saved"
     case chezDelegationToggled = "chez_delegation_toggled"
     case chezProposalDecided = "chez_proposal_decided"
+    // Wave 4 — delegation composer v2
+    /// preview_snapshot rendered on a confirm sheet or the composer.
+    /// Payload: kind, source ("confirm_sheet" | "composer"),
+    /// has_suggested_budget.
+    case chezSnapshotPreviewShown = "chez_snapshot_preview_shown"
+    /// Homeowner picked a budget band on the intake form.
+    /// Payload: band, source.
+    case chezIntakeBudgetSelected = "chez_intake_budget_selected"
+    /// The confirm sheet's "Hand this to Chez" succeeded.
+    /// Payload: kind, had_intake, had_notes.
+    case chezDelegationConfirmed = "chez_delegation_confirmed"
+    /// Wave 6 — homeowner sent answers to a structured info request.
+    /// Payload: field_count.
+    case chezInfoRequestAnswered = "chez_info_request_answered"
+    /// Wave 6 — homeowner expanded the progress timeline on a request.
+    case chezProgressExpanded = "chez_progress_expanded"
 
     // MARK: - Phase 70 (Tasks v2)
     /// Tile tap on YearRibbon. Properties: season ("Spring|Summer|Fall|Winter"),

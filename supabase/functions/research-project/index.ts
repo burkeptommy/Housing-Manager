@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold } from "../_shared/require-household.ts";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
 
 const corsHeaders = {
@@ -50,6 +51,22 @@ serve(async (req: Request) => {
     // --- PARSE REQUEST ---
     const body: ResearchRequest = await req.json();
     const { project_name, category, description, property_location, project_id, user_toolkit, freeform, style_preferences, pinterest_url, project_type, inspiration_images } = body;
+
+    // July 2026 security sweep (audit S1): research results write back to
+    // property_projects.ai_research — the caller must own the project.
+    const auth = await requireHousehold(req);
+    if ("failure" in auth) return authFailure(auth, headers);
+    if (project_id) {
+      const ownerCheck = createClient(supabaseUrl, serviceRoleKey);
+      const { data: proj } = await ownerCheck
+        .from("property_projects").select("household_id").eq("id", project_id).single();
+      if (!proj || proj.household_id !== auth.householdId) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: project does not belong to your household" }),
+          { status: 403, headers },
+        );
+      }
+    }
     const isProProject = project_type === "professional";
     const isDiyProject = project_type === "diy";
     const hasInspirationImages = inspiration_images && inspiration_images.length > 0;

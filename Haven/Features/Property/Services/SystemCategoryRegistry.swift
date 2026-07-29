@@ -436,11 +436,15 @@ enum SystemCategoryRegistry {
             "pool":                   "Pool/Spa",
             "pool service":           "Pool/Spa",
             "spa":                    "Pool/Spa",
-            // Chimney alias — chimney_sweep chip used to map to Fire
-            // Protection (a sub-system with showInVendorCoverage=false).
-            // Phase 60.6 remaps the chip to "Chimney"; this entry catches
-            // already-saved rows on the old mapping.
-            "fire protection":        "Chimney",
+            // NOTE (July 2026 audit): do NOT add a "fire protection" alias
+            // here. "Fire Protection" is a live registry categoryKey (the
+            // smoke/fire sub-system that invoice parent grouping writes),
+            // and step 2's registry-key match short-circuits BEFORE this
+            // variant map — so an alias entry for any string that is also
+            // a categoryKey can never fire. The pre-60.6 chimney-sweep
+            // contractors stamped "Fire Protection" are healed by an
+            // explicit contractor-only remap in
+            // AppState.canonicalizeContractorCategoriesOnceIfNeeded instead.
             "chimney sweep":          "Chimney",
             "chimney service":        "Chimney",
             // Trash & Recycling — common aliases

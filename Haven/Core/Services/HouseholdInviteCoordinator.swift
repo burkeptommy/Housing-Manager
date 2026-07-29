@@ -374,7 +374,10 @@ actor HouseholdInviteCoordinator {
                 invitedEmail: inviteEmail,
                 inviteCode: candidate,
                 familyMemberId: familyMember.id,
-                personalMessage: request.personalMessage?.trimmedNonEmpty
+                personalMessage: request.personalMessage?.trimmedNonEmpty,
+                // This flow created the member placeholder above — revoke is
+                // allowed to clean it up. (audit F3)
+                createdMember: true
             )
             do {
                 invitation = try await db.createInvitation(invitationInsert)

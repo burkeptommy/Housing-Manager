@@ -352,6 +352,13 @@ struct HouseQuizView: View {
                     // confirm them in one card before Q1 / Q2 instead of
                     // asking cold. Falls through when ATTOM has neither.
                     attomCardScreen
+                } else if viewModel.showForwardingReveal,
+                          let email = viewModel.cachedHouseholdEmail {
+                    // July 2026 quiz-fun restore — the forwarding-email
+                    // reveal fires once after q15b (vendor capture). Rides
+                    // its own flag because the legacy milestone system
+                    // (showMilestoneCard) has been disabled since Phase 60.3.
+                    forwardingEmailMilestoneCard(email: email)
                 } else if viewModel.showMilestoneCard {
                     milestoneCard
                 } else if let q = viewModel.currentQuestion {
@@ -5239,11 +5246,12 @@ struct HouseQuizView: View {
 
     @ViewBuilder
     private var milestoneCard: some View {
-        // Build 84: at the Q17 milestone (~50% through), reveal the user's
-        // forwarding inbox address. Other milestones (Q5, Q10, Q22, Q27, Q33)
-        // keep the generic "Section complete!" variant. The forwarding email
-        // is loaded into `viewModel.cachedHouseholdEmail` from the view's
-        // .task on first appear so this branch never has to wait on the DB.
+        // LEGACY — the index-based milestone system has been dormant since
+        // Phase 60.3 emptied `milestoneIndices` (chapter intro cards own
+        // section transitions now), so this only renders if that set is ever
+        // repopulated. The forwarding-email reveal moved to its own
+        // question-id-gated branch in the body routing (July 2026); the
+        // index-17 check below is retained only for the dormant path.
         if viewModel.currentIndex == 17, let email = viewModel.cachedHouseholdEmail {
             forwardingEmailMilestoneCard(email: email)
         } else {

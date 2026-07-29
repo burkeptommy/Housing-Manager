@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { inferSpecialtyCategory } from "../_shared/specialty-inference.ts";
 import { callClaudeWithDiscipline } from "../_shared/ai-cost-discipline.ts";
+import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
+import { assignIds, chezAction, pickActionType, routineAction, taskAction } from "../_shared/suggested-actions.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,7 +113,39 @@ serve(async (req: Request) => {
 
     // --- PARSE REQUEST ---
     const body = await req.json();
-    const { document_id, text, image_base64, category, household_id, document_title } = body;
+    const { document_id, text, image_base64, category, document_title } = body;
+    let household_id = body.household_id as string | undefined;
+
+    // --- AUTH (July 2026 security sweep, audit S1) ---
+    // Previously unauthenticated: any caller could rewrite any document's
+    // category — and therefore its visible_to_home_managers flag — or
+    // poison its extracted text. Three accepted caller shapes:
+    //   1. Internal secret (receive-email / process-inbox-item / crons).
+    //   2. Legacy internal: Authorization bearing the service-role key
+    //      (what the in-repo callers send today — kept so deploy order
+    //      can't break the pipeline; callers migrate to the secret).
+    //   3. A household member's JWT — document ownership verified below.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const isLegacyInternal = serviceRoleKey.length > 0 && authHeader === `Bearer ${serviceRoleKey}`;
+    const isInternal = requireInternal(req) || isLegacyInternal;
+
+    if (!isInternal) {
+      const auth = await requireHousehold(req);
+      if ("failure" in auth) return authFailure(auth, headers);
+      // The caller's JWT household always wins over the body value.
+      household_id = auth.householdId;
+      if (document_id) {
+        const ownerCheck = createClient(supabaseUrl, serviceRoleKey);
+        const { data: docRow } = await ownerCheck
+          .from("documents").select("household_id").eq("id", document_id).single();
+        if (!docRow || docRow.household_id !== auth.householdId) {
+          return new Response(
+            JSON.stringify({ error: "Access denied: document does not belong to your household" }),
+            { status: 403, headers },
+          );
+        }
+      }
+    }
 
     if (!document_id || !household_id) {
       return new Response(JSON.stringify({ error: "Missing document_id or household_id" }), { status: 400, headers });
@@ -217,6 +251,16 @@ serve(async (req: Request) => {
       "estimatedCost": "rough cost estimate or null"
     }
   ],
+  "standing_arrangements": [
+    {
+      "category": "service category, e.g. Landscaping | Pool Service | Cleaning Service | Pest Control | Snow Removal | Gutter Cleaning | Painting | Mosquito & Tick | Pet Waste Removal | Window Cleaning",
+      "intervalDays": "number or null (7 weekly, 14 biweekly, 30 monthly...)",
+      "cadencePhrase": "the exact cadence phrase from the document",
+      "activeMonths": "[array of month numbers 1-12 when the service runs] or null if year-round/unstated",
+      "quotedText": "short verbatim quote of the evidence, <= 140 chars",
+      "estimatedCostPerVisit": "number in dollars or null"
+    }
+  ],
   "insurance_policy": {
     "type": "auto|home|umbrella|renters|flood|life|other or null",
     "provider": "Carrier name or null",
@@ -234,6 +278,7 @@ EXTRACTION RULES:
 - vendor_info: Extract if the document is from a contractor, service company, vendor, or business. Include for: quotes, invoices, service reports, warranties, vendor contracts, repair estimates, inspection reports.
 - home_systems: Extract if the document mentions specific home systems, appliances, or equipment. Especially important for: inspection reports (extract ALL systems inspected), warranty cards (extract the covered system), appliance manuals, service reports, completion certificates.
 - maintenance_suggestions: Extract if the document recommends maintenance, repairs, or follow-up work. Especially from: inspection reports, service reports, warranty cards (maintenance requirements to keep warranty valid).
+- standing_arrangements: Be VERY conservative. Populate (max 2) ONLY when the document is an ACCEPTED/ACTIVE recurring service arrangement — a signed service contract, a seasonal agreement, a service plan with an explicit recurring cadence ("every week", "biweekly", "monthly service", "May through October"). A one-time job, a single invoice, a recommendation for annual service (that is a maintenance_suggestion), or an unaccepted proposal is NOT a standing arrangement. Empty array when in doubt. Do not duplicate a standing arrangement into maintenance_suggestions.
 - insurance_policy: Extract if this is a declarations page, policy summary, ID card, binder, or any insurance document. The "type" should be the PRIMARY policy type (auto/home/umbrella/etc). The "bundled_policies" list captures any OTHER policy types that appear on the same declaration (e.g. a State Farm dec page that lists both auto AND home gets "auto" as type and ["home"] in bundled_policies). When the user uploads such a declaration we surface both policies in the inbox so they can confirm both with one tap.
 - If none of these apply (e.g., a will or passport), return null/empty arrays for those fields.
 
@@ -346,6 +391,14 @@ Return ONLY JSON. No markdown. No explanation.`;
     if (supabaseUrl && serviceRoleKey) {
       const svc = createClient(supabaseUrl, serviceRoleKey);
 
+      // July 2026 (audit F20): background writes MUST be registered with
+      // EdgeRuntime.waitUntil or the isolate can tear down mid-write after
+      // the response returns — intermittently losing the category +
+      // visible_to_home_managers rewrite (a security control) and the
+      // vendor/system auto-creates. Every fire-and-forget chain below
+      // pushes into this array; waitUntil is called at the end of the block.
+      const pendingWrites: PromiseLike<unknown>[] = [];
+
       // NOTE: content_hash is now set at document creation time (receive-email, process-inbox-item,
       // DocumentUploadManager). No longer computed here to avoid race conditions or hash mismatches.
 
@@ -369,25 +422,29 @@ Return ONLY JSON. No markdown. No explanation.`;
         docUpdate.property_id = analysis.property_id;
         console.log(`[analyze] Auto-linked to property: ${analysis.property_id}`);
       }
-      svc.from("documents").update(docUpdate).eq("id", document_id).then(({ error }) => {
-        if (error) console.error("[analyze] DB update failed:", error.message);
-        else console.log("[analyze] Document updated in DB");
-      });
+      pendingWrites.push(
+        svc.from("documents").update(docUpdate).eq("id", document_id).then(({ error }) => {
+          if (error) console.error("[analyze] DB update failed:", error.message);
+          else console.log("[analyze] Document updated in DB");
+        }),
+      );
 
       // Store extracted text
       const extractedText = (analysis.extracted_text as string) ?? text ?? "";
       if (extractedText.length > 0) {
-        svc.from("document_content").upsert({
-          document_id,
-          household_id,
-          extracted_text: extractedText,
-          extraction_method: text ? "text_extraction" : "ocr",
-          extracted_at: new Date().toISOString(),
-          last_ai_analysis_at: new Date().toISOString(),
-          ai_model_version: "claude-sonnet-4-6",
-        }, { onConflict: "document_id" }).then(({ error }) => {
-          if (error) console.error("[analyze] document_content upsert failed:", error.message);
-        });
+        pendingWrites.push(
+          svc.from("document_content").upsert({
+            document_id,
+            household_id,
+            extracted_text: extractedText,
+            extraction_method: text ? "text_extraction" : "ocr",
+            extracted_at: new Date().toISOString(),
+            last_ai_analysis_at: new Date().toISOString(),
+            ai_model_version: "claude-sonnet-4-6",
+          }, { onConflict: "document_id" }).then(({ error }) => {
+            if (error) console.error("[analyze] document_content upsert failed:", error.message);
+          }),
+        );
       }
 
       // Auto-create vendor if extracted
@@ -395,7 +452,8 @@ Return ONLY JSON. No markdown. No explanation.`;
       if (vendorInfo?.name && (vendorInfo?.phone || vendorInfo?.email)) {
         const vendorName = vendorInfo.name as string;
         // Check if vendor already exists
-        svc.from("contractors")
+        pendingWrites.push(
+          svc.from("contractors")
           .select("id")
           .eq("household_id", household_id)
           .ilike("company_name", `%${vendorName}%`)
@@ -417,7 +475,8 @@ Return ONLY JSON. No markdown. No explanation.`;
             } else {
               console.log(`[analyze] Vendor already exists: ${vendorName}`);
             }
-          });
+          }),
+        );
       }
 
       // --- AUTO-DETECT VINs AND LINK TO VEHICLES ---
@@ -471,16 +530,19 @@ Return ONLY JSON. No markdown. No explanation.`;
             unmatched_vins: unmatchedVins,
           };
           // Re-update the document with VIN metadata
-          svc.from("documents").update({ metadata: docUpdate.metadata }).eq("id", document_id).then(({ error }) => {
-            if (error) console.error("[analyze] VIN metadata update failed:", error.message);
-          });
+          pendingWrites.push(
+            svc.from("documents").update({ metadata: docUpdate.metadata }).eq("id", document_id).then(({ error }) => {
+              if (error) console.error("[analyze] VIN metadata update failed:", error.message);
+            }),
+          );
         }
       }
 
       // Auto-link family members from key_parties
       const keyParties = analysis.key_parties as Array<{ name: string; role: string }> | null;
       if (keyParties && keyParties.length > 0) {
-        svc.from("family_members")
+        pendingWrites.push(
+          svc.from("family_members")
           .select("id, first_name, last_name")
           .eq("household_id", household_id)
           .then(async ({ data: members }) => {
@@ -506,7 +568,8 @@ Return ONLY JSON. No markdown. No explanation.`;
                 }
               }
             }
-          });
+          }),
+        );
       }
 
       // Auto-create home systems if extracted (for inspection reports, warranty cards, etc.)
@@ -519,7 +582,8 @@ Return ONLY JSON. No markdown. No explanation.`;
       const homeSystems = analysis.home_systems as Array<Record<string, unknown>> | null;
       if (homeSystems && homeSystems.length > 0 && !isInvoice) {
         // Get property for this household
-        svc.from("properties")
+        pendingWrites.push(
+          svc.from("properties")
           .select("id")
           .eq("household_id", household_id)
           .limit(1)
@@ -554,44 +618,121 @@ Return ONLY JSON. No markdown. No explanation.`;
                 else console.log(`[analyze] Auto-created home system: ${sysName}`);
               }
             }
-          });
+          }),
+        );
       }
 
-      // Auto-create maintenance tasks from suggestions
-      // Also skip auto-creating maintenance tasks for invoices (invoice intelligence handles this)
+      // Follow-up tasks from document suggestions (inspection reports,
+      // service reports, warranty upkeep). July 2026: this used to SILENTLY
+      // insert maintenance_tasks — which violated "always ask the homeowner"
+      // and created duplicates on re-upload (no dedup, no source). It now
+      // surfaces a "we spotted N follow-ups — add them?" inbox review card
+      // using the SAME shape the email pipeline uses. The homeowner taps
+      // "Add these" → process-inbox-item action=add_suggested_tasks creates
+      // the tasks with dedup. Skipped for invoices (process-invoice owns
+      // those follow-ups).
       const maintSuggestions = analysis.maintenance_suggestions as Array<Record<string, unknown>> | null;
-      if (maintSuggestions && maintSuggestions.length > 0 && !isInvoice) {
-        svc.from("properties")
-          .select("id")
-          .eq("household_id", household_id)
-          .limit(1)
-          .then(async ({ data: props }) => {
-            const propertyId = props?.[0]?.id;
-            if (!propertyId) return;
-
-            for (const maint of maintSuggestions) {
-              const taskName = maint.task as string;
-              if (!taskName) continue;
-
-              const dueDate = (maint.dueDate as string) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-              const { error: mErr } = await svc.from("maintenance_tasks").insert({
-                household_id,
-                property_id: propertyId,
-                title: taskName,
-                service_key: "custom_seasonal_service",
-                frequency: "once",
-                next_due_date: dueDate,
-                priority: maint.urgency === "critical" ? "high" : maint.urgency === "soon" ? "medium" : "low",
-                notes: `Auto-suggested from document analysis. ${(maint.estimatedCost as string) ? `Estimated cost: ${maint.estimatedCost}` : ""}`.trim(),
-              });
-              if (mErr) console.error(`[analyze] Maintenance task creation failed for ${taskName}:`, mErr.message);
-              else console.log(`[analyze] Auto-created maintenance task: ${taskName}`);
-            }
+      // Phase 7 M2 — standing arrangements from uploaded service
+      // agreements/contracts. Evidence-only payloads; iOS derives kind /
+      // serviceKey / cadence and enforces the template-backed exclusions.
+      const rawArrangements = Array.isArray(analysis.standing_arrangements)
+        ? analysis.standing_arrangements as Array<Record<string, unknown>>
+        : [];
+      const routineActions = isInvoice ? [] : rawArrangements
+        .filter((r) => r && typeof r.category === "string" && (r.category as string).trim().length > 0)
+        .slice(0, 2)
+        .map((r) => {
+          const months = Array.isArray(r.activeMonths)
+            ? (r.activeMonths as unknown[]).filter((m): m is number =>
+                typeof m === "number" && Number.isInteger(m) && m >= 1 && m <= 12)
+            : [];
+          const interval = typeof r.intervalDays === "number" && r.intervalDays > 0
+            ? Math.round(r.intervalDays as number)
+            : null;
+          const costDollars = typeof r.estimatedCostPerVisit === "number" && r.estimatedCostPerVisit > 0
+            ? r.estimatedCostPerVisit as number
+            : null;
+          const category = (r.category as string).trim();
+          const cadencePhrase = typeof r.cadencePhrase === "string" ? (r.cadencePhrase as string).trim() : null;
+          return routineAction({
+            title: `Set up ${category.toLowerCase()} routine${cadencePhrase ? ` (${cadencePhrase})` : ""}`,
+            reason: typeof r.quotedText === "string" && (r.quotedText as string).trim()
+              ? `"${(r.quotedText as string).trim().substring(0, 140)}"`
+              : null,
+            source: "document_analysis",
+            category,
+            raw_category: category,
+            interval_days: interval,
+            cadence_phrase: cadencePhrase,
+            active_months_hint: months.length > 0 ? months : null,
+            quoted_text: typeof r.quotedText === "string" ? (r.quotedText as string).substring(0, 140) : null,
+            estimated_cost_cents: costDollars ? Math.round(costDollars * 100) : null,
           });
+        });
+      if (((maintSuggestions && maintSuggestions.length > 0) || routineActions.length > 0) && !isInvoice) {
+        const suggestedTasks = (maintSuggestions ?? [])
+          .filter((m) => typeof m.task === "string" && (m.task as string).trim().length > 0)
+          .slice(0, 3)
+          .map((m) => ({
+            title: (m.task as string).trim(),
+            due_date: (m.dueDate as string) || null,
+            urgency: m.urgency === "critical" ? "soon" : (m.urgency as string) || "routine",
+            reason: (m.estimatedCost as string)
+              ? `From document analysis. Estimated cost: ${m.estimatedCost}`
+              : "Recommended by the document you uploaded.",
+          }));
+        if (suggestedTasks.length > 0 || routineActions.length > 0) {
+          const followTitle = suggestedTasks.length === 0
+            ? "Standing service spotted in your document"
+            : suggestedTasks.length === 1
+              ? "Follow-up spotted in your document"
+              : `${suggestedTasks.length} follow-ups spotted in your document`;
+          // Phase 7 M1 — unified suggested_actions alongside the legacy
+          // suggested_tasks (see _shared/suggested-actions.ts).
+          const unifiedActions = assignIds([
+            ...suggestedTasks.map((t) => taskAction({
+              title: t.title,
+              reason: t.reason,
+              source: "document_analysis",
+              due_date: t.due_date,
+              urgency: t.urgency,
+            })),
+            ...routineActions,
+            chezAction({
+              summary: `Handle ${suggestedTasks.length > 0 ? "follow-ups" : "a standing service"} from an uploaded document: ${[...suggestedTasks.map((t) => t.title), ...routineActions.map((r) => r.title)].join("; ")}`.substring(0, 300),
+              description: (analysis.summary as string | null) ?? null,
+              category: "coordinate_task",
+              source: "document_analysis",
+            }),
+          ]);
+          const { error: followErr } = await svc.from("inbox_items").insert({
+            household_id,
+            type: "follow_ups",
+            title: followTitle,
+            summary: [
+              ...suggestedTasks.map((t) => `• ${t.title}`),
+              ...routineActions.map((r) => `• ${r.title}`),
+            ].join("\n"),
+            related_document_id: document_id,
+            needs_action: true,
+            action_type: pickActionType(unifiedActions),
+            metadata: {
+              // Legacy mirror is TASK KINDS ONLY — routine rows must never
+              // become one-off tasks on an old client.
+              ...(suggestedTasks.length > 0 ? { suggested_tasks: suggestedTasks } : {}),
+              suggested_actions: unifiedActions,
+              source_document_id: document_id,
+            },
+            status: "ready",
+          });
+          if (followErr) console.error("[analyze] follow-up review item insert failed:", followErr.message);
+          else console.log(`[analyze] Created follow-up review item (${suggestedTasks.length} tasks, ${routineActions.length} routines)`);
+        }
       }
 
       // Log
-      svc.from("access_log").insert({
+      pendingWrites.push(
+        svc.from("access_log").insert({
         household_id,
         user_id: body.user_id ?? null,
         action: "document_ai_analyzed",
@@ -605,9 +746,10 @@ Return ONLY JSON. No markdown. No explanation.`;
           auto_created_systems: homeSystems?.length ?? 0,
           auto_created_maintenance: maintSuggestions?.length ?? 0,
         },
-      }).then(({ error }) => {
-        if (error) console.warn("[analyze] access_log insert failed:", error.message);
-      });
+        }).then(({ error }) => {
+          if (error) console.warn("[analyze] access_log insert failed:", error.message);
+        }),
+      );
 
       // Chez v1: Phase 48 estate extraction branch removed. Estate
       // management is out of v1 scope; estate_state, estate_pdf_exports,
@@ -616,6 +758,17 @@ Return ONLY JSON. No markdown. No explanation.`;
       // logging — keeping it.
       const resolvedCategory = (analysis.category_suggestion as string) ?? "";
       void resolvedCategory;
+
+      // Register every background write with the runtime so the isolate
+      // stays alive until they settle. Fall back to awaiting inline when
+      // EdgeRuntime isn't available (local `deno run`, tests).
+      const settled = Promise.allSettled(pendingWrites);
+      try {
+        // @ts-ignore — EdgeRuntime is injected by the Supabase edge runtime
+        EdgeRuntime.waitUntil(settled);
+      } catch (_) {
+        await settled;
+      }
     }
 
     return new Response(responseBody, { status: 200, headers });

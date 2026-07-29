@@ -33,10 +33,10 @@ import re
 from pathlib import Path
 
 SOURCE = Path(
-    "/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Services/MaintenanceTemplates.swift"
+    "/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Services/MaintenanceTemplates.swift"
 )
 OUTPUT = Path(
-    "/Users/tomburke/Projects/Housing-Manager/PHASE-66-67-TASK-AUDIT.csv"
+    "/Users/tomburke/Documents/Projects/Housing-Manager/PHASE-66-67-TASK-AUDIT.csv"
 )
 
 # Fields we want to pull off each template, in order for the output CSV.

@@ -395,6 +395,15 @@ final class AppState: ObservableObject {
                         // dedup.
                         await Self.ensureSmokeCoRoutineOnceIfNeeded()
 
+                        // July 2026 audit: heal Q15b waterproofing captures
+                        // that landed before the Crawl Space system
+                        // auto-create shipped — the contractor existed but
+                        // no system row meant the Crawl Space:annual bundle
+                        // never seeded, so the vendor had zero scheduled
+                        // work. Idempotent via UserDefaults gate +
+                        // ensure-then-reconcile dedup.
+                        await Self.ensureCrawlSpaceSystemsForWaterproofingVendorsOnceIfNeeded()
+
                         // Chez v1: pre-fill install_date for systems
                         // whose category correlates with year_built
                         // (roof, foundation, structural shells). The
@@ -1703,6 +1712,83 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(true, forKey: key)
     }
 
+    /// July 2026 audit: one-time healer for Q15b waterproofing captures
+    /// that landed before the mapper's Crawl Space auto-create shipped.
+    /// The waterproofing chip is universally visible but no quiz question
+    /// creates a Crawl Space system, so those households have a contractor
+    /// (category "Crawl Space", or "Waterproofing" post-migration) with no
+    /// system row — which means the Crawl Space:annual template bundle
+    /// never seeded and the vendor has zero scheduled work.
+    ///
+    /// Creates the missing system on the household's FIRST quiz-completed
+    /// property (contractors are household-scoped; TestFlight households
+    /// are single-property) and runs the reconciler for that one system so
+    /// the bundle lands and the vendor auto-links. Idempotent: skips when
+    /// a top-level Crawl Space system already exists, and the reconciler
+    /// dedups by templateKey.
+    static func ensureCrawlSpaceSystemsForWaterproofingVendorsOnceIfNeeded() async {
+        let key = "hasEnsuredCrawlSpaceForWaterproofingVendors_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+
+        let db = DatabaseService.shared
+        let contractors: [ContractorRow]
+        do {
+            contractors = try await db.fetchContractors()
+        } catch {
+            print("[AppState] crawl-space healer: fetchContractors failed: \(error)")
+            return
+        }
+        let waterproofingVendor = contractors.first { contractor in
+            let canonical = SystemCategoryRegistry.canonical(category: contractor.category)
+            return canonical == "Crawl Space" || canonical == "Waterproofing"
+        }
+        guard let vendor = waterproofingVendor else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let properties = (try? await db.fetchProperties()) ?? []
+        guard let property = properties.first(where: { p in
+            let quiz = p.houseQuizState
+            return quiz?.completedAt != nil
+                || quiz?.intakeCompletedAt != nil
+                || quiz?.walkthroughCompletedAt != nil
+        }) else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let systems = (try? await db.fetchHomeSystems(propertyId: property.id, topLevelOnly: false)) ?? []
+        var systemId = systems.first(where: {
+            $0.category.lowercased() == "crawl space" && $0.parentSystemId == nil
+        })?.id
+
+        if systemId == nil {
+            let insert = HomeSystemInsert(
+                propertyId: property.id,
+                householdId: property.householdId,
+                name: "Crawl Space / Basement",
+                category: "Crawl Space",
+                notes: "Created from your waterproofing vendor (\(vendor.companyName))."
+            )
+            systemId = (try? await db.createHomeSystem(insert))?.id
+        }
+
+        if let systemId {
+            _ = await MaintenanceTaskReconciler.reconcile(
+                propertyId: property.id,
+                householdId: property.householdId,
+                systemId: systemId,
+                systemCategory: "Crawl Space",
+                confirmedSubtype: nil
+            )
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        }
+
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
     /// Chez v1: walks every existing property and pre-fills install
     /// dates on systems whose category correlates with the home's age
     /// (roof, foundation, structural shells, original windows, etc.)
@@ -1921,7 +2007,14 @@ final class AppState: ObservableObject {
     }
 
     static func canonicalizeContractorCategoriesOnceIfNeeded() async {
-        let key = "hasRunContractorCategoryCanonicalizationP60_6_v1"
+        // July 2026 audit: bumped _v1 → _v2 to re-sweep for the explicit
+        // "Fire Protection" → "Chimney" contractor remap below. The old
+        // pass relied on canonical()'s variant map for that alias, but
+        // canonical() matches registry keys BEFORE the variant map and
+        // "Fire Protection" is a live registry key (the smoke/fire
+        // sub-system) — so the alias never fired and pre-60.6 chimney
+        // sweeps stayed locked out of Chimney coverage.
+        let key = "hasRunContractorCategoryCanonicalizationP60_6_v2"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         let db = DatabaseService.shared
         let contractors: [ContractorRow]
@@ -1935,9 +2028,24 @@ final class AppState: ObservableObject {
             return
         }
 
+        // Contractor-only remaps that canonical() intentionally can't
+        // express because the source string is itself a registry key.
+        // "Fire Protection" is a valid home_systems sub-system category,
+        // but on a CONTRACTOR it only ever meant the pre-60.6 chimney
+        // sweep chip mapping.
+        let contractorOnlyRemaps: [String: String] = [
+            "fire protection": "Chimney",
+        ]
+
         for contractor in contractors {
             let oldCategory = contractor.category
-            let newCategory = SystemCategoryRegistry.canonical(category: oldCategory)
+            let newCategory: String? = {
+                if let old = oldCategory,
+                   let remapped = contractorOnlyRemaps[old.lowercased()] {
+                    return remapped
+                }
+                return SystemCategoryRegistry.canonical(category: oldCategory)
+            }()
 
             let oldSpecialties = contractor.specialties ?? []
             // Only canonicalize specialties that round-trip through the
@@ -1945,6 +2053,9 @@ final class AppState: ObservableObject {
             // / CPA", etc.) are not registry keys and must pass through
             // untouched so the Contacts filter can still find them.
             let newSpecialties = oldSpecialties.map { s -> String in
+                if let remapped = contractorOnlyRemaps[s.lowercased()] {
+                    return remapped
+                }
                 if let canonical = SystemCategoryRegistry.canonical(category: s),
                    SystemCategoryRegistry.byCategoryKey[canonical] != nil {
                     return canonical

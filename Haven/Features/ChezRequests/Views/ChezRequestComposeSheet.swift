@@ -21,8 +21,14 @@ struct ChezRequestComposeSheet: View {
 
     @State private var showFileImporter = false
     @State private var showDismissConfirm = false
+    // Photo-to-case (2026-07-08): camera-first entry hands the captured
+    // image in; it stages through the same upload pipeline on appear.
+    private let initialImageData: Data?
+    @State private var didIngestInitialImage = false
+    @State private var showCamera = false
 
-    init(category: ChezCategory, contextHints: [String: String], isCategoryFixed: Bool) {
+    init(category: ChezCategory, contextHints: [String: String], isCategoryFixed: Bool, initialImageData: Data? = nil) {
+        self.initialImageData = initialImageData
         _viewModel = StateObject(
             wrappedValue: ChezRequestComposeViewModel(
                 category: category,
@@ -40,6 +46,13 @@ struct ChezRequestComposeSheet: View {
                     if viewModel.hasContextCard {
                         contextCard
                     }
+                    // Wave 4 — "What Chez already knows" disclosure.
+                    // Collapsed by default; only renders when the entry
+                    // point handed over a recognized entity id and the
+                    // preview_snapshot fetch succeeded.
+                    if viewModel.hasSnapshot {
+                        snapshotDisclosure
+                    }
                     if !viewModel.isCategoryFixed {
                         categorySection
                     } else {
@@ -47,6 +60,7 @@ struct ChezRequestComposeSheet: View {
                     }
                     summarySection
                     descriptionSection
+                    intakeSection
                     attachmentSection
                     if let err = viewModel.errorMessage {
                         Text(err)
@@ -66,6 +80,30 @@ struct ChezRequestComposeSheet: View {
                 .padding(.vertical, 20)
             }
             .background(HavenColors.background.ignoresSafeArea())
+            .task { await viewModel.loadSnapshotIfPossible() }
+            .task {
+                // Photo-to-case: stage the camera-first capture exactly once.
+                guard let data = initialImageData, !didIngestInitialImage else { return }
+                didIngestInitialImage = true
+                await viewModel.ingestFile(
+                    data: data,
+                    filename: "chez-photo-\(UUID().uuidString.prefix(8)).jpg",
+                    mimeType: "image/jpeg"
+                )
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraCaptureView { image in
+                    guard let data = image.jpegData(compressionQuality: 0.8) else { return }
+                    Task {
+                        await viewModel.ingestFile(
+                            data: data,
+                            filename: "chez-photo-\(UUID().uuidString.prefix(8)).jpg",
+                            mimeType: "image/jpeg"
+                        )
+                    }
+                }
+                .ignoresSafeArea()
+            }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -197,6 +235,67 @@ struct ChezRequestComposeSheet: View {
         )
     }
 
+    // MARK: - Wave 4: snapshot disclosure + intake
+
+    /// Collapsed-by-default "What Chez already knows" card. The chevron
+    /// row expands into the full ChezSnapshotSummaryCard so the composer
+    /// stays compact for homeowners who just want to type and send.
+    private var snapshotDisclosure: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                Haptics.light()
+                withAnimation(HavenTheme.animationStandard) {
+                    viewModel.isSnapshotExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(HavenColors.success.opacity(0.85))
+                    Text("What Chez already knows")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    Image(systemName: viewModel.isSnapshotExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(HavenColors.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(HavenColors.beige200, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+
+            if viewModel.isSnapshotExpanded, let snapshot = viewModel.snapshotPreview?.snapshot {
+                ChezSnapshotSummaryCard(snapshot: snapshot, showHeader: false)
+            }
+        }
+    }
+
+    /// "Only you can tell Chez" — budget band, urgency, preferred
+    /// windows, and the access-note override. All optional; nothing
+    /// selected sends no intake at all.
+    private var intakeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("ONLY YOU CAN TELL CHEZ")
+            ChezIntakeForm(
+                budgetBand: $viewModel.intakeBudgetBand,
+                urgency: $viewModel.intakeUrgency,
+                preferredWindows: $viewModel.intakePreferredWindows,
+                accessNote: $viewModel.intakeAccessNote,
+                suggestedBudget: viewModel.snapshotPreview?.suggestedBudget,
+                analyticsSource: "composer"
+            )
+        }
+    }
+
     // MARK: - Category
 
     private var fixedCategoryHeader: some View {
@@ -318,6 +417,11 @@ struct ChezRequestComposeSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel("ATTACHMENTS · OPTIONAL")
             HStack(spacing: 8) {
+                if CameraCaptureView.isAvailable {
+                    attachmentButton(label: "Camera", icon: "camera.fill") {
+                        showCamera = true
+                    }
+                }
                 attachmentButton(label: "Photos", icon: "photo.fill") {
                     // PhotosPicker presents via menu rather than .photosPicker(isPresented:)
                     // because we want side-by-side with the document button. Wrap inside.

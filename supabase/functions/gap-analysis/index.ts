@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold } from "../_shared/require-household.ts";
 
 // CORS headers for all responses
 const corsHeaders = {
@@ -85,44 +86,23 @@ serve(async (req: Request) => {
       );
     }
 
-    // === Authenticate user ===
-    const authHeader = req.headers.get("Authorization");
+    // === Authenticate user (July 2026 security sweep, audit S1) ===
+    // Previously fell back to the service-role client on failed JWT auth
+    // and trusted body.household_id — a household UUID was enough to read
+    // the full document inventory. Hard 401 now; household derives from
+    // the caller's JWT, and the RLS-scoped client keeps home-manager
+    // document gating intact.
+    const auth = await requireHousehold(req);
+    if ("failure" in auth) return authFailure(auth, responseHeaders);
 
-    let userId: string | null = null;
-    let supabase;
-
-    if (authHeader) {
-      supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
-
-      try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (user && !authError) {
-          userId = user.id;
-          console.log("Authenticated via JWT:", userId);
-        } else {
-          console.warn("JWT auth failed:", authError?.message, "- will try service client");
-        }
-      } catch (authErr) {
-        console.warn("JWT auth threw:", authErr, "- will try service client");
-      }
-    }
-
-    // If JWT auth failed, create client with service role for DB operations
-    if (!supabase || !userId) {
-      console.log("Using service client fallback for auth");
-      supabase = createClient(supabaseUrl, serviceRoleKey);
-    }
+    const userId: string = auth.userId;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: req.headers.get("Authorization")! } },
+    });
 
     const body: GapAnalysisRequest = await req.json();
-    const householdId = body.household_id;
-
-    // Use JWT-authenticated userId, or fall back to body-provided userId
-    if (!userId && body.user_id) {
-      userId = body.user_id;
-      console.log("Using body-provided user_id:", userId);
-    }
+    const householdId = auth.householdId;
+    body.household_id = auth.householdId;
 
     // Service client for document_content access and logging
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);

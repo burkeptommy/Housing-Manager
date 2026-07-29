@@ -14,6 +14,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAdminOrInternal } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,17 @@ const corsHeaders = {
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  // July 2026 security sweep (audit S9): these batch/admin utilities were
+  // fully unauthenticated in prod (arbitrary uploads, batch-job triggers,
+  // Claude spend). Admin JWT (CHEZ_ADMIN_EMAILS), the internal secret, or
+  // the service-role bearer are now required.
+  if (!(await requireAdminOrInternal(req))) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {

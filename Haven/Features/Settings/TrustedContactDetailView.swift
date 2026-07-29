@@ -141,6 +141,11 @@ struct TrustedContactDetailView: View {
                         .foregroundStyle(statusColor)
                 }
 
+                // July 2026 (audit): this button previously read "Send Invite"
+                // but no trusted-contact invite pipeline exists — it only
+                // flipped the status flag, so it promised an email it never
+                // sent. Relabeled to reflect what it actually does: a manual
+                // tracker the user flips after reaching out on their own.
                 if contact.inviteStatus == "pending" && !contact.email.isEmpty {
                     Button {
                         Task {
@@ -148,8 +153,8 @@ struct TrustedContactDetailView: View {
                         }
                     } label: {
                         HStack {
-                            Image(systemName: "paperplane.fill")
-                            Text("Send Invite")
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Mark as reached out")
                         }
                         .font(HavenTypography.uiButton)
                         .frame(maxWidth: .infinity)

@@ -348,7 +348,7 @@ class InvoiceProcessingViewModel: ObservableObject {
                     if let parentName = resolved.resolvedParentName, !parentName.isEmpty, parentName != "Independent" {
                         parentId = try await resolveOrCreateParent(
                             name: parentName,
-                            category: resolved.resolvedParentCategory ?? system.suggestedCategory ?? "Other",
+                            category: Self.canonicalCategory(resolved.resolvedParentCategory ?? system.suggestedCategory),
                             existingSystems: &existingSystems,
                             cache: &parentSystemCache,
                             db: db
@@ -360,7 +360,7 @@ class InvoiceProcessingViewModel: ObservableObject {
                     // User explicitly chose this name — don't alias-resolve to a different system
                     parentId = try await resolveOrCreateParent(
                         name: newParentName,
-                        category: system.suggestedCategory ?? "Other",
+                        category: Self.canonicalCategory(system.suggestedCategory),
                         existingSystems: &existingSystems,
                         cache: &parentSystemCache,
                         db: db,
@@ -379,7 +379,7 @@ class InvoiceProcessingViewModel: ObservableObject {
                         propertyId: propertyId,
                         householdId: householdId,
                         name: system.name,
-                        category: system.suggestedCategory ?? "Other",
+                        category: Self.canonicalCategory(system.suggestedCategory),
                         manufacturer: system.manufacturer,
                         modelNumber: system.modelNumber,
                         installDate: system.installDate,
@@ -806,6 +806,17 @@ class InvoiceProcessingViewModel: ObservableObject {
          "Roof", "Roofing"),
     ]
 
+    /// July 2026 audit: home_systems.category must be stamped canonical at
+    /// WRITE time (codebase-wide rule). process-invoice's suggestedCategory
+    /// comes back from Claude and can be any casing / alias / free text;
+    /// exact-match read paths would silently miss non-canonical rows.
+    /// Unrecognized strings pass through unchanged so genuinely custom
+    /// categories still work.
+    private static func canonicalCategory(_ raw: String?) -> String {
+        let value = raw ?? "Other"
+        return SystemCategoryRegistry.canonical(category: value) ?? value
+    }
+
     private static func findParentGroup(for systemName: String, category: String? = nil) -> (parentName: String, parentCategory: String)? {
         let lower = systemName.lowercased()
         let catLower = (category ?? "").lowercased()
@@ -961,6 +972,48 @@ final class InvoiceCadenceCoordinator: ObservableObject {
             current = nil
             return true
         }
+
+        // Phase 7 M2 — program-kind categories (landscaping, cleaning, pool,
+        // pest…) become REAL routines instead of a bare interval + legacy
+        // standing appointment. The interval path below remains for
+        // non-program system cadences (HVAC filter swaps, water treatment).
+        // RoutineSeeder.createFromIngestion owns eligibility + dedup, so a
+        // second invoice from the same vendor is a no-op.
+        if let system = (try? await DatabaseService.shared.fetchHomeSystems())?
+            .first(where: { $0.id == systemId }),
+           let canonical = SystemCategoryRegistry.canonical(category: system.category),
+           RoutineGroupingEngine.routineKindFor(systemCategory: canonical) != nil {
+            var vendorId: UUID?
+            if let vendorName = suggestion.vendorName {
+                let contractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
+                vendorId = contractors.first(where: {
+                    $0.companyName.localizedCaseInsensitiveCompare(vendorName) == .orderedSame
+                })?.id
+            }
+            do {
+                let outcome = try await RoutineSeeder.shared.createFromIngestion(
+                    householdId: system.householdId,
+                    propertyId: system.propertyId,
+                    rawCategory: system.category,
+                    intervalDays: suggestion.intervalDays,
+                    activeMonthsHint: nil,
+                    quotedText: suggestion.quotedText,
+                    estimatedCostCents: nil,
+                    vendorId: vendorId,
+                    vendorLabel: vendorId != nil ? suggestion.vendorName : nil
+                )
+                switch outcome {
+                case .created, .duplicate:
+                    current = nil
+                    return true
+                case .notEligible:
+                    break // fall through to the interval path
+                }
+            } catch {
+                print("[InvoiceCadence] Routine apply failed, falling back to interval: \(error)")
+            }
+        }
+
         var update = HomeSystemUpdate()
         update.serviceIntervalDays = suggestion.intervalDays
         update.serviceIntervalSource = "vendor_invoice"

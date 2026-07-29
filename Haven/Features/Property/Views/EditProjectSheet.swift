@@ -151,11 +151,21 @@ struct EditProjectSheet: View {
         isSaving = true
         error = nil
 
+        // July 2026 (audit): an insurance_claim project's projectType is not
+        // one of the ProjectApproach cases, so the init coerced it to
+        // .professional and this save WROTE "professional" back — silently
+        // destroying claim mode (the claim card, sub-projects, and roll-up
+        // vanished, orphaning linked sub-projects). Preserve the original
+        // type for claim projects; the approach picker only governs
+        // diy/professional projects.
+        let isClaim = project.projectType == "insurance_claim"
+        let resolvedProjectType = isClaim ? project.projectType : approach.rawValue
+
         let updates = PropertyProjectUpdate(
             name: name.trimmingCharacters(in: .whitespaces),
             description: description.isEmpty ? nil : description,
             category: category.rawValue,
-            projectType: approach.rawValue
+            projectType: resolvedProjectType
         )
 
         do {

@@ -126,6 +126,11 @@ struct ChezRequestDetailView: View {
                     mergedIntoBanner(mergedIntoRequestId: mergedInto)
                 }
                 headerCard(for: req)
+                // Wave 6 — "What Chez is doing" progress timeline. Loads
+                // itself, renders nothing when there's nothing to show.
+                if req.typedStatus != .resolved {
+                    ChezProgressStrip(requestId: req.id, isActive: true)
+                }
                 if let context = req.context, !context.isEmpty {
                     detailsCard(context: context)
                 }
@@ -295,9 +300,15 @@ struct ChezRequestDetailView: View {
                                 return "That cost is higher than I expected. Is there room to negotiate or a leaner scope?"
                             case .quote:
                                 return "A few line items on this quote feel off. Can you push back on "
+                            case .infoRequest, .unknown:
+                                // Wave 6 — these kinds never surface a
+                                // Counter button; keep the composer as-is.
+                                return ""
                             }
                         }()
-                        viewModel.replyText = template
+                        if !template.isEmpty {
+                            viewModel.replyText = template
+                        }
                     }
                 )
             }

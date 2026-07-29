@@ -42,7 +42,7 @@ struct VehicleDetailView: View {
                 } description: {
                     Text(error)
                 } actions: {
-                    Button("Retry") { Task { await viewModel.load(vehicleId: vehicleID) } }
+                    Button("Retry") { Task { await viewModel.load(vehicleId: vehicleID, force: true) } }
                 }
             } else {
                 // Loading or initial state
@@ -106,7 +106,7 @@ struct VehicleDetailView: View {
             if let vehicle = viewModel.vehicle {
                 ArchiveVehicleSheet(vehicle: vehicle) {
                     Task {
-                        await viewModel.load(vehicleId: vehicleID)
+                        await viewModel.load(vehicleId: vehicleID, force: true)
                         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                     }
                     showArchiveSheet = false
@@ -124,25 +124,25 @@ struct VehicleDetailView: View {
                     viewModel.contractors.first { $0.id == mechId }?.phone
                 },
                 onComplete: {
-                    Task { await viewModel.load(vehicleId: vehicleID) }
+                    Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                 }
             )
         }
         .sheet(isPresented: $showAddService) {
             AddVehicleServiceSheet(vehicleId: vehicleID) {
-                Task { await viewModel.load(vehicleId: vehicleID) }
+                Task { await viewModel.load(vehicleId: vehicleID, force: true) }
             }
         }
         .sheet(isPresented: $showDocumentUpload) {
             DocumentUploadView(preselectedCategory: .vehicleTitle) {
-                Task { await viewModel.load(vehicleId: vehicleID) }
+                Task { await viewModel.load(vehicleId: vehicleID, force: true) }
             }
         }
         .sheet(isPresented: $showEditVehicle) {
             if let vehicle = viewModel.vehicle {
                 NavigationStack {
                     EditVehicleSheet(vehicle: vehicle) {
-                        Task { await viewModel.load(vehicleId: vehicleID) }
+                        Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                     }
                 }
             }
@@ -159,14 +159,14 @@ struct VehicleDetailView: View {
                 currentMileage: viewModel.vehicle?.currentMileage,
                 vehicleId: vehicleID,
                 onSave: {
-                    Task { await viewModel.load(vehicleId: vehicleID) }
+                    Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                 }
             )
             .presentationDetents([.height(240)])
         }
         .sheet(isPresented: $showRegUpload) {
             DocumentUploadView(preselectedCategory: .vehicleTitle) {
-                Task { await viewModel.load(vehicleId: vehicleID) }
+                Task { await viewModel.load(vehicleId: vehicleID, force: true) }
             }
         }
         .sheet(isPresented: $showRegDoc) {
@@ -178,7 +178,7 @@ struct VehicleDetailView: View {
         }
         .sheet(isPresented: $showInsuranceUpload) {
             DocumentUploadView(preselectedCategory: .autoInsurance) {
-                Task { await viewModel.load(vehicleId: vehicleID) }
+                Task { await viewModel.load(vehicleId: vehicleID, force: true) }
             }
         }
         // Phase 95 (gap #78) — explicit insurance editor. Renders
@@ -187,7 +187,7 @@ struct VehicleDetailView: View {
         .sheet(isPresented: $showInsuranceEdit) {
             if let vehicle = viewModel.vehicle {
                 EditInsuranceSheet(vehicle: vehicle) {
-                    Task { await viewModel.load(vehicleId: vehicleID) }
+                    Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                 }
                 .presentationDetents([.medium])
             }
@@ -195,7 +195,7 @@ struct VehicleDetailView: View {
         .sheet(isPresented: $showPurchaseDatePicker) {
             if let vehicle = viewModel.vehicle {
                 PurchaseDatePickerSheet(vehicle: vehicle) {
-                    Task { await viewModel.load(vehicleId: vehicleID) }
+                    Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                 }
                 .presentationDetents([.height(300)])
             }
@@ -835,7 +835,11 @@ struct VehicleDetailView: View {
                 title: task.title,
                 subtitle: "Overdue by \(daysOverdue) days",
                 icon: "wrench.fill",
-                type: .maintenance(VehicleMaintenanceInterval(type: task.title.lowercased().replacingOccurrences(of: " ", with: "_"), intervalMiles: nil, intervalMonths: nil, estimatedCost: task.estimatedCost, description: nil))
+                // July 2026 (audit F9): carry the task id + frequency so
+                // completing the alert actually completes the underlying
+                // maintenance_tasks row (it used to only write a service
+                // record, so the alert reappeared forever).
+                type: .maintenance(VehicleMaintenanceInterval(type: task.title.lowercased().replacingOccurrences(of: " ", with: "_"), intervalMiles: nil, intervalMonths: nil, estimatedCost: task.estimatedCost, description: nil, taskId: task.id, frequency: task.frequency))
             ))
         }
 
@@ -960,7 +964,7 @@ struct VehicleDetailView: View {
                     primaryDriverId: vehicle.primaryDriverId,
                     householdId: vehicle.householdId,
                     onSave: {
-                        Task { await viewModel.load(vehicleId: vehicleID) }
+                        Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                     }
                 )
             }
@@ -1185,7 +1189,7 @@ struct VehicleDetailView: View {
                     vehicleId: viewModel.vehicle?.id ?? UUID(),
                     householdId: viewModel.vehicle?.householdId ?? UUID(),
                     onSave: {
-                        Task { await viewModel.load(vehicleId: vehicleID) }
+                        Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                     }
                 )
             }
@@ -1446,14 +1450,14 @@ struct VehicleDetailView: View {
                 MaintenanceTaskDetailSheet(
                     task: task,
                     onTaskCompleted: {
-                        Task { await viewModel.load(vehicleId: vehicleID) }
+                        Task { await viewModel.load(vehicleId: vehicleID, force: true) }
                     },
                     onDeleteTask: {
                         let taskId = task.id
                         Task {
                             try? await DatabaseService.shared.deleteMaintenanceTask(id: taskId)
                             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
-                            await viewModel.load(vehicleId: vehicleID)
+                            await viewModel.load(vehicleId: vehicleID, force: true)
                         }
                     }
                 )
@@ -1805,7 +1809,7 @@ struct VehicleDetailView: View {
                                         .eq("id", value: doc.id.uuidString)
                                         .execute()
                                     Haptics.success()
-                                    await viewModel.load(vehicleId: vehicleID)
+                                    await viewModel.load(vehicleId: vehicleID, force: true)
                                     NotificationCenter.default.post(name: .documentChanged, object: nil)
                                 }
                             } label: {
@@ -1816,7 +1820,7 @@ struct VehicleDetailView: View {
                                 Task {
                                     try? await DatabaseService.shared.deleteDocument(id: doc.id)
                                     Haptics.success()
-                                    await viewModel.load(vehicleId: vehicleID)
+                                    await viewModel.load(vehicleId: vehicleID, force: true)
                                     NotificationCenter.default.post(name: .documentChanged, object: nil)
                                 }
                             } label: {
@@ -2455,6 +2459,30 @@ struct VehicleAlertDetailSheet: View {
         }
     }
 
+    /// July 2026 (audit F9): frequency → next due date for re-dating a
+    /// completed recurring vehicle task. Mirrors
+    /// MaintenanceViewModel.calculateNextDueDate.
+    static func nextVehicleTaskDueDate(frequency: String, from date: Date) -> Date {
+        let cal = Calendar.current
+        switch frequency.lowercased() {
+        case "weekly": return cal.date(byAdding: .day, value: 7, to: date)!
+        case "every 2 weeks", "biweekly": return cal.date(byAdding: .day, value: 14, to: date)!
+        case "every 3 weeks": return cal.date(byAdding: .day, value: 21, to: date)!
+        case "monthly": return cal.date(byAdding: .month, value: 1, to: date)!
+        case "every 2 months": return cal.date(byAdding: .month, value: 2, to: date)!
+        case "quarterly": return cal.date(byAdding: .month, value: 3, to: date)!
+        case "every 4 months": return cal.date(byAdding: .month, value: 4, to: date)!
+        case "semi-annually": return cal.date(byAdding: .month, value: 6, to: date)!
+        case "annually": return cal.date(byAdding: .year, value: 1, to: date)!
+        case "every 2 years": return cal.date(byAdding: .year, value: 2, to: date)!
+        case "every 3 years": return cal.date(byAdding: .year, value: 3, to: date)!
+        case "every 5 years": return cal.date(byAdding: .year, value: 5, to: date)!
+        case "every 10 years": return cal.date(byAdding: .year, value: 10, to: date)!
+        case "seasonal": return cal.date(byAdding: .month, value: 3, to: date)!
+        default: return cal.date(byAdding: .year, value: 1, to: date)!
+        }
+    }
+
     private func completeAlert() async {
         isCompleting = true
         defer { isCompleting = false }
@@ -2465,7 +2493,12 @@ struct VehicleAlertDetailSheet: View {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        let today = formatter.string(from: Date())
+        // Single completion instant — the "today" string and the recurring
+        // next-due calc (F9) must derive from the SAME moment, or a
+        // completion near midnight can put next-due a day off from the
+        // recorded last-completed date.
+        let completedAt = Date()
+        let today = formatter.string(from: completedAt)
 
         do {
             switch alert.type {
@@ -2483,6 +2516,29 @@ struct VehicleAlertDetailSheet: View {
 
                 if let newMileage = Int(completionMileage), newMileage > (vehicle.currentMileage ?? 0) {
                     _ = try await db.updateVehicle(id: vehicle.id, VehicleUpdate(currentMileage: newMileage))
+                }
+
+                // July 2026 (audit F9): actually complete the underlying task.
+                // Before this, completing an overdue-maintenance alert only
+                // wrote a service record — the task's next_due_date was never
+                // touched, so the alert reappeared on every load forever.
+                // Recurring tasks re-date forward (last done = today, next =
+                // today + interval); one-time tasks archive as completed.
+                if let taskId = interval.taskId {
+                    let freq = (interval.frequency ?? "").lowercased().trimmingCharacters(in: .whitespaces)
+                    let isRecurring = !freq.isEmpty && freq != "once" && freq != "one time" && freq != "one-time"
+                    var update = MaintenanceTaskUpdate()
+                    update.lastCompletedDate = today
+                    if isRecurring {
+                        let next = Self.nextVehicleTaskDueDate(frequency: freq, from: completedAt)
+                        update.nextDueDate = formatter.string(from: next)
+                    } else {
+                        update.isArchived = true
+                        update.archivedAt = Date()
+                        update.archivedReason = "completed"
+                    }
+                    _ = try await db.updateMaintenanceTask(id: taskId, update)
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                 }
 
             case .recall(let recall):

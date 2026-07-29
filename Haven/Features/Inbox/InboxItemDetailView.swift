@@ -17,6 +17,11 @@ struct InboxItemDetailView: View {
     @State private var selectedVehicleId: UUID?
     @State private var selectedCategory: String = "Other"
     @State private var showDeleteConfirm = false
+    // Phase 8.1 — quarantine vendor mapping (seeded from the gate's
+    // fuzzy suggestion; overridable via ContractorPickerSheet).
+    @State private var quarantineVendorId: String?
+    @State private var quarantineVendorName: String?
+    @State private var showQuarantineVendorPicker = false
     @State private var isProcessing = false
     @State private var quickLookURL: URL?
     @State private var isLoadingAttachment = false
@@ -111,6 +116,13 @@ struct InboxItemDetailView: View {
 
                 // Actions
                 if item.isPending {
+                    actionSection
+                } else if item.metadata?.scheduleStamp != nil,
+                          item.metadata?.scheduleStamp?.undoneAt == nil,
+                          item.actionCompleted != true {
+                    // Phase 7 M5 — the schedule-stamp notice is informational
+                    // (needs_action false), so it fails isPending; the Undo
+                    // branch inside actionSection still needs to render.
                     actionSection
                 } else if showsPostSaveQuoteActions {
                     // Phase 55.X: Persistent quote actions for items
@@ -782,6 +794,178 @@ struct InboxItemDetailView: View {
                         icon: "doc.fill",
                         isDisabled: isProcessing
                     )
+                } else if item.actionType == "review_quarantined_sender" {
+                    // Phase 8.1 — quarantined unknown sender, with the
+                    // mapping moment: link the address to a vendor so every
+                    // future email from them attributes automatically. The
+                    // gate's fuzzy suggestion pre-fills; the picker overrides.
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        Button {
+                            showQuarantineVendorPicker = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: quarantineVendorName == nil ? "person.crop.circle.badge.plus" : "person.crop.circle.fill.badge.checkmark")
+                                    .font(.system(size: 13))
+                                Text(quarantineVendorName.map { "This is: \($0)" } ?? "Who is this? Link to a vendor (recommended)")
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.navy800)
+                            .padding(HavenTheme.spacing12)
+                            .background(HavenColors.navy800.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+                        .buttonStyle(.plain)
+                        .onAppear {
+                            // Seed from the gate ladder's fuzzy suggestion.
+                            if quarantineVendorId == nil,
+                               let q = item.metadata?.quarantined,
+                               let sid = q.suggestedContractorId {
+                                quarantineVendorId = sid
+                                quarantineVendorName = q.suggestedContractorName
+                            }
+                        }
+
+                        HavenButton(
+                            title: quarantineVendorName.map { "Allow & link to \($0)" } ?? "Allow & process their email",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                onProcess(nil, "allow_quarantined_sender", quarantineVendorId, nil)
+                                dismiss()
+                            },
+                            icon: "checkmark.shield",
+                            isLoading: isProcessing,
+                            isDisabled: isProcessing
+                        )
+                        HavenButton(
+                            title: "Block this sender",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                onProcess(nil, "reject_quarantined_sender", nil, nil)
+                                dismiss()
+                            },
+                            style: .secondary,
+                            icon: "hand.raised",
+                            isDisabled: isProcessing
+                        )
+                        Text("Allowing adds them to your senders list, saves the address on the linked vendor, and processes this email like any other. Blocking silently drops their future emails.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .sheet(isPresented: $showQuarantineVendorPicker) {
+                        ContractorPickerSheet(systemCategory: "") { contractor in
+                            quarantineVendorId = contractor.id.uuidString
+                            quarantineVendorName = contractor.companyName
+                            Haptics.selection()
+                        }
+                    }
+                } else if let stamp = item.metadata?.scheduleStamp, stamp.undoneAt == nil, item.actionCompleted != true {
+                    // Phase 7 M5 — the appointment auto-stamp's undoable
+                    // notice, mirrored from the inbox card so the detail
+                    // view offers the same escape hatch.
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar.badge.checkmark")
+                                .foregroundStyle(HavenColors.success)
+                            Text("We put this visit on the matching task.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        HavenButton(
+                            title: "Undo — take it off the task",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                Analytics.track(.scheduleStampUndone, ["source": "inbox_detail"])
+                                onProcess(nil, "undo_schedule_stamp", nil, nil)
+                                dismiss()
+                            },
+                            style: .secondary,
+                            icon: "arrow.uturn.backward",
+                            isDisabled: isProcessing
+                        )
+                    }
+                } else if isFollowupsAction && item.metadata?.suggestedActions?.isEmpty == false {
+                    // Phase 7 — the universal review card (full mode):
+                    // per-row selection, destination remapping (Task ⇄
+                    // Handyman ⇄ Chez), inline due-date edits. Applies via
+                    // the hybrid engine; the item completes through the
+                    // server-owned ledger, so we don't dismiss until the
+                    // card reports a clean apply.
+                    SuggestedActionsReviewCard(item: item, mode: .full, onApplied: {
+                        dismiss()
+                    })
+                } else if isFollowupsAction {
+                    // July 2026 — follow-up tasks review. The server spotted
+                    // implied follow-up work (invoice recommendations, a
+                    // service-due reminder that came with a document) and is
+                    // asking before adding anything. One tap adds them all;
+                    // each carries the evidence sentence so the homeowner
+                    // trusts what they're adding.
+                    let tasks = item.metadata?.suggestedTasks ?? []
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(tasks) { task in
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "checklist")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(HavenColors.action)
+                                    .padding(.top, 1)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(task.title)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    if let reason = task.reason, !reason.isEmpty {
+                                        Text(reason)
+                                            .font(HavenTypography.uiLabelSmall)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    if let due = task.dueDate, !due.isEmpty {
+                                        Text("Due \(due)")
+                                            .font(HavenTypography.uiLabelSmall)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(HavenTheme.spacing12)
+                            .background(HavenColors.creamWhite)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+
+                    HavenButton(
+                        title: tasks.count == 1 ? "Add this to my plan" : "Add all \(tasks.count) to my plan",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "add_suggested_tasks", nil, nil)
+                            dismiss()
+                        },
+                        icon: "plus.circle.fill",
+                        isLoading: isProcessing,
+                        isDisabled: isProcessing
+                    )
+
+                    HavenButton(
+                        title: "No thanks",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            onProcess(nil, "dismiss", nil, nil)
+                            dismiss()
+                        },
+                        style: .secondary,
+                        icon: "xmark",
+                        isDisabled: isProcessing
+                    )
                 } else if isWarrantyAction {
                     // Phase 101 (E3) — one-tap warranty save. The server
                     // extracted the coverage facts and fuzzy-matched a
@@ -1368,6 +1552,18 @@ struct InboxItemDetailView: View {
     /// Phase 101 (E3) — warranty emails get a one-tap save card.
     private var isWarrantyAction: Bool {
         (initialActionType ?? item.actionType) == "save_warranty" && item.isPending
+    }
+
+    /// July 2026 — follow-up tasks review card ("we spotted N follow-ups").
+    private var isFollowupsAction: Bool {
+        // Phase 7: "review_actions" is the unified-card action_type used
+        // when the item carries only non-task kinds (old clients render it
+        // as a generic item; this branch gives new clients the full card).
+        let actionType = initialActionType ?? item.actionType
+        let isReviewType = actionType == "review_followups" || actionType == "review_actions"
+        let hasContent = (item.metadata?.suggestedTasks?.isEmpty == false)
+            || (item.metadata?.suggestedActions?.isEmpty == false)
+        return isReviewType && hasContent && item.isPending
     }
 
     private var primaryActionTitle: String {

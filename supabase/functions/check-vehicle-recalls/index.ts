@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold, requireInternal } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +27,17 @@ serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json();
-    const { household_id } = body;
+    let { household_id } = body;
+
+    // --- AUTH (July 2026 security sweep, audit S1) ---
+    // Previously read AND WROTE any household's vehicles/recalls from a
+    // body-supplied household_id. User callers now derive household from
+    // their JWT; internal callers (future scheduled scans) use the secret.
+    if (!requireInternal(req)) {
+      const auth = await requireHousehold(req);
+      if ("failure" in auth) return authFailure(auth, headers);
+      household_id = auth.householdId;
+    }
 
     if (!household_id) {
       return new Response(JSON.stringify({ error: "Missing household_id" }), { status: 400, headers });

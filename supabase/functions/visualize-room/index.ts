@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,6 +111,28 @@ serve(async (req: Request) => {
         JSON.stringify({ error: "project_id, household_id, and user_id are required" }),
         { status: 400, headers }
       );
+    }
+
+    // July 2026 security sweep (audit S1): storage paths + usage counters
+    // keyed on body household_id/user_id were unverified. The caller's JWT
+    // identity must match both, and the project must be theirs.
+    const auth = await requireHousehold(req);
+    if ("failure" in auth) return authFailure(auth, headers);
+    if (household_id !== auth.householdId || user_id !== auth.userId) {
+      return new Response(
+        JSON.stringify({ error: "Access denied: identity mismatch" }),
+        { status: 403, headers }
+      );
+    }
+    {
+      const { data: proj } = await supabase
+        .from("property_projects").select("household_id").eq("id", project_id).single();
+      if (!proj || proj.household_id !== auth.householdId) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: project does not belong to your household" }),
+          { status: 403, headers }
+        );
+      }
     }
 
     // --- CHECK MONTHLY USAGE LIMIT ---

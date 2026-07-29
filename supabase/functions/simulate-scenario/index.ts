@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -40,14 +41,23 @@ serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+    // --- AUTH (July 2026 security sweep, audit S1) ---
+    // Previously fell back to the service-role client on failed JWT auth and
+    // trusted body.household_id. Hard 401 now; the body household must match
+    // the caller's own (kept in the body for backward compat with the iOS
+    // request shape).
+    const auth = await requireHousehold(req);
+    if ("failure" in auth) return authFailure(auth, headers);
+
     // --- PARSE REQUEST ---
     const body: ScenarioRequest = await req.json();
-    const { scenario_id, custom_query, household_id, params } = body;
+    const { scenario_id, custom_query, params } = body;
+    const household_id = auth.householdId;
 
-    if (!household_id) {
+    if (body.household_id && body.household_id !== auth.householdId) {
       return new Response(
-        JSON.stringify({ error: "Missing household_id" }),
-        { status: 400, headers }
+        JSON.stringify({ error: "Access denied: household mismatch" }),
+        { status: 403, headers }
       );
     }
 
@@ -70,25 +80,12 @@ serve(async (req: Request) => {
     // Falls back to service role only when JWT auth fails entirely — that
     // path bypasses RLS but the caller is unauthenticated, so they can't
     // be a home manager anyway.
-    const authHeader = req.headers.get("Authorization");
-    let supabase;
-    if (authHeader && supabaseAnonKey) {
-      supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      try {
-        const { error: authError } = await supabase.auth.getUser();
-        if (authError) {
-          console.warn("[simulate-scenario] JWT auth failed, falling back to service role:", authError.message);
-          supabase = createClient(supabaseUrl, serviceRoleKey);
-        }
-      } catch (authErr) {
-        console.warn("[simulate-scenario] JWT auth threw, falling back to service role:", authErr);
-        supabase = createClient(supabaseUrl, serviceRoleKey);
-      }
-    } else {
-      supabase = createClient(supabaseUrl, serviceRoleKey);
-    }
+    // requireHousehold already verified the JWT — build the RLS-scoped
+    // client directly so home-manager document gating applies. No
+    // service-role fallback (that was audit finding S1).
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: req.headers.get("Authorization")! } },
+    });
 
     const [
       householdResult,
@@ -100,7 +97,6 @@ serve(async (req: Request) => {
       systemsResult,
       vehiclesResult,
       vehicleRecallsResult,
-      estateStateResult,
     ] = await Promise.all([
       supabase.from("households").select("*").eq("id", household_id).single(),
       supabase.from("family_members").select("*").eq("household_id", household_id),
@@ -111,7 +107,6 @@ serve(async (req: Request) => {
       supabase.from("home_systems").select("*").eq("household_id", household_id),
       supabase.from("vehicles").select("id, name, year, make, model, current_mileage, ownership_type, purchase_price, current_value, registration_expiry").eq("household_id", household_id),
       supabase.from("vehicle_recalls").select("vehicle_id, component, summary").eq("household_id", household_id).eq("is_resolved", false),
-      supabase.from("estate_state").select("*").eq("household_id", household_id).maybeSingle(),
     ]);
 
     const household = householdResult.data;
@@ -123,7 +118,9 @@ serve(async (req: Request) => {
     const systems = systemsResult.data ?? [];
     const vehicles = vehiclesResult.data ?? [];
     const vehicleRecalls = vehicleRecallsResult.data ?? [];
-    const estateState = estateStateResult?.data;
+    // Chez v1: estate_state was dropped (20260901). The query here used to
+    // fail on every run; estate context is permanently absent from v1.
+    const estateState = null as Record<string, unknown> | null;
 
     // Fetch document content (summaries + extracted text) for key documents
     const { data: documentContent } = await supabase

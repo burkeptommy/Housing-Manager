@@ -66,7 +66,7 @@ enum WeatherEventTaskMap {
 
     private static let hardFreezeTasks: [WeatherPrepTask] = [
         .init(id: "freeze-drip", title: "Drip exposed faucets overnight",
-              detail: "Bathroom + kitchen faucets on exterior walls. A pencil-thin trickle is enough — running water doesn't freeze.",
+              detail: "Bathroom + kitchen faucets on exterior walls. A pencil-thin trickle is enough. Running water doesn't freeze.",
               phase: .pre, action: .markDone),
         .init(id: "freeze-hoses", title: "Disconnect garden hoses",
               detail: "Drain and store. Cover outdoor spigots with foam covers if you have them.",
@@ -81,7 +81,7 @@ enum WeatherEventTaskMap {
 
     private static let winterStormTasks: [WeatherPrepTask] = [
         .init(id: "storm-plow", title: "Confirm snow plow contractor for this storm",
-              detail: "Call your plow vendor to confirm you're on the route. Don't assume — first-snow storms book out fast.",
+              detail: "Call your plow vendor to confirm you're on the route. Don't assume. First-snow storms book out fast.",
               phase: .pre, action: .askChez(category: "Snow Removal")),
         .init(id: "storm-salt", title: "Stock salt and ice melt",
               detail: "Check the garage. Calcium chloride works down to -25°F; rock salt only to 5°F. Pet-safe brands available for around-the-walkway use.",
@@ -108,7 +108,7 @@ enum WeatherEventTaskMap {
               detail: "Phones, tablets, portable power banks, headlamps. Plug in vehicles too if you have EVs.",
               phase: .pre, action: .markDone),
         .init(id: "storm-tree-cleanup", title: "After: arborist for downed limbs",
-              detail: "Walk the property. Any limb above 4 inches in diameter or near power lines is an arborist call — don't DIY it.",
+              detail: "Walk the property. Any limb above 4 inches in diameter or near power lines is an arborist call. Don't DIY it.",
               phase: .post, action: .findVendor(category: "Tree Service"))
     ]
 
@@ -135,7 +135,7 @@ enum WeatherEventTaskMap {
 
     private static let heatTasks: [WeatherPrepTask] = [
         .init(id: "heat-ac", title: "Verify AC is keeping up",
-              detail: "Walk every room with the thermostat set to 72°F. If any room is 4+°F over, the system is struggling — call your HVAC tech.",
+              detail: "Walk every room with the thermostat set to 72°F. If any room is 4+°F over, the system is struggling. Call your HVAC tech.",
               phase: .pre, action: .findVendor(category: "HVAC")),
         .init(id: "heat-irrigation", title: "Bump irrigation runtime up 30-50%",
               detail: "Check local water restrictions first. Lawns and beds use significantly more water in 95°F+ heat.",
@@ -144,7 +144,7 @@ enum WeatherEventTaskMap {
               detail: "Make sure outdoor pets have water + shade. Bring small / elderly pets inside if 95°F+. Check elderly family members daily during heat events.",
               phase: .pre, action: .markDone),
         .init(id: "heat-condensate", title: "Check AC condensate drain pan",
-              detail: "If you see standing water, the drain is clogging — pour distilled vinegar down the access tee or call your HVAC tech.",
+              detail: "If you see standing water, the drain is clogging. Pour distilled vinegar down the access tee or call your HVAC tech.",
               phase: .pre, action: .markDone)
     ]
 

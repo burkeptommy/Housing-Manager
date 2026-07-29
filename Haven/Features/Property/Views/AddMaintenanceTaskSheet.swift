@@ -104,6 +104,9 @@ struct AddMaintenanceTaskSheet: View {
     @State private var notes = ""
     @State private var followUpReason = ""
     @State private var isSaving = false
+    /// July 2026 (audit F5): surface routine/task insert failures instead of
+    /// only an error haptic + console print.
+    @State private var saveError: String?
     // Phase 70.A1.x: seasonal-timing picker. Default "Not sure" preserves
     // pre-Phase-D behavior (no seasonalTiming stamped → date-bucketed).
     @State private var seasonalTimingChoice: SeasonalTimingChoice = .notSure
@@ -436,6 +439,14 @@ struct AddMaintenanceTaskSheet: View {
                     .disabled(!canSave)
                 }
             }
+            .alert("Couldn't save", isPresented: Binding(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
+            }
             .task {
                 applyInitialContextIfNeeded()
                 await loadDuplicateContext()
@@ -648,6 +659,7 @@ struct AddMaintenanceTaskSheet: View {
                     dismiss()
                 } catch {
                     print("[AddTask] Failed to create task: \(error)")
+                    saveError = "Couldn't create this task. Please try again."
                     Haptics.error()
                     isSaving = false
                 }
@@ -668,16 +680,30 @@ struct AddMaintenanceTaskSheet: View {
                 insert.cadenceIntervalDays = cadence.intervalDays
                 insert.vendorId = selectedContractorId
                 insert.notes = notes.isEmpty ? nil : notes
+                insert.startDate = formatter.string(from: dueDate)
                 insert.nextExpectedDate = formatter.string(from: dueDate)
                 insert.activeMonths = Array(activeMonths).sorted()
                 insert.serviceKey = "custom_routine_program"
+                // July 2026 (audit F5): weekly/biweekly/triweekly cadences
+                // require days_of_week (DB CHECK weekly_has_days_of_week) or
+                // the insert 4xx'd with only an error haptic. This form has
+                // no weekday picker, so synthesize the day from the chosen
+                // start date's weekday. iOS Calendar.weekday already yields
+                // ISO 8601 (1=Sun..7=Sat) matching the routines schema.
+                if ["weekly", "biweekly", "triweekly"].contains(cadence.type) {
+                    insert.daysOfWeek = [Calendar.current.component(.weekday, from: dueDate)]
+                }
                 _ = try await ServiceOrchestrator.createCustomRoutine(insert)
                 Haptics.success()
                 NotificationCenter.default.post(name: .routineChanged, object: nil)
                 onSave?()
                 dismiss()
             } catch {
+                // July 2026 (audit F5): surface the failure instead of only an
+                // error haptic + console print — a rejected insert left the
+                // user with no explanation.
                 print("[AddTask] Failed to create routine: \(error)")
+                saveError = "Couldn't create this routine. Please try again."
                 Haptics.error()
                 isSaving = false
             }
@@ -700,6 +726,7 @@ struct AddMaintenanceTaskSheet: View {
                 dismiss()
             } catch {
                 print("[AddTask] Failed to create handyman item: \(error)")
+                saveError = "Couldn't add this handyman item. Please try again."
                 Haptics.error()
                 isSaving = false
             }

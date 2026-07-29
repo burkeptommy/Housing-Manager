@@ -140,4 +140,4 @@ Answer these out loud and write down whoever's reaction is sharper:
 
 ## After the test
 
-Drop the filled-out script in `/Users/tomburke/Projects/Housing-Manager/Tests/e2e/` named `TONIGHT_RESULTS_YYYY-MM-DD.md` or just send me your raw notes. I'll triage into HOMEOWNER_GAPS.md and fix anything mechanical in the morning.
+Drop the filled-out script in `/Users/tomburke/Documents/Projects/Housing-Manager/Tests/e2e/` named `TONIGHT_RESULTS_YYYY-MM-DD.md` or just send me your raw notes. I'll triage into HOMEOWNER_GAPS.md and fix anything mechanical in the morning.

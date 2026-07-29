@@ -154,6 +154,8 @@ serve(async (req: Request) => {
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${supabaseAnonKey}`,
+                // expand-catalog is admin/internal-gated post-sweep.
+                "x-internal-secret": Deno.env.get("INTERNAL_FN_SECRET") ?? "",
               },
               body: JSON.stringify({
                 manufacturer_slug: pair.manufacturer_slug,

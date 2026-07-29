@@ -116,6 +116,19 @@ struct EditInsuranceSheet: View {
 
         do {
             _ = try await DatabaseService.shared.updateVehicle(id: vehicle.id, update)
+
+            // July 2026 (audit F4): nil fields above are OMITTED from the
+            // PATCH by the synthesized encoder — blanking the carrier/policy
+            // or toggling "Track expiration" off never actually cleared the
+            // columns (this sheet's doc comment claimed it did). Explicit
+            // SQL NULLs for anything the user cleared.
+            var clearedColumns: [String] = []
+            if trimmedCarrier.isEmpty, vehicle.insuranceCarrier?.isEmpty == false { clearedColumns.append("insurance_carrier") }
+            if trimmedPolicy.isEmpty, vehicle.insurancePolicyNum?.isEmpty == false { clearedColumns.append("insurance_policy_num") }
+            if expiryString == nil, vehicle.insuranceExpiry != nil { clearedColumns.append("insurance_expiry") }
+            try? await DatabaseService.shared.clearColumns(
+                table: "vehicles", id: vehicle.id, columns: clearedColumns
+            )
             Analytics.track(.vehicleInsuranceEdited, [
                 "vehicle_id": vehicle.id.uuidString,
                 "has_carrier": String(!trimmedCarrier.isEmpty),

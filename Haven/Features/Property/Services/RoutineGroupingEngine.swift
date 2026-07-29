@@ -146,14 +146,13 @@ enum RoutineGroupingEngine {
     /// Reverse operation — called when a routine is archived or switched
     /// from shop_managed to self_managed. Clears parent_routine_id on
     /// every task that currently points at this routine.
+    ///
+    /// July 2026 (audit F6): the old implementation set
+    /// `update.parentRoutineId = nil` on the synthesized MaintenanceTaskUpdate
+    /// encoder — nil fields are OMITTED from the PATCH, so this never
+    /// actually unlinked anything. Routes through the explicit-null helper.
     static func unlinkTasksFromRoutine(_ routineId: UUID) async throws {
-        let db = DatabaseService.shared
-        let tasks = try await db.fetchTasksForRoutine(routineId: routineId)
-        for task in tasks {
-            var update = MaintenanceTaskUpdate()
-            update.parentRoutineId = nil
-            _ = try? await db.updateMaintenanceTask(id: task.id, update)
-        }
+        try await DatabaseService.shared.clearTasksParentRoutine(routineId: routineId)
     }
 
     // MARK: - Category mapping

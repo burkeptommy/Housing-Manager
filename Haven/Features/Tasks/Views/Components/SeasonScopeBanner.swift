@@ -67,7 +67,7 @@ struct SeasonScopeBanner: View {
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Open year overview — 18-month timeline")
+            .accessibilityLabel("Open year overview, 18-month timeline")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

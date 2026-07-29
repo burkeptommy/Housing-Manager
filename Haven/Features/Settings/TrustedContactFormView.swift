@@ -166,6 +166,16 @@ struct TrustedContactFormView: View {
                 company: company.isEmpty ? nil : company,
                 notes: notes.isEmpty ? nil : notes
             ))
+
+            // July 2026 (audit F4): nil fields are OMITTED from the PATCH —
+            // deleting a wrong phone/company/note never persisted.
+            var clearedColumns: [String] = []
+            if phone.isEmpty, contact.phone?.isEmpty == false { clearedColumns.append("phone") }
+            if company.isEmpty, contact.company?.isEmpty == false { clearedColumns.append("company") }
+            if notes.isEmpty, contact.notes?.isEmpty == false { clearedColumns.append("notes") }
+            try? await DatabaseService.shared.clearColumns(
+                table: "trusted_contacts", id: contact.id, columns: clearedColumns
+            )
         } else {
             let user = try? await DatabaseService.shared.fetchCurrentUser()
             guard let householdId = user?.householdId else {

@@ -689,6 +689,9 @@ struct ContractorDetailView: View {
             LazyVStack(alignment: .leading, spacing: 16) {
                 heroCard
                 quickActionsRow
+                // Phase 8.1 — adoption: hand this vendor the household's
+                // Chez address so their emails organize themselves.
+                ShareChezContactButton(vendorName: contractor.companyName)
                 // Phase 80.1 — Recurring delegation toggle. Lives near
                 // the top of the contractor surface so the homeowner
                 // sees the "make Chez point of contact" option as a
@@ -2264,7 +2267,27 @@ struct EditContractorSheet: View {
                 }
             }
 
-            let updated = try await DatabaseService.shared.updateContractor(id: contractor.id, update)
+            var updated = try await DatabaseService.shared.updateContractor(id: contractor.id, update)
+
+            // July 2026 (audit F4): nil fields above are OMITTED from the
+            // PATCH — deleting a wrong email/phone/website never persisted.
+            // Explicit SQL NULLs for anything the user cleared.
+            var clearedColumns: [String] = []
+            if contactName.isEmpty, contractor.contactName?.isEmpty == false { clearedColumns.append("contact_name") }
+            if email.isEmpty, contractor.email?.isEmpty == false { clearedColumns.append("email") }
+            if address.isEmpty, contractor.address?.isEmpty == false { clearedColumns.append("address") }
+            if website.isEmpty, contractor.website?.isEmpty == false { clearedColumns.append("website") }
+            if licenseNumber.isEmpty, contractor.licenseNumber?.isEmpty == false { clearedColumns.append("license_number") }
+            if notes.isEmpty, contractor.notes?.isEmpty == false { clearedColumns.append("notes") }
+            if !clearedColumns.isEmpty {
+                try? await DatabaseService.shared.clearColumns(
+                    table: "contractors", id: contractor.id, columns: clearedColumns
+                )
+                if let refreshed = try? await DatabaseService.shared.fetchContractor(id: contractor.id) {
+                    updated = refreshed
+                }
+            }
+
             Haptics.success()
             NotificationCenter.default.post(name: .contractorChanged, object: nil,
                 userInfo: ["action": "updated", "id": contractor.id.uuidString])

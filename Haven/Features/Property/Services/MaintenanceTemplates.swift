@@ -897,7 +897,7 @@ enum MaintenanceTemplates {
             // inspection, flashing, shingles, and gutters.)
             MaintenanceTemplate(systemCategory: "Roofing", title: "Annual roof inspection", description: "Inspect for damage, wear, and potential leaks.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor, stableId: "Roofing:Professional roof inspection", bundleId: "Roofing:spring", safetyFloor: true),
             MaintenanceTemplate(systemCategory: "Roofing", title: "Check for damaged shingles", description: "Roofer walks the roof looking for missing, curled, or cracked shingles. Part of the annual inspection or a dedicated post-storm visit.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Also after major storms", requiredSubtypes: ["roof_asphalt"], assignmentType: .vendor, bundleId: "Roofing:spring", safetyFloor: true),
-            MaintenanceTemplate(systemCategory: "Roofing", title: "Clean gutters and downspouts", description: "Roofer or gutter service clears debris and verifies downspouts drain away from the foundation.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Spring and fall — both occurrences needed; the spring clear catches winter debris before the rainy season, the fall clear handles leaves before ice can dam in frozen downspouts.", assignmentType: .vendor, bundleId: "Roofing:spring", bundleTitle: "Roof and Gutter Service", safetyFloor: true),
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Clean gutters and downspouts", description: "Roofer or gutter service clears debris and verifies downspouts drain away from the foundation.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Spring and fall are both needed; the spring clear catches winter debris before the rainy season, the fall clear handles leaves before ice can dam in frozen downspouts.", assignmentType: .vendor, bundleId: "Roofing:spring", bundleTitle: "Roof and Gutter Service", safetyFloor: true),
             // Phase 97 — see "Annual roof inspection" note above.
             // Retagged from Fall → Spring to match the bundle intent.
             MaintenanceTemplate(systemCategory: "Roofing", title: "Inspect flashing around chimney/vents", description: "Roofer verifies flashing around chimneys, vents, and skylights is intact and properly sealed.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (part of inspection)", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, isEssential: false, assignmentType: .vendor, bundleId: "Roofing:spring", safetyFloor: true),
@@ -1007,14 +1007,14 @@ enum MaintenanceTemplates {
         // ──────────────────────────────────────────────
         ("Siding/Exterior", [
             MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pressure washer soft-washes siding to remove dirt, mildew, and algae buildup.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring/Fall", professionalRequired: true, notes: "Semi-annual is right for vinyl in our region. Wood, brick, and fiber-cement homes can stretch this to once a year. Spring wash catches winter grime (salt, sand, tree drip); fall wash clears summer pollen and algae before winter rain amplifies mildew. Mixed-material homes follow the more frequent cadence wherever vinyl is present.", assignmentType: .vendor, bundleId: "Siding/Exterior:annual", bundleTitle: "Annual Exterior Maintenance"),
-            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Deck and patio annual service", description: "Handyman or deck pro inspects deck boards, railings, and stairs for rot or loose fasteners; spot-seals as needed. Full stain or seal every 2-3 years.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Summer", professionalRequired: true, notes: "Seal or stain every 2-3 years. Best done in dry warm conditions — mid-summer outperforms spring because wood is bone-dry after a stretch of low humidity, so the seal grabs and lasts.", isEssential: false, assignmentType: .vendor, bundleId: "Siding/Exterior:annual"),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Deck and patio annual service", description: "Handyman or deck pro inspects deck boards, railings, and stairs for rot or loose fasteners; spot-seals as needed. Full stain or seal every 2-3 years.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$400", isDIY: false, seasonalTiming: "Summer", professionalRequired: true, notes: "Seal or stain every 2-3 years. Best done in dry warm conditions. Mid-summer outperforms spring because wood is bone-dry after a stretch of low humidity, so the seal grabs and lasts.", isEssential: false, assignmentType: .vendor, bundleId: "Siding/Exterior:annual"),
             // Phase 70 (Tasks v2 / Section B.3): Fall sibling bundle.
             // The "annual" bundle covers Spring (deck inspect, spring
             // wash); this new fall bundle covers the second wash before
             // winter rain amplifies mildew on shaded north faces. HNW
             // vinyl/mixed-material homes notice algae growth fast, so
             // the dual-anchor model better matches reality.
-            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pre-winter soft-wash removes summer pollen, algae, and grime that would otherwise lock into the siding over winter rain. Catches mildew growth on shaded north and east faces before it stains permanently.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Schedule for late September or early October — after pollen season ends but before the first hard freeze locks moisture into siding pockets.", assignmentType: .vendor, stableId: "Siding/Exterior:Power wash exterior siding (fall)", bundleId: "Siding/Exterior:fall", bundleTitle: "Fall Exterior Wash"),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Pre-winter soft-wash removes summer pollen, algae, and grime that would otherwise lock into the siding over winter rain. Catches mildew growth on shaded north and east faces before it stains permanently.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Schedule for late September or early October, after pollen season ends but before the first hard freeze locks moisture into siding pockets.", assignmentType: .vendor, stableId: "Siding/Exterior:Power wash exterior siding (fall)", bundleId: "Siding/Exterior:fall", bundleTitle: "Fall Exterior Wash"),
             // Phase 54C: value-preservation exterior walkarounds. These
             // are NOT bundled into the annual exterior bundle because
             // they require different pros (painter vs handyman) and
@@ -1029,7 +1029,7 @@ enum MaintenanceTemplates {
                 isDIY: false,
                 seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Best done in a stretch of dry warm weather — paint cures best at 60-85°F with low humidity. Most painters keep your color formulation on file once you've used them.",
+                notes: "Best done in a stretch of dry warm weather. Paint cures best at 60-85°F with low humidity. Most painters keep your color formulation on file once you've used them.",
                 isEssential: false,
                 assignmentType: .vendor
             ),
@@ -1106,14 +1106,14 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Siding/Exterior",
                 title: "Inspect deck stain and spot-treat",
-                description: "Walk the deck in July looking for spots where the stain has worn — typically high-traffic paths, the area in front of the door, and the rail tops that get full sun. Spot-stain those areas with the same product before bare wood greys out. Less work than waiting for a full re-stain.",
+                description: "Walk the deck in July looking for spots where the stain has worn: typically high-traffic paths, the area in front of the door, and the rail tops that get full sun. Spot-stain those areas with the same product before bare wood greys out. Less work than waiting for a full re-stain.",
                 frequency: "Annually",
                 priority: "Low",
                 estimatedCostRange: "$30-60 (stain) or $150-300 (handyman)",
                 isDIY: true,
                 seasonalTiming: "Summer",
                 professionalRequired: false,
-                notes: "Test stain on an inconspicuous spot first — older stains darken with age and a fresh coat can look mis-matched. If the whole deck looks faded, schedule the every-2-3-year re-stain instead.",
+                notes: "Test stain on an inconspicuous spot first. Older stains darken with age and a fresh coat can look mis-matched. If the whole deck looks faded, schedule the every-2-3-year re-stain instead.",
                 isEssential: false,
                 assignmentType: .either,
                 diyEffortMinutes: 60,
@@ -1127,14 +1127,14 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Siding/Exterior",
                 title: "Outdoor furniture deep clean and recover",
-                description: "Pull out the patio furniture, deep clean frames + cushions, spot-repair any tears, and re-protect cushions with fabric guard. June is the right time — gets you ready for peak outdoor season without the cushions baking in storage longer than they need to.",
+                description: "Pull out the patio furniture, deep clean frames + cushions, spot-repair any tears, and re-protect cushions with fabric guard. June is the right time. It gets you ready for peak outdoor season without the cushions baking in storage longer than they need to.",
                 frequency: "Annually",
                 priority: "Low",
                 estimatedCostRange: "$0-50 (DIY) or $150-400 (handyman)",
                 isDIY: true,
                 seasonalTiming: "Summer",
                 professionalRequired: false,
-                notes: "Powdered Oxiclean + warm water removes most mildew on cushions. If a cushion is permanently stained, check whether the cover unzips — replacement covers are often cheaper than full cushion replacement.",
+                notes: "Powdered Oxiclean + warm water removes most mildew on cushions. If a cushion is permanently stained, check whether the cover unzips. Replacement covers are often cheaper than full cushion replacement.",
                 isEssential: false,
                 assignmentType: .either,
                 diyEffortMinutes: 120,
@@ -1228,7 +1228,7 @@ enum MaintenanceTemplates {
                 isDIY: true,
                 seasonalTiming: "Summer",
                 professionalRequired: false,
-                notes: "Match the size printed on the filter frame. MERV 8-11 is the sweet spot for most homes — higher MERV restricts airflow and can stress the blower.",
+                notes: "Match the size printed on the filter frame. MERV 8-11 is the sweet spot for most homes. Higher MERV restricts airflow and can stress the blower.",
                 requiredSubtypes: ["ducted"],
                 assignmentType: .either,
                 diyEffortMinutes: 5,
@@ -1286,7 +1286,7 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Exercise main shutoff valve",
-                description: "Plumber operates the main water shutoff valve in both directions to confirm it moves freely. Seized shutoff valves are the #1 reason a small leak becomes a flood — when seconds matter you need the valve to move on the first try.",
+                description: "Plumber operates the main water shutoff valve in both directions to confirm it moves freely. Seized shutoff valves are the #1 reason a small leak becomes a flood. When seconds matter you need the valve to move on the first try.",
                 frequency: "Annually",
                 priority: "High",
                 estimatedCostRange: "$0 (part of inspection)",
@@ -1337,7 +1337,7 @@ enum MaintenanceTemplates {
                 isDIY: false,
                 seasonalTiming: "Winter",
                 professionalRequired: false,
-                notes: "Folded into the winter plumbing visit — the plumber tests this in 60 seconds while on-site.",
+                notes: "Folded into the winter plumbing visit. The plumber tests this in 60 seconds while on-site.",
                 requiredSubtypes: ["sump_pump", "has_sump_battery_backup"],
                 assignmentType: .either,
                 bundleId: "Plumbing:winter"
@@ -1359,14 +1359,14 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Frozen pipe risk walk",
-                description: "During any sustained cold snap below 20°F, walk every pipe in an unheated space (crawl, garage, exterior wall closets, basement bays near sill plates). Listen for unusual hissing, feel for frost on the pipe itself, check fixtures for slow flow. A pipe that's still drippable when you open a faucet is still flowing — full freeze means no water at all, and that's an emergency.",
+                description: "During any sustained cold snap below 20°F, walk every pipe in an unheated space (crawl, garage, exterior wall closets, basement bays near sill plates). Listen for unusual hissing, feel for frost on the pipe itself, check fixtures for slow flow. A pipe that's still drippable when you open a faucet is still flowing. Full freeze means no water at all, and that's an emergency.",
                 frequency: "Annually",
                 priority: "High",
                 estimatedCostRange: "$0 (DIY)",
                 isDIY: true,
                 seasonalTiming: "Winter",
                 professionalRequired: false,
-                notes: "If you find a frozen section, open the closest faucet downstream (so any melt has somewhere to go) and apply heat gently — hair dryer, heat tape, never an open flame. Burst pipes are 4-figure repairs; catching the freeze before the burst is the goal.",
+                notes: "If you find a frozen section, open the closest faucet downstream (so any melt has somewhere to go) and apply heat gently: hair dryer, heat tape, never an open flame. Burst pipes are 4-figure repairs; catching the freeze before the burst is the goal.",
                 assignmentType: .either,
                 diyEffortMinutes: 15,
                 regionalPack: .northeast
@@ -1385,7 +1385,7 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Plumbing",
                 title: "Inspect pipe insulation in attic, crawl, and garage",
-                description: "Plumber walks every pipe in unheated spaces (attic, crawl, garage, exterior-wall closets) during the winter visit and flags any insulation gaps. Replace torn / slipped / chewed sections — mice love pipe insulation. Adds ~10 minutes to the visit; pays off the first time the temperature drops below 10°F.",
+                description: "Plumber walks every pipe in unheated spaces (attic, crawl, garage, exterior-wall closets) during the winter visit and flags any insulation gaps. Replace torn / slipped / chewed sections. Mice love pipe insulation. Adds ~10 minutes to the visit; pays off the first time the temperature drops below 10°F.",
                 frequency: "Annually",
                 priority: "Medium",
                 estimatedCostRange: "$0–$50 in parts",
@@ -1416,14 +1416,14 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Water Heater",
                 title: "Inspect anode rod",
-                description: "Plumber pulls the sacrificial anode rod and visually checks remaining material. Anode rods sacrifice themselves to corrosion so the tank doesn't — once depleted past ~50% the tank starts corroding. Replacement runs ~$50 in parts and 20 minutes of labor; replacement of the whole tank when the anode is ignored is $1,500+.",
+                description: "Plumber pulls the sacrificial anode rod and visually checks remaining material. Anode rods sacrifice themselves to corrosion so the tank doesn't. Once depleted past ~50% the tank starts corroding. Replacement runs ~$50 in parts and 20 minutes of labor; replacement of the whole tank when the anode is ignored is $1,500+.",
                 frequency: "Annually",
                 priority: "High",
                 estimatedCostRange: "$0 (inspection part of flush) / $50–$100 if replacement",
                 isDIY: false,
                 seasonalTiming: nil,
                 professionalRequired: true,
-                notes: "Tank water heaters only. Tankless units don't have anode rods. Replacement requires partial drain plus a 1-1/16\" socket — your plumber has both on the truck.",
+                notes: "Tank water heaters only. Tankless units don't have anode rods. Replacement requires partial drain plus a 1-1/16\" socket. Your plumber has both on the truck.",
                 requiredSubtypes: ["tank"],
                 equipmentKeywords: ["water heater"],
                 assignmentType: .vendor,
@@ -1485,7 +1485,7 @@ enum MaintenanceTemplates {
             // actual due years (or whenever the user opts in via
             // Recommended for your home). All four are
             // `isEssential: false` — the bundle stays opt-in.
-            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detectors", description: "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply. This is one of the few maintenance items where the timing isn't optional.", frequency: "Every 10 years", priority: "High", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "DST anchor — pair the swap with the Fall daylight-saving clock change so the detector cycle stays predictable. If you have hardwired/interconnected detectors, replace them all at once with the same model. Mixing brands or sensor types in an interconnected system can cause false alarms.", isEssential: false, assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detectors", description: "Electrician or handyman replaces smoke detectors that have passed their 10-year lifespan. Detectors have a manufacture date printed on the back. After 10 years the sensor degrades and false-positive / false-negative rates climb sharply. This is one of the few maintenance items where the timing isn't optional.", frequency: "Every 10 years", priority: "High", estimatedCostRange: "$100–$250", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "DST anchor: pair the swap with the Fall daylight-saving clock change so the detector cycle stays predictable. If you have hardwired/interconnected detectors, replace them all at once with the same model. Mixing brands or sensor types in an interconnected system can cause false alarms.", isEssential: false, assignmentType: .vendor),
             MaintenanceTemplate(systemCategory: "Electrical", title: "Inspect electrical panel", description: "Electrician opens the main breaker panel to check for signs of wear: burned or discolored bus bars, loose terminations, corrosion, water staining, and breakers that feel warm to the touch under load. Catches the early warning signs of a panel that's nearing end-of-life or has a high-current connection slowly arcing.", frequency: "Every 3 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Flexible", professionalRequired: true, notes: "Federal Pacific (FPE), Zinsco, and Sylvania-Challenger panels are known fire risks. If you have one and haven't replaced it, inspection is critical and a panel swap ($2K–$4K) should be on the radar. Most insurance companies will discount your premium after a panel upgrade.", isEssential: false, assignmentType: .vendor, safetyFloor: true),
             // Phase 57: EV charger inspection — annual electrical check of
             // the Level 2 charger, dedicated circuit, and connections.
@@ -1722,14 +1722,14 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Chimney",
                 title: "Spring wood chimney inspection",
-                description: "Sweep performs a post-burn-season inspection — checks for animal nests in the cap, residual creosote in the smoke shelf, signs of masonry damage from freeze-thaw cycles, and verifies the flue liner is intact going into the off-season. Cheaper to address damage in spring than to discover it in October when you want to start using the fireplace again.",
+                description: "Sweep performs a post-burn-season inspection, checking for animal nests in the cap, residual creosote in the smoke shelf, and signs of masonry damage from freeze-thaw cycles, then verifies the flue liner is intact going into the off-season. Cheaper to address damage in spring than to discover it in October when you want to start using the fireplace again.",
                 frequency: "Annually",
                 priority: "Medium",
                 estimatedCostRange: "$150–$300",
                 isDIY: false,
                 seasonalTiming: "Spring",
                 professionalRequired: true,
-                notes: "Time it for April or May after the last freeze. Birds and squirrels start nesting in uncapped chimneys by late May — earlier is better for animal exclusion.",
+                notes: "Time it for April or May after the last freeze. Birds and squirrels start nesting in uncapped chimneys by late May, so earlier is better for animal exclusion.",
                 requiredSubtypes: ["wood"],
                 assignmentType: .vendor,
                 stableId: "Chimney:Spring wood inspection",
@@ -1744,14 +1744,14 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Chimney",
                 title: "Flue liner video scope inspection",
-                description: "Specialty camera service runs a video scope down the flue from above, recording the full liner condition. Detects cracks, missing mortar joints, bird nests, and animal damage that the standard sweep can't see from below. The video is yours to keep — useful for insurance claims and resale disclosure.",
+                description: "Specialty camera service runs a video scope down the flue from above, recording the full liner condition. Detects cracks, missing mortar joints, bird nests, and animal damage that the standard sweep can't see from below. The video is yours to keep, useful for insurance claims and resale disclosure.",
                 frequency: "Every 3 years",
                 priority: "Medium",
                 estimatedCostRange: "$300–$500",
                 isDIY: false,
                 seasonalTiming: "Fall",
                 professionalRequired: true,
-                notes: "Pre-burn-season anchor — book early Fall before the chimney sweep schedule fills. Different specialist than your annual sweep. Required by some insurance carriers after a chimney fire or major repair.",
+                notes: "Pre-burn-season anchor: book early Fall before the chimney sweep schedule fills. Different specialist than your annual sweep. Required by some insurance carriers after a chimney fire or major repair.",
                 isEssential: false,
                 assignmentType: .vendor,
                 stableId: "Chimney:Flue liner video scope",
@@ -1765,14 +1765,14 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Chimney",
                 title: "Re-mortar chimney crown",
-                description: "Mason patches or rebuilds the chimney crown — the cement cap at the very top that sheds water off the structure. Crown mortar erodes from rainfall and freeze-thaw; once it cracks, water gets into the masonry below and accelerates damage to the flue liner and brick.",
+                description: "Mason patches or rebuilds the chimney crown, the cement cap at the very top that sheds water off the structure. Crown mortar erodes from rainfall and freeze-thaw; once it cracks, water gets into the masonry below and accelerates damage to the flue liner and brick.",
                 frequency: "Every 10 years",
                 priority: "Medium",
                 estimatedCostRange: "$500–$1,500",
                 isDIY: false,
                 seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Major masonry work; book in summer when the weather lets the mortar cure properly. Annual cap/crown inspection (Chimney:fall) catches the need for this — you'll see it coming a year or two ahead.",
+                notes: "Major masonry work; book in summer when the weather lets the mortar cure properly. Annual cap/crown inspection (Chimney:fall) catches the need for this, so you'll see it coming a year or two ahead.",
                 isEssential: false,
                 assignmentType: .vendor,
                 stableId: "Chimney:Re-mortar crown",
@@ -1789,7 +1789,7 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(
                 systemCategory: "Chimney",
                 title: "HVAC tech inspects flue during annual tune-up",
-                description: "The flue is the venting path that carries combustion gases from your furnace or boiler out of the house. The HVAC tech who handles your annual heating tune-up can confirm the flue is clear, the draft is correct, and there's no corrosion or blockage. No separate vendor visit — bundled into the tune-up you're already paying for.",
+                description: "The flue is the venting path that carries combustion gases from your furnace or boiler out of the house. The HVAC tech who handles your annual heating tune-up can confirm the flue is clear, the draft is correct, and there's no corrosion or blockage. No separate vendor visit. It's bundled into the tune-up you're already paying for.",
                 frequency: "Annually",
                 priority: "Medium",
                 estimatedCostRange: "$0 (part of HVAC tune-up)",
@@ -2092,7 +2092,7 @@ enum MaintenanceTemplates {
                 isDIY: false,
                 seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Best done in mid-July when both broken-head symptoms and dry-spell impact are visible. Some irrigation contracts include this — confirm with your vendor.",
+                notes: "Best done in mid-July when both broken-head symptoms and dry-spell impact are visible. Some irrigation contracts include this. Confirm with your vendor.",
                 assignmentType: .vendor
             ),
         ]),
@@ -2202,7 +2202,7 @@ enum MaintenanceTemplates {
                 isDIY: false,
                 seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Mid-July through early August. Most pool services don't push for this — you have to ask. Worth it for HNW households where the pool is heavily used.",
+                notes: "Mid-July through early August. Most pool services don't push for this. You have to ask. Worth it for HNW households where the pool is heavily used.",
                 requiredSubtypes: ["pool"],
                 assignmentType: .vendor,
                 stableId: "Pool/Spa:Mid-season pool service"
@@ -3239,7 +3239,7 @@ enum MaintenanceTemplates {
                 isDIY: false,
                 seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Sealer needs 80°F+ surface temps to cure properly. Mid-summer is the sweet spot in the Northeast — warm enough for the cure, ahead of the early-fall rains that can pit fresh sealer.",
+                notes: "Sealer needs 80°F+ surface temps to cure properly. Mid-summer is the sweet spot in the Northeast: warm enough for the cure, ahead of the early-fall rains that can pit fresh sealer.",
                 requiredSubtypes: ["driveway_asphalt"],
                 isEssential: false,
                 assignmentType: .vendor
@@ -3259,7 +3259,7 @@ enum MaintenanceTemplates {
                 isDIY: false,
                 seasonalTiming: "Summer",
                 professionalRequired: true,
-                notes: "Best done in dry warm weather — gravel beds compact and lock in cleanly when the underlying soil isn't saturated.",
+                notes: "Best done in dry warm weather. Gravel beds compact and lock in cleanly when the underlying soil isn't saturated.",
                 requiredSubtypes: ["driveway_gravel"],
                 isEssential: false,
                 assignmentType: .vendor
@@ -3347,7 +3347,7 @@ enum MaintenanceTemplates {
                 isDIY: true,
                 seasonalTiming: "Winter",
                 professionalRequired: false,
-                notes: "Heating-on detection — running the furnace plus closed windows pulls more radon from the soil into the home, so winter readings expose the worst-case level. NH, CT, and much of the surrounding Northeast are in the granite belt, one of the highest radon zones in the country.",
+                notes: "Heating-on detection: running the furnace plus closed windows pulls more radon from the soil into the home, so winter readings expose the worst-case level. NH, CT, and much of the surrounding Northeast are in the granite belt, one of the highest radon zones in the country.",
                 isEssential: false,
                 assignmentType: .either,
                 diyEffortMinutes: 20,

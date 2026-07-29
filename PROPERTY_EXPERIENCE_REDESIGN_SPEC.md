@@ -52,15 +52,15 @@ Existing capabilities already in the product include:
 
 Relevant implementation anchors:
 
-- Property tabs and current systems placement: [PropertyDetailView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:3)
-- System data model: [DatabaseModels.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Core/Networking/DatabaseModels.swift:745)
-- System detail experience: [SystemDetailView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/SystemDetailView.swift:3)
-- Grouped systems browse experience: [SystemGroupListView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/SystemGroupListView.swift:3)
-- Equipment photo identification flow: [EquipmentIdentifySheet.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/EquipmentIdentifySheet.swift:4)
-- Add system and catalog-backed setup: [AddSystemView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/AddSystemView.swift:3)
-- Search equipment edge function: [search-equipment/index.ts](/Users/tomburke/Projects/Housing-Manager/supabase/functions/search-equipment/index.ts:138)
-- Photo identify edge function: [identify-equipment/index.ts](/Users/tomburke/Projects/Housing-Manager/supabase/functions/identify-equipment/index.ts:1)
-- Appliance systems seeded during quiz: [HouseQuizAnswerMapper.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Onboarding/HouseQuiz/HouseQuizAnswerMapper.swift:203)
+- Property tabs and current systems placement: [PropertyDetailView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:3)
+- System data model: [DatabaseModels.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Core/Networking/DatabaseModels.swift:745)
+- System detail experience: [SystemDetailView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/SystemDetailView.swift:3)
+- Grouped systems browse experience: [SystemGroupListView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/SystemGroupListView.swift:3)
+- Equipment photo identification flow: [EquipmentIdentifySheet.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/EquipmentIdentifySheet.swift:4)
+- Add system and catalog-backed setup: [AddSystemView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/AddSystemView.swift:3)
+- Search equipment edge function: [search-equipment/index.ts](/Users/tomburke/Documents/Projects/Housing-Manager/supabase/functions/search-equipment/index.ts:138)
+- Photo identify edge function: [identify-equipment/index.ts](/Users/tomburke/Documents/Projects/Housing-Manager/supabase/functions/identify-equipment/index.ts:1)
+- Appliance systems seeded during quiz: [HouseQuizAnswerMapper.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Onboarding/HouseQuiz/HouseQuizAnswerMapper.swift:203)
 
 This is not support infrastructure. It is a product moat.
 
@@ -308,7 +308,7 @@ Dashboard and property overview should deep-link directly into the property's Ma
 6. Coverage by system
 7. Recommended
 
-The current Phase 66 direction already contains strong building blocks for this, especially `Home status`, `Needs your decision`, `Upcoming scheduled`, `Active programs`, and the handyman bundle concepts in [MaintenanceHubSections.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/Components/MaintenanceHubSections.swift:21).
+The current Phase 66 direction already contains strong building blocks for this, especially `Home status`, `Needs your decision`, `Upcoming scheduled`, `Active programs`, and the handyman bundle concepts in [MaintenanceHubSections.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/Components/MaintenanceHubSections.swift:21).
 
 ### Maintenance hero
 
@@ -465,7 +465,7 @@ Subtext:
 - `Browse specialty systems`
 - `Upload manual or warranty`
 
-These actions already align with current functionality in [AddSystemView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/AddSystemView.swift:69) and [EquipmentIdentifySheet.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/EquipmentIdentifySheet.swift:66).
+These actions already align with current functionality in [AddSystemView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/AddSystemView.swift:69) and [EquipmentIdentifySheet.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/EquipmentIdentifySheet.swift:66).
 
 ### Grouped systems
 
@@ -824,11 +824,11 @@ This redesign should reuse existing work rather than replacing it:
 
 ### Specific code implications for a later implementation pass
 
-- Add `.systems` to `PropertyDetailTab` and update the tab selector in [PropertyDetailView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:3)
-- Move `systemsSection` out of the maintenance tab's primary content and turn it into a dedicated tab backed by the existing grouped browse flow [PropertyDetailView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:1075)
-- Replace the overview tab's top-first `InvestmentSummaryCard` priority with a home-status-first layout [PropertyDetailView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:510)
-- Make the overview maintenance card switch into the property's Maintenance tab instead of pushing an extra maintenance destination [PropertyDetailView.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:783)
-- Retain `MaintenanceStatusSection` and related Phase 66 structures as the backbone of the property maintenance hub [MaintenanceHubSections.swift](/Users/tomburke/Projects/Housing-Manager/Haven/Features/Property/Views/Components/MaintenanceHubSections.swift:21)
+- Add `.systems` to `PropertyDetailTab` and update the tab selector in [PropertyDetailView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:3)
+- Move `systemsSection` out of the maintenance tab's primary content and turn it into a dedicated tab backed by the existing grouped browse flow [PropertyDetailView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:1075)
+- Replace the overview tab's top-first `InvestmentSummaryCard` priority with a home-status-first layout [PropertyDetailView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:510)
+- Make the overview maintenance card switch into the property's Maintenance tab instead of pushing an extra maintenance destination [PropertyDetailView.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/PropertyDetailView.swift:783)
+- Retain `MaintenanceStatusSection` and related Phase 66 structures as the backbone of the property maintenance hub [MaintenanceHubSections.swift](/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Property/Views/Components/MaintenanceHubSections.swift:21)
 
 ## Final Product Thesis
 

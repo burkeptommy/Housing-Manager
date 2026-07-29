@@ -28,6 +28,22 @@ struct ChezProposalCard: View {
     }
 
     var body: some View {
+        // Wave 6 — route by kind before assuming the decision-card
+        // shape. Info requests get their own card with per-field
+        // inputs; unknown kinds degrade to a quiet caption with no
+        // action buttons (older builds rendered them as broken vendor
+        // cards with live Approve buttons).
+        switch proposal.typedKind {
+        case .infoRequest:
+            ChezInfoRequestCard(proposal: proposal, messageId: messageId)
+        case .unknown:
+            unknownKindBody
+        case .vendor, .dateSlot, .cost, .quote:
+            decisionCardBody
+        }
+    }
+
+    private var decisionCardBody: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
             payload
@@ -51,6 +67,26 @@ struct ChezProposalCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(HavenColors.action.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    /// Wave 6 — plain-text degradation for proposal kinds this build
+    /// doesn't recognize. The message content already renders as normal
+    /// bubble text above; this is just a quiet marker so the homeowner
+    /// knows a structured update rode along. No decision buttons.
+    private var unknownKindBody: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(HavenColors.textSecondary)
+            Text("Update from Chez")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule().fill(HavenColors.beige200.opacity(0.5))
         )
     }
 
@@ -79,6 +115,10 @@ struct ChezProposalCard: View {
         case .dateSlot: return "calendar.badge.clock"
         case .cost: return "dollarsign.circle.fill"
         case .quote: return "doc.text.fill"
+        // Wave 6 — these kinds never reach the decision-card body
+        // (routed in `body`), but the switch stays exhaustive.
+        case .infoRequest: return "questionmark.bubble.fill"
+        case .unknown: return "sparkles"
         }
     }
 
@@ -88,6 +128,9 @@ struct ChezProposalCard: View {
         case .dateSlot: return "DATE OPTIONS"
         case .cost: return "COST PROPOSAL"
         case .quote: return "QUOTE PROPOSAL"
+        // Wave 6 — unreachable from the decision-card body; exhaustive.
+        case .infoRequest: return "CHEZ NEEDS DETAILS"
+        case .unknown: return "UPDATE FROM CHEZ"
         }
     }
 
@@ -104,6 +147,10 @@ struct ChezProposalCard: View {
             costPayload
         case .quote:
             quotePayload
+        case .infoRequest, .unknown:
+            // Wave 6 — routed before the decision-card body renders;
+            // nothing structured to show here.
+            EmptyView()
         }
     }
 
@@ -351,6 +398,7 @@ struct ChezProposalCard: View {
         case .declined: return "xmark.circle.fill"
         case .countered: return "arrow.uturn.left.circle.fill"
         case .pending: return "clock"
+        case .answered: return "checkmark.circle.fill"
         }
     }
 
@@ -360,6 +408,7 @@ struct ChezProposalCard: View {
         case .declined: return HavenColors.critical
         case .countered: return HavenColors.action
         case .pending: return HavenColors.textSecondary
+        case .answered: return HavenColors.success
         }
     }
 
@@ -369,6 +418,7 @@ struct ChezProposalCard: View {
         case .declined: return "You declined this proposal."
         case .countered: return "You sent a counter-offer."
         case .pending: return "Awaiting your decision."
+        case .answered: return "You sent your answers to Chez."
         }
     }
 

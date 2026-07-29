@@ -251,6 +251,21 @@ serve(async (req: Request) => {
         return new Response(JSON.stringify({ error: "Merge request already resolved" }), { status: 400, headers: responseHeaders });
       }
 
+      // July 2026 security sweep (audit S1): preview returns FULL data for
+      // both households, but never checked the caller was a party to the
+      // merge. Same predicate the execute/accept paths already use, plus
+      // the requester's side.
+      if (
+        mergeReq.requested_by !== user.id &&
+        mergeReq.target_user_id !== user.id &&
+        mergeReq.requested_for_email !== user.email
+      ) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: you are not a party to this merge request" }),
+          { status: 403, headers: responseHeaders }
+        );
+      }
+
       const sourceId = mergeReq.source_household_id;
       const targetId = mergeReq.target_household_id;
 

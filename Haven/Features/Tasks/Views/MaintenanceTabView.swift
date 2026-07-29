@@ -25,6 +25,21 @@ struct MaintenanceTabView: View {
     @State private var pushTarget: MaintenancePush?
     @State private var pickerForRoutine: RoutineRow?
 
+    /// July 2026 — real task search. The toolbar magnifier used to push
+    /// RecommendedServicesView (a browse catalog masquerading as search).
+    /// It now toggles an inline field; a non-empty query swaps
+    /// `activeFeed` to a year-wide filtered feed so every section below
+    /// renders matches with the exact same row components.
+    @State private var searchActive = false
+    @State private var searchQuery = ""
+    @FocusState private var searchFieldFocused: Bool
+
+    /// July 2026 — "Add a routine" opens RoutineEditSheet directly. The
+    /// Add-menu button used to push RoutinesListView, leaving the user
+    /// one more tap (and a context switch) away from the form they asked
+    /// for. Programs "See all" still reaches the list view.
+    @State private var showAddRoutineSheet = false
+
     /// Phase 70 (Tasks v2): The task currently being scheduled via the
     /// inline QuickSchedulingSheet. Non-nil while the half-detent sheet
     /// is open; set back to nil after the user picks a date or cancels.
@@ -147,7 +162,19 @@ struct MaintenanceTabView: View {
                     // the YearRibbon's season/count text.
                     onSearch: {
                         Analytics.track(.tasksV2SearchTapped, [:])
-                        pushTarget = .recommendedServices
+                        withAnimation(HavenTheme.animationStandard) {
+                            searchActive.toggle()
+                            if searchActive {
+                                // Same reset as season swaps (F1): a
+                                // lingering "Overdue" pill silently
+                                // shrinking search results reads as
+                                // "search is broken".
+                                viewModel.activeStatsFilter = nil
+                            } else {
+                                searchQuery = ""
+                            }
+                        }
+                        searchFieldFocused = searchActive
                     },
                     onTimeline: {
                         showYearOverview = true
@@ -157,76 +184,93 @@ struct MaintenanceTabView: View {
                     }
                 )
 
-                YearRibbon(
-                    activeSeason: $activeSeason,
-                    summaries: viewModel.seasonSummaries(activeSeason: currentSeason),
-                    currentSeason: currentSeason,
-                    onTap: { season in
-                        // Phase 70 (Tasks v2): Tap = filter the screen
-                        // to that season. The binding update already
-                        // re-renders the feed via `activeFeed`.
-                        // Phase F1: clear stats filter on season swap
-                        // so the user isn't trapped in "Overdue" when
-                        // jumping forward to a different season.
-                        withAnimation(HavenTheme.animationStandard) {
-                            activeSeason = season
-                            viewModel.activeStatsFilter = nil
+                searchBarSection
+
+                // July 2026 — while a search query is live, the seasonal
+                // chrome (ribbon, hero, up-next, glance, stats pills) and
+                // the non-feed sections hide: results are year-wide, so
+                // season framing would contradict what's on screen. The
+                // feed-backed sections below (needs attention / tasks /
+                // programs) keep rendering — `activeFeed` swaps to the
+                // filtered year-wide feed so they become the results list.
+                if !isSearching {
+                    YearRibbon(
+                        activeSeason: $activeSeason,
+                        summaries: viewModel.seasonSummaries(activeSeason: currentSeason),
+                        currentSeason: currentSeason,
+                        onTap: { season in
+                            // Phase 70 (Tasks v2): Tap = filter the screen
+                            // to that season. The binding update already
+                            // re-renders the feed via `activeFeed`.
+                            // Phase F1: clear stats filter on season swap
+                            // so the user isn't trapped in "Overdue" when
+                            // jumping forward to a different season.
+                            withAnimation(HavenTheme.animationStandard) {
+                                activeSeason = season
+                                viewModel.activeStatsFilter = nil
+                            }
+                            Haptics.selection()
+                            Analytics.track(.tasksV2SeasonTapped, [
+                                "season": season.rawValue,
+                                "source": "ribbon"
+                            ])
                         }
-                        Haptics.selection()
-                        Analytics.track(.tasksV2SeasonTapped, [
-                            "season": season.rawValue,
-                            "source": "ribbon"
-                        ])
-                    }
-                )
+                    )
 
-                miniHeroSection
+                    miniHeroSection
 
-                // Phase 70.A1 follow-on F3 — Up Next 14-day strip.
-                // Ignores season scope so scheduled work that crosses
-                // a season boundary (book "Next week" from Spring → row
-                // lands in June → Summer tile, but UP NEXT still shows
-                // it) never disappears.
-                upNextSection
+                    // Phase 70.A1 follow-on F3 — Up Next 14-day strip.
+                    // Ignores season scope so scheduled work that crosses
+                    // a season boundary (book "Next week" from Spring → row
+                    // lands in June → Summer tile, but UP NEXT still shows
+                    // it) never disappears.
+                    upNextSection
 
-                // Phase 70 (Tasks v2): unified view sections.
-                //
-                // Replaces the prior decisionsSection / programsSection /
-                // chezHandlingSection trio. Single source of truth via
-                // `viewModel.seasonFeed(activeSeason)` so the YearRibbon
-                // count == the rendered row count. The old section
-                // helpers are kept below for safety + rollback.
-                duplicateBannerSection
+                    // Phase 70 (Tasks v2): unified view sections.
+                    //
+                    // Replaces the prior decisionsSection / programsSection /
+                    // chezHandlingSection trio. Single source of truth via
+                    // `viewModel.seasonFeed(activeSeason)` so the YearRibbon
+                    // count == the rendered row count. The old section
+                    // helpers are kept below for safety + rollback.
+                    duplicateBannerSection
 
-                yearAtAGlanceSection
+                    yearAtAGlanceSection
 
-                // Phase 80 — SeasonScopeBanner removed; its search +
-                // timeline icons live in the HeaderSwitcher toolbar
-                // now, the season/count text was duplicative of the
-                // YearRibbon tiles.
+                    // Phase 80 — SeasonScopeBanner removed; its search +
+                    // timeline icons live in the HeaderSwitcher toolbar
+                    // now, the season/count text was duplicative of the
+                    // YearRibbon tiles.
 
-                statsFilterStripSection
+                    statsFilterStripSection
+                }
 
                 needsAttentionSection
 
-                flexibleTasksSection
+                if !isSearching {
+                    flexibleTasksSection
+                }
 
                 thisSeasonTasksSection
 
-                activeRoutinesSeasonCard
+                if !isSearching {
+                    activeRoutinesSeasonCard
+                }
 
                 combinedProgramsSection
 
-                vehiclesSection
+                if !isSearching {
+                    vehiclesSection
 
-                BrowseBand(
-                    title: "Browse additional services",
-                    subtitle: "\(viewModel.browseCatalogCount) seasonal & on-demand services"
-                ) {
-                    pushTarget = .recommendedServices
+                    BrowseBand(
+                        title: "Browse additional services",
+                        subtitle: "\(viewModel.browseCatalogCount) seasonal & on-demand services"
+                    ) {
+                        pushTarget = .recommendedServices
+                    }
+                    .padding(.horizontal, TasksV5.pageMargin)
+                    .padding(.bottom, TasksV5.bottomTabInset)
                 }
-                .padding(.horizontal, TasksV5.pageMargin)
-                .padding(.bottom, TasksV5.bottomTabInset)
 
                 // Phase 80 — the previous "View hidden tasks" muted
                 // link that lived here was buried beneath 1000+pt of
@@ -378,6 +422,23 @@ struct MaintenanceTabView: View {
                 viewModel: maintenanceVM
             )
         }
+        // July 2026 — direct routine creation from the Add menu. Same
+        // construction RoutinesListView uses for its own + button; the
+        // .routineChanged post from the sheet's save refreshes this tab.
+        .sheet(isPresented: $showAddRoutineSheet) {
+            if let householdId {
+                NavigationStack {
+                    RoutineEditSheet(
+                        householdId: householdId,
+                        propertyId: viewModel.activePropertyId ?? appState.primaryProperty?.id,
+                        existing: nil,
+                        onSaved: {
+                            Task { await viewModel.load(householdId: householdId) }
+                        }
+                    )
+                }
+            }
+        }
         // Phase G2 — Year overview / Timeline scrub. fullScreenCover
         // so the 18-month list reads as a distinct mode. Tap any row
         // → swap to detailTask sheet (existing path); tap a routine
@@ -469,7 +530,7 @@ struct MaintenanceTabView: View {
             }
         }
         .confirmationDialog("Add", isPresented: $showAddMenu, titleVisibility: .hidden) {
-            Button("Add a routine") { pushTarget = .routinesList }
+            Button("Add a routine") { showAddRoutineSheet = true }
             Button("Add a one-off task") { showAddTaskSheet = true }
             Button("Browse all services") { pushTarget = .recommendedServices }
             // Phase 80 — discoverable Task Library entry. The buried
@@ -501,14 +562,115 @@ struct MaintenanceTabView: View {
 
     // MARK: - Sections
 
+    /// July 2026 — inline search field, toggled by the toolbar magnifier.
+    /// Styled to match the Contacts sub-tab's search treatment (creamLight
+    /// field, magnifier + clear-X). The caption under the field reports
+    /// the year-wide match count so the user knows the scope changed.
+    @ViewBuilder
+    private var searchBarSection: some View {
+        if searchActive {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(HavenColors.textTertiary)
+                        TextField("Search tasks, programs, vendors", text: $searchQuery)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .focused($searchFieldFocused)
+                            .submitLabel(.search)
+                            .autocorrectionDisabled()
+                        if !searchQuery.isEmpty {
+                            Button {
+                                searchQuery = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                            .strokeBorder(HavenColors.beige200, lineWidth: 1)
+                    }
+
+                    Button("Cancel") {
+                        withAnimation(HavenTheme.animationStandard) {
+                            searchActive = false
+                            searchQuery = ""
+                        }
+                        searchFieldFocused = false
+                    }
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.navy800)
+                }
+
+                if isSearching {
+                    let feed = activeFeed
+                    let matchCount = feed.totalItems + feed.programs.count + feed.chezTasks.count
+                    if matchCount == 0 {
+                        searchEmptyCard
+                            .padding(.top, 4)
+                    } else {
+                        Text(matchCount == 1
+                            ? "1 match across the next 12 months"
+                            : "\(matchCount) matches across the next 12 months")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, 14)
+        }
+    }
+
+    private var searchEmptyCard: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(HavenColors.textTertiary)
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle().fill(HavenColors.beige200.opacity(0.6))
+                )
+            VStack(alignment: .leading, spacing: 2) {
+                Text("No matches for \u{201C}\(searchQuery.trimmingCharacters(in: .whitespacesAndNewlines))\u{201D}")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Text("Try a shorter word, a vendor name, or browse all services from the + menu.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+    }
+
     private var miniHeroSection: some View {
         IndigoGradientCard(variant: .hero) {
             MiniHeroContent(
                 scopeLabel: scopeLabel,
                 coveredCount: viewModel.coveredCount(for: activeSeason, currentSeason: currentSeason),
                 totalCount: viewModel.totalCount(for: activeSeason, currentSeason: currentSeason),
-                programCount: viewModel.activePrograms().count,
-                decisionCount: viewModel.pendingDecisions().count,
+                // July 2026 audit: programs + decisions must use the SAME
+                // season scope as coveredCount/totalCount and the sections
+                // below (scopedSeasonOrNil). Unscoped counts made the hero
+                // claim year-wide numbers while a non-current season's
+                // sections rendered scoped rows — the "30 vs 5" bug class
+                // Phase 70 was built to kill.
+                programCount: viewModel.activePrograms(scopedTo: scopedSeasonOrNil).count,
+                decisionCount: viewModel.pendingDecisions(scopedTo: scopedSeasonOrNil).count,
                 // Phase 80 — total task line items across every visible
                 // bundle parent (counting its resolved children) plus
                 // every standalone. Computed via the same library lookup
@@ -715,8 +877,16 @@ struct MaintenanceTabView: View {
     /// always scoped to one season tile. "Active Routines This Season"
     /// card surfaces the routine density that the old full-year toggle
     /// was used to discover.
+    /// True while a live search query should drive the screen. The field
+    /// being open with an empty query keeps the normal seasonal layout.
+    private var isSearching: Bool {
+        searchActive && !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var activeFeed: SeasonFeed {
-        viewModel.seasonFeed(activeSeason)
+        isSearching
+            ? viewModel.searchFeed(query: searchQuery)
+            : viewModel.seasonFeed(activeSeason)
     }
 
     /// SeasonScopeBanner — the 44pt pill below MiniHero that names the
@@ -969,8 +1139,8 @@ struct MaintenanceTabView: View {
         let monthSections = activeFeed.monthSections
         if !monthSections.isEmpty {
             SectionLabel(
-                eyebrow: "This season",
-                sub: "What's coming up"
+                eyebrow: isSearching ? "Matching tasks" : "This season",
+                sub: isSearching ? "Across the next 12 months" : "What's coming up"
             )
             .padding(.bottom, TasksV5.sectionLabelGap)
 
@@ -986,11 +1156,13 @@ struct MaintenanceTabView: View {
                 }
             }
             .padding(.bottom, TasksV5.sectionGap)
-        } else if activeFeed.decisions.isEmpty {
+        } else if activeFeed.decisions.isEmpty && !isSearching {
             // Friend feedback (May 2026): when the year-aware filter
             // strips a tile down to zero rows, surface a graceful
             // "wrapped" empty state instead of silently rendering
-            // nothing under the previous section's footer.
+            // nothing under the previous section's footer. During a
+            // live search, `searchBarSection`'s empty card owns the
+            // zero-results state — the season copy would be wrong.
             seasonWrappedEmptyCard
                 .padding(.horizontal, TasksV5.pageMargin)
                 .padding(.bottom, TasksV5.sectionGap)
@@ -3052,6 +3224,102 @@ final class MaintenanceTabViewModel: ObservableObject {
             )
         }
         return result
+    }
+
+    /// July 2026 — real task search. Builds a synthetic year-wide feed by
+    /// unioning all four seasons' feeds and filtering every entry against
+    /// the query. Derives from the SAME `seasonFeed` pipeline as the
+    /// rendered sections (hard rule: never recompute rows independently —
+    /// that's the "30 vs 5" bug class). Matching is case/diacritic-
+    /// insensitive over task titles + notes + descriptions and routine
+    /// labels; routine labels embed vendor names ("Landscaping · Blue
+    /// Fox") and vendor-managed task titles embed them too ("Schedule
+    /// Petro: ..."), so vendor search works without a contractor join.
+    ///
+    /// Months are disjoint across seasons (each month belongs to exactly
+    /// one Season), but year-round pending routines and programs appear
+    /// in every season's feed — hence the id-based dedup. Result months
+    /// are ordered from the current month forward so matches read as
+    /// "upcoming first".
+    func searchFeed(query: String) -> SeasonFeed {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        func hit(_ text: String?) -> Bool {
+            guard !q.isEmpty, let text, !text.isEmpty else { return false }
+            return text.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
+        func taskHit(_ t: MaintenanceTaskDBRow) -> Bool {
+            hit(t.title) || hit(t.notes) || hit(t.description)
+        }
+        func routineHit(_ r: RoutineRow) -> Bool {
+            hit(r.label) || hit(r.presentationLabel)
+        }
+
+        var decisions: [DecisionEntry] = []
+        var seenDecisionIds = Set<String>()
+        var monthEntries: [Int: [SeasonEntry]] = [:]
+        var programs: [RoutineRow] = []
+        var seenProgramIds = Set<UUID>()
+        var chezTasks: [MaintenanceTaskDBRow] = []
+        var seenChezTaskIds = Set<UUID>()
+
+        for season in Season.allCases {
+            let feed = seasonFeed(season)
+
+            for decision in feed.decisions where !seenDecisionIds.contains(decision.id) {
+                let matches: Bool
+                switch decision {
+                case .routinePendingVendor(let routine): matches = routineHit(routine)
+                case .taskNeedsVendor(let task): matches = taskHit(task)
+                }
+                if matches {
+                    seenDecisionIds.insert(decision.id)
+                    decisions.append(decision)
+                }
+            }
+
+            for section in feed.monthSections {
+                let filtered = section.entries.filter { entry in
+                    switch entry {
+                    case .bundle(let task), .standaloneTask(let task):
+                        return taskHit(task)
+                    case .routineOccurrence(let occurrence):
+                        return routineHit(occurrence.routine)
+                    }
+                }
+                if !filtered.isEmpty {
+                    monthEntries[section.month, default: []].append(contentsOf: filtered)
+                }
+            }
+
+            for program in feed.programs
+            where !seenProgramIds.contains(program.id) && routineHit(program) {
+                seenProgramIds.insert(program.id)
+                programs.append(program)
+            }
+
+            for task in feed.chezTasks
+            where !seenChezTaskIds.contains(task.id) && taskHit(task) {
+                seenChezTaskIds.insert(task.id)
+                chezTasks.append(task)
+            }
+        }
+
+        let currentMonth = Calendar.current.component(.month, from: Date())
+        let monthOrder = (0..<12).map { ((currentMonth - 1 + $0) % 12) + 1 }
+        let monthSections = monthOrder.compactMap { month -> MonthSection? in
+            guard let entries = monthEntries[month], !entries.isEmpty else { return nil }
+            return MonthSection(month: month, entries: entries)
+        }
+
+        return SeasonFeed(
+            season: Season.current(),
+            decisions: decisions,
+            monthSections: monthSections,
+            programs: programs,
+            chezTasks: chezTasks,
+            routineVisitCount: 0
+        )
     }
 
     func coveredCount(for season: Season, currentSeason: Season) -> Int {

@@ -502,6 +502,10 @@ struct DocumentMetadata: Codable {
     let detectedVins: [String]?
     let matchedVehicleIds: [String]?
     let unmatchedVins: [String]?
+    /// Phase 7 M3 — stamped by process-invoice when the email pipeline's
+    /// auto-run analyzed this invoice; iOS scan affordances read it to
+    /// point at the inbox review card instead of re-running.
+    let invoiceAutoProcessedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case crossReferences = "cross_references"
@@ -509,15 +513,18 @@ struct DocumentMetadata: Codable {
         case detectedVins = "detected_vins"
         case matchedVehicleIds = "matched_vehicle_ids"
         case unmatchedVins = "unmatched_vins"
+        case invoiceAutoProcessedAt = "invoice_auto_processed_at"
     }
 
     init(crossReferences: [String]? = nil, extractedMetadata: [String: FlexibleValue]? = nil,
-         detectedVins: [String]? = nil, matchedVehicleIds: [String]? = nil, unmatchedVins: [String]? = nil) {
+         detectedVins: [String]? = nil, matchedVehicleIds: [String]? = nil, unmatchedVins: [String]? = nil,
+         invoiceAutoProcessedAt: String? = nil) {
         self.crossReferences = crossReferences
         self.extractedMetadata = extractedMetadata
         self.detectedVins = detectedVins
         self.matchedVehicleIds = matchedVehicleIds
         self.unmatchedVins = unmatchedVins
+        self.invoiceAutoProcessedAt = invoiceAutoProcessedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -527,6 +534,7 @@ struct DocumentMetadata: Codable {
         detectedVins = try? container.decode([String].self, forKey: .detectedVins)
         matchedVehicleIds = try? container.decode([String].self, forKey: .matchedVehicleIds)
         unmatchedVins = try? container.decode([String].self, forKey: .unmatchedVins)
+        invoiceAutoProcessedAt = try? container.decode(String.self, forKey: .invoiceAutoProcessedAt)
     }
 }
 
@@ -3375,6 +3383,11 @@ struct HouseholdInvitationRow: Codable, Identifiable {
     let expiresAt: Date?
     let acceptedAt: Date?
     let acceptedBy: UUID?
+    /// July 2026 (audit F3): true only when the invite flow created the
+    /// family_members placeholder itself. Revoke may delete the member ONLY
+    /// when this is true — pre-migration rows decode as false, so legacy
+    /// revokes never delete.
+    let createdMember: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, role, status
@@ -3390,6 +3403,7 @@ struct HouseholdInvitationRow: Codable, Identifiable {
         case expiresAt = "expires_at"
         case acceptedAt = "accepted_at"
         case acceptedBy = "accepted_by"
+        case createdMember = "created_member"
     }
 }
 
@@ -3401,6 +3415,9 @@ struct HouseholdInvitationInsert: Codable {
     var role: String = "member"
     var familyMemberId: UUID?
     var personalMessage: String?
+    /// True only when the invite flow itself created the family_members
+    /// placeholder (addPersonToHousehold path). See HouseholdInvitationRow.
+    var createdMember: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case role
@@ -3410,6 +3427,7 @@ struct HouseholdInvitationInsert: Codable {
         case inviteCode = "invite_code"
         case familyMemberId = "family_member_id"
         case personalMessage = "personal_message"
+        case createdMember = "created_member"
     }
 }
 
@@ -3781,6 +3799,30 @@ struct ProjectQuoteRow: Codable, Identifiable {
         case updatedAt = "updated_at"
     }
 
+    // July 2026 (audit): resilient decode. `analysis` is non-optional and
+    // decoded from JSONB — a missing/null analysis key used to throw and
+    // drop the whole quote via loadQuotes's try?. id/projectId/householdId
+    // are genuinely required (throw is correct — a quote with no id is
+    // unusable), but everything else, especially analysis, degrades to a
+    // safe default.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        projectId = try c.decode(UUID.self, forKey: .projectId)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        contractorId = try? c.decodeIfPresent(UUID.self, forKey: .contractorId) ?? nil
+        quoteDate = try? c.decodeIfPresent(String.self, forKey: .quoteDate) ?? nil
+        quoteTotal = try? c.decodeIfPresent(Double.self, forKey: .quoteTotal) ?? nil
+        estimatedFairTotal = try? c.decodeIfPresent(Double.self, forKey: .estimatedFairTotal) ?? nil
+        overallRating = try? c.decodeIfPresent(String.self, forKey: .overallRating) ?? nil
+        analysis = (try? c.decodeIfPresent(QuoteAnalysis.self, forKey: .analysis) ?? nil) ?? QuoteAnalysis()
+        filePath = try? c.decodeIfPresent(String.self, forKey: .filePath) ?? nil
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes) ?? nil
+        trade = try? c.decodeIfPresent(String.self, forKey: .trade) ?? nil
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt) ?? nil
+        updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? nil
+    }
+
     /// Vendor name from the quote analysis
     var vendorName: String? { analysis.vendor?.name }
 
@@ -3818,6 +3860,12 @@ struct ProjectQuoteInsert: Codable {
 
 // MARK: - Quote Analysis Response
 
+// July 2026 (audit — resilient-decoder sweep): the quote tree is decoded
+// from the analyze-quote Edge Function's JSONB (project_quotes.analysis).
+// Before this, every struct used the synthesized decoder, so ONE field with
+// a drifted type (e.g. quote_total as a string) threw all the way up and
+// `ProjectsViewModel.loadQuotes`'s `try?` dropped the ENTIRE quote silently
+// — the exact Phase 60.1 trust-bug class. Every field is now try?.
 struct QuoteAnalysis: Codable {
     let vendor: QuoteVendor?
     let projectType: String?
@@ -3827,6 +3875,29 @@ struct QuoteAnalysis: Codable {
     let lineItems: [QuoteLineItem]?
     let overallAssessment: QuoteOverallAssessment?
     let suggestedDiyAlternative: QuoteDiyAlternative?
+
+    enum CodingKeys: String, CodingKey {
+        case vendor, projectType, quoteDate, quoteTotal, hasItemizedPricing
+        case lineItems, overallAssessment, suggestedDiyAlternative
+    }
+
+    init() {
+        vendor = nil; projectType = nil; quoteDate = nil; quoteTotal = nil
+        hasItemizedPricing = nil; lineItems = nil; overallAssessment = nil
+        suggestedDiyAlternative = nil
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        vendor = try? c?.decodeIfPresent(QuoteVendor.self, forKey: .vendor) ?? nil
+        projectType = try? c?.decodeIfPresent(String.self, forKey: .projectType) ?? nil
+        quoteDate = try? c?.decodeIfPresent(String.self, forKey: .quoteDate) ?? nil
+        quoteTotal = try? c?.decodeIfPresent(Double.self, forKey: .quoteTotal) ?? nil
+        hasItemizedPricing = try? c?.decodeIfPresent(Bool.self, forKey: .hasItemizedPricing) ?? nil
+        lineItems = try? c?.decodeIfPresent([QuoteLineItem].self, forKey: .lineItems) ?? nil
+        overallAssessment = try? c?.decodeIfPresent(QuoteOverallAssessment.self, forKey: .overallAssessment) ?? nil
+        suggestedDiyAlternative = try? c?.decodeIfPresent(QuoteDiyAlternative.self, forKey: .suggestedDiyAlternative) ?? nil
+    }
 }
 
 struct QuoteVendor: Codable {
@@ -3836,31 +3907,65 @@ struct QuoteVendor: Codable {
     let address: String?
     let license: String?
     let trade: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        name = try? c?.decodeIfPresent(String.self, forKey: .name) ?? nil
+        phone = try? c?.decodeIfPresent(String.self, forKey: .phone) ?? nil
+        email = try? c?.decodeIfPresent(String.self, forKey: .email) ?? nil
+        address = try? c?.decodeIfPresent(String.self, forKey: .address) ?? nil
+        license = try? c?.decodeIfPresent(String.self, forKey: .license) ?? nil
+        trade = try? c?.decodeIfPresent(String.self, forKey: .trade) ?? nil
+    }
 }
 
 struct QuoteLineItem: Codable, Identifiable {
-    var id: String { description ?? UUID().uuidString }
+    // July 2026 (audit): stable identity. The old `description ?? UUID()`
+    // regenerated a new UUID on every access (breaking ForEach diffing) and
+    // collided when two line items had the same/nil description. A per-value
+    // UUID generated once at decode time is stable and unique.
+    private let stableId: String
+    var id: String { stableId }
     let description: String?
     let category: String?
     let quantity: Double?
     let unit: String?
-    // Price from the contractor's quote (null if quote only has a lump sum total)
     let quotedPrice: Double?
-    // Haven's independent cost estimates for this specific location
     let estimatedMaterialsCost: Double?
     let estimatedLaborCost: Double?
-    // Total fair market estimate (materials + labor)
     let marketMedianPrice: Double?
-    // Local county price range (low-high) adjusted for cost of living
     let localPriceRange: LocalPriceRange?
-    // "quoted" if contractor provided the price, "estimated" if Haven researched it
     let priceSource: String?
     let rating: String?
     let ratingReason: String?
-
-    // Backwards compat: old responses used unitPrice/totalPrice
     let unitPrice: Double?
     let totalPrice: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case description, category, quantity, unit, quotedPrice
+        case estimatedMaterialsCost, estimatedLaborCost, marketMedianPrice
+        case localPriceRange, priceSource, rating, ratingReason
+        case unitPrice, totalPrice
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        description = try? c?.decodeIfPresent(String.self, forKey: .description) ?? nil
+        category = try? c?.decodeIfPresent(String.self, forKey: .category) ?? nil
+        quantity = try? c?.decodeIfPresent(Double.self, forKey: .quantity) ?? nil
+        unit = try? c?.decodeIfPresent(String.self, forKey: .unit) ?? nil
+        quotedPrice = try? c?.decodeIfPresent(Double.self, forKey: .quotedPrice) ?? nil
+        estimatedMaterialsCost = try? c?.decodeIfPresent(Double.self, forKey: .estimatedMaterialsCost) ?? nil
+        estimatedLaborCost = try? c?.decodeIfPresent(Double.self, forKey: .estimatedLaborCost) ?? nil
+        marketMedianPrice = try? c?.decodeIfPresent(Double.self, forKey: .marketMedianPrice) ?? nil
+        localPriceRange = try? c?.decodeIfPresent(LocalPriceRange.self, forKey: .localPriceRange) ?? nil
+        priceSource = try? c?.decodeIfPresent(String.self, forKey: .priceSource) ?? nil
+        rating = try? c?.decodeIfPresent(String.self, forKey: .rating) ?? nil
+        ratingReason = try? c?.decodeIfPresent(String.self, forKey: .ratingReason) ?? nil
+        unitPrice = try? c?.decodeIfPresent(Double.self, forKey: .unitPrice) ?? nil
+        totalPrice = try? c?.decodeIfPresent(Double.self, forKey: .totalPrice) ?? nil
+        stableId = description ?? UUID().uuidString
+    }
 
     /// The price to display — prefers quotedPrice, falls back to totalPrice (old format)
     var displayPrice: Double? { quotedPrice ?? totalPrice }
@@ -3873,6 +3978,14 @@ struct LocalPriceRange: Codable {
     let high: Double?
     let countyName: String?
     let costIndex: String? // "low", "average", "high", "very_high"
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        low = try? c?.decodeIfPresent(Double.self, forKey: .low) ?? nil
+        high = try? c?.decodeIfPresent(Double.self, forKey: .high) ?? nil
+        countyName = try? c?.decodeIfPresent(String.self, forKey: .countyName) ?? nil
+        costIndex = try? c?.decodeIfPresent(String.self, forKey: .costIndex) ?? nil
+    }
 }
 
 struct QuoteOverallAssessment: Codable {
@@ -3884,12 +3997,31 @@ struct QuoteOverallAssessment: Codable {
     let estimatedLabor: Double?
     let potentialSavings: Double?
     let negotiationTips: [String]?
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        rating = try? c?.decodeIfPresent(String.self, forKey: .rating) ?? nil
+        summary = try? c?.decodeIfPresent(String.self, forKey: .summary) ?? nil
+        totalQuoted = try? c?.decodeIfPresent(Double.self, forKey: .totalQuoted) ?? nil
+        estimatedFairTotal = try? c?.decodeIfPresent(Double.self, forKey: .estimatedFairTotal) ?? nil
+        estimatedMaterials = try? c?.decodeIfPresent(Double.self, forKey: .estimatedMaterials) ?? nil
+        estimatedLabor = try? c?.decodeIfPresent(Double.self, forKey: .estimatedLabor) ?? nil
+        potentialSavings = try? c?.decodeIfPresent(Double.self, forKey: .potentialSavings) ?? nil
+        negotiationTips = try? c?.decodeIfPresent([String].self, forKey: .negotiationTips) ?? nil
+    }
 }
 
 struct QuoteDiyAlternative: Codable {
     let feasible: Bool?
     let estimatedDiyCost: Double?
     let notes: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        feasible = try? c?.decodeIfPresent(Bool.self, forKey: .feasible) ?? nil
+        estimatedDiyCost = try? c?.decodeIfPresent(Double.self, forKey: .estimatedDiyCost) ?? nil
+        notes = try? c?.decodeIfPresent(String.self, forKey: .notes) ?? nil
+    }
 }
 
 // MARK: - AI Research Response (decoded from JSONB)
@@ -4107,6 +4239,9 @@ struct CostBreakdownItem: Codable {
 
 // MARK: - Project Feasibility Response
 
+// July 2026 (audit — resilient-decoder sweep): decoded from the
+// project-feasibility Edge Function JSON. Every field try? so a drifted
+// type in one field doesn't take down the whole feasibility card.
 struct ProjectFeasibility: Codable {
     let projectName: String?
     let estimatedCostRange: FeasibilityCostRange?
@@ -4120,11 +4255,33 @@ struct ProjectFeasibility: Codable {
     let marketDemand: String?
     let marketDemandNote: String?
     let quickTip: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        projectName = try? c?.decodeIfPresent(String.self, forKey: .projectName) ?? nil
+        estimatedCostRange = try? c?.decodeIfPresent(FeasibilityCostRange.self, forKey: .estimatedCostRange) ?? nil
+        estimatedDiyCostRange = try? c?.decodeIfPresent(FeasibilityCostRange.self, forKey: .estimatedDiyCostRange) ?? nil
+        estimatedMaterialsCost = try? c?.decodeIfPresent(FeasibilityCostRange.self, forKey: .estimatedMaterialsCost) ?? nil
+        complexity = try? c?.decodeIfPresent(String.self, forKey: .complexity) ?? nil
+        complexityNote = try? c?.decodeIfPresent(String.self, forKey: .complexityNote) ?? nil
+        estimatedTimeframe = try? c?.decodeIfPresent(String.self, forKey: .estimatedTimeframe) ?? nil
+        roi = try? c?.decodeIfPresent(FeasibilityROI.self, forKey: .roi) ?? nil
+        valueIncrease = try? c?.decodeIfPresent(FeasibilityValueIncrease.self, forKey: .valueIncrease) ?? nil
+        marketDemand = try? c?.decodeIfPresent(String.self, forKey: .marketDemand) ?? nil
+        marketDemandNote = try? c?.decodeIfPresent(String.self, forKey: .marketDemandNote) ?? nil
+        quickTip = try? c?.decodeIfPresent(String.self, forKey: .quickTip) ?? nil
+    }
 }
 
 struct FeasibilityCostRange: Codable {
     let low: Double?
     let high: Double?
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        low = try? c?.decodeIfPresent(Double.self, forKey: .low) ?? nil
+        high = try? c?.decodeIfPresent(Double.self, forKey: .high) ?? nil
+    }
 
     var displayRange: String {
         guard let low, let high else { return "N/A" }
@@ -4137,12 +4294,27 @@ struct FeasibilityROI: Codable {
     let label: String?
     let typicalReturn: String?
     let explanation: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        score = try? c?.decodeIfPresent(Int.self, forKey: .score) ?? nil
+        label = try? c?.decodeIfPresent(String.self, forKey: .label) ?? nil
+        typicalReturn = try? c?.decodeIfPresent(String.self, forKey: .typicalReturn) ?? nil
+        explanation = try? c?.decodeIfPresent(String.self, forKey: .explanation) ?? nil
+    }
 }
 
 struct FeasibilityValueIncrease: Codable {
     let estimatedDollarIncrease: Double?
     let percentageIncrease: String?
     let timeToRecoup: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        estimatedDollarIncrease = try? c?.decodeIfPresent(Double.self, forKey: .estimatedDollarIncrease) ?? nil
+        percentageIncrease = try? c?.decodeIfPresent(String.self, forKey: .percentageIncrease) ?? nil
+        timeToRecoup = try? c?.decodeIfPresent(String.self, forKey: .timeToRecoup) ?? nil
+    }
 }
 
 // MARK: - Merge Preview Models
@@ -4898,18 +5070,55 @@ struct VehicleRow: Codable, Identifiable {
 }
 
 struct VehicleMaintenanceInterval: Codable, Identifiable {
-    var id: String { type }
+    var id: String { taskId?.uuidString ?? type }
     let type: String
     let intervalMiles: Int?
     let intervalMonths: Int?
     let estimatedCost: Double?
     let description: String?
+    /// July 2026 (audit F9): the underlying maintenance_tasks row id when
+    /// this interval was built by wrapping an OVERDUE task in the vehicle
+    /// attention list. Nil for AI-schedule intervals (which aren't tasks).
+    /// Optional so all existing decode/construct sites are unaffected.
+    var taskId: UUID?
+    /// The task's frequency string, so completing an overdue recurring task
+    /// can re-date the next occurrence rather than just archiving it.
+    var frequency: String?
 
     enum CodingKeys: String, CodingKey {
-        case type, description
+        case type, description, frequency
         case intervalMiles = "interval_miles"
         case intervalMonths = "interval_months"
         case estimatedCost = "estimated_cost"
+        case taskId = "task_id"
+    }
+
+    // Standard memberwise init retained for the in-app construction site
+    // (VehicleDetailView.buildAttentionItems wraps overdue tasks).
+    init(type: String, intervalMiles: Int?, intervalMonths: Int?, estimatedCost: Double?,
+         description: String?, taskId: UUID? = nil, frequency: String? = nil) {
+        self.type = type
+        self.intervalMiles = intervalMiles
+        self.intervalMonths = intervalMonths
+        self.estimatedCost = estimatedCost
+        self.description = description
+        self.taskId = taskId
+        self.frequency = frequency
+    }
+
+    // July 2026: resilient decoder (CLAUDE.md hard rule) — this struct is
+    // decoded from vehicle-lookup Edge Function passthrough JSON. A single
+    // malformed interval (e.g. estimated_cost as a string) must not take
+    // down the whole maintenance_schedule array. Every field is try?.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type = (try? c.decodeIfPresent(String.self, forKey: .type)) ?? ""
+        intervalMiles = try? c.decodeIfPresent(Int.self, forKey: .intervalMiles) ?? nil
+        intervalMonths = try? c.decodeIfPresent(Int.self, forKey: .intervalMonths) ?? nil
+        estimatedCost = try? c.decodeIfPresent(Double.self, forKey: .estimatedCost) ?? nil
+        description = try? c.decodeIfPresent(String.self, forKey: .description) ?? nil
+        frequency = try? c.decodeIfPresent(String.self, forKey: .frequency) ?? nil
+        taskId = try? c.decodeIfPresent(UUID.self, forKey: .taskId) ?? nil
     }
 
     var estimatedCostDisplay: String? {

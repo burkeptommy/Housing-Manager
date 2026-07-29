@@ -164,11 +164,28 @@ struct PendingInvitationsSection: View {
     private func revoke(_ invitation: HouseholdInvitationRow) async {
         do {
             try await DatabaseService.shared.revokeInvitation(id: invitation.id)
-            // Soft-remove the matching family_member row so the household
-            // strip stops showing the pending dashed avatar.
-            if let familyMemberId = invitation.familyMemberId {
-                try? await DatabaseService.shared.deleteFamilyMember(id: familyMemberId)
+            // July 2026 (audit F3): only remove the family_member placeholder
+            // when THIS invite flow created it (createdMember == true) and no
+            // account ever linked. Invitations to pre-existing members
+            // (inviteExistingMember) point at real profiles — DOB, school,
+            // document links — which revoking an invite must never delete.
+            // Legacy invitations (pre-20270121) decode createdMember as
+            // nil/false and are never deleted.
+            if invitation.createdMember == true, let familyMemberId = invitation.familyMemberId {
+                // fetchFamilyMembers filters staff server-side, so check both
+                // lists — staff invites create home_manager-typed rows.
+                var member = try? await DatabaseService.shared.fetchFamilyMembers(
+                    householdId: invitation.householdId
+                ).first(where: { $0.id == familyMemberId })
+                if member == nil {
+                    member = try? await DatabaseService.shared.fetchHouseholdStaff()
+                        .first(where: { $0.id == familyMemberId })
+                }
+                if let member, member.linkedUserId == nil {
+                    try? await DatabaseService.shared.deleteFamilyMember(id: familyMemberId)
+                }
             }
+            NotificationCenter.default.post(name: .householdMemberChanged, object: nil)
             await onRefreshNeeded()
             let daysPending = invitation.createdAt.map { Int(Date().timeIntervalSince($0) / 86400) } ?? 0
             Analytics.track(.inviteRevoked, [

@@ -18,6 +18,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authFailure, requireHousehold } from "../_shared/require-household.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,6 +43,23 @@ serve(async (req: Request) => {
     const brand: string | null = body.brand ?? null;
     const category: string | null = body.category ?? null;
     const householdSystemId: string | null = body.home_system_id ?? null;
+
+    // July 2026 security sweep (audit S1): the home_system_id branch reads
+    // AND updates the row (catalog link-back), so the caller must own it.
+    // Pure catalog searches (no system id) stay open — public catalog data.
+    if (householdSystemId) {
+      const corsJson = { ...corsHeaders, "Content-Type": "application/json" };
+      const auth = await requireHousehold(req);
+      if ("failure" in auth) return authFailure(auth, corsJson);
+      const { data: owned } = await supabase
+        .from("home_systems").select("household_id").eq("id", householdSystemId).single();
+      if (!owned || owned.household_id !== auth.householdId) {
+        return new Response(
+          JSON.stringify({ error: "Access denied: system does not belong to your household" }),
+          { status: 403, headers: corsJson },
+        );
+      }
+    }
 
     // === Strategy 1: Lookup by home_system_id (user's actual equipment) ===
     if (householdSystemId) {

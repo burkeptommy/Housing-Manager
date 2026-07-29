@@ -125,10 +125,14 @@ serve(async (req: Request) => {
       }
     }
 
-    // Email body — links to the admin portal request page if we successfully
-    // wrote a DB row. Email is the backstop, admin portal is the canonical surface.
-    const adminLink = requestId
-      ? `\nAdmin portal: https://admin.getchez.com/system-requests/${requestId}\n`
+    // July 2026 (audit F14): the email used to link to
+    // admin.getchez.com/system-requests/{id} — a host + route that have
+    // NEVER existed (no admin queue reads equipment_catalog_requests), and
+    // promised a 4-hour SLA against that dead surface. Email IS the surface:
+    // the request row (id below) is the record; act on it by hand, then
+    // UPDATE its status to 'added'. No fabricated SLA, no dead link.
+    const requestRef = requestId
+      ? `\nRequest id: ${requestId} (update equipment_catalog_requests.status = 'added' when done)\n`
       : "";
 
     const emailBody = `
@@ -144,9 +148,9 @@ ${notes ? `Notes: ${notes}` : ""}
 
 Customer: ${userName} (${userEmail})
 ${householdName ? `Household: ${householdName}` : ""}
-${adminLink}
-SLA: resolve within 4 hours during business hours. Add the model to equipment_catalog,
-mark this request 'added' in the admin portal, and the customer will get a push.
+${requestRef}
+To fulfill: add the model to equipment_catalog, then set this request's
+status to 'added' — the customer gets a push when it lands.
     `.trim();
 
     if (sendgridApiKey) {
@@ -179,7 +183,6 @@ mark this request 'added' in the admin portal, and the customer will get a push.
       JSON.stringify({
         success: true,
         request_id: requestId,
-        sla_due_at_hint: "4 hours from now during business hours",
       }),
       { status: 200, headers }
     );

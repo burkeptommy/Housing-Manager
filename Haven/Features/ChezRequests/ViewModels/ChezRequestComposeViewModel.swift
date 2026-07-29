@@ -27,6 +27,24 @@ final class ChezRequestComposeViewModel: ObservableObject {
     /// dropping them back at whatever screen they came from.
     @Published var submittedRequestId: UUID?
 
+    // MARK: - Wave 4: snapshot preview + homeowner intake
+
+    /// The "What Chez already knows" preview, loaded on appear whenever
+    /// the context hints carry a recognized entity id. Nil on failure or
+    /// for general asks — the composer degrades to its pre-Wave-4 shape.
+    @Published var snapshotPreview: ChezSnapshotPreview?
+    /// Collapsed-by-default disclosure state for the snapshot card.
+    @Published var isSnapshotExpanded: Bool = false
+
+    /// Homeowner intake bindings for the "Only you can tell Chez"
+    /// section. All optional; an untouched form sends no intake.
+    @Published var intakeBudgetBand: ChezBudgetBand?
+    @Published var intakeUrgency: ChezUrgency?
+    @Published var intakePreferredWindows: Set<ChezPreferredWindow> = []
+    @Published var intakeAccessNote: String = ""
+    /// The prefill baseline — an unedited access note is NOT an override.
+    private var initialAccessNote: String = ""
+
     /// Set by the entry-point. When non-empty the composer skips the
     /// category picker (treats the prefilled category as fixed).
     let isCategoryFixed: Bool
@@ -75,7 +93,11 @@ final class ChezRequestComposeViewModel: ObservableObject {
         "task_title", "due", "due_date", "next_due_date", "scheduled_date",
         "frequency", "notes", "system_category", "system_name",
         "town", "state", "vendor_name", "project_name", "vehicle_label",
-        "task_route", "estimated_cost"
+        "task_route", "estimated_cost",
+        // Wave 4 — the server mirrors intake display strings into the
+        // context ("budget": "Under $250", "timing": "This week") so the
+        // existing "Details you sent" card shows them on the thread.
+        "budget", "timing"
     ]
 
     /// Pretty-printed context list used inside the read-only "Re:" card.
@@ -107,6 +129,78 @@ final class ChezRequestComposeViewModel: ObservableObject {
 
     private func formattedContextKey(_ raw: String) -> String {
         raw.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    // MARK: - Wave 4: snapshot preview
+
+    /// Recognized entity-id context keys → preview_snapshot kinds, in
+    /// specificity order. A task context usually also carries system_id
+    /// and property_id; the task wins because its snapshot embeds the
+    /// system + service history anyway.
+    private static let snapshotKindsByContextKey: [(key: String, kind: String)] = [
+        ("task_id", "task"),
+        ("routine_id", "routine"),
+        ("contractor_id", "contractor"),
+        ("project_id", "project"),
+        ("vehicle_id", "vehicle"),
+        ("system_id", "system"),
+    ]
+
+    /// The (kind, entityId) pair the composer should preview, if any.
+    var recognizedSnapshotEntity: (kind: String, entityId: String)? {
+        for entry in Self.snapshotKindsByContextKey {
+            if let value = trimmedContextValue(entry.key) {
+                return (entry.kind, value)
+            }
+        }
+        return nil
+    }
+
+    var hasSnapshot: Bool {
+        snapshotPreview?.snapshot != nil
+    }
+
+    /// Fires preview_snapshot when the context hints carry a recognized
+    /// entity id. Failures are silent — the composer keeps its
+    /// pre-Wave-4 shape and the intake form still works.
+    func loadSnapshotIfPossible() async {
+        guard snapshotPreview == nil,
+              let entity = recognizedSnapshotEntity else { return }
+        do {
+            let result = try await HavenSupabase.previewChezSnapshot(
+                kind: entity.kind,
+                entityId: entity.entityId,
+                propertyId: trimmedContextValue("property_id")
+            )
+            snapshotPreview = result
+            if intakeAccessNote.isEmpty,
+               let entry = result.snapshot?.household?.chezProfile?.logistics?.entryInstructions,
+               !entry.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                intakeAccessNote = entry
+                initialAccessNote = entry
+            }
+            if intakeBudgetBand == nil, let suggestion = result.suggestedBudget {
+                intakeBudgetBand = ChezBudgetBand.containing(suggested: suggestion)
+            }
+            Analytics.track(.chezSnapshotPreviewShown, [
+                "kind": entity.kind,
+                "source": "composer",
+                "has_suggested_budget": String(result.suggestedBudget != nil),
+            ])
+        } catch {
+            print("[ChezRequestCompose] preview_snapshot failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Builds the optional intake payload from the form bindings.
+    var currentIntake: ChezDelegationIntake? {
+        ChezDelegationIntake.make(
+            budgetBand: intakeBudgetBand,
+            urgency: intakeUrgency,
+            preferredWindows: intakePreferredWindows,
+            accessNote: intakeAccessNote,
+            initialAccessNote: initialAccessNote
+        )
     }
 
     // MARK: - Photo upload pipeline
@@ -176,12 +270,14 @@ final class ChezRequestComposeViewModel: ObservableObject {
         isSubmitting = true
         defer { isSubmitting = false }
         do {
+            let intake = currentIntake
             let request = try await HavenSupabase.submitChezRequest(
                 category: category,
                 summary: resolvedSummary,
                 description: description.trimmingCharacters(in: .whitespacesAndNewlines),
                 context: contextHints.isEmpty ? nil : contextHints,
-                attachments: pendingAttachments.isEmpty ? nil : pendingAttachments
+                attachments: pendingAttachments.isEmpty ? nil : pendingAttachments,
+                intake: intake
             )
             // K1: capture the id BEFORE flipping didSucceed so the sheet's
             // onChange handler has it available when posting .openChezRequest.
@@ -192,6 +288,7 @@ final class ChezRequestComposeViewModel: ObservableObject {
             Analytics.track(.chezRequestSubmitted, [
                 "category": category.rawValue,
                 "has_attachments": String(!pendingAttachments.isEmpty),
+                "has_intake": String(intake != nil),
             ])
         } catch {
             errorMessage = error.localizedDescription

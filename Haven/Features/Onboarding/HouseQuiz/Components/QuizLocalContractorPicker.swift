@@ -700,6 +700,22 @@ struct QuizLocalContractorPicker: View {
         case "snow_removal":       return "Snow Removal"
         case "mosquito_tick":      return "Mosquito & Tick"
         case "pet_waste":          return "Pet Waste"
+        // July 2026 audit: these six chips were falling through to the
+        // raw chipId, so find-local-vendors ran Places text searches on
+        // literal strings like "solar_service" / "gutter_cleaning".
+        // Keys match HouseQuizAnswerMapper.householdContractorCategoryFor
+        // EXCEPT waterproofing: the mapper stamps the contractor with the
+        // system category ("Crawl Space") so task/system linking works,
+        // but the SEARCH trade is "Waterproofing" — the server maps it to
+        // "basement waterproofing contractor", which is how these
+        // companies are actually indexed by Places ("crawl space" pulls
+        // narrower encapsulation-only results).
+        case "pool_service":       return "Pool/Spa"
+        case "solar_service":      return "Solar"
+        case "security_service":   return "Security System"
+        case "waterproofing":      return "Waterproofing"
+        case "gutter_cleaning":    return "Gutter Cleaning"
+        case "painter":            return "Painting"
         default:                   return chipId
         }
     }

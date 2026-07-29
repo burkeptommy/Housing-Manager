@@ -1571,6 +1571,18 @@ final class DatabaseService {
         return try await query.order("next_due_date").execute().value
     }
 
+    /// Phase 7 M3 — single-row fetch for the complete_task applier (the
+    /// suggested-action payload carries a task id, not a row).
+    func fetchMaintenanceTask(id: UUID) async throws -> MaintenanceTaskDBRow? {
+        let rows: [MaintenanceTaskDBRow] = try await from("maintenance_tasks")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
     func fetchVehicleMaintenanceTasks(vehicleId: UUID, includeArchived: Bool = false) async throws -> [MaintenanceTaskDBRow] {
         var query = from("maintenance_tasks")
             .select()
@@ -2795,10 +2807,46 @@ final class DatabaseService {
             .value
     }
 
+    /// July 2026 (audit F6): explicit-null raw PATCH that unlinks every task
+    /// parented to a routine. `parent_routine_id != nil` is the universal
+    /// hiding signal, so archiving without this strands the tasks invisibly.
+    /// A raw dictionary is required — Update structs omit nil fields (the F4
+    /// nil-omission class): the old RoutineGroupingEngine.unlinkTasksFromRoutine
+    /// set `update.parentRoutineId = nil` on a synthesized encoder and never
+    /// actually wrote NULL, so ALL archive paths were stranding tasks.
+    func clearTasksParentRoutine(routineId: UUID) async throws {
+        try await from("maintenance_tasks")
+            .update(["parent_routine_id": nil] as [String: String?])
+            .eq("parent_routine_id", value: routineId.uuidString)
+            .execute()
+    }
+
+    /// July 2026 (audit F4): Update structs use synthesized encoders, so nil
+    /// fields are OMITTED from the PATCH — "clear this field" silently never
+    /// persisted anywhere in the app (remove a routine's vendor, blank a
+    /// plate/phone/notes, toggle off insurance tracking…). This helper writes
+    /// explicit SQL NULLs for the columns a save path knows the user cleared.
+    /// All-nil `[String: String?]` values encode as JSON null regardless of
+    /// the column's actual type. Pair it with the struct update at each save
+    /// site; see RoutineEditSheet.save for the reference pattern.
+    func clearColumns(table: String, id: UUID, columns: [String]) async throws {
+        guard !columns.isEmpty else { return }
+        var payload: [String: String?] = [:]
+        for column in columns { payload[column] = String?.none }
+        try await from(table)
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     /// Phase 55: Soft-delete a routine via archived_at. The list
     /// fetch filters on archived_at IS NULL so the row disappears
     /// everywhere without losing history or cascading to visits.
+    /// July 2026 (audit F6): this is the single choke point for
+    /// user-initiated removal — child tasks are unlinked first so they
+    /// resurface in the flat buckets instead of vanishing.
     func archiveRoutine(id: UUID) async throws {
+        try? await clearTasksParentRoutine(routineId: id)
         var update = RoutineUpdate()
         update.archivedAt = Date()
         _ = try await updateRoutine(id: id, update)
@@ -2808,6 +2856,7 @@ final class DatabaseService {
     /// routine gone — cascades to routine_visits. Prefer archiveRoutine
     /// for user-initiated removals from the list UI.
     func deleteRoutine(id: UUID) async throws {
+        try? await clearTasksParentRoutine(routineId: id)
         try await from("routines")
             .delete()
             .eq("id", value: id.uuidString)
@@ -4160,6 +4209,317 @@ final class DatabaseService {
         let fairMarket: FairMarketHint?
         let warranty: WarrantyHint?
         let specialtySystemSuggestion: InboxSpecialtySuggestion?
+        /// July 2026 — follow-up tasks the email/document implies. Present on
+        /// `review_followups` items (ask path); the homeowner taps "Add these"
+        /// to create them. Also present as `autoAddedTasks` on
+        /// `tasks_auto_added` informational items (already created).
+        let suggestedTasks: [SuggestedTaskHint]?
+        let autoAddedTasks: [AutoAddedTask]?
+        // Phase 7: the unified review rows + the server-owned apply ledger.
+        let suggestedActions: [SuggestedAction]?
+        let appliedActions: [AppliedAction]?
+        let matchedContractorName: String?
+        /// M4 — medium-confidence sender→vendor ladder hit. Renders as an
+        /// "Is this X?" confirm row; the answer feeds confirmed_contractor_id
+        /// into apply. Never silently attributed.
+        let suggestedVendorMatch: SuggestedVendorMatch?
+        /// M5 — the appointment auto-stamp receipt. Non-nil renders the
+        /// undoable "Scheduled: X — Oct 14" notice.
+        let scheduleStamp: ScheduleStamp?
+        /// 8.5 — thread grouping. Items sharing a thread_key collapse to
+        /// the latest with a count; keys come from real mail headers
+        /// (References/In-Reply-To) or a vendor-scoped subject fallback.
+        let threadKey: String?
+        let messageId: String?
+        /// 8.1 — the quarantined-sender payload (sender identity + the
+        /// gate ladder's fuzzy vendor suggestion for one-tap mapping).
+        let quarantined: QuarantinedInfo?
+
+        struct QuarantinedInfo: Decodable, Hashable {
+            let senderEmail: String?
+            let senderDisplay: String?
+            let suggestedContractorId: String?
+            let suggestedContractorName: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                senderEmail = try? c.decodeIfPresent(String.self, forKey: .senderEmail)
+                senderDisplay = try? c.decodeIfPresent(String.self, forKey: .senderDisplay)
+                let suggestion = try? c.decodeIfPresent(Suggestion.self, forKey: .suggestedContractor)
+                suggestedContractorId = suggestion?.id
+                suggestedContractorName = suggestion?.name
+            }
+            private struct Suggestion: Decodable {
+                let id: String?
+                let name: String?
+                init(from decoder: Decoder) throws {
+                    let c = try decoder.container(keyedBy: CodingKeys.self)
+                    id = try? c.decodeIfPresent(String.self, forKey: .id)
+                    name = try? c.decodeIfPresent(String.self, forKey: .name)
+                }
+                enum CodingKeys: String, CodingKey { case id, name }
+            }
+            enum CodingKeys: String, CodingKey {
+                case senderEmail = "sender_email"
+                case senderDisplay = "sender_display"
+                case suggestedContractor = "suggested_contractor"
+            }
+        }
+
+        struct ScheduleStamp: Decodable, Hashable {
+            let taskId: String
+            let taskTitle: String?
+            let previousScheduledDate: String?
+            let newScheduledDate: String?
+            let undoneAt: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                taskId = (try? c.decodeIfPresent(String.self, forKey: .taskId)) ?? ""
+                taskTitle = try? c.decodeIfPresent(String.self, forKey: .taskTitle)
+                previousScheduledDate = try? c.decodeIfPresent(String.self, forKey: .previousScheduledDate)
+                newScheduledDate = try? c.decodeIfPresent(String.self, forKey: .newScheduledDate)
+                undoneAt = try? c.decodeIfPresent(String.self, forKey: .undoneAt)
+            }
+            enum CodingKeys: String, CodingKey {
+                case taskId = "task_id"
+                case taskTitle = "task_title"
+                case previousScheduledDate = "previous_scheduled_date"
+                case newScheduledDate = "new_scheduled_date"
+                case undoneAt = "undone_at"
+            }
+        }
+
+        struct SuggestedVendorMatch: Decodable, Hashable {
+            let contractorId: String
+            let name: String
+            let category: String?
+            let evidence: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                contractorId = (try? c.decodeIfPresent(String.self, forKey: .contractorId)) ?? ""
+                name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? ""
+                category = try? c.decodeIfPresent(String.self, forKey: .category)
+                evidence = try? c.decodeIfPresent(String.self, forKey: .evidence)
+            }
+            enum CodingKeys: String, CodingKey {
+                case name, category, evidence
+                case contractorId = "contractor_id"
+            }
+        }
+
+        struct SuggestedTaskHint: Decodable, Identifiable, Hashable {
+            let title: String
+            let dueDate: String?
+            let urgency: String?
+            let reason: String?
+            var id: String { title }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+                dueDate = try? c.decodeIfPresent(String.self, forKey: .dueDate)
+                urgency = try? c.decodeIfPresent(String.self, forKey: .urgency)
+                reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+            }
+            enum CodingKeys: String, CodingKey {
+                case title, urgency, reason
+                case dueDate = "due_date"
+            }
+        }
+
+        struct AutoAddedTask: Decodable, Identifiable, Hashable {
+            let id: String
+            let title: String
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+                title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+            }
+            enum CodingKeys: String, CodingKey { case id, title }
+        }
+
+        // Phase 7 (Ingestion Intelligence v2): one unified row per spotted
+        // action, rendered by SuggestedActionsReviewCard with per-row
+        // checkboxes + destination remapping. Kind decodes as a raw String
+        // with a typed accessor so UNKNOWN future kinds hide the row instead
+        // of killing the decode (forward compat). The payload is one flat
+        // all-optional struct — union across kinds — so a malformed field
+        // never takes down the row (resilient-decoder hard rule).
+        struct SuggestedAction: Decodable, Identifiable, Hashable {
+            let id: String
+            let kindRaw: String
+            let title: String
+            let reason: String?
+            let confidence: String?
+            let recommended: Bool
+            let source: String?
+            let payload: Payload
+
+            enum Kind: String {
+                case task, routine, project, event
+                case completeTask = "complete_task"
+                case visitLog = "visit_log"
+                case punchItem = "punch_item"
+                case chezRequest = "chez_request"
+                case scheduleTask = "schedule_task"
+                case systemLink = "system_link"
+            }
+
+            /// nil for kinds this app version doesn't know — the card
+            /// hides those rows.
+            var typedKind: Kind? { Kind(rawValue: kindRaw) }
+
+            struct Payload: Decodable, Hashable {
+                // task
+                let dueDate: String?
+                let urgency: String?
+                let category: String?
+                let needsVendor: Bool?
+                // complete_task
+                let taskId: String?
+                let taskTitle: String?
+                let completedOn: String?
+                let costCents: Int?
+                // routine (evidence only — Swift derives kind/serviceKey)
+                let rawCategory: String?
+                let intervalDays: Int?
+                let cadencePhrase: String?
+                let activeMonthsHint: [Int]?
+                let quotedText: String?
+                let estimatedCostCents: Int?
+                let contractorId: String?
+                // project
+                let projectId: String?
+                let projectName: String?
+                let signal: String?
+                // event
+                let date: String?
+                let endDate: String?
+                let allDay: Bool?
+                let location: String?
+                // punch_item
+                let description: String?
+                // chez_request
+                let chezCategory: String?
+                let summary: String?
+                // schedule_task / system_link
+                let count: Int?
+                let candidates: [ScheduleCandidate]?
+
+                struct ScheduleCandidate: Decodable, Hashable, Identifiable {
+                    let taskId: String
+                    let title: String
+                    let dueDate: String?
+                    var id: String { taskId }
+                    init(from decoder: Decoder) throws {
+                        let c = try decoder.container(keyedBy: CodingKeys.self)
+                        taskId = (try? c.decodeIfPresent(String.self, forKey: .taskId)) ?? ""
+                        title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+                        dueDate = try? c.decodeIfPresent(String.self, forKey: .dueDate)
+                    }
+                    enum CodingKeys: String, CodingKey {
+                        case title
+                        case taskId = "task_id"
+                        case dueDate = "due_date"
+                    }
+                }
+
+                init(from decoder: Decoder) throws {
+                    let c = try? decoder.container(keyedBy: CodingKeys.self)
+                    dueDate = try? c?.decodeIfPresent(String.self, forKey: .dueDate) ?? nil
+                    urgency = try? c?.decodeIfPresent(String.self, forKey: .urgency) ?? nil
+                    category = try? c?.decodeIfPresent(String.self, forKey: .category) ?? nil
+                    needsVendor = try? c?.decodeIfPresent(Bool.self, forKey: .needsVendor) ?? nil
+                    taskId = try? c?.decodeIfPresent(String.self, forKey: .taskId) ?? nil
+                    taskTitle = try? c?.decodeIfPresent(String.self, forKey: .taskTitle) ?? nil
+                    completedOn = try? c?.decodeIfPresent(String.self, forKey: .completedOn) ?? nil
+                    costCents = try? c?.decodeIfPresent(Int.self, forKey: .costCents) ?? nil
+                    rawCategory = try? c?.decodeIfPresent(String.self, forKey: .rawCategory) ?? nil
+                    intervalDays = try? c?.decodeIfPresent(Int.self, forKey: .intervalDays) ?? nil
+                    cadencePhrase = try? c?.decodeIfPresent(String.self, forKey: .cadencePhrase) ?? nil
+                    activeMonthsHint = try? c?.decodeIfPresent([Int].self, forKey: .activeMonthsHint) ?? nil
+                    quotedText = try? c?.decodeIfPresent(String.self, forKey: .quotedText) ?? nil
+                    estimatedCostCents = try? c?.decodeIfPresent(Int.self, forKey: .estimatedCostCents) ?? nil
+                    contractorId = try? c?.decodeIfPresent(String.self, forKey: .contractorId) ?? nil
+                    projectId = try? c?.decodeIfPresent(String.self, forKey: .projectId) ?? nil
+                    projectName = try? c?.decodeIfPresent(String.self, forKey: .projectName) ?? nil
+                    signal = try? c?.decodeIfPresent(String.self, forKey: .signal) ?? nil
+                    date = try? c?.decodeIfPresent(String.self, forKey: .date) ?? nil
+                    endDate = try? c?.decodeIfPresent(String.self, forKey: .endDate) ?? nil
+                    allDay = try? c?.decodeIfPresent(Bool.self, forKey: .allDay) ?? nil
+                    location = try? c?.decodeIfPresent(String.self, forKey: .location) ?? nil
+                    description = try? c?.decodeIfPresent(String.self, forKey: .description) ?? nil
+                    chezCategory = try? c?.decodeIfPresent(String.self, forKey: .chezCategory) ?? nil
+                    summary = try? c?.decodeIfPresent(String.self, forKey: .summary) ?? nil
+                    count = try? c?.decodeIfPresent(Int.self, forKey: .count) ?? nil
+                    candidates = try? c?.decodeIfPresent([ScheduleCandidate].self, forKey: .candidates) ?? nil
+                }
+
+                enum CodingKeys: String, CodingKey {
+                    case urgency, category, date, location, description, summary, count, signal, candidates
+                    case dueDate = "due_date"
+                    case needsVendor = "needs_vendor"
+                    case taskId = "task_id"
+                    case taskTitle = "task_title"
+                    case completedOn = "completed_on"
+                    case costCents = "cost_cents"
+                    case rawCategory = "raw_category"
+                    case intervalDays = "interval_days"
+                    case cadencePhrase = "cadence_phrase"
+                    case activeMonthsHint = "active_months_hint"
+                    case quotedText = "quoted_text"
+                    case estimatedCostCents = "estimated_cost_cents"
+                    case contractorId = "contractor_id"
+                    case projectId = "project_id"
+                    case projectName = "project_name"
+                    case endDate = "end_date"
+                    case allDay = "all_day"
+                    case chezCategory = "chez_category"
+                }
+
+                /// All-nil payload — the resilient fallback when the payload
+                /// key is absent or malformed.
+                static let empty: Payload = {
+                    // Safe: the resilient decoder tolerates an empty object.
+                    // swiftlint:disable:next force_try
+                    try! JSONDecoder().decode(Payload.self, from: Data("{}".utf8))
+                }()
+            }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+                kindRaw = (try? c.decodeIfPresent(String.self, forKey: .kind)) ?? ""
+                title = (try? c.decodeIfPresent(String.self, forKey: .title)) ?? ""
+                reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+                confidence = try? c.decodeIfPresent(String.self, forKey: .confidence)
+                recommended = (try? c.decodeIfPresent(Bool.self, forKey: .recommended)) ?? true
+                source = try? c.decodeIfPresent(String.self, forKey: .source)
+                payload = (try? c.decodeIfPresent(Payload.self, forKey: .payload)) ?? Payload.empty
+            }
+
+            enum CodingKeys: String, CodingKey {
+                case id, kind, title, reason, confidence, recommended, source, payload
+            }
+        }
+
+        // Phase 7: server-owned apply ledger. iOS only READS this (which
+        // rows are already resolved); writes go through the
+        // record_applied_actions server action.
+        struct AppliedAction: Decodable, Identifiable, Hashable {
+            let id: String
+            let status: String
+            let resultRef: String?
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? ""
+                status = (try? c.decodeIfPresent(String.self, forKey: .status)) ?? ""
+                resultRef = try? c.decodeIfPresent(String.self, forKey: .resultRef)
+            }
+            enum CodingKeys: String, CodingKey {
+                case id, status
+                case resultRef = "result_ref"
+            }
+            var isResolved: Bool { status == "applied" || status == "duplicate" }
+        }
 
         struct SuggestedProjectInfo: Decodable {
             let id: String?
@@ -4257,6 +4617,16 @@ final class DatabaseService {
             case suggestedProject = "suggested_project"
             case fairMarket = "fair_market"
             case specialtySystemSuggestion = "specialty_system_suggestion"
+            case suggestedTasks = "suggested_tasks"
+            case autoAddedTasks = "auto_added_tasks"
+            case suggestedActions = "suggested_actions"
+            case appliedActions = "applied_actions"
+            case suggestedVendorMatch = "suggested_vendor_match"
+            case scheduleStamp = "schedule_stamp"
+            case threadKey = "thread_key"
+            case messageId = "message_id"
+            case quarantined
+            case matchedContractorName = "matched_contractor_name"
         }
 
         var chezRequestIdAsUUID: UUID? {
@@ -4307,6 +4677,16 @@ final class DatabaseService {
             fairMarket = try? c.decodeIfPresent(FairMarketHint.self, forKey: .fairMarket)
             warranty = try? c.decodeIfPresent(WarrantyHint.self, forKey: .warranty)
             specialtySystemSuggestion = try? c.decodeIfPresent(InboxSpecialtySuggestion.self, forKey: .specialtySystemSuggestion)
+            suggestedTasks = try? c.decodeIfPresent([SuggestedTaskHint].self, forKey: .suggestedTasks)
+            autoAddedTasks = try? c.decodeIfPresent([AutoAddedTask].self, forKey: .autoAddedTasks)
+            suggestedActions = try? c.decodeIfPresent([SuggestedAction].self, forKey: .suggestedActions)
+            appliedActions = try? c.decodeIfPresent([AppliedAction].self, forKey: .appliedActions)
+            suggestedVendorMatch = try? c.decodeIfPresent(SuggestedVendorMatch.self, forKey: .suggestedVendorMatch)
+            scheduleStamp = try? c.decodeIfPresent(ScheduleStamp.self, forKey: .scheduleStamp)
+            threadKey = try? c.decodeIfPresent(String.self, forKey: .threadKey)
+            messageId = try? c.decodeIfPresent(String.self, forKey: .messageId)
+            quarantined = try? c.decodeIfPresent(QuarantinedInfo.self, forKey: .quarantined)
+            matchedContractorName = try? c.decodeIfPresent(String.self, forKey: .matchedContractorName)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
                 vendorName = try? classContainer.decodeIfPresent(String.self, forKey: .vendorName)

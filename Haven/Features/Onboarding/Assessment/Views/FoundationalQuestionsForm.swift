@@ -243,7 +243,7 @@ struct FoundationalQuestionsForm: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(HavenColors.action)
                         }
-                        Text(answers.vehiclesSkipped == true ? "I'll add cars later" : "Skip — I'll add cars later")
+                        Text(answers.vehiclesSkipped == true ? "I'll add cars later" : "Skip, I'll add cars later")
                             .font(HavenTypography.uiLabelMedium)
                             .foregroundStyle(HavenColors.textSecondary)
                     }

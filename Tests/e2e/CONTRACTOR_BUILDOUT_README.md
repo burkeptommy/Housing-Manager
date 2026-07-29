@@ -51,8 +51,8 @@ In a **fresh chat** (not the main session):
 You are dispatched to execute Wave M{N} (or W{N}, B{N}, T{N}) of the Chez Contractor buildout.
 
 Read these in order:
-1. /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_BUILDOUT_README.md  ← this file
-2. /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_{MOBILE|WEB|BUILDOUT_TEST}_PLAN.md  ← the relevant plan
+1. /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_BUILDOUT_README.md  ← this file
+2. /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_{MOBILE|WEB|BUILDOUT_TEST}_PLAN.md  ← the relevant plan
 3. /tmp/ui-test/CONTRACTOR_SETUP.md  ← env setup, JWT, test users
 
 Execute the wave per its spec. Use the standard pre-flight + post-flight from this README.

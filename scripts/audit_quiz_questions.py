@@ -26,13 +26,13 @@ import re
 from pathlib import Path
 
 SOURCE = Path(
-    "/Users/tomburke/Projects/Housing-Manager/Haven/Features/Onboarding/HouseQuiz/HouseQuizQuestionLibrary.swift"
+    "/Users/tomburke/Documents/Projects/Housing-Manager/Haven/Features/Onboarding/HouseQuiz/HouseQuizQuestionLibrary.swift"
 )
 OUTPUT_CSV = Path(
-    "/Users/tomburke/Projects/Housing-Manager/PHASE-66-67-QUIZ-AUDIT.csv"
+    "/Users/tomburke/Documents/Projects/Housing-Manager/PHASE-66-67-QUIZ-AUDIT.csv"
 )
 OUTPUT_TSV = Path(
-    "/Users/tomburke/Projects/Housing-Manager/PHASE-66-67-QUIZ-AUDIT.tsv"
+    "/Users/tomburke/Documents/Projects/Housing-Manager/PHASE-66-67-QUIZ-AUDIT.tsv"
 )
 
 HEADERS = [

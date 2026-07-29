@@ -6051,8 +6051,13 @@ function renderConciergeHomeownerPanelHtml(req) {
 
   // Standing-instruction flags surfaced on the profile card.
   const tier = profile.spending_tiers || {};
+  // July 2026 security sweep (audit S8): tiers come from homeowner-writable
+  // JSONB — coerce to numbers before landing in innerHTML. Server-side
+  // coercion in handleUpdateProfile is the primary fix; this is the
+  // display-layer belt-and-braces.
+  const tierNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : "?");
   const tierLine = tier.auto_approve_under !== undefined
-    ? `Auto $${tier.auto_approve_under} · Ping $${tier.ping_under} · Ask &gt; $${tier.explicit_above}`
+    ? `Auto $${tierNum(tier.auto_approve_under)} · Ping $${tierNum(tier.ping_under)} · Ask &gt; $${tierNum(tier.explicit_above)}`
     : "Default tiers (200/500/500)";
 
   // Phase 9d — standing-engagement rail. Pulls every chez_owned routine
@@ -11735,8 +11740,10 @@ function renderHouseholdDossierHtml(d) {
   const property = (d.properties && d.properties[0]) || null;
   const homeowner = primaryHomeownerLabel(d);
   const tiers = d.profile?.spending_tiers || {};
+  // Audit S8: homeowner-writable JSONB → coerce to numbers before innerHTML.
+  const dossierTierNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : "?");
   const tierLine = (tiers.auto_approve_under !== undefined)
-    ? `Auto-approve &lt; $${tiers.auto_approve_under} · Ping &lt; $${tiers.ping_under} · Always ask &gt; $${tiers.explicit_above}`
+    ? `Auto-approve &lt; $${dossierTierNum(tiers.auto_approve_under)} · Ping &lt; $${dossierTierNum(tiers.ping_under)} · Always ask &gt; $${dossierTierNum(tiers.explicit_above)}`
     : "Spending tiers not set — defaults (200 / 500 / 500) apply.";
   const profile = d.profile || {};
   const profileLines = [];

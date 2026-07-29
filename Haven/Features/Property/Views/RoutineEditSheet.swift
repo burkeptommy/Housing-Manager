@@ -828,6 +828,12 @@ struct RoutineEditSheet: View {
                 if isPaused { return RoutineSetupState.paused.rawValue }
                 if !routineKind.isVendorBased { return "active" }
                 if vendorIdOut != nil { return "active" }
+                // July 2026 (audit F4/F6): the user just REMOVED the vendor
+                // from a vendor-based routine — drop back to pending_vendor
+                // so the routine stops hiding child tasks and the "pick a
+                // pro" card resurfaces. (Previously the vendor removal never
+                // persisted at all, so this branch was unreachable.)
+                if existing?.vendorId != nil { return "pending_vendor" }
                 return existing?.setupState ?? "pending_vendor"
             }()
 
@@ -851,6 +857,25 @@ struct RoutineEditSheet: View {
                 update.setupState = derivedSetupState
                 update.isPaused = isPaused
                 savedRoutine = try await DatabaseService.shared.updateRoutine(id: existing.id, update)
+
+                // July 2026 (audit F4): every nil above was OMITTED from the
+                // PATCH by the synthesized encoder — "Remove vendor", turning
+                // off the time, blanking notes/cost never persisted. Write
+                // the cleared columns as explicit SQL NULLs.
+                var clearedColumns: [String] = []
+                if vendorIdOut == nil, existing.vendorId != nil { clearedColumns.append("vendor_id") }
+                if timeString == nil, existing.timeOfDay != nil { clearedColumns.append("time_of_day") }
+                if trimmedNotes.isEmpty, existing.notes?.isEmpty == false { clearedColumns.append("notes") }
+                if costCents == nil, existing.estimatedCostPerVisitCents != nil { clearedColumns.append("estimated_cost_per_visit_cents") }
+                if daysOut == nil, existing.daysOfWeek?.isEmpty == false { clearedColumns.append("days_of_week") }
+                if intervalDaysOut == nil, existing.cadenceIntervalDays != nil { clearedColumns.append("cadence_interval_days") }
+                try? await DatabaseService.shared.clearColumns(
+                    table: "routines", id: existing.id, columns: clearedColumns
+                )
+                if !clearedColumns.isEmpty,
+                   let refreshed = try? await DatabaseService.shared.fetchRoutine(id: existing.id) {
+                    savedRoutine = refreshed
+                }
             } else {
                 var insert = RoutineInsert(
                     householdId: householdId,
