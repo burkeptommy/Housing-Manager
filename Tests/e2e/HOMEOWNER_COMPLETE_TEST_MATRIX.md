@@ -1156,7 +1156,7 @@ Critical / major persistence findings = auto-fix candidates for the overnight ru
 
 ```sh
 # Wipe homeowner test artefacts
-/opt/homebrew/opt/postgresql@16/bin/psql "postgresql://..." -c "SET ROLE postgres;" -f /Users/tomburke/Projects/Housing-Manager/Tests/e2e/cleanup.sql
+/opt/homebrew/opt/postgresql@16/bin/psql "postgresql://..." -c "SET ROLE postgres;" -f /Users/tomburke/Documents/Projects/Housing-Manager/Tests/e2e/cleanup.sql
 
 # Reinstall app
 xcrun simctl uninstall <UDID> com.havenhome.app

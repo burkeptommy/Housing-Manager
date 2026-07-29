@@ -534,7 +534,7 @@ Total: ~5 hours overnight. With 25% buffer: 6.25 hours. Comfortably fits an 8-ho
 In a fresh chat:
 
 ```
-Read /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_BUILDOUT_TEST_PLAN.md
+Read /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_BUILDOUT_TEST_PLAN.md
 
 Execute Test wave T{N} via a general-purpose subagent. Use the wave's spec verbatim from the plan doc.
 

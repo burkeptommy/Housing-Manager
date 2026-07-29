@@ -13,8 +13,8 @@ This is a **complete spec** — no "skip this" gates. Each wave is dispatched in
 1. Read `/tmp/ui-test/CONTRACTOR_SETUP.md` (env, fixtures, JWT, test users)
 2. `mcp__Claude_in_Chrome__list_connected_browsers` returns ≥ 1
 3. Resize Chrome to **1440×900** (desktop standard); **1280×800** for compact-laptop checks; **1920×1080** for large-screen verification
-4. `cd /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/website/operations && npm install && npm run dev` — Vite at `localhost:5173/operations/`
-5. In a second terminal: `cd /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/website && python3 -m http.server 8000` — serves `handyman.html` so the auth flow + `?next=` deep-link round-trip works
+4. `cd /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/website/operations && npm install && npm run dev` — Vite at `localhost:5173/operations/`
+5. In a second terminal: `cd /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/website && python3 -m http.server 8000` — serves `handyman.html` so the auth flow + `?next=` deep-link round-trip works
 6. Sign in as `e2e-contractor-w1@chezcontractor.test` (W1 solo) / `e2e-contractor-w2@chezcontractor.test` (W2 crew6) / `e2e-contractor-w3@chezcontractor.test` (W3 crew25) — each pre-seeded by `Tests/e2e/run-contractor.mjs`
 7. Initial discipline check on every screen: `grep -i 'handyman'` in rendered DOM = 0; em-dash count = 0; salmon usage matches Section 22 B1 (only primary CTA / active queue / SLA pills / fit-meter success / homeowner-panel highlighted system row)
 
@@ -1242,7 +1242,7 @@ B6 (Alfred reply suggestions)     ← independent
 In a fresh chat:
 
 ```
-Read /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_WEB_BUILDOUT_PLAN.md
+Read /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8/Tests/e2e/CONTRACTOR_WEB_BUILDOUT_PLAN.md
 
 Execute Wave W{N} (or B{N}) via a general-purpose subagent. Use the wave's spec verbatim from the plan doc.
 
@@ -1312,7 +1312,7 @@ Most waves extend `handyman-provider/index.ts`. New edge functions introduced:
 
 Each wave deploys via:
 ```bash
-cd /Users/tomburke/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8
+cd /Users/tomburke/Documents/Projects/Housing-Manager/.claude/worktrees/priceless-burnell-028ac8
 supabase functions deploy handyman-provider --no-verify-jwt
 # or for new fns:
 supabase functions deploy provider-email --no-verify-jwt

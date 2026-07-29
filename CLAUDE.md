@@ -119,7 +119,7 @@ The maintenance sections below predate several deletions and are kept for the co
 ## Project Structure
 
 ```
-/Users/tomburke/Projects/Housing-Manager/
+/Users/tomburke/Documents/Projects/Housing-Manager/
 ├── Haven/                          # iOS app (SwiftUI)
 │   ├── App/                        # HavenApp, AppState, MainTabView, ContentView
 │   ├── Config/                     # AppConfig, Info.plist, entitlements
