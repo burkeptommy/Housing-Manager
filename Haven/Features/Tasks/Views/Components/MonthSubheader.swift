@@ -16,11 +16,21 @@ struct MonthSubheader: View {
     /// 1-indexed month number (1 = January, 12 = December).
     let month: Int
 
+    /// Phase 70.A2: calendar year. nil = current year (season-scoped feed,
+    /// no label suffix). When set and not the current year, the label reads
+    /// "JANUARY 2027" so the all-upcoming feed reads unambiguously across a
+    /// year boundary.
+    var year: Int? = nil
+
     /// When true, renders the salmon "TODAY" pill on the trailing edge of
     /// the header text. Computed at render time against `Calendar.current`
-    /// so the pill appears on whatever month is the active "now."
+    /// so the pill appears on whatever month is the active "now." Only the
+    /// CURRENT year's instance of the month gets the badge.
     var showsTodayBadge: Bool {
-        Calendar.current.component(.month, from: Date()) == month
+        let cal = Calendar.current
+        let nowMonth = cal.component(.month, from: Date())
+        let nowYear = cal.component(.year, from: Date())
+        return nowMonth == month && (year == nil || year == nowYear)
     }
 
     var body: some View {
@@ -53,13 +63,21 @@ struct MonthSubheader: View {
     private var monthLabel: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "LLLL"  // standalone month name
+        let currentYear = Calendar.current.component(.year, from: Date())
         var comps = DateComponents()
-        comps.year = Calendar.current.component(.year, from: Date())
+        comps.year = year ?? currentYear
         comps.month = month
         comps.day = 1
         guard let date = Calendar.current.date(from: comps) else {
             return ""
         }
-        return formatter.string(from: date)
+        let base = formatter.string(from: date)
+        // Append the year only when it differs from the current year, so
+        // the all-upcoming feed disambiguates "January 2027" from this
+        // year's January without cluttering same-year headers.
+        if let year, year != currentYear {
+            return "\(base) \(year)"
+        }
+        return base
     }
 }

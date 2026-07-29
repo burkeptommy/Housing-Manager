@@ -5364,7 +5364,12 @@ struct PropertyDetailView: View {
             activeChezVendorRequests: viewModel.activeChezVendorRequests
         )
         let uncoveredKeys = Set(coverage.uncovered.compactMap { item -> String? in
-            SystemCategoryRegistry.canonical(category: item.categoryKey) ?? item.categoryKey
+            // Pre-existing WIP breakage (commit c5d52559): `VendorCoverageItem`
+            // was refactored to drop `categoryKey`; its `id` IS the canonical
+            // category key (see SystemCategoryRegistry construction + the
+            // `$0.id` usage in `vendorCoverageItems`). This callsite was
+            // orphaned. Map onto `.id` to match.
+            SystemCategoryRegistry.canonical(category: item.id) ?? item.id
         })
         return candidates
             .compactMap { categoryKey -> PopularVendorEntry? in

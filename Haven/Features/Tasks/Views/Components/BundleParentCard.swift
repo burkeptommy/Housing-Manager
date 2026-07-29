@@ -68,6 +68,11 @@ struct BundleParentCard: View {
     /// depending on whether a contractor is linked.
     var onBookIt: () -> Void = {}
 
+    /// Phase 70.A2: the consistent per-task action menu (the visible "⋯").
+    /// Empty = no menu rendered.
+    var menuActions: [TaskAction] = []
+    var onAction: (TaskAction) -> Void = { _ in }
+
     // MARK: - Local state
 
     /// Controls the BundleChildList expansion. Per-session only — the
@@ -140,7 +145,29 @@ struct BundleParentCard: View {
             if isChezOwned {
                 ChezOwnedPill()
             }
+            if !menuActions.isEmpty { taskActionMenu }
         }
+    }
+
+    /// Phase 70.A2: visible "⋯" action menu — mirrors StandaloneTaskRow so
+    /// every feed row exposes the same per-task actions.
+    @ViewBuilder
+    private var taskActionMenu: some View {
+        Menu {
+            ForEach(menuActions) { action in
+                Button { onAction(action) } label: {
+                    Label(action.title, systemImage: action.systemImage)
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(HavenColors.textTertiary)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Visit actions")
     }
 
     private var includedSection: some View {

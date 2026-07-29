@@ -15,53 +15,87 @@ struct YearRibbonSummary {
 }
 
 struct YearRibbon: View {
-    @Binding var activeSeason: Season
+    /// Phase 70.A2: the season the feed is filtered to. nil = "All"
+    /// (everything upcoming) — the new default. The ribbon is a FILTER:
+    /// no tile is highlighted in the All state.
+    var selectedSeason: Season?
     let summaries: [Season: YearRibbonSummary]
+    /// Count for the "All" chip — derived from the all-upcoming feed so
+    /// it equals the rendered rows in All mode.
+    var allSummary: YearRibbonSummary = YearRibbonSummary(totalItems: 0, actionItems: 0)
     let currentSeason: Season
 
     /// Year to display in the eyebrow. Defaults to the calendar year of
     /// the active season's reference period (Winter Dec/Jan straddles).
     var year: Int = Season.year(for: .current(), referenceDate: .now)
 
-    /// Tap handler. When set, the parent owns navigation — we update
-    /// `activeSeason` for visual selection and then call the closure
-    /// (typically pushes into `MaintenanceScheduleView` scrolled to
-    /// the selected season). When nil, taps only re-scope the binding
-    /// in place — the legacy in-screen-only behavior.
-    var onTap: ((Season) -> Void)? = nil
+    /// Tapped the "All" chip — parent resets scope to `.allUpcoming`.
+    var onSelectAll: () -> Void = {}
+    /// Tapped a season tile — parent narrows scope to that season (or
+    /// toggles back to All if it was already the active tile).
+    var onTapSeason: (Season) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Eyebrow: "2026 · YEAR AT A GLANCE"
-            Text("\(verbatimYear) · YEAR AT A GLANCE")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.5)
-                .textCase(.uppercase)
-                .foregroundStyle(HavenColors.textTertiary)
+            // Eyebrow row: "All" filter chip + "2026 · YEAR AT A GLANCE"
+            HStack(spacing: 8) {
+                allChip
+                Text("\(verbatimYear) · YEAR AT A GLANCE")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .textCase(.uppercase)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Spacer(minLength: 0)
+            }
 
             HStack(spacing: 6) {
                 ForEach(Season.allCases, id: \.rawValue) { season in
                     SeasonTile(
                         season: season,
                         summary: summaries[season] ?? YearRibbonSummary(totalItems: 0, actionItems: 0),
-                        isActive: season == activeSeason,
+                        isActive: season == selectedSeason,
                         isCurrent: season == currentSeason
                     )
                     .onTapGesture {
                         Haptics.selection()
-                        withAnimation(TasksV5.easeRibbon) {
-                            activeSeason = season
-                        }
-                        onTap?(season)
+                        onTapSeason(season)
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel(accessibilityLabel(for: season))
-                    .accessibilityAddTraits(season == activeSeason ? .isSelected : [])
+                    .accessibilityAddTraits(season == selectedSeason ? .isSelected : [])
                 }
             }
         }
         .padding(.horizontal, TasksV5.pageMargin)
         .padding(.bottom, 16)
+    }
+
+    /// "All N" chip — active (navy fill) when no season is selected.
+    /// Matches the app's active-filter convention (navy fill + white text,
+    /// same as the stats-pill filter), not a salmon decoration.
+    private var allChip: some View {
+        let isActive = selectedSeason == nil
+        return Button {
+            Haptics.selection()
+            onSelectAll()
+        } label: {
+            HStack(spacing: 5) {
+                Text("All")
+                    .font(.system(size: 11, weight: .bold))
+                Text("\(allSummary.totalItems)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .opacity(0.85)
+            }
+            .foregroundStyle(isActive ? HavenColors.textOnNavy : HavenColors.textPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule().fill(isActive ? HavenColors.navy800 : HavenColors.beige200)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("All upcoming, \(allSummary.totalItems) items")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
     private var verbatimYear: String {
@@ -160,18 +194,21 @@ private struct SeasonTile: View {
 }
 
 #Preview {
-    @Previewable @State var season: Season = .spring
+    @Previewable @State var scope: Season? = nil
 
     VStack {
         YearRibbon(
-            activeSeason: $season,
+            selectedSeason: scope,
             summaries: [
                 .spring: .init(totalItems: 16, actionItems: 9),
                 .summer: .init(totalItems: 7, actionItems: 0),
                 .fall:   .init(totalItems: 9, actionItems: 2),
                 .winter: .init(totalItems: 4, actionItems: 1),
             ],
-            currentSeason: .spring
+            allSummary: .init(totalItems: 36, actionItems: 12),
+            currentSeason: .spring,
+            onSelectAll: { scope = nil },
+            onTapSeason: { scope = (scope == $0) ? nil : $0 }
         )
         Spacer()
     }

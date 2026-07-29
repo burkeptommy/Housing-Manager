@@ -19,7 +19,11 @@ struct MaintenanceTabView: View {
     @ObservedObject private var maintenanceVM = MaintenanceViewModel.shared
     @StateObject private var viewModel = MaintenanceTabViewModel()
 
-    @State private var activeSeason: Season = .current()
+    /// Phase 70.A2: default scope is "everything upcoming" — the season
+    /// ribbon is a FILTER, not the default lens. `.allUpcoming` shows the
+    /// next 12 months grouped by month with a leading Overdue bucket;
+    /// `.season(_)` narrows to one season tile.
+    @State private var feedScope: FeedScope = .allUpcoming
     @State private var showAddMenu = false
     @State private var pushTarget: MaintenancePush?
     @State private var pickerForRoutine: RoutineRow?
@@ -34,6 +38,11 @@ struct MaintenanceTabView: View {
     /// heavy Phase 56.4 timeline) just to re-tap the same row from
     /// inside that view.
     @State private var detailTask: MaintenanceTaskDBRow?
+    /// Phase 70.A2: per-task action-menu sheet targets. Opened from any
+    /// row's "⋯" menu (or long-press) via the central `handleTaskAction`
+    /// dispatcher.
+    @State private var findVendorTask: MaintenanceTaskDBRow?
+    @State private var pickVendorTask: MaintenanceTaskDBRow?
     /// Phase F3: MaintenanceScheduleView parity — duplicate banner.
     /// `DuplicateDetector` scans routines + tasks for high-confidence
     /// match pairs (same vendor + category family + title similarity);
@@ -54,6 +63,11 @@ struct MaintenanceTabView: View {
     /// default — the card hides itself until data arrives.
     @State private var vendorDocumentsForYear: [DocumentRow] = []
     @State private var serviceRecordsForYear: [ServiceRecordRow] = []
+    /// Phase 70.A2: pending handyman punch items, surfaced as ONE batched
+    /// card on Maintenance so the DIY/handyman rail (which otherwise lives
+    /// only in the separate Contractor tab mode) is visible here. Loaded on
+    /// appear + refreshed on .handymanPunchListChanged / .maintenanceTaskChanged.
+    @State private var handymanPunchItems: [HandymanPunchItemRow] = []
     /// Phase G2: Year overview / Timeline scrub. Opens as a
     /// fullScreenCover so the 18-month linear list reads as a
     /// "different mode" without losing scroll context in the parent.
@@ -104,12 +118,17 @@ struct MaintenanceTabView: View {
         appState.primaryProperty?.id ?? maintenanceVM.properties.first?.id
     }
 
-    private var isScopedToYear: Bool {
-        activeSeason == currentSeason
+    /// The season the feed is filtered to, or nil in all-upcoming mode.
+    private var scopedSeason: Season? {
+        if case .season(let s) = feedScope { return s }
+        return nil
     }
 
     private var scopeLabel: String {
-        isScopedToYear ? "this year" : "this \(activeSeason.displayName.lowercased())"
+        if let season = scopedSeason {
+            return "this \(season.displayName.lowercased())"
+        }
+        return "this year"
     }
 
     var body: some View {
@@ -136,21 +155,30 @@ struct MaintenanceTabView: View {
                 )
 
                 YearRibbon(
-                    activeSeason: $activeSeason,
+                    selectedSeason: scopedSeason,
                     summaries: viewModel.seasonSummaries(activeSeason: currentSeason),
+                    allSummary: viewModel.allUpcomingSummary(),
                     currentSeason: currentSeason,
-                    onTap: { season in
-                        // Phase 70 (Tasks v2): Tap = filter the screen
-                        // to that season. The binding update already
-                        // re-renders the feed via `activeFeed`.
-                        // Phase F1: clear stats filter on season swap
-                        // so the user isn't trapped in "Overdue" when
-                        // jumping forward to a different season.
+                    onSelectAll: {
+                        // Phase 70.A2: back to everything-upcoming.
                         withAnimation(HavenTheme.animationStandard) {
-                            activeSeason = season
+                            feedScope = .allUpcoming
                             viewModel.activeStatsFilter = nil
                         }
-                        Haptics.selection()
+                        Analytics.track(.tasksV2SeasonTapped, [
+                            "season": "all",
+                            "source": "ribbon"
+                        ])
+                    },
+                    onTapSeason: { season in
+                        // Tap = filter to that season; tap the active tile
+                        // again = back to All. Clear the stats filter on
+                        // any scope change so the user isn't trapped in
+                        // "Overdue" when they jump.
+                        withAnimation(HavenTheme.animationStandard) {
+                            feedScope = (feedScope == .season(season)) ? .allUpcoming : .season(season)
+                            viewModel.activeStatsFilter = nil
+                        }
                         Analytics.track(.tasksV2SeasonTapped, [
                             "season": season.rawValue,
                             "source": "ribbon"
@@ -184,7 +212,11 @@ struct MaintenanceTabView: View {
 
                 needsAttentionSection
 
+                handymanSummarySection
+
                 flexibleTasksSection
+
+                overdueSection
 
                 thisSeasonTasksSection
 
@@ -235,6 +267,7 @@ struct MaintenanceTabView: View {
             await maintenanceVM.loadTasks()
             await loadDuplicates()
             await loadYearStats()
+            await loadHandymanPunch()
 
             // Phase 70.A1 (Summer/Winter library expansion v3): seed
             // the 8 new templates onto existing households once. The
@@ -271,7 +304,11 @@ struct MaintenanceTabView: View {
                 await maintenanceVM.loadTasks()
                 await loadDuplicates()
                 await loadYearStats()
+                await loadHandymanPunch()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .handymanPunchListChanged)) { _ in
+            Task { await loadHandymanPunch() }
         }
         // Phase 70 (Tasks v2) — deep-link contract. Push handlers, inbox
         // action menus, and activity-feed "view task" links all post this
@@ -428,18 +465,65 @@ struct MaintenanceTabView: View {
                 Task { if let householdId { await viewModel.load(householdId: householdId) } }
             }
         }
+        // Phase 70.A2: per-task action-menu sheets (find / assign vendor).
+        .sheet(item: $findVendorTask) { task in
+            let loc = vendorSearchLocation(for: task)
+            let category = vendorSearchCategory(for: task)
+            FindLocalVendorSheet(
+                task: task,
+                householdId: task.householdId,
+                town: loc.town,
+                state: loc.state,
+                systemCategory: category,
+                categoryDisplayName: category.lowercased(),
+                onComplete: {
+                    Task { await maintenanceVM.loadTasks() }
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                },
+                onAdoptedVendor: { contractor in
+                    // The adopt-existing path doesn't link the task itself
+                    // (only the add-manually path does), so link it here —
+                    // a light set (no title reframe), mirroring the detail
+                    // sheet's `assignContractorToTask`.
+                    Task {
+                        _ = try? await DatabaseService.shared.updateMaintenanceTask(
+                            id: task.id,
+                            MaintenanceTaskUpdate(assignedContractorId: contractor.id, needsVendor: false)
+                        )
+                        await maintenanceVM.loadTasks()
+                        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                    }
+                }
+            )
+        }
+        .sheet(item: $pickVendorTask) { task in
+            NavigationStack {
+                ContractorDirectoryView(onSelect: { contractor in
+                    Task { await maintenanceVM.convertToVendorManaged(taskId: task.id, contractor: contractor) }
+                    pickVendorTask = nil
+                })
+            }
+        }
     }
 
     // MARK: - Sections
 
     private var miniHeroSection: some View {
-        IndigoGradientCard(variant: .hero) {
+        // Phase 70.A2 / Task D: derive every hero number from `activeFeed`
+        // so "% scheduled" and the stat columns match the rendered rows
+        // exactly. The old path used `coveredCount`/`totalCount(for:)`
+        // (programs + decisions) which diverged from `feed.totalItems`.
+        let feed = activeFeed
+        let total = feed.totalItems
+        let actions = feed.actionItems
+        let covered = max(total - actions, 0)
+        return IndigoGradientCard(variant: .hero) {
             MiniHeroContent(
                 scopeLabel: scopeLabel,
-                coveredCount: viewModel.coveredCount(for: activeSeason, currentSeason: currentSeason),
-                totalCount: viewModel.totalCount(for: activeSeason, currentSeason: currentSeason),
-                programCount: viewModel.activePrograms().count,
-                decisionCount: viewModel.pendingDecisions().count,
+                coveredCount: covered,
+                totalCount: total,
+                programCount: feed.programs.count,
+                decisionCount: actions,
                 bundleReadyCount: viewModel.bundleReadyCount
             )
         }
@@ -639,7 +723,10 @@ struct MaintenanceTabView: View {
     /// card surfaces the routine density that the old full-year toggle
     /// was used to discover.
     private var activeFeed: SeasonFeed {
-        viewModel.seasonFeed(activeSeason)
+        if case .season(let season) = feedScope {
+            return viewModel.seasonFeed(season)
+        }
+        return viewModel.upcomingFeed()
     }
 
     /// SeasonScopeBanner — the 44pt pill below MiniHero that names the
@@ -697,7 +784,7 @@ struct MaintenanceTabView: View {
 
     private var seasonScopeBannerSection: some View {
         SeasonScopeBanner(
-            season: activeSeason,
+            season: scopedSeason,
             totalItems: activeFeed.totalItems,
             actionItems: activeFeed.actionItems,
             onSearch: {
@@ -708,7 +795,7 @@ struct MaintenanceTabView: View {
             onYearOverview: {
                 showYearOverview = true
                 Analytics.track(.tasksV2YearOverviewOpened, [
-                    "season": activeSeason.rawValue
+                    "season": scopedSeason?.rawValue ?? "all"
                 ])
             }
         )
@@ -724,7 +811,7 @@ struct MaintenanceTabView: View {
     /// against the active season + Flexible bucket.
     @ViewBuilder
     private var statsFilterStripSection: some View {
-        let counts = viewModel.statsFilterCounts(for: activeSeason)
+        let counts = viewModel.statsFilterCounts(for: scopedSeason)
         let totalAvailable = counts.values.reduce(0, +)
         if totalAvailable > 0 || viewModel.activeStatsFilter != nil {
             StatsFilterStrip(
@@ -737,7 +824,7 @@ struct MaintenanceTabView: View {
                         if let value = newValue {
                             Analytics.track(.tasksV2StatsFilterApplied, [
                                 "filter": value.rawValue,
-                                "season": activeSeason.rawValue
+                                "season": scopedSeason?.rawValue ?? "all"
                             ])
                         }
                     }
@@ -899,6 +986,79 @@ struct MaintenanceTabView: View {
         }
     }
 
+    /// Phase 70.A2: batched handyman / quick-fixes card. Surfaces the
+    /// `handyman_punch_items` rail on Maintenance (it otherwise lives only
+    /// in the Contractor tab mode). One card, never N rows. Tapping opens
+    /// the Contractor screen via `.handymanModeRequested`.
+    @ViewBuilder
+    private var handymanSummarySection: some View {
+        if !handymanPunchItems.isEmpty {
+            HandymanSummaryCard(
+                count: handymanPunchItems.count,
+                previewTitles: handymanPunchItems.map(\.title),
+                seasonalNudge: handymanSeasonalNudge,
+                onOpen: {
+                    Analytics.track(.nextHandymanVisitOpened, [
+                        "source": "maintenance_summary_card",
+                        "count": String(handymanPunchItems.count)
+                    ])
+                    NotificationCenter.default.post(name: .handymanModeRequested, object: nil)
+                }
+            )
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
+    /// Lightweight Spring/Fall nudge for the handyman card — mirrors the
+    /// Apr 1 / Oct 1 visit windows the dashboard reminder uses, without
+    /// coupling to DashboardViewModel. nil outside those months / when empty.
+    private var handymanSeasonalNudge: String? {
+        guard !handymanPunchItems.isEmpty else { return nil }
+        switch Calendar.current.component(.month, from: Date()) {
+        case 3, 4:  return "Spring is handyman season. A good time to book a visit."
+        case 9, 10: return "Fall is handyman season. A good time to book a visit."
+        default:    return nil
+        }
+    }
+
+    /// Load pending handyman punch items for the batched summary card.
+    private func loadHandymanPunch() async {
+        guard let householdId else { return }
+        let items = (try? await DatabaseService.shared.fetchPendingHandymanPunchItems(householdId: householdId)) ?? []
+        if let pid = viewModel.activePropertyId {
+            handymanPunchItems = items.filter { $0.propertyId == nil || $0.propertyId == pid }
+        } else {
+            handymanPunchItems = items
+        }
+    }
+
+    /// Phase 70.A2: leading "Overdue" group for the all-upcoming feed.
+    /// Past-due standalone + bundle tasks collect here instead of
+    /// scattering into past-month subheaders. Empty (and hidden) for the
+    /// season-scoped feed, where overdue items land in that season's month
+    /// buckets. Rows reuse `seasonEntryRow`, which already renders an
+    /// "Overdue · {date}" caption in critical red.
+    @ViewBuilder
+    private var overdueSection: some View {
+        let overdue = activeFeed.overdueEntries
+        if !overdue.isEmpty {
+            SectionLabel(
+                eyebrow: "Overdue",
+                sub: overdue.count == 1 ? "1 past due" : "\(overdue.count) past due"
+            )
+            .padding(.bottom, TasksV5.sectionLabelGap)
+
+            VStack(spacing: TasksV5.rowGap) {
+                ForEach(overdue) { entry in
+                    seasonEntryRow(for: entry)
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
+        }
+    }
+
     /// Phase 70 "This Season's Tasks" — bundle parents (with children
     /// inline), standalone tasks, and routine occurrences with scheduled
     /// visits this season. Grouped by MonthSubheader. The section the
@@ -908,14 +1068,14 @@ struct MaintenanceTabView: View {
         let monthSections = activeFeed.monthSections
         if !monthSections.isEmpty {
             SectionLabel(
-                eyebrow: "This season",
+                eyebrow: scopedSeason == nil ? "Upcoming" : "This season",
                 sub: "What's coming up"
             )
             .padding(.bottom, TasksV5.sectionLabelGap)
 
             VStack(spacing: 0) {
                 ForEach(monthSections) { monthSection in
-                    MonthSubheader(month: monthSection.month)
+                    MonthSubheader(month: monthSection.month, year: monthSection.year)
                     VStack(spacing: TasksV5.rowGap) {
                         ForEach(monthSection.entries) { entry in
                             seasonEntryRow(for: entry)
@@ -925,24 +1085,70 @@ struct MaintenanceTabView: View {
                 }
             }
             .padding(.bottom, TasksV5.sectionGap)
-        } else if activeFeed.decisions.isEmpty {
-            // Friend feedback (May 2026): when the year-aware filter
-            // strips a tile down to zero rows, surface a graceful
-            // "wrapped" empty state instead of silently rendering
-            // nothing under the previous section's footer.
-            seasonWrappedEmptyCard
-                .padding(.horizontal, TasksV5.pageMargin)
-                .padding(.bottom, TasksV5.sectionGap)
+        } else if activeFeed.decisions.isEmpty && activeFeed.overdueEntries.isEmpty {
+            // When the feed has zero rows, surface a graceful empty state
+            // instead of silently rendering nothing under the previous
+            // section's footer. Phase 70.A2: the all-upcoming variant has
+            // no "next season" to point at, so it routes to Browse instead.
+            Group {
+                if scopedSeason == nil {
+                    allCaughtUpEmptyCard
+                } else {
+                    seasonWrappedEmptyCard
+                }
+            }
+            .padding(.horizontal, TasksV5.pageMargin)
+            .padding(.bottom, TasksV5.sectionGap)
         }
+    }
+
+    /// Phase 70.A2: all-upcoming empty state. No work in the next 12
+    /// months across any season — nudge toward the services catalog
+    /// rather than a (nonexistent) "next season" tile.
+    private var allCaughtUpEmptyCard: some View {
+        Button {
+            Haptics.selection()
+            pushTarget = .recommendedServices
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(HavenColors.success)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(HavenColors.success.opacity(0.12)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("You're all caught up")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Nothing scheduled for the next 12 months. Browse more services →")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(HavenColors.creamLight)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(HavenColors.beige200, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     /// Empty-state for season tiles with no work left for the current
     /// calendar instance. Nudges the homeowner toward the next season's
     /// tile rather than leaving them on a blank screen.
     private var seasonWrappedEmptyCard: some View {
-        let nextSeason = activeSeason.next
+        let season = scopedSeason ?? currentSeason
+        let nextSeason = season.next
         return HStack(alignment: .center, spacing: 12) {
-            Image(systemName: activeSeason.icon)
+            Image(systemName: season.icon)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(HavenColors.action)
                 .frame(width: 36, height: 36)
@@ -950,7 +1156,7 @@ struct MaintenanceTabView: View {
                     Circle().fill(HavenColors.action.opacity(0.12))
                 )
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(activeSeason.rawValue) is wrapped")
+                Text("\(season.rawValue) is wrapped")
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.textPrimary)
                 Text("Nothing left to schedule this season. Tap \(nextSeason.rawValue) →")
@@ -973,7 +1179,7 @@ struct MaintenanceTabView: View {
         .onTapGesture {
             Haptics.selection()
             withAnimation(HavenTheme.animationStandard) {
-                activeSeason = nextSeason
+                feedScope = .season(nextSeason)
             }
         }
     }
@@ -1004,7 +1210,9 @@ struct MaintenanceTabView: View {
                     },
                     onBookIt: {
                         quickScheduleTask = task
-                    }
+                    },
+                    menuActions: TaskActionResolver.actions(for: task),
+                    onAction: { handleTaskAction($0, for: task) }
                 )
                 // Phase F2 + 70.A1 follow-on F5: leading swipe = complete,
                 // trailing = archive (was snooze pre-follow-on; snooze
@@ -1044,7 +1252,9 @@ struct MaintenanceTabView: View {
                         // the bundle parent above — no more deferring to
                         // MaintenanceScheduleView.
                         detailTask = task
-                    }
+                    },
+                    menuActions: TaskActionResolver.actions(for: task),
+                    onAction: { handleTaskAction($0, for: task) }
                 )
                 .swipeRowActions(
                     archiveLabel: "Archive",
@@ -1121,26 +1331,13 @@ struct MaintenanceTabView: View {
         } else {
             content()
                 .contextMenu {
-                    // Phase 70.A1 follow-on J1 — long-press actions match
-                    // the swipe gestures (Done = right-swipe, Archive =
-                    // left-swipe) so power users have a discoverable
-                    // alternative when the swipe is awkward (small touch
-                    // targets, accessibility settings, etc.). All three
-                    // committal actions land an Undo toast via I3 so
-                    // accidents recover the same way.
-                    Button {
-                        Task {
-                            await maintenanceVM.completeTask(task)
-                            lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+                    // Phase 70.A2: long-press surfaces the SAME type-aware
+                    // action set as the visible "⋯" menu (single resolver),
+                    // plus Select + Archive (list-management affordances).
+                    ForEach(TaskActionResolver.actions(for: task)) { action in
+                        Button { handleTaskAction(action, for: task) } label: {
+                            Label(action.title, systemImage: action.systemImage)
                         }
-                    } label: {
-                        Label("Mark done", systemImage: "checkmark.circle")
-                    }
-
-                    Button {
-                        quickScheduleTask = task
-                    } label: {
-                        Label("Reschedule", systemImage: "calendar")
                     }
 
                     Divider()
@@ -1197,7 +1394,7 @@ struct MaintenanceTabView: View {
                             Circle().fill(HavenColors.navy800.opacity(0.08))
                         )
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Active routines this \(activeSeason.displayName.lowercased())")
+                        Text("Active routines \(scopeLabel)")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(HavenColors.textPrimary)
                             .lineLimit(1)
@@ -1327,7 +1524,7 @@ struct MaintenanceTabView: View {
         let totalCount = programs.count + chezTasks.count
         let visits = activeFeed.routineVisitCount
         let visitsPart: String? = visits > 0
-            ? "\(visits) visit\(visits == 1 ? "" : "s") this \(activeSeason.displayName.lowercased())"
+            ? "\(visits) visit\(visits == 1 ? "" : "s") \(scopeLabel)"
             : nil
         let chezPart: String?
         if chezCount == 0 { chezPart = nil }
@@ -1925,12 +2122,13 @@ struct MaintenanceTabView: View {
            let propUUID = UUID(uuidString: propString) {
             viewModel.activePropertyId = propUUID
         }
-        // Apply season override.
-        if let seasonRaw = userInfo["season"] as? String,
-           let season = Season(rawValue: seasonRaw) {
-            withAnimation(HavenTheme.animationStandard) {
-                activeSeason = season
-            }
+        // Phase 70.A2: land in all-upcoming scope (which always contains
+        // the deep-linked task) rather than forcing a season filter from
+        // the push payload — a `season` key would otherwise yank the user
+        // out of the default view. The highlight ring below draws the eye
+        // to the row regardless of where it sits in the feed.
+        withAnimation(HavenTheme.animationStandard) {
+            feedScope = .allUpcoming
         }
         // Apply highlight.
         if let taskString = userInfo["task_id"] as? String,
@@ -2046,9 +2244,65 @@ struct MaintenanceTabView: View {
     // MARK: - Helpers
 
     private var scopedSeasonOrNil: Season? {
-        // When the current season is active, show everything (year-wide).
-        // When a non-current season is active, scope to that season.
-        activeSeason == currentSeason ? nil : activeSeason
+        // Phase 70.A2: the legacy sections (decisionsSection /
+        // programsSection / chezHandlingSection) that still call this are
+        // no longer rendered in the body, but this keeps them compiling by
+        // mapping onto the new scope. nil = all-upcoming.
+        scopedSeason
+    }
+
+    // MARK: - Phase 70.A2 per-task action dispatcher
+
+    /// Single dispatcher for the consistent per-task action menu (the "⋯"
+    /// on every row + the long-press context menu). Mirrors the admin
+    /// cockpit's single `handleConciergeAction` pattern — every action
+    /// routes to an existing, verified handler so wiring stays centralized
+    /// and no surface drifts.
+    private func handleTaskAction(_ action: TaskAction, for task: MaintenanceTaskDBRow) {
+        switch action {
+        case .markDone:
+            Task {
+                await maintenanceVM.completeTask(task)
+                lastSwipeToast = SwipeToast(taskId: task.id, action: .completed, taskTitle: task.title)
+            }
+        case .schedule:
+            quickScheduleTask = task
+        case .findVendor:
+            findVendorTask = task
+        case .pickVendor:
+            pickVendorTask = task
+        case .haveChezHandle:
+            Task {
+                try? await HavenSupabase.delegateTaskToChez(taskId: task.id, delegated: true)
+                // delegateTaskToChez doesn't self-post a refresh — do it here
+                // so the row picks up isChezOwned and moves to the programs
+                // section with a Chez pill.
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            }
+        case .addToHandyman:
+            Task { await maintenanceVM.moveTaskToHandymanPunchList(task) }
+        case .doMyself:
+            Task { await maintenanceVM.convertToPersonal(taskId: task.id) }
+        case .snooze:
+            Task { await maintenanceVM.snoozeTask(task, days: 7) }
+        }
+    }
+
+    /// Town/state for the find-a-vendor sheet, resolved from the task's
+    /// property (falls back to the primary property).
+    private func vendorSearchLocation(for task: MaintenanceTaskDBRow) -> (town: String, state: String) {
+        let prop = maintenanceVM.properties.first { $0.id == task.propertyId }
+            ?? maintenanceVM.properties.first
+        return (prop?.city ?? "", prop?.state ?? "")
+    }
+
+    /// Canonical service category for the find-a-vendor sheet, derived from
+    /// the task's templateId prefix ("Plumbing:Drain cleaning" → "Plumbing").
+    private func vendorSearchCategory(for task: MaintenanceTaskDBRow) -> String {
+        if let key = task.templateId, let colon = key.firstIndex(of: ":") {
+            return String(key[..<colon])
+        }
+        return "Service"
     }
 
     private func vehicleDisplayName(_ vehicle: VehicleRow) -> String {
@@ -2099,6 +2353,15 @@ private struct DecisionVendorPicker: View {
 
 // MARK: - View Model
 
+/// Phase 70.A2: the Tasks tab's scope. `.allUpcoming` is the default —
+/// the next 12 months grouped by month. `.season(_)` narrows to a single
+/// season tile (the YearRibbon filter). Equatable so the view can toggle a
+/// tile off (tapping the active tile returns to `.allUpcoming`).
+enum FeedScope: Equatable {
+    case allUpcoming
+    case season(Season)
+}
+
 // MARK: - Phase 70 (Tasks v2) SeasonFeed types
 
 /// Phase 70 (Tasks v2): the single source of truth for one season of the
@@ -2139,21 +2402,28 @@ struct SeasonFeed {
     /// without seeing every Wednesday-Blue-Fox row in the season feed.
     let routineVisitCount: Int
 
-    /// Convenience: chip + ribbon tile counts. Counts decisions + tasks
-    /// the user actually scrolls through in the main feed. Programs are
-    /// EXCLUDED — they're autopilot, already surfaced via the Active
-    /// Programs section's "N visits this season · On autopilot" subtitle.
+    /// Phase 70.A2: past-due tasks (date < today) that aren't decisions,
+    /// routine-managed, chez-owned, or flexible. Rendered in a leading
+    /// "Overdue" group above the month sections so past-due work never
+    /// scatters into past-month subheaders. Always empty for the
+    /// season-scoped `seasonFeed` (overdue lands in that season's month
+    /// buckets there); populated only by the all-upcoming feed.
+    var overdueEntries: [SeasonEntry] = []
+
+    /// Convenience: chip + ribbon tile counts. Counts decisions + overdue
+    /// + tasks the user actually scrolls through in the main feed.
+    /// Programs are EXCLUDED — they're autopilot, already surfaced via the
+    /// Active Programs section's "N visits · On autopilot" subtitle.
     /// Including them in `totalItems` made the chip claim 26 items in
     /// Spring while the user only saw ~9 task rows in the main feed
     /// (the other 17 were either decisions hidden behind a 5-item cap
     /// or programs in the collapsed bottom section). Now the count
-    /// maps directly to user mental model: "things I need to read or do
-    /// in this season's feed."
+    /// maps directly to user mental model: "things I need to read or do."
     var totalItems: Int {
-        decisions.count + monthSections.reduce(0) { $0 + $1.entries.count }
+        decisions.count + overdueEntries.count + monthSections.reduce(0) { $0 + $1.entries.count }
     }
 
-    var actionItems: Int { decisions.count }
+    var actionItems: Int { decisions.count + overdueEntries.count }
 
     /// Total task entries in the main feed (excludes decisions and
     /// programs). Used by the SeasonScopeBanner subtitle when it wants
@@ -2198,8 +2468,14 @@ struct MonthSection: Identifiable {
     /// Bundle parents + standalone tasks + routine occurrences within
     /// this month, sorted by date.
     let entries: [SeasonEntry]
+    /// Phase 70.A2: calendar year. The all-upcoming feed spans up to 12
+    /// months and can cross a year boundary (e.g. Dec 2026 + Jan 2027),
+    /// so the same month number can appear twice. Folding the year into
+    /// `id` keeps SwiftUI's ForEach diffing stable; the season-scoped
+    /// feed defaults it to the current year (single-instance, no clash).
+    var year: Int = Calendar.current.component(.year, from: Date())
 
-    var id: Int { month }
+    var id: Int { year * 100 + month }
 }
 
 /// One row inside a `MonthSection`. The case discriminator drives which
@@ -2761,6 +3037,137 @@ final class MaintenanceTabViewModel: ObservableObject {
         )
     }
 
+    /// Phase 70.A2: the all-upcoming feed — the new DEFAULT for the Tasks
+    /// tab. Same shape as `seasonFeed` but spans the next `monthsAhead`
+    /// months instead of a single season, with a leading Overdue bucket.
+    /// The YearRibbon season tiles narrow this down to one season via
+    /// `seasonFeed`; tapping "All" returns here.
+    ///
+    /// Guardrail (the lesson that killed the old full-year toggle):
+    /// routine occurrences are NOT expanded into month rows — weekly
+    /// cadences would flood the feed. They stay in the Active Programs
+    /// section; only their visit COUNT crosses over.
+    ///
+    /// Section assignment is mutually exclusive so `totalItems` == rendered
+    /// rows: a task is a decision (find-a-pro), a chez row, a flexible row,
+    /// a routine child (hidden), an overdue row, or a month row — never two.
+    func upcomingFeed(monthsAhead: Int = 12, propertyId: UUID? = nil) -> SeasonFeed {
+        let propScope = propertyId ?? self.activePropertyId
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        let windowEnd = calendar.date(byAdding: .month, value: monthsAhead, to: startOfToday) ?? now
+
+        // Base filter — identical to seasonFeed's `allTasks`.
+        let allTasks = MaintenanceViewModel.shared.tasks.filter { task in
+            if let scope = propScope, task.propertyId != scope { return false }
+            guard task.vehicleId == nil else { return false }
+            if let last = task.lastCompletedDate, !last.isEmpty { return false }
+            if (task.isArchived ?? false) == true { return false }
+            if let templateKey = task.templateId,
+               let template = MaintenanceTemplates.template(forKey: templateKey),
+               template.bundleId != nil {
+                return false
+            }
+            return true
+        }
+
+        // ── Decisions (all upcoming, no season gate) ────────────────
+        let routineDecisions = pendingDecisions(scopedTo: nil)
+            .map { DecisionEntry.routinePendingVendor($0) }
+        let taskDecisions = allTasks
+            .filter { task in
+                task.parentRoutineId == nil &&
+                task.assignmentType == "vendor" &&
+                task.assignedContractorId == nil &&
+                task.isChezOwned != true &&
+                taskMatchesActiveStatsFilter(task)
+            }
+            .map { DecisionEntry.taskNeedsVendor($0) }
+        let combinedDecisions = (routineDecisions + taskDecisions)
+            .sorted { ($0.sortDate ?? .distantFuture) < ($1.sortDate ?? .distantFuture) }
+
+        // ── Programs (active + chez), unscoped, deduped ─────────────
+        let regularPrograms = activePrograms(scopedTo: nil)
+        let chezPrograms = chezHandlingPrograms(scopedTo: nil)
+        var seenRoutine: Set<UUID> = []
+        var mergedPrograms: [RoutineRow] = []
+        for routine in regularPrograms + chezPrograms where !seenRoutine.contains(routine.id) {
+            seenRoutine.insert(routine.id)
+            mergedPrograms.append(routine)
+        }
+
+        // ── Month feed + Overdue ────────────────────────────────────
+        // Real scheduled / DIY work only: exclude decisions (top section),
+        // chez-owned (programs section), flexible (own section), and
+        // routine-managed (render under their routine).
+        let feedTasks = allTasks.filter { task in
+            guard task.parentRoutineId == nil else { return false }
+            guard task.isChezOwned != true else { return false }
+            if task.assignmentType == "vendor" && task.assignedContractorId == nil { return false }
+            let timing = task.seasonalTiming?
+                .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+            if timing == "flexible" { return false }
+            return taskMatchesActiveStatsFilter(task)
+        }
+
+        func entry(for task: MaintenanceTaskDBRow) -> SeasonEntry {
+            MaintenanceTemplates.isBundleId(task.templateId) ? .bundle(task) : .standaloneTask(task)
+        }
+
+        var overdue: [SeasonEntry] = []
+        var monthBuckets: [Int: (year: Int, month: Int, entries: [SeasonEntry])] = [:]
+        for task in feedTasks {
+            let dateString = task.scheduledDate ?? task.nextDueDate
+            guard let date = formatter.date(from: dateString) else { continue }
+            if date < startOfToday {
+                overdue.append(entry(for: task))
+                continue
+            }
+            guard date <= windowEnd else { continue }
+            let year = calendar.component(.year, from: date)
+            let month = calendar.component(.month, from: date)
+            let key = year * 100 + month
+            monthBuckets[key, default: (year, month, [])].entries.append(entry(for: task))
+        }
+        overdue.sort { ($0.sortDate ?? .distantPast) < ($1.sortDate ?? .distantPast) }
+
+        let monthSections = monthBuckets.keys.sorted().compactMap { key -> MonthSection? in
+            guard let bucket = monthBuckets[key], !bucket.entries.isEmpty else { return nil }
+            let sortedEntries = bucket.entries.sorted {
+                ($0.sortDate ?? .distantFuture) < ($1.sortDate ?? .distantFuture)
+            }
+            return MonthSection(month: bucket.month, entries: sortedEntries, year: bucket.year)
+        }
+
+        // Routine visit density across the window (count only — guardrail).
+        let occurrences = RoutineOccurrenceExpander.occurrences(
+            routines: routines.filter { propScope == nil || $0.propertyId == propScope },
+            from: startOfToday,
+            through: windowEnd,
+            calendar: calendar
+        )
+
+        return SeasonFeed(
+            season: Season.current(),
+            decisions: combinedDecisions,
+            monthSections: monthSections,
+            programs: mergedPrograms,
+            chezTasks: chezHandlingTasks(scopedTo: nil),
+            routineVisitCount: occurrences.count,
+            overdueEntries: overdue
+        )
+    }
+
+    /// Phase 70.A2: ribbon "All" tile summary — derived from `upcomingFeed`
+    /// so the All count == the rendered rows in all-upcoming mode.
+    func allUpcomingSummary() -> YearRibbonSummary {
+        let feed = upcomingFeed()
+        return YearRibbonSummary(totalItems: feed.totalItems, actionItems: feed.actionItems)
+    }
+
     // Phase 70.A1.x dropped the `fullYearFeed()` aggregator. The "Show
     // full year" toggle proved noisy in practice — year-round routines
     // dominated the combined view and the user couldn't tell what was
@@ -2956,7 +3363,7 @@ final class MaintenanceTabViewModel: ObservableObject {
     /// scheduledDate/nextDueDate falls in the pill's window, plus the
     /// Flexible section's tasks. Computed against the active season
     /// scope so the pills move when the user changes seasons.
-    func statsFilterCounts(for season: Season, propertyId: UUID? = nil) -> [TasksStatsFilter: Int] {
+    func statsFilterCounts(for season: Season?, propertyId: UUID? = nil) -> [TasksStatsFilter: Int] {
         let propScope = propertyId ?? self.activePropertyId
         let candidates = MaintenanceViewModel.shared.tasks.filter { task in
             if let scope = propScope, task.propertyId != scope { return false }
@@ -2970,12 +3377,15 @@ final class MaintenanceTabViewModel: ObservableObject {
                 return false
             }
             // Either a season-anchored task or a Flexible task — both
-            // surface in the Tasks v2 feed.
+            // surface in the Tasks v2 feed. Phase 70.A2: season == nil is
+            // the all-upcoming scope, where every active non-routine,
+            // non-bundle-child task counts.
             let timing = task.seasonalTiming?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased() ?? ""
             if timing == "flexible" { return true }
-            return isTask(task, in: season)
+            if let season { return isTask(task, in: season) }
+            return true
         }
 
         var counts: [TasksStatsFilter: Int] = [:]

@@ -8,6 +8,24 @@ This file tracks session-by-session development history. Claude Code reads this 
 
 ---
 
+## Phase 70.A2 — everything-upcoming default + handyman surfacing + per-task action menu (2026-06-01)
+
+Tom: "massive tasks library but only 10-20 ever show up — feels broken. Users must see all tasks relevant to them at the right times, assign/schedule vendors, and let Chez handle them." Diagnosed the root cause as **hidden rails**: ~50-70 DIY-tier tasks live only in the separate Contractor tab mode, routine-linked tasks are hidden, and the feed was scoped to a single season (the full-year view had been removed because routines flooded it). Three additive changes on top of 70.A1's single-source-of-truth feed.
+
+- **Everything-upcoming is the default.** New `MaintenanceTabViewModel.upcomingFeed(monthsAhead:propertyId:)` — next 12 months bucketed by month (cross-year aware via `MonthSection.year`) + a leading **Overdue** group, sections mutually-exclusive so `totalItems` == rendered rows. Routines counted, never expanded (the guardrail that killed the old full-year toggle). `enum FeedScope { allUpcoming; season(_) }` (default allUpcoming) replaces the `activeSeason` state; the **YearRibbon became a filter** with an "All N" chip (navy-fill active) + tap-to-narrow / tap-active-to-clear. Scope-aware copy everywhere (`scopeLabel`, "Upcoming" vs "This season" header, all-upcoming empty card → Browse, `SeasonScopeBanner`/`MonthSubheader` optional season/year). Deep-links land in all-upcoming + highlight. MiniHero now derives from `activeFeed` (Task D — last count divergence closed).
+- **Handyman rail surfaced on Maintenance.** New `HandymanSummaryCard` — ONE batched count-bearing card (`handyman_punch_items`) between Needs-attention and the month feed; whole-card tap → `.handymanModeRequested` (Contractor screen). Not counted in ribbon total (like programs), so count==rows holds. Spring/Fall nudge.
+- **One consistent per-task action menu.** New `TaskActionResolver` (`TaskAction` enum + type-aware `actions(for:)`). `StandaloneTaskRow` + `BundleParentCard` gained a visible "⋯" menu; long-press context menu is resolver-driven too. Single `handleTaskAction(_:for:)` dispatcher → verified handlers (complete / quick-schedule / `FindLocalVendorSheet` / `ContractorDirectoryView`→`convertToVendorManaged` / `delegateTaskToChez` / new `moveTaskToHandymanPunchList` / `convertToPersonal` / `snooze`).
+
+**Build-verified clean** (scheme `Chez`, iPhone 17 sim) + launches to AddressHookView without crash. Interactive functional matrix (assign vendor, Chez, complete→Completed tab, archive→Archived, etc.) is auth-gated → Tom's review loop; every action traced to an existing verified handler.
+
+**Two pre-existing branch breakages fixed to make the branch compile at all** (NOT this work — from WIP commit `c5d52559` + incomplete Field-target removal): `PropertyDetailView.swift:5367` `item.categoryKey`→`item.id`, and a stub for the deleted `HavenFieldCrewTab` (HavenFieldView.swift is still 24k lines of dormant Field code despite CLAUDE.md saying it's removed). Both flagged for cleanup.
+
+**Deferred:** wiring the dead `onDelegate` on `UnifiedTaskCard` + deduping the detail sheet's two Chez paths (secondary surfaces, modest value, real risk). Spawned as a follow-up.
+
+**Not committed** — changes live in worktree `upbeat-swartz-4376f7`; need merge to trunk to reach the running app.
+
+---
+
 ## Phase 70.A1 — Tasks v2 unified view (the visibility fix) (2026-05-24)
 
 The follow-on session to Phase 70 Section B+C. Built the UI rewrite that solves the "30 tasks but I only see 5 rows" complaint. Five commits on `claude/tasks-v2` after the Section B+C work:

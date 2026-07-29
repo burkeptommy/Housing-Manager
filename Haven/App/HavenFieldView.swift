@@ -16,6 +16,18 @@ enum AppExperience: Equatable {
     case field
 }
 
+/// Pre-existing WIP breakage (NOT part of the Tasks-tab work): the Field
+/// target was decommissioned per CLAUDE.md, but HavenFieldView.swift was
+/// not fully removed — the `HavenFieldCrewTab` view was deleted while its
+/// callsite, `RootTab.crew` wiring, and crew-chat data layer all remained,
+/// which broke the Haven target build at HEAD. Minimal stub to restore
+/// compilation; the Field app no longer ships so this surface is dormant.
+/// Flagged for proper Field-code cleanup.
+private struct HavenFieldCrewTab: View {
+    let viewModel: HavenFieldViewModel
+    var body: some View { EmptyView() }
+}
+
 extension Notification.Name {
     /// Posted by the visit-detail view after a successful coordination
     /// action (Confirm / Reschedule / Decline / Ask question) so the

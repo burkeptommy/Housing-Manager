@@ -585,6 +585,27 @@ final class MaintenanceViewModel: ObservableObject {
         }
     }
 
+    /// Phase 70.A2: move a task off the schedule and onto the handyman
+    /// punch list (the Phase 67E/F single-rail invariant). Mirrors
+    /// `MaintenanceTaskDetailSheet`'s add-to-handyman flow: build the punch
+    /// insert via `ServiceLibrary`, create it, archive the source task with
+    /// reason "moved_to_handyman_punch", then refresh BOTH rails so the
+    /// Maintenance feed and the handyman summary card update together.
+    func moveTaskToHandymanPunchList(_ task: MaintenanceTaskDBRow) async {
+        do {
+            let insert = MaintenanceTaskRoutingSupport.buildPunchItemInsert(for: task)
+            _ = try await db.createHandymanPunchItem(insert)
+            try await db.archiveMaintenanceTask(id: task.id, reason: "moved_to_handyman_punch")
+            tasks.removeAll { $0.id == task.id }
+            Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .handymanPunchListChanged, object: nil)
+        } catch {
+            print("[MaintenanceViewModel] moveTaskToHandymanPunchList failed: \(error)")
+            Haptics.error()
+        }
+    }
+
     func completeTask(_ task: MaintenanceTaskDBRow) async {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"

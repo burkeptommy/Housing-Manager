@@ -14,6 +14,9 @@ struct StandaloneTaskRow: View {
     let contractor: ContractorRow?
     var isHighlighted: Bool = false
     var onTap: () -> Void = {}
+    /// Phase 70.A2: the consistent per-task action menu. Empty = no "⋯".
+    var menuActions: [TaskAction] = []
+    var onAction: (TaskAction) -> Void = { _ in }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -35,6 +38,7 @@ struct StandaloneTaskRow: View {
                 }
                 Spacer(minLength: 8)
                 if task.isChezOwned { ChezOwnedPill() }
+                if !menuActions.isEmpty { taskActionMenu }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(HavenColors.textTertiary)
@@ -51,6 +55,29 @@ struct StandaloneTaskRow: View {
             Haptics.selection()
             onTap()
         }
+    }
+
+    /// Phase 70.A2: the visible "⋯" action menu (discoverable, not
+    /// long-press-only). Items come from `TaskActionResolver`; selection
+    /// routes through the single `onAction` closure to the parent's
+    /// dispatcher.
+    @ViewBuilder
+    private var taskActionMenu: some View {
+        Menu {
+            ForEach(menuActions) { action in
+                Button { onAction(action) } label: {
+                    Label(action.title, systemImage: action.systemImage)
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(HavenColors.textTertiary)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Task actions")
     }
 
     @ViewBuilder

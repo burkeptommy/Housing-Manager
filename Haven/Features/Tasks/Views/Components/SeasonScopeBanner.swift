@@ -15,9 +15,10 @@ import SwiftUI
 ///   │ Spring · 27 items · 4 need a decision                ⌕  │
 ///   └─────────────────────────────────────────────────────────┘
 struct SeasonScopeBanner: View {
-    /// Active season scope. Always non-nil post-70.A1.x — full-year
-    /// aggregation was removed (see file-level comment).
-    let season: Season
+    /// Active season scope. Phase 70.A2: nil = "All upcoming" (the new
+    /// default) — the ribbon is a filter, and the banner reads
+    /// "All upcoming · N items" until the user narrows to a season.
+    var season: Season? = nil
 
     /// Total items shown under the active scope (from `SeasonFeed.totalItems`).
     let totalItems: Int
@@ -82,7 +83,7 @@ struct SeasonScopeBanner: View {
     /// Scope summary in homeowner voice. "Spring · 27 items · 4 need a decision"
     /// (singular pluralization handled below).
     private var scopeSummary: String {
-        let head: String = season.displayName
+        let head: String = season?.displayName ?? "All upcoming"
         let totalPart = "\(totalItems) item\(totalItems == 1 ? "" : "s")"
         if actionItems > 0 {
             let actionPart = actionItems == 1
