@@ -33,7 +33,7 @@ struct HouseQuizChezSummaryCard: View {
                     .foregroundStyle(HavenColors.textPrimary)
             }
 
-            Text("You'll get a message in your Chez inbox the moment we have options for you.")
+            Text("A real person on the Chez team is already on it. You'll hear back within one business day, the moment there are options for you.")
                 .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -117,12 +117,12 @@ struct HouseQuizChezSummaryCard: View {
 
     private func rowSubtitle(for intent: ChezQuizRequestSubmitter.QuizIntent) -> String {
         switch intent.category {
-        case .findVendor: return "Finding pros · in progress"
-        case .getQuote: return "Getting quotes · in progress"
-        case .scheduleVisit: return "Scheduling · in progress"
-        case .coordinateTask: return "Coordinating · in progress"
-        case .findHandyman: return "Finding a handyman · in progress"
-        case .general: return "On it · in progress"
+        case .findVendor: return "Sourcing vetted pros now"
+        case .getQuote: return "Gathering quotes now"
+        case .scheduleVisit: return "Coordinating the visit now"
+        case .coordinateTask: return "On it now"
+        case .findHandyman: return "Lining up a handyman now"
+        case .general: return "On it now"
         }
     }
 }

@@ -1029,6 +1029,22 @@ struct DashboardView: View {
     /// Phase 95.2 — Chez ownership hero, monthly summary, weekly tally, Home Coverage Hero, seasonal reminder, this week + upcoming + quick actions.
     @ViewBuilder
     private var dashboardCoverageStack: some View {
+        // Hint competitive response — lead the post-quiz stack with
+        // proof of work. "THIS WEEK WITH CHEZ, N things handled" is the
+        // visceral "done, not told" signal, so it sits above the more
+        // abstract ownership summary. Self-hides when there's been no
+        // Chez activity (DIY-default + brand-new users see nothing), so
+        // Day 0 stays clean.
+        if viewModel.chezActivityWeeklyTally.hasAnything {
+            ChezActivityCard(
+                tally: viewModel.chezActivityWeeklyTally,
+                recentItems: viewModel.recentChezActivity
+            ) {
+                Haptics.light()
+                navigationPath.append("chez_activity")
+            }
+        }
+
         // Phase 84 — Chez ownership hero card. Surfaces
         // "what % of your house Chez is running" and
         // routes to the new What Chez Handles page where
@@ -1072,21 +1088,9 @@ struct DashboardView: View {
         // Tom's call: the Inbox → Chez sub-tab is the canonical chat
         // surface, and K1's auto-route-after-submit lands users there
         // directly without needing a Dashboard preview card. The
-        // ChezOwnershipHeroCard (above) + ChezActivityCard (below) still
-        // cover the "what's Chez doing" surface from different angles.
-
-        // Phase 85 — "This week with Chez" digest. Renders
-        // only when there's been Chez activity in the
-        // last 7 days; DIY-default users see nothing.
-        if viewModel.chezActivityWeeklyTally.hasAnything {
-            ChezActivityCard(
-                tally: viewModel.chezActivityWeeklyTally,
-                recentItems: viewModel.recentChezActivity
-            ) {
-                Haptics.light()
-                navigationPath.append("chez_activity")
-            }
-        }
+        // ChezOwnershipHeroCard + ChezActivityCard (now lifted to the top
+        // of this stack) still cover the "what's Chez doing" surface from
+        // different angles.
 
         if viewModel.hasCompletedAnyQuiz {
             HomeCoverageHero(

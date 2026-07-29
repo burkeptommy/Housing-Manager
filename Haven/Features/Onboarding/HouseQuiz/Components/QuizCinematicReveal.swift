@@ -4,8 +4,9 @@ import SwiftUI
 /// navy-on-cream. The protection value animates from $0 to its final
 /// figure over 2.5 seconds via SwiftUI's
 /// `.contentTransition(.numericText(value:))`. A secondary "over N years,
-/// on schedule" line fades in after the number settles, then a chevron
-/// prompts the user to scroll into the summary.
+/// on schedule" line fades in after the number settles, followed by a
+/// Chez attribution line so the win is clearly credited to Chez (not a
+/// checklist), then a chevron prompts the user to scroll into the summary.
 ///
 /// Reference anchors:
 /// - Opendoor offer reveal: large number, white space, anticipation
@@ -24,6 +25,7 @@ struct QuizCinematicReveal: View {
     @State private var displayValue: Double = 0
     @State private var showSubtitle: Bool = false
     @State private var showFooter: Bool = false
+    @State private var showChezAttribution: Bool = false
     @State private var showChevron: Bool = false
     @State private var hasStarted: Bool = false
 
@@ -46,6 +48,15 @@ struct QuizCinematicReveal: View {
                 .multilineTextAlignment(.center)
                 .opacity(showFooter ? 1.0 : 0.0)
                 .animation(.easeIn(duration: 0.7), value: showFooter)
+
+            Text("While you live your life, Chez runs your home.")
+                .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.navy700)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, HavenTheme.pageMargin)
+                .padding(.top, HavenTheme.spacing8)
+                .opacity(showChezAttribution ? 1.0 : 0.0)
+                .animation(.easeIn(duration: 0.7), value: showChezAttribution)
 
             Spacer(minLength: 40)
 
@@ -136,9 +147,17 @@ struct QuizCinematicReveal: View {
             showFooter = true
         }
 
-        // Phase 4 (4.0s): chevron prompt appears to invite the scroll
+        // Phase 3.5 (3.8s): the Chez attribution line lands as a
+        // deliberate final beat. The reveal answers "who is protecting
+        // it?" with Chez, the differentiator versus apps that stop at a
+        // list.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.8) {
+            showChezAttribution = true
+        }
+
+        // Phase 4 (4.5s): chevron prompt appears to invite the scroll
         // down into the summary cards.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) {
             withAnimation(.easeIn(duration: 0.4)) {
                 showChevron = true
             }
